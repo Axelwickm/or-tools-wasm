@@ -266,6 +266,9 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest && npm --version
+
       - name: Download package artifact
         uses: actions/download-artifact@v4
         with:
@@ -273,7 +276,7 @@ jobs:
           path: build/javascript/lib
 
       - name: Publish to npm
-        run: npm publish build/javascript/lib/*.tgz --access public
+        run: npm publish build/javascript/lib/*.tgz --access public --provenance
 
       - name: Create GitHub release
         env:
