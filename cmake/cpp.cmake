@@ -519,11 +519,10 @@ if(BUILD_MATH_OPT)
   add_dependencies(${PROJECT_NAME} ${PROJECT_NAMESPACE}::math_opt_proto)
 endif()
 
-foreach(SUBPROJECT IN ITEMS
+set(ORTOOLS_CPP_SUBPROJECTS
  algorithms
  base
  init
- bop
  glop
  graph
  ${GLPK_DIR}
@@ -531,13 +530,22 @@ foreach(SUBPROJECT IN ITEMS
  ${GUROBI_DIR}
  ${PDLP_DIR}
  sat
- xpress
  lp_data
  packing
  scheduling
  set_cover
  util
  port)
+
+if(USE_BOP)
+  list(APPEND ORTOOLS_CPP_SUBPROJECTS bop)
+endif()
+
+if(USE_XPRESS)
+  list(APPEND ORTOOLS_CPP_SUBPROJECTS xpress)
+endif()
+
+foreach(SUBPROJECT IN LISTS ORTOOLS_CPP_SUBPROJECTS)
   add_subdirectory(ortools/${SUBPROJECT})
   #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_${SUBPROJECT})
   target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}_${SUBPROJECT}>)

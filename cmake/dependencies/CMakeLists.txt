@@ -119,22 +119,31 @@ endif()
 if(BUILD_absl)
   message(CHECK_START "Fetching Abseil-cpp")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
+  FetchContent_Declare(
+    absl
+    GIT_REPOSITORY "https://github.com/abseil/abseil-cpp.git"
+    GIT_TAG "20250814.1"
+    GIT_SHALLOW TRUE
+    UPDATE_COMMAND git reset --hard
+    PATCH_COMMAND git apply --ignore-whitespace
+    "${CMAKE_CURRENT_LIST_DIR}/../../patches/abseil-cpp-20250814.1.patch"
+    OVERRIDE_FIND_PACKAGE
+    SYSTEM
+  )
   set(ABSL_USE_SYSTEM_INCLUDES ON)
   # We want Abseil to declare what C++ standard it was compiled with.
   set(ABSL_PROPAGATE_CXX_STD ON)
+  if(OR_TOOLS_BUILD_TESTING)
+    set(ABSL_BUILD_TEST_HELPERS ON)
+  else()
+    set(ABSL_BUILD_TEST_HELPERS OFF)
+  endif()
+  set(ABSL_USE_EXTERNAL_GOOGLETEST ON)
+  set(ABSL_FIND_GOOGLETEST OFF)
   # We want Abseil to keep the INSTALL rules enabled, even though it is a
   # subproject. Otherwise the install rules in this project break.
   set(ABSL_ENABLE_INSTALL ON)
   set(ABSL_BUILD_TESTING OFF)
-  FetchContent_Declare(
-    absl
-    GIT_REPOSITORY "https://github.com/abseil/abseil-cpp.git"
-    GIT_TAG "20250512.0"
-    GIT_SHALLOW TRUE
-    PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/abseil-cpp-20250512.0.patch"
-    OVERRIDE_FIND_PACKAGE
-  )
   FetchContent_MakeAvailable(absl)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
@@ -146,20 +155,23 @@ endif()
 if(BUILD_Protobuf)
   message(CHECK_START "Fetching Protobuf")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
+  FetchContent_Declare(
+    Protobuf
+    GIT_REPOSITORY "https://github.com/protocolbuffers/protobuf.git"
+    GIT_TAG "v33.1"
+    GIT_SHALLOW TRUE
+    GIT_SUBMODULES ""
+    UPDATE_COMMAND git reset --hard
+    PATCH_COMMAND git apply --ignore-whitespace
+    "${CMAKE_CURRENT_LIST_DIR}/../../patches/protobuf-v33.1.patch"
+    OVERRIDE_FIND_PACKAGE # Make package visible for "protobuf-matchers" below
+    SYSTEM
+  )
   set(protobuf_BUILD_TESTS OFF)
   set(protobuf_BUILD_SHARED_LIBS ON)
   set(protobuf_BUILD_EXPORT OFF)
   set(protobuf_MSVC_STATIC_RUNTIME OFF)
   #set(protobuf_BUILD_LIBUPB ON)
-  FetchContent_Declare(
-    Protobuf
-    GIT_REPOSITORY "https://github.com/protocolbuffers/protobuf.git"
-    GIT_TAG "v31.1"
-    GIT_SHALLOW TRUE
-    GIT_SUBMODULES ""
-    PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/protobuf-v31.1.patch"
-  )
   FetchContent_MakeAvailable(Protobuf)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
@@ -171,15 +183,17 @@ endif()
 if(BUILD_re2)
   message(CHECK_START "Fetching re2")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
-  set(RE2_BUILD_TESTING OFF)
   FetchContent_Declare(
     re2
     GIT_REPOSITORY "https://github.com/google/re2.git"
-    GIT_TAG "2024-07-02"
+    GIT_TAG "2025-08-12"
     GIT_SHALLOW TRUE
+    UPDATE_COMMAND git reset --hard
     PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/re2-2024-07-02.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/../../patches/re2-2025-08-12.patch"
+    SYSTEM
   )
+  set(RE2_BUILD_TESTING OFF)
   FetchContent_MakeAvailable(re2)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
@@ -300,16 +314,16 @@ endif()
 if(BUILD_HIGHS)
   message(CHECK_START "Fetching HiGHS")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
-  set(CI OFF) # disable CI tests
-  set(BUILD_EXAMPLES OFF)
   FetchContent_Declare(
     highs
     GIT_REPOSITORY "https://github.com/ERGO-Code/HiGHS.git"
-    GIT_TAG        "v1.11.0"
+    GIT_TAG        "v1.12.0"
     GIT_SHALLOW TRUE
-    PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/highs-v1.11.0.patch"
+    UPDATE_COMMAND git reset --hard
+    SYSTEM
   )
+  set(CI OFF) # disable CI tests
+  set(BUILD_EXAMPLES OFF)
   FetchContent_MakeAvailable(highs)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
@@ -348,10 +362,11 @@ if(BUILD_soplex)
   FetchContent_Declare(
     soplex
     GIT_REPOSITORY "https://github.com/scipopt/soplex.git"
-    GIT_TAG        "release-713"
+    GIT_TAG        "v8.0.0"
     GIT_SHALLOW TRUE
     PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/soplex-v7.1.3.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/../../patches/soplex-v8.0.0.patch"
+    SYSTEM
   )
   set(SHARED ON CACHE BOOL "Soplex param" FORCE)
   set(ZLIB ON CACHE BOOL "Soplex param" FORCE)
@@ -377,10 +392,11 @@ if(BUILD_SCIP)
   FetchContent_Declare(
     scip
     GIT_REPOSITORY "https://github.com/scipopt/scip.git"
-    GIT_TAG        "v922"
+    GIT_TAG        "v10.0.0"
     GIT_SHALLOW TRUE
     PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/scip-v922.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/../../patches/scip-v10.0.0.patch"
+    SYSTEM
   )
   set(SHARED ON CACHE BOOL "Scip param" FORCE)
   set(ZLIB ON CACHE BOOL "Scip param" FORCE)
@@ -540,22 +556,6 @@ if(BUILD_benchmark)
   set(BENCHMARK_ENABLE_WERROR OFF)
   set(BENCHMARK_ENABLE_INSTALL OFF)
   FetchContent_MakeAvailable(benchmark)
-  list(POP_BACK CMAKE_MESSAGE_INDENT)
-  message(CHECK_PASS "fetched")
-endif()
-
-if(BUILD_fuzztest)
-  message(CHECK_START "Fetching fuzztest")
-  list(APPEND CMAKE_MESSAGE_INDENT "  ")
-  FetchContent_Declare(
-    fuzztest
-    GIT_REPOSITORY https://github.com/google/fuzztest.git
-    GIT_TAG 2025-02-14
-    GIT_SHALLOW TRUE
-    PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/fuzztest-2025-02-14.patch"
-  )
-  FetchContent_MakeAvailable(fuzztest)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
 endif()

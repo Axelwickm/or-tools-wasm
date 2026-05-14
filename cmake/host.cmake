@@ -37,6 +37,9 @@ add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/host_tools
   COMMAND ${CMAKE_COMMAND} -S. -Bbuild -DCMAKE_BUILD_TYPE=Release -DCMAKE_RUNTIME_OUTPUT_DIRECTORY:PATH=${CMAKE_CURRENT_BINARY_DIR}/host_tools/bin
   COMMAND ${CMAKE_COMMAND} --build build --config Release -v
+  DEPENDS
+    ${CMAKE_CURRENT_BINARY_DIR}/host_tools/CMakeLists.txt
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/host.CMakeLists.txt
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/host_tools
 )
 

@@ -67,6 +67,7 @@ export_meta
 ortools/bazel-*
 examples/bazel-*
 bazel-*
+user.bazelrc
 
 .vagrant/
 

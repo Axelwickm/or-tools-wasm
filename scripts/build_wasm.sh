@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${CMAKE_BUILD_PARALLEL_LEVEL:-}" ]]; then
+  build_parallel_level="${CMAKE_BUILD_PARALLEL_LEVEL}"
+elif [[ -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+  build_parallel_level=4
+else
+  if command -v nproc >/dev/null 2>&1; then
+    host_cores="$(nproc)"
+  elif command -v sysctl >/dev/null 2>&1; then
+    host_cores="$(sysctl -n hw.ncpu)"
+  else
+    host_cores=2
+  fi
+  build_parallel_level="$((host_cores > 1 ? host_cores - 1 : 1))"
+fi
+
+scripts/ensure-emsdk.sh
+source ./emsdk/emsdk_env.sh
+
+cmake -S . -B build \
+  -DCMAKE_TOOLCHAIN_FILE="${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
+  ${CMAKE_ARGS:-}
+
+cmake --build build --target cp_sat_runtime_site --parallel "${build_parallel_level}"

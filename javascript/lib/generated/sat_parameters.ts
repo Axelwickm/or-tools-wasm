@@ -47,39 +47,18 @@ export enum SatParameters_ConflictMinimizationAlgorithm {
   NONE = 0,
   SIMPLE = 1,
   RECURSIVE = 2,
-  EXPERIMENTAL = 3,
 }
-export type SatParameters_ConflictMinimizationAlgorithm_Name = 'NONE' | 'SIMPLE' | 'RECURSIVE' | 'EXPERIMENTAL';
+export type SatParameters_ConflictMinimizationAlgorithm_Name = 'NONE' | 'SIMPLE' | 'RECURSIVE';
 
 /**
  * Whether to expoit the binary clause to minimize learned clauses further.
  */
 export enum SatParameters_BinaryMinizationAlgorithm {
   NO_BINARY_MINIMIZATION = 0,
-  BINARY_MINIMIZATION_FIRST = 1,
-  BINARY_MINIMIZATION_FIRST_WITH_TRANSITIVE_REDUCTION = 4,
-  BINARY_MINIMIZATION_WITH_REACHABILITY = 2,
-  EXPERIMENTAL_BINARY_MINIMIZATION = 3,
+  BINARY_MINIMIZATION_FROM_UIP = 1,
+  BINARY_MINIMIZATION_FROM_UIP_AND_DECISIONS = 5,
 }
-export type SatParameters_BinaryMinizationAlgorithm_Name = 'NO_BINARY_MINIMIZATION' | 'BINARY_MINIMIZATION_FIRST' | 'BINARY_MINIMIZATION_FIRST_WITH_TRANSITIVE_REDUCTION' | 'BINARY_MINIMIZATION_WITH_REACHABILITY' | 'EXPERIMENTAL_BINARY_MINIMIZATION';
-
-/**
- * Each time a clause activity is bumped, the clause has a chance to be
- * protected during the next cleanup phase. Note that clauses used as a reason
- * are always protected.
- */
-export enum SatParameters_ClauseProtection {
-  PROTECTION_NONE = 0,
-  /**
-   * No protection.
-   */
-  PROTECTION_ALWAYS = 1,
-  /**
-   * Protect all clauses whose activity is bumped.
-   */
-  PROTECTION_LBD = 2,
-}
-export type SatParameters_ClauseProtection_Name = 'PROTECTION_NONE' | 'PROTECTION_ALWAYS' | 'PROTECTION_LBD';
+export type SatParameters_BinaryMinizationAlgorithm_Name = 'NO_BINARY_MINIMIZATION' | 'BINARY_MINIMIZATION_FROM_UIP' | 'BINARY_MINIMIZATION_FROM_UIP_AND_DECISIONS';
 
 /**
  * The clauses that will be kept during a cleanup are the ones that come
@@ -284,7 +263,7 @@ export type SatParameters_FPRoundingMethod_Name = 'NEAREST_INTEGER' | 'LOCK_BASE
 /**
  * Contains the definitions for all the sat algorithm parameters and their
  * default values.
- * NEXT TAG: 325
+ * NEXT TAG: 356
  */
 export type SatParameters = {
   /**
@@ -382,7 +361,7 @@ export type SatParameters = {
    */
   minimizationAlgorithm?: SatParameters_ConflictMinimizationAlgorithm | SatParameters_ConflictMinimizationAlgorithm_Name;
   /**
-   * @default BINARY_MINIMIZATION_FIRST
+   * @default BINARY_MINIMIZATION_FROM_UIP_AND_DECISIONS
    */
   binaryMinimizationAlgorithm?: SatParameters_BinaryMinizationAlgorithm | SatParameters_BinaryMinizationAlgorithm_Name;
   /**
@@ -395,6 +374,58 @@ export type SatParameters = {
    */
   subsumptionDuringConflictAnalysis?: boolean;
   /**
+   * It is possible that "intermediate" clauses during conflict resolution
+   * subsumes some of the clauses that propagated. This is quite cheap to detect
+   * and result in more subsumption/strengthening of clauses.
+   *
+   * @default true
+   */
+  extraSubsumptionDuringConflictAnalysis?: boolean;
+  /**
+   * Try even more subsumption options during conflict analysis.
+   *
+   * @default true
+   */
+  decisionSubsumptionDuringConflictAnalysis?: boolean;
+  /**
+   * If >=0, each time we have a conflict, we try to subsume the last n learned
+   * clause with it.
+   *
+   * @default 4
+   */
+  eagerlySubsumeLastNConflicts?: number;
+  /**
+   * If we remove clause that we now are "implied" by others. Note that this
+   * might not always be good as we might loose some propagation power.
+   *
+   * @default true
+   */
+  subsumeDuringVivification?: boolean;
+  /**
+   * If true, try to backtrack as little as possible on conflict and re-imply
+   * the clauses later.
+   * This means we discard less propagation than traditional backjumping, but
+   * requites additional bookkeeping to handle reimplication.
+   * See: https://doi.org/10.1007/978-3-319-94144-8_7
+   *
+   * @default false
+   */
+  useChronologicalBacktracking?: boolean;
+  /**
+   * If chronological backtracking is enabled, this is the maximum number of
+   * levels we will backjump over, otherwise we will backtrack.
+   *
+   * @default 50
+   */
+  maxBackjumpLevels?: number;
+  /**
+   * If chronological backtracking is enabled, this is the minimum number of
+   * conflicts before we will consider backjumping.
+   *
+   * @default 1000
+   */
+  chronologicalBacktrackMinConflicts?: number;
+  /**
    * ==========================================================================
    * Clause database management
    * ==========================================================================
@@ -403,6 +434,12 @@ export type SatParameters = {
    * @default 10000
    */
   clauseCleanupPeriod?: number;
+  /**
+   * Increase clause_cleanup_period by this amount after each cleanup.
+   *
+   * @default 0
+   */
+  clauseCleanupPeriodIncrement?: number;
   /**
    * During a cleanup, we will always keep that number of "deletable" clauses.
    * Note that this doesn't include the "protected" clauses.
@@ -419,16 +456,33 @@ export type SatParameters = {
    */
   clauseCleanupRatio?: number;
   /**
-   * @default PROTECTION_NONE
-   */
-  clauseCleanupProtection?: SatParameters_ClauseProtection | SatParameters_ClauseProtection_Name;
-  /**
    * All the clauses with a LBD (literal blocks distance) lower or equal to this
    * parameters will always be kept.
+   * Note that the LBD of a clause that just propagated is 1 + number of
+   * different decision levels of its literals. So that the "classic" LBD of a
+   * learned conflict is the same as its LBD when we backjump and then propagate
+   * it.
    *
    * @default 5
    */
   clauseCleanupLbdBound?: number;
+  /**
+   * All the clause with a LBD lower or equal to this will be kept except if
+   * its activity hasn't been bumped in the last 32 cleanup phase. Note that
+   * this has no effect if it is <= clause_cleanup_lbd_bound.
+   *
+   * @default 0
+   */
+  clauseCleanupLbdTier1?: number;
+  /**
+   * All the clause with a LBD lower or equal to this will be kept except if its
+   * activity hasn't been bumped since the previous cleanup phase. Note that
+   * this has no effect if it is <= clause_cleanup_lbd_bound or <=
+   * clause_cleanup_lbd_tier1.
+   *
+   * @default 0
+   */
+  clauseCleanupLbdTier2?: number;
   /**
    * @default CLAUSE_ACTIVITY
    */
@@ -697,6 +751,11 @@ export type SatParameters = {
    */
   logToResponse?: boolean;
   /**
+   * Experimental.
+   * This is an old experiment, it might cause crashes in multi-thread and you
+   * should double check the solver result. It can still be used if you only
+   * care about feasible solutions (these are checked) and it gives good result
+   * on your problem. We might revive it at some point.
    * Whether to use pseudo-Boolean resolution to analyze a conflict. Note that
    * this option only make sense if your problem is modelized using
    * pseudo-Boolean constraints. If you only have clauses, this shouldn't change
@@ -819,6 +878,16 @@ export type SatParameters = {
    */
   cpModelUseSatPresolve?: boolean;
   /**
+   * If we try to load at most ones and exactly ones constraints when running
+   * the pure SAT presolve. Or if we just ignore them.
+   * If one detects at_most_one via merge_at_most_one_work_limit or exactly one
+   * with find_clauses_that_are_exactly_one, it might be good to also set this
+   * to true.
+   *
+   * @default false
+   */
+  loadAtMostOnesInSatPresolve?: boolean;
+  /**
    * If cp_model_presolve is true and there is a large proportion of fixed
    * variable after the first model copy, remap all the model to a dense set of
    * variable before the full presolve even starts. This should help for LNS on
@@ -866,6 +935,12 @@ export type SatParameters = {
    * @default true
    */
   expandReservoirConstraints?: boolean;
+  /**
+   * Max domain size for expanding linear2 constraints (ax + by ==/!= c).
+   *
+   * @default 8
+   */
+  maxDomainSizeForLinear2Expansion?: number;
   /**
    * Mainly useful for testing.
    * If this and expand_reservoir_constraints is true, we use a different
@@ -987,6 +1062,16 @@ export type SatParameters = {
    */
   findBigLinearOverlap?: boolean;
   /**
+   * By propagating (or just using binary clauses), one can detect that all
+   * literal of a clause are actually in at most one relationship. Thus this
+   * constraint can be promoted to an exactly one constraints. This should help
+   * as it convey more structure. Note that this is expensive, so we have a
+   * deterministic limit in place.
+   *
+   * @default true
+   */
+  findClausesThatAreExactlyOne?: boolean;
+  /**
    * ==========================================================================
    * Inprocessing
    * ==========================================================================
@@ -1031,6 +1116,22 @@ export type SatParameters = {
    * @default false
    */
   inprocessingMinimizationUseAllOrderings?: boolean;
+  /**
+   * Whether we use the algorithm described in "Clausal Congruence closure",
+   * Armin Biere, Katalin Fazekas, Mathias Fleury, Nils Froleyks, 2024.
+   * Note that we only have a basic version currently.
+   *
+   * @default true
+   */
+  inprocessingUseCongruenceClosure?: boolean;
+  /**
+   * Whether we use the SAT sweeping algorithm described in "Clausal Equivalence
+   * Sweeping", Armin Biere, Katalin Fazekas, Mathias Fleury, Nils Froleyks,
+   * 2025.
+   *
+   * @default false
+   */
+  inprocessingUseSatSweeping?: boolean;
   /**
    * ==========================================================================
    * Multithread
@@ -1141,6 +1242,15 @@ export type SatParameters = {
    */
   shareLevelZeroBounds?: boolean;
   /**
+   * Allows sharing of the bounds on linear2 discovered at level 0. This is
+   * mainly interesting on scheduling type of problems when we branch on
+   * precedences.
+   * Warning: This currently non-deterministic.
+   *
+   * @default false
+   */
+  shareLinear2Bounds?: boolean;
+  /**
    * Allows sharing of new learned binary clause between workers.
    *
    * @default true
@@ -1150,7 +1260,7 @@ export type SatParameters = {
    * Allows sharing of short glue clauses between workers.
    * Implicitly disabled if share_binary_clauses is false.
    *
-   * @default false
+   * @default true
    */
   shareGlueClauses?: boolean;
   /**
@@ -1166,6 +1276,75 @@ export type SatParameters = {
    * @default 1
    */
   shareGlueClausesDtime?: number;
+  /**
+   * ==========================================================================
+   * Proofs
+   * ==========================================================================
+   * If true, inferred clauses are checked with an LRAT checker as they are
+   * learned, in presolve (reduced to trivial simplifications if
+   * cp_model_presolve is false), and in each worker. As of December 2025, this
+   * only works with pure SAT problems, with
+   * - cp_model_presolve = false,
+   * - linearization_level <= 1,
+   * - symmetry_level <= 1.
+   *
+   * @default false
+   */
+  checkLratProof?: boolean;
+  /**
+   * If true, and if output_lrat_proof is true and the problem is UNSAT, check
+   * that the merged proof file is valid, i.e., that clause sharing between
+   * workers is correct. This checks each inferred clause, so you might want to
+   * disable check_lrat_proof to avoid redundant work. As of November 2025, this
+   * only works for pure SAT problems, with num_workers = 1.
+   *
+   * @default false
+   */
+  checkMergedLratProof?: boolean;
+  /**
+   * If true, an LRAT proof that all the clauses inferred by the solver are
+   * valid is output to several files (one for presolve -- reduced to trivial
+   * simplifications if cp_model_presolve is false, one per worker, and one for
+   * the merged proof). As of December 2025, this only works for pure SAT
+   * problems, with
+   * - cp_model_presolve = false,
+   * - linearization_level <= 1,
+   * - symmetry_level <= 1.
+   *
+   * @default false
+   */
+  outputLratProof?: boolean;
+  /**
+   * If true, and if the problem is UNSAT, a DRAT proof of this UNSAT property
+   * is checked after the solver has finished. As of November 2025, this only
+   * works for pure SAT problems, with
+   * - num_workers = 1,
+   * - cp_model_presolve = false,
+   * - linearization_level <= 1,
+   * - symmetry_level <= 1.
+   *
+   * @default false
+   */
+  checkDratProof?: boolean;
+  /**
+   * If true, a DRAT proof that all the clauses inferred by the solver are valid
+   * is output to a file. As of December 2025, this only works for pure SAT
+   * problems, with
+   * - num_workers = 1,
+   * - cp_model_presolve = false,
+   * - linearization_level <= 1,
+   * - symmetry_level <= 1.
+   *
+   * @default false
+   */
+  outputDratProof?: boolean;
+  /**
+   * The maximum time allowed to check the DRAT proof (this can take more time
+   * than the solve itself). Only used if check_drat_proof is true.
+   *
+   * @default inf
+   */
+  maxDratTimeInSeconds?: number;
   /**
    * ==========================================================================
    * Debugging parameters
@@ -1196,6 +1375,12 @@ export type SatParameters = {
    * @default false
    */
   debugCrashIfPresolveBreaksHint?: boolean;
+  /**
+   * Crash if the LRAT UNSAT proof is invalid.
+   *
+   * @default false
+   */
+  debugCrashIfLratCheckFails?: boolean;
   /**
    * ==========================================================================
    * Max-sat parameters
@@ -1276,6 +1461,14 @@ export type SatParameters = {
    * @default true
    */
   usePrecedencesInDisjunctiveConstraint?: boolean;
+  /**
+   * At root level, we might compute the transitive closure of "precedences"
+   * relations so that we can exploit that in scheduling problems. Setting this
+   * to zero disable the feature.
+   *
+   * @default 1000000
+   */
+  transitivePrecedencesWorkLimit?: number;
   /**
    * Create one literal for each disjunction of two pairs of tasks. This slows
    * down the solve time, but improves the lower bound of the objective in the
@@ -1773,7 +1966,7 @@ export type SatParameters = {
    * Specifying a negative number uses a heuristic to select an appropriate
    * number of shared tree workeres based on the total number of workers.
    *
-   * @default 0
+   * @default -1
    */
   sharedTreeNumWorkers?: number;
   /**
@@ -1835,12 +2028,22 @@ export type SatParameters = {
    */
   sharedTreeBalanceTolerance?: number;
   /**
-   * Whether we enumerate all solutions of a problem without objective. Note
-   * that setting this to true automatically disable some presolve reduction
-   * that can remove feasible solution. That is it has the same effect as
-   * setting keep_all_feasible_solutions_in_presolve.
-   * TODO(user): Do not do that and let the user choose what behavior is best by
-   * setting keep_all_feasible_solutions_in_presolve ?
+   * How much dtime a worker will wait between proposing splits.
+   * This limits the contention in splitting the shared tree, and also reduces
+   * the number of too-easy subtrees that are generates.
+   *
+   * @default 0
+   */
+  sharedTreeSplitMinDtime?: number;
+  /**
+   * Whether we enumerate all solutions of a problem without objective.
+   * WARNING:
+   * - This can be used with num_workers > 1 but then each solutions can be
+   * found more than once, so it is up to the client to deduplicate them.
+   * - If keep_all_feasible_solutions_in_presolve is unset, we will set it to
+   * true as otherwise, many feasible solution can just be removed by the
+   * presolve. It is still possible to manually set this to false if one only
+   * wants to enumerate all solutions of the presolved model.
    *
    * @default false
    */
@@ -1940,12 +2143,29 @@ export type SatParameters = {
   useLnsOnly?: boolean;
   /**
    * Size of the top-n different solutions kept by the solver.
-   * This parameter must be > 0.
-   * Currently this only impact the "base" solution chosen for a LNS fragment.
+   * This parameter must be > 0. Currently, having this larger than one mainly
+   * impact the "base" solution chosen for a LNS/LS fragment.
    *
    * @default 3
    */
   solutionPoolSize?: number;
+  /**
+   * If solution_pool_size is <= this, we will use DP to keep a "diverse" set
+   * of solutions (the one further apart via hamming distance) in the pool.
+   * Setting this to large value might be slow, especially if your solution are
+   * large.
+   *
+   * @default 10
+   */
+  solutionPoolDiversityLimit?: number;
+  /**
+   * In order to not get stuck in local optima, when this is non-zero, we try to
+   * also work on "older" solutions with a worse objective value so we get a
+   * chance to follow a different LS/LNS trajectory.
+   *
+   * @default 1
+   */
+  alternativePoolSize?: number;
   /**
    * Turns on relaxation induced neighborhood generator.
    *
@@ -2381,6 +2601,20 @@ export type SatParameters = {
    * @default false
    */
   detectLinearizedProduct?: boolean;
+  /**
+   * This should be better on integer problems.
+   * But it is still work in progress.
+   *
+   * @default false
+   */
+  useNewIntegerConflictResolution?: boolean;
+  /**
+   * If true, and during integer conflict resolution (icr) the 1-UIP is an
+   * integer literal for which we do not have an associated Boolean. Create one.
+   *
+   * @default true
+   */
+  create1uipBooleanDuringIcr?: boolean;
   /**
    * ==========================================================================
    * MIP -> CP-SAT (i.e. IP with integer coeff) conversion parameters that are
