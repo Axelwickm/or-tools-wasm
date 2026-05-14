@@ -10,16 +10,6 @@ Used in [PragmaPlanner.com](https://pragmaplanner.com/?utm_source=or-tools-wasm&
 [GitHub](https://github.com/Axelwickm/or-tools-wasm)
 [npm](https://www.npmjs.com/package/or-tools-wasm)
 
-## Install
-
-```sh
-npm install or-tools-wasm
-```
-
-```ts
-import { CpSat } from 'or-tools-wasm';
-```
-
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Vite 7 dev Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Chromium&name=Vite%207%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Vite 7 dev Firefox](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Firefox&name=Vite%207%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
@@ -32,6 +22,16 @@ import { CpSat } from 'or-tools-wasm';
 [![Rollup 4 static Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Chromium&name=Rollup%204%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Rollup 4 static Firefox](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Firefox&name=Rollup%204%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Deno](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Deno&name=Deno%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+
+## Install
+
+```sh
+npm install or-tools-wasm
+```
+
+```ts
+import { CpSat } from 'or-tools-wasm';
+```
 
 Currently supported solvers: CP-SAT.
 
