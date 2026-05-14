@@ -1,10 +1,24 @@
-# or-tools-wasm
+# or-tools-wasm - solve complex constraint problems in browser
 
-Unofficial JavaScript and WebAssembly bindings for the OR-Tools CP-SAT solver.
+Solve complex models directly in the browser with Google OR-Tools CP-SAT
+running as multithreaded WebAssembly.
+
+## [Try Online](https://axelwickman.com/or-tools-wasm)
+
+Used in [PragmaPlanner.com](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in).
 
 [GitHub](https://github.com/Axelwickm/or-tools-wasm)
 [npm](https://www.npmjs.com/package/or-tools-wasm)
-[Try Online](https://axelwickman.com/or-tools-wasm)
+
+## Install
+
+```sh
+npm install or-tools-wasm
+```
+
+```ts
+import { CpSat } from 'or-tools-wasm';
+```
 
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Vite 7 dev Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Chromium&name=Vite%207%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
@@ -28,13 +42,6 @@ Verified with:
 - Rollup 4 static browser builds
 - Deno runtime solves
 
-This package builds a browser-oriented CP-SAT runtime from Google OR-Tools and
-wraps it with a TypeScript API, worker bridge, generated SAT parameter types,
-and Vite-powered demos.
-
-The upstream solver source is vendored from
-[google/or-tools](https://github.com/google/or-tools).
-
 ## What is included
 
 - A CP-SAT WebAssembly runtime built with Emscripten pthread support.
@@ -45,82 +52,9 @@ The upstream solver source is vendored from
 - Demo pages for Magic Square, Sports Scheduling, Steel Mill Slab, and schema
   inspection.
 
-## Install
-
-```sh
-npm install or-tools-wasm
-```
-
-Then import it normally:
-
-```ts
-import { CpSat } from 'or-tools-wasm';
-```
-
 This flow is verified with Vite, Webpack, and Rollup. The worker script and
 WebAssembly files are emitted automatically from the package import, with no
 manual copying into `public/` or `static/` required.
-
-## Vite configuration
-
-For Vite apps, keep `or-tools-wasm` out of dependency optimization so Vite
-handles the worker and WebAssembly URLs through its normal asset pipeline.
-`protobufjs` is CommonJS, so include it in dependency optimization. The worker
-runtime also needs ES module worker output:
-
-```ts
-// vite.config.ts
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-  optimizeDeps: {
-    include: ['protobufjs'],
-    exclude: ['or-tools-wasm'],
-  },
-  worker: {
-    format: 'es',
-  },
-});
-```
-
-## Rollup configuration
-
-Rollup core does not bundle module workers or emit `new URL(...,
-import.meta.url)` assets by itself. The verified fixture uses Rollup's standard
-plugin surface for those features:
-
-```js
-// rollup.config.mjs
-import { nodeResolve } from '@rollup/plugin-node-resolve';
-import OMT from '@surma/rollup-plugin-off-main-thread';
-import { importMetaAssets } from '@web/rollup-plugin-import-meta-assets';
-
-function moduleRelativeFileUrls() {
-  return {
-    name: 'module-relative-file-urls',
-    resolveFileUrl({ fileName }) {
-      return `new URL(${JSON.stringify(fileName)}, import.meta.url).href`;
-    },
-  };
-}
-
-export default {
-  input: 'src/main.js',
-  output: {
-    dir: 'dist',
-    format: 'es',
-  },
-  plugins: [
-    nodeResolve({ browser: true }),
-    moduleRelativeFileUrls(),
-    OMT(),
-    importMetaAssets(),
-  ],
-};
-```
-
-Other modern bundlers may also work if they support module workers and
-WebAssembly asset emission, but they are not yet officially verified.
 
 ## Usage
 
@@ -161,43 +95,6 @@ const result = await CpSat.solve(modelBytes, {
 console.log(result.response);
 ```
 
-## Threading model
-
-The WebAssembly runtime is built with Emscripten pthread support. When the
-runtime starts, Emscripten creates a pthread worker pool sized from
-`navigator.hardwareConcurrency`. This pool is separate from CP-SAT's own search
-worker setting.
-
-`SatParameters.numSearchWorkers` controls how many CP-SAT search workers the
-solver should use for a solve. It does not change how many Emscripten pthread
-workers are created when the WebAssembly runtime is initialized.
-
-By default, `CpSat.solve` runs through the package's worker bridge. The bridge
-loads the CP-SAT runtime in a dedicated JavaScript worker, so the browser's main
-thread remains available for rendering, input, progress UI, and cancellation.
-If the worker bridge is disabled, solving runs directly on the main thread. The
-solver still works, but the GUI can freeze until CP-SAT returns because the
-browser cannot repaint or process UI events during the synchronous WebAssembly
-call.
-
-## Build
-
-```sh
-npm install
-npm run build
-npm run preview
-```
-
-`npm run build` runs the full pipeline: Emscripten/CMake builds the low-level
-CP-SAT WebAssembly runtime, Vite builds the package bundle, and Vite builds the
-static demo site.
-
-The Emscripten SDK is tracked as a pinned `emsdk` git submodule. The build
-script initializes that submodule automatically if needed, so a normal clone can
-run `npm run build` directly after `npm install`. If you prefer to fetch
-submodules up front, clone with `--recurse-submodules` or run
-`git submodule update --init --recursive`.
-
 ## Browser hosting requirements
 
 This package uses a threaded WebAssembly runtime. Browser pages that load it
@@ -234,12 +131,120 @@ export default defineConfig({
 });
 ```
 
+## Bundler configuration
+
+### Vite
+
+For Vite apps, keep `or-tools-wasm` out of dependency optimization so Vite
+handles the worker and WebAssembly URLs through its normal asset pipeline.
+`protobufjs` is CommonJS, so include it in dependency optimization. The worker
+runtime also needs ES module worker output:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  optimizeDeps: {
+    include: ['protobufjs'],
+    exclude: ['or-tools-wasm'],
+  },
+  worker: {
+    format: 'es',
+  },
+});
+```
+
+### Rollup
+
+Rollup core does not bundle module workers or emit `new URL(...,
+import.meta.url)` assets by itself. The verified fixture uses Rollup's standard
+plugin surface for those features:
+
+```js
+// rollup.config.mjs
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import OMT from '@surma/rollup-plugin-off-main-thread';
+import { importMetaAssets } from '@web/rollup-plugin-import-meta-assets';
+
+function moduleRelativeFileUrls() {
+  return {
+    name: 'module-relative-file-urls',
+    resolveFileUrl({ fileName }) {
+      return `new URL(${JSON.stringify(fileName)}, import.meta.url).href`;
+    },
+  };
+}
+
+export default {
+  input: 'src/main.js',
+  output: {
+    dir: 'dist',
+    format: 'es',
+  },
+  plugins: [
+    nodeResolve({ browser: true }),
+    moduleRelativeFileUrls(),
+    OMT(),
+    importMetaAssets(),
+  ],
+};
+```
+
+Other modern bundlers may also work if they support module workers and
+WebAssembly asset emission, but they are not yet officially verified.
+
+## Threading model
+
+The WebAssembly runtime is built with Emscripten pthread support. When the
+runtime starts, Emscripten creates a pthread worker pool sized from
+`navigator.hardwareConcurrency`. This pool is separate from CP-SAT's own search
+worker setting.
+
+`SatParameters.numSearchWorkers` controls how many CP-SAT search workers the
+solver should use for a solve. It does not change how many Emscripten pthread
+workers are created when the WebAssembly runtime is initialized.
+
+By default, `CpSat.solve` runs through the package's worker bridge. The bridge
+loads the CP-SAT runtime in a dedicated JavaScript worker, so the browser's main
+thread remains available for rendering, input, progress UI, and cancellation.
+If the worker bridge is disabled, solving runs directly on the main thread. The
+solver still works, but the GUI can freeze until CP-SAT returns because the
+browser cannot repaint or process UI events during the synchronous WebAssembly
+call.
+
+## Local development
+
+```sh
+npm install
+npm run dev
+```
+
+`npm run dev` / `npm run start` builds the library and launches the Vite dev
+server for the demo site.
+
+## Build
+
+```sh
+npm run build
+npm run preview
+```
+
+`npm run build` runs the full pipeline: Emscripten/CMake builds the low-level
+CP-SAT WebAssembly runtime, Vite builds the package bundle, and Vite builds the
+static demo site.
+
+The Emscripten SDK is tracked as a pinned `emsdk` git submodule. The build
+script initializes that submodule automatically if needed, so a normal clone can
+run `npm run build` directly after `npm install`. If you prefer to fetch
+submodules up front, clone with `--recurse-submodules` or run
+`git submodule update --init --recursive`.
+
 ## npm scripts
 
 - `npm run build:wasm` rebuilds the `cp_sat_runtime` wasm/js bundle via emsdk + CMake.
 - `npm run build:lib` regenerates SAT parameter types, type-checks with `tsc`, and builds the library bundle with `vite.lib.config.ts`.
 - `npm run build:site` builds the demo site with `vite.site.config.ts`. The site imports `or-tools-wasm` directly, so Vite emits the worker/runtime/wasm assets from the package bundle automatically.
-- `npm run dev` / `npm run start` builds the library and launches the Vite dev server for the demo site.
 - `npm run build` runs `build:wasm`, `build:lib`, and `build:site`.
 - `npm run preview` serves the already-built Vite site from `build/javascript/site`.
 - `npm run clean` removes the entire `build/` tree.
@@ -287,6 +292,10 @@ Upstream project:
 - Source: [github.com/google/or-tools](https://github.com/google/or-tools)
 - Documentation: [developers.google.com/optimization](https://developers.google.com/optimization/)
 - License: Apache License 2.0
+
+## Maintainer
+
+Maintained by [Axel Wickman](https://axelwickman.com).
 
 ## License
 
