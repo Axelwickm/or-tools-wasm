@@ -11,17 +11,17 @@ Used in [PragmaPlanner.com](https://pragmaplanner.com/?utm_source=or-tools-wasm&
 [npm](https://www.npmjs.com/package/or-tools-wasm)
 
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Vite 7 dev Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Chromium&name=Vite%207%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Vite 7 dev Firefox](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Firefox&name=Vite%207%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Vite 7 static Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Vite%207%20static%20Chromium&name=Vite%207%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Vite 7 static Firefox](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Vite%207%20static%20Firefox&name=Vite%207%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Webpack 5 dev Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20dev%20Chromium&name=Webpack%205%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Webpack 5 dev Firefox](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20dev%20Firefox&name=Webpack%205%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Webpack 5 static Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Chromium&name=Webpack%205%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Webpack 5 static Firefox](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Firefox&name=Webpack%205%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Rollup 4 static Chromium](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Chromium&name=Rollup%204%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Rollup 4 static Firefox](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Firefox&name=Rollup%204%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Deno](https://img.shields.io/github/checks-status/Axelwickm/or-tools-wasm/stable?label=Deno&name=Deno%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 7 dev Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Chromium&nameFilter=Vite%207%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 7 dev Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Firefox&nameFilter=Vite%207%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 7 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20static%20Chromium&nameFilter=Vite%207%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 7 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20static%20Firefox&nameFilter=Vite%207%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Webpack 5 dev Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20dev%20Chromium&nameFilter=Webpack%205%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Webpack 5 dev Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20dev%20Firefox&nameFilter=Webpack%205%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Webpack 5 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Chromium&nameFilter=Webpack%205%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Webpack 5 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Firefox&nameFilter=Webpack%205%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Rollup 4 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Chromium&nameFilter=Rollup%204%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Rollup 4 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Firefox&nameFilter=Rollup%204%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Deno](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno&nameFilter=Deno%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 
 ## Install
 
@@ -153,6 +153,40 @@ export default defineConfig({
     format: 'es',
   },
 });
+```
+
+### Webpack
+
+For Webpack 5, enable async WebAssembly, emit `.wasm` files as resources, and
+use `publicPath: 'auto'` so worker and WebAssembly URLs resolve from the emitted
+bundle location:
+
+```js
+// webpack.config.cjs
+const headers = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+};
+
+module.exports = {
+  output: {
+    publicPath: 'auto',
+  },
+  experiments: {
+    asyncWebAssembly: true,
+  },
+  module: {
+    rules: [
+      {
+        test: /\.wasm$/,
+        type: 'asset/resource',
+      },
+    ],
+  },
+  devServer: {
+    headers,
+  },
+};
 ```
 
 ### Rollup
