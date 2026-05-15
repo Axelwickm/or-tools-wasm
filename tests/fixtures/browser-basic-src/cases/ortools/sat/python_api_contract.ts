@@ -1,8 +1,12 @@
 import type { CpSatCase, CpSatLike, CpSatSolveParams, SolverResponse } from '../../../cpsat_types.ts';
-import {
-  DecisionStrategyProto_DomainReductionStrategy,
-  DecisionStrategyProto_VariableSelectionStrategy,
-} from 'or-tools-wasm';
+
+const DecisionStrategyProto_VariableSelectionStrategy = {
+  CHOOSE_MIN_DOMAIN_SIZE: 3,
+} as const;
+
+const DecisionStrategyProto_DomainReductionStrategy = {
+  SELECT_MAX_VALUE: 1,
+} as const;
 
 const INT64_MAX = { low: -1, high: 2147483647, unsigned: false };
 const INT64_MIN = { low: 0, high: -2147483648, unsigned: false };
