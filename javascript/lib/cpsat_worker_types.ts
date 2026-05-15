@@ -3,6 +3,7 @@ export type SolveRequest = {
   id: number;
   modelBytes: Uint8Array;
   paramsBytes?: Uint8Array;
+  callbackFlags?: number;
 };
 
 export type ValidateRequest = {
@@ -26,6 +27,9 @@ export type WorkerRequest = SolveRequest | ValidateRequest | SchemaRequest | Can
 export type WorkerResponse =
   | { type: 'ready' }
   | { type: 'solveResult'; id: number; bytes: Uint8Array }
+  | { type: 'solveCallback'; id: number; eventType: 'solution'; bytes: Uint8Array }
+  | { type: 'solveCallback'; id: number; eventType: 'bestBound'; bound: number }
+  | { type: 'solveCallback'; id: number; eventType: 'log'; message: string }
   | { type: 'validateResult'; id: number; ok: boolean; message: string }
   | { type: 'schemaResult'; id: number; schemas: { cp_model: string; sat_parameters: string } }
   | { type: 'solved_cancelled', id: number }

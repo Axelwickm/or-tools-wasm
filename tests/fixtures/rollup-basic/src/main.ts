@@ -1,25 +1,7 @@
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
+import type { CpSat as CpSatValue } from 'or-tools-wasm';
 
 const statusEl = document.getElementById('status');
-
-type RunResult = {
-  mode: 'direct' | 'worker';
-  ok: boolean;
-  solverStatus?: unknown;
-  cases: Array<{
-    name: string;
-    ok: boolean;
-    solverStatus: unknown;
-  }>;
-  workerStats: WorkerStats;
-};
-
-type WorkerStats = {
-  total: number;
-  pthread: number;
-};
-
-type CpSatApi = typeof import('or-tools-wasm')['CpSat'];
 
 function setStatus(value: unknown) {
   if (statusEl) {
@@ -28,7 +10,7 @@ function setStatus(value: unknown) {
 }
 
 function installWorkerSpy() {
-  const originalWorker = window.Worker;
+  const OriginalWorker = window.Worker;
   const creations: Array<{ url: string; name?: string }> = [];
 
   window.Worker = function WorkerSpy(scriptURL: string | URL, options?: WorkerOptions) {
@@ -36,11 +18,11 @@ function installWorkerSpy() {
       url: String(scriptURL),
       name: options?.name,
     });
-    return new originalWorker(scriptURL, options);
+    return new OriginalWorker(scriptURL, options);
   } as unknown as typeof Worker;
 
   return {
-    snapshot(): WorkerStats {
+    snapshot() {
       return {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
@@ -61,10 +43,10 @@ async function main() {
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
   const { CpSat } = await import('or-tools-wasm');
-  const typedCpSat: CpSatApi = CpSat;
+  const typedCpSat: typeof CpSatValue = CpSat;
   const results = await runCpSatCases(typedCpSat, {
     getWorkerStats: workerSpy.snapshot,
-  }) as RunResult[];
+  });
   setStatus({ ok: true, results });
 }
 

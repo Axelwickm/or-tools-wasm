@@ -222,7 +222,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency"
     "-sPTHREAD_POOL_SIZE_STRICT=2"
     "--bind"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_solve_model','_free_buffer','_validate_model','_interrupt_solve','_get_cp_model_schema','_get_sat_parameters_schema']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_solve_model','_solve_model_with_callback_events','_free_buffer','_validate_model','_interrupt_solve','_get_cp_model_schema','_get_sat_parameters_schema']"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8"
     "-sNODEJS_CATCH_REJECTION=0"
     "-sNODEJS_CATCH_EXIT=0"

@@ -1,0 +1,133 @@
+CP-SAT JS API TEST TRACKER
+
+Goal:
+Track the upstream API behavior we want this package to guarantee, without trying
+to port every internal C++ solver test. The canonical source for CP-SAT API
+behavior is the Python API test suite because this package exposes proto-first
+solver APIs rather than internal propagator APIs.
+
+Default fixture entrypoint:
+tests/fixtures/browser-basic-src/cases/ortools/sat/index.ts
+
+Canonical upstream CP-SAT API sources:
+- ortools/sat/python/cp_model_helper_test.py
+- ortools/sat/python/cp_model_test.py
+
+Future routing API source:
+- ortools/constraint_solver/python/pywraprouting_test.py
+
+Status values:
+- implemented: covered by the shared JS fixture corpus.
+- todo: API behavior should be covered, but is not implemented yet.
+- blocked_missing_api: upstream behavior needs a callback/helper/builder API that
+  this package does not expose today.
+- not_applicable_no_builder: upstream test only covers Python builder ergonomics,
+  operator overloads, or Python-specific data structures.
+- future_solver: belongs to a solver/API this package does not expose yet.
+
+double_checked:
+- no means the test was categorized or implemented, but has not yet been audited
+  line-by-line against upstream.
+- yes means the JS fixture has been compared against upstream behavior.
+
+CP-SAT API SURFACE
+api | behavior | status | double_checked | fixture | notes
+--- | --- | --- | --- | --- | ---
+createModel(CpModelProto) | encode typed proto objects, including int64 values | implemented | no | python_api_contract.ts | Uses protobufjs object input; no text-format parser.
+validate(modelBytes) | return ok/message for invalid CP-SAT model protos | implemented | no | python_api_contract.ts | Covers overflow rejection.
+solve(modelBytes, SatParameters?) | solve direct and through worker bridge | implemented | no | python_api_contract.ts | Shared runner executes every case in both modes.
+solve(modelBytes, { optimizeWithCore }) | solve optimized-core objective model | implemented | no | python_api_contract.ts | Mirrors helper simple solve with core parameter.
+solve(modelBytes, { enumerateAllSolutions }) | enumerate feasible solutions through onSolution | implemented | no | python_api_contract.ts | Mirrors Python SearchForAllSolutions callback behavior.
+solve response | expose objectiveValue and bestObjectiveBound | implemented | no | python_api_contract.ts | Mirrors simple objective and bound checks.
+generated TS types | CpModelProto, CpSolverResponse, SatParameters exports compile | implemented | no | browser fixture TypeScript imports | TypeScript fixture imports exported package types.
+solution callbacks | per-solution callback hook | implemented | no | python_api_contract.ts | Covered in direct and worker bridge fixture runs.
+best-bound callbacks | live best-bound callback hook | implemented | no | python_api_contract.ts | Covered in direct and worker bridge fixture runs.
+log callbacks | live solver log callback hook | implemented | no | python_api_contract.ts | Covered alongside log_to_response.
+model stats helpers | CpSatHelper.model_stats equivalent | blocked_missing_api | no |  | No public stats helper exposed.
+Python builder API | IntVar, LinearExpr, CpModel builder ergonomics | not_applicable_no_builder | no |  | Package is proto-first today.
+
+CP-SAT PYTHON HELPER TESTS
+source | python_test | scope | status | double_checked | fixture | notes
+--- | --- | --- | --- | --- | --- | ---
+cp_model_helper_test.py | test_simple_solve | proto solve objective | implemented | no | python_api_contract.ts | Model built as typed proto object instead of text format.
+cp_model_helper_test.py | test_simple_solve_with_core | SatParameters optimize_with_core | implemented | no | python_api_contract.ts | Uses optimizeWithCore.
+cp_model_helper_test.py | test_simple_solve_with_proto_api | proto object construction, objective, best bound | implemented | no | python_api_contract.ts | Closest direct match to this package API.
+cp_model_helper_test.py | test_solution_callback | enumerate all solutions callback count | implemented | no | python_api_contract.ts | Requires solution callback hook.
+cp_model_helper_test.py | test_best_bound_callback | best-bound callback | implemented | no | python_api_contract.ts | Requires best-bound callback hook.
+cp_model_helper_test.py | test_model_stats | model stats helper | blocked_missing_api | no |  | No stats helper exposed.
+cp_model_helper_test.py | test_int_lin_expr | Python LinearExpr API | not_applicable_no_builder | no |  | Python builder-only behavior.
+cp_model_helper_test.py | test_float_lin_expr | Python LinearExpr API | not_applicable_no_builder | no |  | Python builder-only behavior.
+cp_model_helper_test.py | test_basic | Python CpModelBuilder API | not_applicable_no_builder | no |  | Python builder-only behavior.
+cp_model_helper_test.py | test_basic_api | Python SatParametersBuilder API | not_applicable_no_builder | no |  | Generated SatParameters type export is covered separately.
+
+CP-SAT PYTHON MODEL FEATURE CHECKLIST
+source | python_test | scope | status | double_checked | fixture | notes
+--- | --- | --- | --- | --- | --- | ---
+cp_model_test.py | test_all_different | allDifferent proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_element | element proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_circuit | circuit proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_multiple_circuit | routes proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_allowed_assignments | table proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_forbidden_assignments | negated table proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_automaton | automaton proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_inverse | inverse proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_max_equality | linMax proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_min_equality | linMax/min-equivalent proto behavior | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_abs | absolute value proto behavior | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_division | intDiv proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_multiplication_equality | intProd proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_implication | bool implication encoding | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_bool_or | boolOr proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_at_most_one | atMostOne proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_exactly_one | exactlyOne proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_bool_and | boolAnd proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_bool_x_or | boolXor proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_interval | interval proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_optional_interval | optional interval proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_no_overlap | noOverlap proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_no_overlap_2d | noOverlap2d proto constraint | implemented | no | python_api_contract.ts | Keeps protobufjs noOverlap2d normalization covered.
+cp_model_test.py | test_cumulative | cumulative proto constraint | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_has_objective_minimize | objective proto minimize semantics | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_has_objective_maximize | objective proto maximize semantics | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_search_for_all_solutions | enumerate all solutions | implemented | no | python_api_contract.ts | Covered through onSolution callback count.
+cp_model_test.py | test_solve_with_solution_callback | callback API | implemented | no | python_api_contract.ts | Requires callback hook.
+cp_model_test.py | test_best_bound_callback | callback API | implemented | no | python_api_contract.ts | Final bestObjectiveBound is covered separately.
+cp_model_test.py | test_value | solution value access | implemented | no | python_api_contract.ts | Covered through response.solution.
+cp_model_test.py | test_boolean_value | boolean solution value access | implemented | no | python_api_contract.ts | Public response behavior.
+cp_model_test.py | test_solution_hinting | solutionHint proto field | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_assumptions | assumptions proto field | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_stats | response stats/log fields | implemented | no | python_api_contract.ts | Need decide which fields are public.
+cp_model_test.py | test_search_strategy | searchStrategy proto field | implemented | no | python_api_contract.ts | Public model feature.
+cp_model_test.py | test_model_and_response_stats | stats helpers | blocked_missing_api | no |  | No helper API exposed.
+cp_model_test.py | test_validate_model | validate API | implemented | no | python_api_contract.ts | Covered by invalid-model validation behavior.
+cp_model_test.py | test_validate_model_with_overflow | validate overflow behavior | implemented | no | python_api_contract.ts | Mirrors the Python model that returns a validation error for overflowing bounds.
+cp_model_test.py | test_log_to_response | solveLog in response and log callback | implemented | no | python_api_contract.ts | Public response and callback behavior.
+cp_model_test.py | test_model_error | invalid model solve behavior | implemented | no | python_api_contract.ts | Public error behavior.
+
+CP-SAT PYTHON MODEL TESTS OUTSIDE CURRENT API
+category | status | notes
+--- | --- | ---
+Python operator overloads and natural syntax | not_applicable_no_builder | Tests named around negation, equality operators, addition, multiplication, sum, weighted sum, LinearExpr, and bounded linear expression only exercise Python builders.
+Python object identity/hash tests | not_applicable_no_builder | Tests around IntVar/BoolVar/Literal identity do not apply to typed proto objects.
+Pandas/NumPy series helpers | not_applicable_no_builder | Python-only integration.
+Copy/model clone helpers | not_applicable_no_builder | No JS CpModel builder object exists today.
+Callback lifecycle tests | implemented | Solution, best-bound, and log callbacks are covered for direct and worker bridge solves.
+
+REMOVED C++ INTERNAL MIRROR CORPUS
+source | status | notes
+--- | --- | ---
+ortools/sat/*_test.cc | not canonical for JS API | Internal C++ tests cover propagators, presolve, cuts, proof checking, and solver internals. Keep selected cases only when they exercise public proto fields or catch a JS packaging/encoding regression.
+tests/fixtures/browser-basic-src/cases/ortools/sat/*_test.ts | removed from fixture tree | The broad hand-migrated C++ mirror corpus was removed to avoid maintaining a large non-canonical suite. Re-add only focused public API cases under python_api_contract.ts.
+
+ROUTING FUTURE API TRACK
+source | python_test | status | notes
+--- | --- | --- | ---
+pywraprouting_test.py | testCtor | future_solver | Routing API is not exposed yet.
+pywraprouting_test.py | testSolve | future_solver | Routing API is not exposed yet.
+pywraprouting_test.py | testTSP | future_solver | Routing API is not exposed yet.
+pywraprouting_test.py | testVRP | future_solver | Routing API is not exposed yet.
+pywraprouting_test.py | testTransitCallback | future_solver | Requires callback support.
+pywraprouting_test.py | testTransitMatrix | future_solver | Routing API is not exposed yet.
+pywraprouting_test.py | testDimensionTSP | future_solver | Routing API is not exposed yet.
+pywraprouting_test.py | testRoutingSearchParameters | future_solver | Routing API is not exposed yet.
+pywraprouting_test.py | remaining pywraprouting_test.py cases | future_solver | Mirror when routing is added.

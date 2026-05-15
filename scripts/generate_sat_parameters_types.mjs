@@ -3,8 +3,20 @@ import path from 'node:path';
 import process from 'node:process';
 
 const ROOT = path.resolve(process.cwd());
-const INPUT_PATH = path.join(ROOT, 'ortools/sat/sat_parameters.proto');
-const OUTPUT_PATH = path.join(ROOT, 'javascript/lib/generated/sat_parameters.ts');
+const SPECS = [
+  {
+    inputPath: path.join(ROOT, 'ortools/sat/sat_parameters.proto'),
+    outputPath: path.join(ROOT, 'javascript/lib/generated/sat_parameters.ts'),
+    requiredMessages: ['SatParameters'],
+    source: 'ortools/sat/sat_parameters.proto',
+  },
+  {
+    inputPath: path.join(ROOT, 'ortools/sat/cp_model.proto'),
+    outputPath: path.join(ROOT, 'javascript/lib/generated/cp_model.ts'),
+    requiredMessages: ['CpModelProto', 'CpSolverResponse'],
+    source: 'ortools/sat/cp_model.proto',
+  },
+];
 
 function stripComments(text) {
   // Keep line comments for JSDoc generation; only remove block comments.
@@ -381,15 +393,15 @@ const PRIMITIVE_TS = new Map([
   ['double', 'number'],
   ['float', 'number'],
   ['int32', 'number'],
-  ['int64', 'number'],
+  ['int64', 'ProtoInt64'],
   ['uint32', 'number'],
-  ['uint64', 'number'],
+  ['uint64', 'ProtoInt64'],
   ['sint32', 'number'],
-  ['sint64', 'number'],
+  ['sint64', 'ProtoInt64'],
   ['fixed32', 'number'],
-  ['fixed64', 'number'],
+  ['fixed64', 'ProtoInt64'],
   ['sfixed32', 'number'],
-  ['sfixed64', 'number'],
+  ['sfixed64', 'ProtoInt64'],
   ['bool', 'boolean'],
   ['string', 'string'],
   ['bytes', 'Uint8Array'],
@@ -402,7 +414,7 @@ function normalizeTypeName(protoType) {
   return parts.join('_');
 }
 
-function generateTs(ast) {
+function generateTs(ast, source) {
   const nameToEnum = new Map(ast.enums.map((e) => [e.name, e]));
   const nameToMessage = new Map(ast.messages.map((m) => [m.name, m]));
 
@@ -430,9 +442,11 @@ function generateTs(ast) {
   lines.push('/*');
   lines.push(' * AUTO-GENERATED FILE.');
   lines.push(' *');
-  lines.push(' * Source: ortools/sat/sat_parameters.proto');
+  lines.push(` * Source: ${source}`);
   lines.push(' * Generator: scripts/generate_sat_parameters_types.mjs');
   lines.push(' */');
+  lines.push('');
+  lines.push('export type ProtoInt64 = number | string | { low: number; high: number; unsigned?: boolean };');
   lines.push('');
 
   const enumNamesInOrder = ast.enums.map((e) => e.name);
@@ -520,17 +534,20 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-const input = fs.readFileSync(INPUT_PATH, 'utf8');
-const stripped = stripComments(input);
-const tokens = tokenize(stripped);
-const ast = parse(tokens);
+for (const spec of SPECS) {
+  const input = fs.readFileSync(spec.inputPath, 'utf8');
+  const stripped = stripComments(input);
+  const tokens = tokenize(stripped);
+  const ast = parse(tokens);
 
-// Ensure SatParameters exists.
-if (!ast.messages.some((m) => m.name === 'SatParameters')) {
-  throw new Error('Did not find message SatParameters in sat_parameters.proto');
+  for (const messageName of spec.requiredMessages) {
+    if (!ast.messages.some((m) => m.name === messageName)) {
+      throw new Error(`Did not find message ${messageName} in ${spec.source}`);
+    }
+  }
+
+  const output = generateTs(ast, spec.source);
+  ensureDir(path.dirname(spec.outputPath));
+  fs.writeFileSync(spec.outputPath, output);
+  console.log(`Generated ${path.relative(ROOT, spec.outputPath)}`);
 }
-
-const output = generateTs(ast);
-ensureDir(path.dirname(OUTPUT_PATH));
-fs.writeFileSync(OUTPUT_PATH, output);
-console.log(`Generated ${path.relative(ROOT, OUTPUT_PATH)}`);

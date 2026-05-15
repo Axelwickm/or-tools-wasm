@@ -3,12 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "webpack --config webpack.config.cjs",
+    "build": "tsc --noEmit && webpack --config webpack.config.cjs",
     "serve": "webpack serve --config webpack.config.cjs --host 127.0.0.1 --port 4176",
     "serve-static": "node static-server.mjs"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.6.1.tgz",
+    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.7.1.tgz",
     "protobufjs": "^7.5.4"
   },
   "devDependencies": {

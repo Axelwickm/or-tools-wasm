@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "deno test --no-check --no-lock --node-modules-dir=manual --allow-read basic.test.ts"
+    "test": "deno test --no-lock --node-modules-dir=manual --allow-read basic.test.ts"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.6.1.tgz"
+    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.7.1.tgz"
   }
 }

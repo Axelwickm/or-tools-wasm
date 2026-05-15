@@ -1,9 +1,16 @@
+import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
+
 const statusEl = document.getElementById('status');
 
 type RunResult = {
   mode: 'direct' | 'worker';
   ok: boolean;
-  solverStatus: unknown;
+  solverStatus?: unknown;
+  cases: Array<{
+    name: string;
+    ok: boolean;
+    solverStatus: unknown;
+  }>;
   workerStats: WorkerStats;
 };
 
@@ -13,28 +20,6 @@ type WorkerStats = {
 };
 
 type CpSatApi = typeof import('or-tools-wasm')['CpSat'];
-
-const model = {
-  name: 'choose_one',
-  variables: [
-    { name: 'x', domain: [0, 1] },
-    { name: 'y', domain: [0, 1] },
-  ],
-  constraints: [
-    {
-      name: 'exactly_one',
-      linear: {
-        vars: [0, 1],
-        coeffs: [1, 1],
-        domain: [1, 1],
-      },
-    },
-  ],
-  objective: {
-    vars: [0, 1],
-    coeffs: [1, 2],
-  },
-};
 
 function setStatus(value: unknown) {
   if (statusEl) {
@@ -71,41 +56,15 @@ function forceSmallHardwareConcurrency() {
   });
 }
 
-async function runCase(CpSat: CpSatApi, mode: RunResult['mode'], getWorkerStats: () => WorkerStats): Promise<RunResult> {
-  CpSat.setWorkerBridgeEnabled(mode === 'worker');
-  const modelBytes = await CpSat.createModel(model);
-  const validation = await CpSat.validate(modelBytes);
-
-  if (!validation.ok) {
-    throw new Error(`${mode} validation failed: ${validation.message}`);
-  }
-
-  const result = await CpSat.solve(modelBytes, {
-    numSearchWorkers: 1,
-  });
-  const solverStatus = result.response?.status;
-
-  if (solverStatus !== 'OPTIMAL' && solverStatus !== 'FEASIBLE') {
-    throw new Error(`${mode} solve returned ${String(solverStatus)}`);
-  }
-
-  return {
-    mode,
-    ok: true,
-    solverStatus,
-    workerStats: getWorkerStats(),
-  };
-}
-
 async function main() {
   setStatus({ ok: false, phase: 'running' });
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
   const { CpSat } = await import('or-tools-wasm');
-  const results = [
-    await runCase(CpSat, 'direct', workerSpy.snapshot),
-    await runCase(CpSat, 'worker', workerSpy.snapshot),
-  ];
+  const typedCpSat: CpSatApi = CpSat;
+  const results = await runCpSatCases(typedCpSat, {
+    getWorkerStats: workerSpy.snapshot,
+  }) as RunResult[];
   setStatus({ ok: true, results });
 }
 

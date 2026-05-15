@@ -42,6 +42,9 @@ Verified with:
 - Rollup 4 static browser builds
 - Deno runtime solves
 
+The CP-SAT contract tests mirror the public OR-Tools Python CP-SAT API tests
+where they map to this package's proto-first TypeScript API.
+
 ## What is included
 
 - A CP-SAT WebAssembly runtime built with Emscripten pthread support.

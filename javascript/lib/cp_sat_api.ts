@@ -1,8 +1,17 @@
 import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
 import { loadCpSat } from './cp_sat_module_loader.js';
 import type { WorkerRequest, WorkerResponse } from './cpsat_worker_types.js';
+import type { CpModelProto, CpSolverResponse } from './generated/cp_model.js';
 import type { SatParameters } from './generated/sat_parameters.js';
 import * as protobufModule from 'protobufjs';
+
+export {
+  CpSolverStatus,
+  DecisionStrategyProto_DomainReductionStrategy,
+  DecisionStrategyProto_VariableSelectionStrategy,
+} from './generated/cp_model.js';
+export type { CpModelProto, CpSolverResponse } from './generated/cp_model.js';
+export type { SatParameters } from './generated/sat_parameters.js';
 
 type SchemaPair = {
   cp_model: string;
@@ -10,18 +19,24 @@ type SchemaPair = {
 };
 
 export type CpSatSolveResult = {
-  response: Record<string, unknown> | null;
+  response: CpSolverResponse | null;
   bytes: Uint8Array;
+};
+
+export type CpSatSolveCallbacks = {
+  onSolution?: (response: CpSolverResponse, bytes: Uint8Array) => void;
+  onBestBound?: (bound: number) => void;
+  onLog?: (message: string) => void;
 };
 
 type SolverParams = Uint8Array | SatParameters | null;
 
 export type CpSatApi = {
-  solve(model: Uint8Array, params?: SolverParams): Promise<CpSatSolveResult>;
+  solve(model: Uint8Array, params?: SolverParams, callbacks?: CpSatSolveCallbacks): Promise<CpSatSolveResult>;
   solveRaw(model: Uint8Array, params?: Uint8Array | null): Promise<Uint8Array>;
   validate(model: Uint8Array): Promise<{ ok: boolean; message: string }>;
   getSchemas(): Promise<SchemaPair>;
-  createModel(model: Record<string, unknown>): Promise<Uint8Array>;
+  createModel(model: CpModelProto): Promise<Uint8Array>;
   loadModule(): Promise<unknown>;
   setWorkerBridgeEnabled(enabled: boolean): void;
   isWorkerBridgeEnabled(): boolean;
@@ -41,15 +56,35 @@ const pendingWorkerRequests = new Map<
   {
     resolve(value: WorkerResponse): void;
     reject(reason: unknown): void;
+    onEvent?(value: WorkerResponse): void;
   }
 >();
 let nextWorkerRequestId = 1;
 
 let workerBridgePreferred = workerBridgeAvailable;
 let activeWorkerSolveId: number | null = null;
+const SOLUTION_CALLBACK_FLAG = 1 << 0;
+const BEST_BOUND_CALLBACK_FLAG = 1 << 1;
+const LOG_CALLBACK_FLAG = 1 << 2;
+const SOLUTION_CALLBACK_EVENT = 1;
+const BEST_BOUND_CALLBACK_EVENT = 2;
+const LOG_CALLBACK_EVENT = 3;
+
+type NativeCallbackEvent =
+  | { eventType: 'solution'; bytes: Uint8Array }
+  | { eventType: 'bestBound'; bound: number }
+  | { eventType: 'log'; message: string };
 
 function shouldUseWorkerBridge() {
   return workerBridgePreferred && workerBridgeAvailable;
+}
+
+function callbackFlags(callbacks?: CpSatSolveCallbacks) {
+  let flags = 0;
+  if (callbacks?.onSolution) flags |= SOLUTION_CALLBACK_FLAG;
+  if (callbacks?.onBestBound) flags |= BEST_BOUND_CALLBACK_FLAG;
+  if (callbacks?.onLog) flags |= LOG_CALLBACK_FLAG;
+  return flags;
 }
 
 function setWorkerBridgePreferred(enabled: boolean) {
@@ -90,6 +125,10 @@ function ensureWorker(): Worker {
         return;
       }
       const pending = pendingWorkerRequests.get(message.id);
+      if (message.type === 'solveCallback') {
+        pending?.onEvent?.(message);
+        return;
+      }
       if (message.type === 'error') {
         const error = new Error(message.error);
         if (pending) {
@@ -128,7 +167,10 @@ async function waitForWorkerReady() {
   await workerReadyPromise;
 }
 
-async function postWorkerRequest<T extends WorkerResponse>(request: WorkerRequest): Promise<T> {
+async function postWorkerRequest<T extends WorkerResponse>(
+  request: WorkerRequest,
+  onEvent?: (value: WorkerResponse) => void,
+): Promise<T> {
   if (!workerBridgeAvailable) {
     throw new Error('Worker bridge is not available.');
   }
@@ -138,6 +180,7 @@ async function postWorkerRequest<T extends WorkerResponse>(request: WorkerReques
     pendingWorkerRequests.set(request.id, {
       resolve: (value: WorkerResponse) => resolve(value as T),
       reject,
+      onEvent,
     });
     workerInstance.postMessage(request);
   });
@@ -264,7 +307,7 @@ async function resolveSatParametersType(): Promise<import('protobufjs').Type> {
   }
 }
 
-async function encodeSatParameters(params: Record<string, unknown>): Promise<Uint8Array> {
+async function encodeSatParameters(params: SatParameters): Promise<Uint8Array> {
   const paramsType = await resolveSatParametersType();
   const validationError = paramsType.verify(params);
   if (validationError) {
@@ -284,8 +327,12 @@ async function resolveParamsBytes(params?: SolverParams): Promise<Uint8Array | n
   return encodeSatParameters(params);
 }
 
-async function decodeSolverResponse(bytes: Uint8Array): Promise<Record<string, unknown>> {
+async function decodeSolverResponse(bytes: Uint8Array): Promise<CpSolverResponse> {
   const solverType = await resolveCpSolverResponseType();
+  return toCpSolverResponse(solverType, bytes);
+}
+
+function toCpSolverResponse(solverType: CpSolverResponseType, bytes: Uint8Array): CpSolverResponse {
   const decoded = solverType.decode(bytes);
   return solverType.toObject(decoded, {
     enums: String,
@@ -293,21 +340,85 @@ async function decodeSolverResponse(bytes: Uint8Array): Promise<Record<string, u
     defaults: true,
     arrays: true,
     objects: true,
-  }) as Record<string, unknown>;
+  }) as CpSolverResponse;
 }
 
-async function createModel(model: Record<string, unknown>): Promise<Uint8Array> {
+function dispatchSolveCallback(
+  callbacks: CpSatSolveCallbacks | undefined,
+  solverType: CpSolverResponseType,
+  event: NativeCallbackEvent | Extract<WorkerResponse, { type: 'solveCallback' }>,
+) {
+  if (event.eventType === 'solution') {
+    const bytes = new Uint8Array(event.bytes);
+    callbacks?.onSolution?.(toCpSolverResponse(solverType, bytes), bytes);
+  } else if (event.eventType === 'bestBound') {
+    callbacks?.onBestBound?.(event.bound);
+  } else if (event.eventType === 'log') {
+    callbacks?.onLog?.(event.message);
+  }
+}
+
+function normalizeCpModelForProtobuf(model: CpModelProto) {
+  return {
+    ...model,
+    constraints: model.constraints?.map((constraint) => {
+      if (!constraint.noOverlap2d) {
+        return constraint;
+      }
+      const normalized = {
+        ...constraint,
+        noOverlap_2d: constraint.noOverlap2d,
+      } as typeof constraint & { noOverlap_2d: typeof constraint.noOverlap2d };
+      delete normalized.noOverlap2d;
+      return normalized;
+    }),
+  };
+}
+
+async function createModel(model: CpModelProto): Promise<Uint8Array> {
   const type = await resolveCpModelType();
-  const validationError = type.verify(model);
+  const protobufModel = normalizeCpModelForProtobuf(model);
+  const validationError = type.verify(protobufModel);
   if (validationError) {
     throw new Error(`CpSat.createModel: ${validationError}`);
   }
-  const message = type.create(model);
+  const message = type.create(protobufModel);
   return type.encode(message).finish();
 }
 
 const readUint32LE = (buffer: ArrayBuffer, ptr: number) =>
   new DataView(buffer, ptr, 4).getUint32(0, true);
+
+function readUint32FromBytes(bytes: Uint8Array, offset: number) {
+  return new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, true);
+}
+
+function parseCallbackEnvelope(bytes: Uint8Array) {
+  let offset = 0;
+  const events: NativeCallbackEvent[] = [];
+  const eventCount = readUint32FromBytes(bytes, offset);
+  offset += 4;
+  for (let i = 0; i < eventCount; i++) {
+    const eventType = bytes[offset++];
+    const payloadLength = readUint32FromBytes(bytes, offset);
+    offset += 4;
+    const payload = bytes.slice(offset, offset + payloadLength);
+    offset += payloadLength;
+    if (eventType === SOLUTION_CALLBACK_EVENT) {
+      events.push({ eventType: 'solution', bytes: payload });
+    } else if (eventType === BEST_BOUND_CALLBACK_EVENT) {
+      events.push({
+        eventType: 'bestBound',
+        bound: new DataView(payload.buffer, payload.byteOffset, payload.byteLength).getFloat64(0, true),
+      });
+    } else if (eventType === LOG_CALLBACK_EVENT) {
+      events.push({ eventType: 'log', message: new TextDecoder().decode(payload) });
+    }
+  }
+  const responseLength = readUint32FromBytes(bytes, offset);
+  offset += 4;
+  return { events, responseBytes: bytes.slice(offset, offset + responseLength) };
+}
 
 function copyBytesToHeap(Module: MainModule, bytes: Uint8Array | null) {
   if (!bytes || !bytes.length) {
@@ -318,20 +429,32 @@ function copyBytesToHeap(Module: MainModule, bytes: Uint8Array | null) {
   return ptr;
 }
 
-
 type WorkerSolveResponse = Extract<WorkerResponse, { type: 'solveResult' }>;
 type WorkerValidateResponse = Extract<WorkerResponse, { type: 'validateResult' }>;
 
-async function solveRawViaWorker(modelBytes: Uint8Array, paramsBytes: Uint8Array | null = null) {
+async function solveRawViaWorker(
+  modelBytes: Uint8Array,
+  paramsBytes: Uint8Array | null = null,
+  callbacks?: CpSatSolveCallbacks,
+  solverType?: CpSolverResponseType,
+) {
   const id = nextWorkerRequestId++;
   activeWorkerSolveId = id;
   try {
-    const response = await postWorkerRequest<WorkerSolveResponse>({
-      type: 'solve',
-      id,
-      modelBytes,
-      paramsBytes: paramsBytes ?? undefined,
-    });
+    const response = await postWorkerRequest<WorkerSolveResponse>(
+      {
+        type: 'solve',
+        id,
+        modelBytes,
+        paramsBytes: paramsBytes ?? undefined,
+        callbackFlags: callbackFlags(callbacks),
+      },
+      (event) => {
+        if (event.type === 'solveCallback' && solverType) {
+          dispatchSolveCallback(callbacks, solverType, event);
+        }
+      },
+    );
     const bytes = new Uint8Array(response.bytes);
     return bytes;
   } finally {
@@ -351,28 +474,51 @@ async function validateViaWorker(modelBytes: Uint8Array) {
   return { ok: response.ok, message: response.message };
 }
 
-async function solveRawDirect(modelBytes: Uint8Array, paramsBytes: Uint8Array | null = null) {
+async function solveRawDirect(
+  modelBytes: Uint8Array,
+  paramsBytes: Uint8Array | null = null,
+  callbacks?: CpSatSolveCallbacks,
+  solverType?: CpSolverResponseType,
+) {
   const Module = await loadModule();
 
   const lenPtr = Module._malloc(4);
   const modelPtr = copyBytesToHeap(Module, modelBytes);
   const paramsPtr = copyBytesToHeap(Module, paramsBytes);
   let responsePtr = 0;
+  const flags = callbackFlags(callbacks);
+  const useCallbackEnvelope = flags !== 0 && solverType !== undefined;
 
   try {
-    responsePtr = (await Module.ccall(
-      'solve_model',
-      'number',
-      ['number', 'number', 'number', 'number', 'number'],
-      [
-        modelPtr,
-        modelBytes.length,
-        paramsPtr,
-        paramsBytes ? paramsBytes.length : 0,
-        lenPtr,
-      ],
-      { async: true },
-    )) as number;
+    if (useCallbackEnvelope) {
+      responsePtr = Module.ccall(
+        'solve_model_with_callback_events',
+        'number',
+        ['number', 'number', 'number', 'number', 'number', 'number'],
+        [
+          modelPtr,
+          modelBytes.length,
+          paramsPtr,
+          paramsBytes ? paramsBytes.length : 0,
+          flags,
+          lenPtr,
+        ],
+      ) as number;
+    } else {
+      responsePtr = (await Module.ccall(
+        'solve_model',
+        'number',
+        ['number', 'number', 'number', 'number', 'number'],
+        [
+          modelPtr,
+          modelBytes.length,
+          paramsPtr,
+          paramsBytes ? paramsBytes.length : 0,
+          lenPtr,
+        ],
+        { async: true },
+      )) as number;
+    }
   } finally {
     if (modelPtr) Module._free(modelPtr);
     if (paramsPtr) Module._free(paramsPtr);
@@ -389,21 +535,39 @@ async function solveRawDirect(modelBytes: Uint8Array, paramsBytes: Uint8Array | 
     Module._free_buffer(responsePtr);
   }
 
+  if (useCallbackEnvelope && solverType) {
+    const { events, responseBytes } = parseCallbackEnvelope(bytes);
+    for (const event of events) {
+      dispatchSolveCallback(callbacks, solverType, event);
+    }
+    return responseBytes;
+  }
+
   return new Uint8Array(bytes);
 }
 
-async function solveRaw(modelBytes: Uint8Array, paramsBytes: Uint8Array | null = null) {
+async function solveRaw(
+  modelBytes: Uint8Array,
+  paramsBytes: Uint8Array | null = null,
+  callbacks?: CpSatSolveCallbacks,
+  solverType?: CpSolverResponseType,
+) {
   return shouldUseWorkerBridge()
-    ? solveRawViaWorker(modelBytes, paramsBytes)
-    : solveRawDirect(modelBytes, paramsBytes);
+    ? solveRawViaWorker(modelBytes, paramsBytes, callbacks, solverType)
+    : solveRawDirect(modelBytes, paramsBytes, callbacks, solverType);
 }
 
-async function solve(modelBytes: Uint8Array, params: SolverParams = null): Promise<CpSatSolveResult> {
+async function solve(
+  modelBytes: Uint8Array,
+  params: SolverParams = null,
+  callbacks?: CpSatSolveCallbacks,
+): Promise<CpSatSolveResult> {
   const paramsBytes = await resolveParamsBytes(params);
-  const bytes = await solveRaw(modelBytes, paramsBytes);
-  let response: Record<string, unknown> | null = null;
+  const solverType = callbacks && callbackFlags(callbacks) ? await resolveCpSolverResponseType() : undefined;
+  const bytes = await solveRaw(modelBytes, paramsBytes, callbacks, solverType);
+  let response: CpSolverResponse | null = null;
   if (bytes.length > 0) {
-    response = await decodeSolverResponse(bytes);
+    response = solverType ? toCpSolverResponse(solverType, bytes) : await decodeSolverResponse(bytes);
   }
   return { bytes, response };
 }
@@ -415,8 +579,6 @@ async function validateDirect(model: Uint8Array) {
   let msgPtr = 0;
 
   try {
-    // Note: Use modelBytes.length here? Original code had 'modelBytes' not defined in arguments.
-    // Assuming 'model' argument is the Uint8Array.
     msgPtr = Module.ccall(
       'validate_model',
       'number',
@@ -457,7 +619,7 @@ async function cancelSolve() {
 }
 
 export const CpSat: CpSatApi = {
-  solve: (model, params = null) => solve(model, params),
+  solve: (model, params = null, callbacks) => solve(model, params, callbacks),
   solveRaw: (model, params = null) => solveRaw(model, params),
   validate: (model) => (shouldUseWorkerBridge() ? validateViaWorker(model) : validateDirect(model)),
   getSchemas,

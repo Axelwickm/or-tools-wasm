@@ -1,4 +1,5 @@
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import { transform } from 'esbuild';
 import OMT from '@surma/rollup-plugin-off-main-thread';
 import { importMetaAssets } from '@web/rollup-plugin-import-meta-assets';
 
@@ -11,8 +12,30 @@ function moduleRelativeFileUrls() {
   };
 }
 
+function esbuildTypeScript() {
+  return {
+    name: 'esbuild-typescript',
+    async transform(code, id) {
+      if (!id.endsWith('.ts')) {
+        return null;
+      }
+      const result = await transform(code, {
+        loader: 'ts',
+        format: 'esm',
+        target: 'es2022',
+        sourcemap: true,
+        sourcefile: id,
+      });
+      return {
+        code: result.code,
+        map: result.map,
+      };
+    },
+  };
+}
+
 export default {
-  input: 'src/main.js',
+  input: 'src/main.ts',
   output: {
     dir: 'dist',
     format: 'es',
@@ -21,6 +44,7 @@ export default {
     nodeResolve({
       browser: true,
     }),
+    esbuildTypeScript(),
     moduleRelativeFileUrls(),
     OMT(),
     importMetaAssets(),

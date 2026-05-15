@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('runs the README model with and without the worker bridge', async ({ page }) => {
+test('runs the shared CP-SAT cases with and without the worker bridge', async ({ page }) => {
   const browserErrors: string[] = [];
   let failOnPageError: (error: Error) => void = () => {};
   const pageErrorPromise = new Promise<never>((_, reject) => {
@@ -57,6 +57,11 @@ test('runs the README model with and without the worker bridge', async ({ page }
       mode?: string;
       ok?: boolean;
       solverStatus?: string;
+      cases?: Array<{
+        name?: string;
+        ok?: boolean;
+        solverStatus?: string;
+      }>;
       workerStats?: {
         total?: number;
         pthread?: number;
@@ -68,6 +73,19 @@ test('runs the README model with and without the worker bridge', async ({ page }
     expect.objectContaining({ mode: 'direct', ok: true }),
     expect.objectContaining({ mode: 'worker', ok: true }),
   ]);
+  const [directResult, workerResult] = parsedStatus.results ?? [];
+  expect(workerResult?.cases).toEqual(directResult?.cases);
+  expect(directResult?.cases?.length).toBeGreaterThan(0);
+  for (const result of parsedStatus.results ?? []) {
+    expect(result.cases).toEqual(
+      directResult?.cases?.map((testCase) =>
+        expect.objectContaining({
+          name: testCase.name,
+          ok: true,
+        }),
+      ),
+    );
+  }
   expect(parsedStatus.results?.[0].workerStats).toEqual(
     expect.objectContaining({
       total: 2,

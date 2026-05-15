@@ -6,6 +6,8 @@
  * Generator: scripts/generate_sat_parameters_types.mjs
  */
 
+export type ProtoInt64 = number | string | { low: number; high: number; unsigned?: boolean };
+
 /**
  * ==========================================================================
  * Branching and polarity
@@ -648,7 +650,7 @@ export type SatParameters = {
    *
    * @default 0
    */
-  maxNumberOfConflicts?: number;
+  maxNumberOfConflicts?: ProtoInt64;
   /**
    * kint64max
    * Maximum memory allowed for the whole thread containing the solver. The
@@ -659,7 +661,7 @@ export type SatParameters = {
    *
    * @default 10000
    */
-  maxMemoryInMb?: number;
+  maxMemoryInMb?: ProtoInt64;
   /**
    * Stop the search when the gap between the best feasible objective (O) and
    * our best objective bound (B) is smaller than a limit.
@@ -1033,7 +1035,7 @@ export type SatParameters = {
    *
    * @default 100000000
    */
-  presolveInclusionWorkLimit?: number;
+  presolveInclusionWorkLimit?: ProtoInt64;
   /**
    * If true, we don't keep names in our internal copy of the user given model.
    *
@@ -1784,7 +1786,7 @@ export type SatParameters = {
    *
    * @default 64
    */
-  shavingSearchThreshold?: number;
+  shavingSearchThreshold?: ProtoInt64;
   /**
    * If true, search will search in ascending max objective value (when
    * minimizing) starting from the lower bound of the objective.
@@ -1814,7 +1816,7 @@ export type SatParameters = {
    *
    * @default 100
    */
-  pseudoCostReliabilityThreshold?: number;
+  pseudoCostReliabilityThreshold?: ProtoInt64;
   /**
    * The default optimization method is a simple "linear scan", each time trying
    * to find a better solution than the previous one. If this is true, then we
@@ -2215,7 +2217,7 @@ export type SatParameters = {
    *
    * @default 0
    */
-  searchRandomVariablePoolSize?: number;
+  searchRandomVariablePoolSize?: ProtoInt64;
   /**
    * Experimental code: specify if the objective pushes all tasks toward the
    * start of the schedule.

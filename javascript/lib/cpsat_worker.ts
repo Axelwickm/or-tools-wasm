@@ -6,6 +6,9 @@ import type { WorkerRequest, WorkerResponse } from './cpsat_worker_types.js';
 
 const workerScope = self as DedicatedWorkerGlobalScope;
 
+const SOLUTION_CALLBACK_EVENT = 1;
+const BEST_BOUND_CALLBACK_EVENT = 2;
+const LOG_CALLBACK_EVENT = 3;
 
 let moduleInstance: MainModule | null = null;
 
@@ -29,6 +32,48 @@ const moduleReady = loadCpSat()
 const readUint32LE = (buffer: ArrayBuffer, ptr: number) =>
   new DataView(buffer, ptr, 4).getUint32(0, true);
 
+function readUint32FromBytes(bytes: Uint8Array, offset: number) {
+  return new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, true);
+}
+
+function postCallbackEnvelopeEvents(id: number, bytes: Uint8Array) {
+  let offset = 0;
+  const eventCount = readUint32FromBytes(bytes, offset);
+  offset += 4;
+  for (let i = 0; i < eventCount; i++) {
+    const eventType = bytes[offset++];
+    const payloadLength = readUint32FromBytes(bytes, offset);
+    offset += 4;
+    const payload = bytes.slice(offset, offset + payloadLength);
+    offset += payloadLength;
+    if (eventType === SOLUTION_CALLBACK_EVENT) {
+      workerScope.postMessage({
+        type: 'solveCallback',
+        id,
+        eventType: 'solution',
+        bytes: payload,
+      } satisfies WorkerResponse);
+    } else if (eventType === BEST_BOUND_CALLBACK_EVENT) {
+      workerScope.postMessage({
+        type: 'solveCallback',
+        id,
+        eventType: 'bestBound',
+        bound: new DataView(payload.buffer, payload.byteOffset, payload.byteLength).getFloat64(0, true),
+      } satisfies WorkerResponse);
+    } else if (eventType === LOG_CALLBACK_EVENT) {
+      workerScope.postMessage({
+        type: 'solveCallback',
+        id,
+        eventType: 'log',
+        message: new TextDecoder().decode(payload),
+      } satisfies WorkerResponse);
+    }
+  }
+  const responseLength = readUint32FromBytes(bytes, offset);
+  offset += 4;
+  return bytes.slice(offset, offset + responseLength);
+}
+
 const copyBytesToHeap = (bytes: Uint8Array | null) => {
   if (!moduleInstance || !bytes?.length) {
     return 0;
@@ -38,7 +83,7 @@ const copyBytesToHeap = (bytes: Uint8Array | null) => {
   return ptr;
 };
 
-async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array) {
+async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requestId = 0, callbackFlags = 0) {
   if (!moduleInstance) {
     throw new Error('Module not initialized.');
   }
@@ -48,19 +93,35 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array) {
   let responsePtr = 0;
 
   try {
-    responsePtr = (await moduleInstance.ccall(
-      'solve_model',
-      'number',
-      ['number', 'number', 'number', 'number', 'number'],
-      [
-        modelPtr,
-        modelBytes.length,
-        paramsPtr,
-        paramsBytes ? paramsBytes.length : 0,
-        lenPtr,
-      ],
-      { async: true },
-    )) as number;
+    if (callbackFlags) {
+      responsePtr = moduleInstance.ccall(
+        'solve_model_with_callback_events',
+        'number',
+        ['number', 'number', 'number', 'number', 'number', 'number'],
+        [
+          modelPtr,
+          modelBytes.length,
+          paramsPtr,
+          paramsBytes ? paramsBytes.length : 0,
+          callbackFlags,
+          lenPtr,
+        ],
+      ) as number;
+    } else {
+      responsePtr = (await moduleInstance.ccall(
+        'solve_model',
+        'number',
+        ['number', 'number', 'number', 'number', 'number'],
+        [
+          modelPtr,
+          modelBytes.length,
+          paramsPtr,
+          paramsBytes ? paramsBytes.length : 0,
+          lenPtr,
+        ],
+        { async: true },
+      )) as number;
+    }
   } finally {
     if (modelPtr) moduleInstance._free(modelPtr);
     if (paramsPtr) moduleInstance._free(paramsPtr);
@@ -76,6 +137,9 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array) {
 
   const bytes = moduleInstance.HEAPU8.slice(responsePtr, responsePtr + len);
   moduleInstance._free_buffer(responsePtr);
+  if (callbackFlags) {
+    return postCallbackEnvelopeEvents(requestId, bytes);
+  }
   return bytes;
 }
 
@@ -130,7 +194,7 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       } satisfies WorkerResponse);
       return;
     } else if (message.type === 'solve') {
-      const bytes = await solveModel(message.modelBytes, message.paramsBytes);
+      const bytes = await solveModel(message.modelBytes, message.paramsBytes, message.id, message.callbackFlags ?? 0);
       workerScope.postMessage({
         type: 'solveResult',
         id: message.id,

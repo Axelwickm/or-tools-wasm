@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
     "dev": "vite dev",
     "preview": "vite preview"
   },
@@ -12,7 +12,7 @@
     "vite": "^7.2.4"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.6.1.tgz",
+    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.7.1.tgz",
     "protobufjs": "^7.5.4"
   }
 }
