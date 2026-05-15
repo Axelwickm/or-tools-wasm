@@ -52,7 +52,7 @@ function installWorkerSpy() {
 function forceSmallHardwareConcurrency() {
   Object.defineProperty(navigator, 'hardwareConcurrency', {
     configurable: true,
-    value: 2,
+    value: 4,
   });
 }
 

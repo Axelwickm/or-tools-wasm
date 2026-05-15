@@ -2,96 +2,117 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
-const wasmDir = path.join(repoRoot, 'build/javascript/wasm');
-const runtimeFiles = ['cp_sat_runtime.js', 'cp_sat_runtime_asyncify.js'];
-
-const patches = [
-  {
-    name: 'deno-runtime-detection',
-    prelude: `
-var __orToolsWasmDeno = typeof Deno !== "undefined";
-if (__orToolsWasmDeno) {
-  globalThis.self ??= globalThis;
-  globalThis.WorkerGlobalScope ??= class WorkerGlobalScope {};
-}
-`,
-    replacements: [
-      [
-        [
-          '  globalThis.window ??= globalThis;\n  globalThis.self ??= globalThis;\n  globalThis.WorkerGlobalScope ??= class WorkerGlobalScope {};',
-          '  globalThis.self ??= globalThis;\n  globalThis.WorkerGlobalScope ??= class WorkerGlobalScope {};\n  globalThis.navigator ??= { hardwareConcurrency: 1 };',
-        ],
-        '  globalThis.self ??= globalThis;\n  globalThis.WorkerGlobalScope ??= class WorkerGlobalScope {};',
-      ],
-      [
-        'var currentNodeVersion=typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
-        'var currentNodeVersion=typeof Deno==="undefined"&&typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
-      ],
-      [
-        [
-          'var ENVIRONMENT_IS_WEB=!!globalThis.window;',
-          'var ENVIRONMENT_IS_WEB=!!globalThis.window||__orToolsWasmDeno;',
-        ],
-        'var ENVIRONMENT_IS_WEB=!!globalThis.window&&!__orToolsWasmDeno;',
-      ],
-      [
-        'var ENVIRONMENT_IS_NODE=globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";',
-        'var ENVIRONMENT_IS_NODE=!__orToolsWasmDeno&&globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";',
-      ],
-      [
-        [
-          '__emscripten_thread_init(tb,!ENVIRONMENT_IS_WORKER,1,!ENVIRONMENT_IS_WEB,65536,false)',
-          '__emscripten_thread_init(tb,__orToolsWasmDeno||!ENVIRONMENT_IS_WORKER,1,!ENVIRONMENT_IS_WEB,65536,false)',
-        ],
-        '__emscripten_thread_init(tb,__orToolsWasmDeno||!ENVIRONMENT_IS_WORKER,1,__orToolsWasmDeno?false:!ENVIRONMENT_IS_WEB,65536,false)',
-      ],
-      [
-        [
-          'function abort(what){Module["onAbort"]?.(what);what="Aborted("+what+")";err(what);ABORT=true;var e=new WebAssembly.RuntimeError(what);readyPromiseReject?.(e);throw e}',
-          'function abort(what){Module["onAbort"]?.(what);what="Aborted("+what+")";err(what);ABORT=true;if(what.indexOf("RuntimeError: unreachable")>=0){what+=\'. "unreachable" may be due to ASYNCIFY_STACK_SIZE not being large enough (try increasing it)\'}var e=new WebAssembly.RuntimeError(what);readyPromiseReject?.(e);throw e}',
-          'function abort(what){if(String(what).includes("emscripten_is_main_browser_thread"))return;Module["onAbort"]?.(what);what="Aborted("+what+")";err(what);ABORT=true;var e=new WebAssembly.RuntimeError(what);readyPromiseReject?.(e);throw e}',
-        ],
-        'function abort(what){if(String(what).includes("emscripten_is_main_browser_thread"))return;Module["onAbort"]?.(what);what="Aborted("+what+")";err(what);ABORT=true;var e=new WebAssembly.RuntimeError(what);readyPromiseReject?.(e);throw e}',
-      ],
-      [
-        [
-          'var ___assert_fail=(condition,filename,line,func)=>abort(`Assertion failed: ${UTF8ToString(condition)}, at: `+[filename?UTF8ToString(filename):"unknown filename",line,func?UTF8ToString(func):"unknown function"]);',
-          'var ___assert_fail=(condition,filename,line,func)=>{var conditionText=UTF8ToString(condition);var funcText=func?UTF8ToString(func):"unknown function";if(__orToolsWasmDeno&&conditionText==="emscripten_is_main_browser_thread()"&&funcText==="futex_wait_main_browser_thread")return;abort(`Assertion failed: ${conditionText}, at: `+[filename?UTF8ToString(filename):"unknown filename",line,funcText])};',
-          'var ___assert_fail=(condition,filename,line,func)=>{var conditionText=UTF8ToString(condition);var funcText=func?UTF8ToString(func):"unknown function";if(__orToolsWasmDeno&&conditionText==="emscripten_is_main_browser_thread()")return;abort(`Assertion failed: ${conditionText}, at: `+[filename?UTF8ToString(filename):"unknown filename",line,funcText])};',
-          'var ___assert_fail=(condition,filename,line,func)=>{var conditionText=UTF8ToString(condition);var funcText=func?UTF8ToString(func):"unknown function";if(__orToolsWasmDeno&&conditionText.includes("emscripten_is_main_browser_thread"))return;abort(`Assertion failed: ${conditionText}, at: `+[filename?UTF8ToString(filename):"unknown filename",line,funcText])};',
-          'var ___assert_fail=(condition,filename,line,func)=>{var conditionText=UTF8ToString(condition);var funcText=func?UTF8ToString(func):"unknown function";if(typeof Deno!=="undefined"&&conditionText.includes("emscripten_is_main_browser_thread"))return;abort(`Assertion failed: ${conditionText}, at: `+[filename?UTF8ToString(filename):"unknown filename",line,funcText])};',
-        ],
-        'var ___assert_fail=(condition,filename,line,func)=>{var conditionText=UTF8ToString(condition);var funcText=func?UTF8ToString(func):"unknown function";if(conditionText.includes("emscripten_is_main_browser_thread"))return;abort(`Assertion failed: ${conditionText}, at: `+[filename?UTF8ToString(filename):"unknown filename",line,funcText])};',
-      ],
-    ],
-  },
+const nodeRuntimePaths = [
+  path.join(repoRoot, 'build/javascript/node-wasm/cp_sat_runtime_node.js'),
+  path.join(repoRoot, 'build/javascript/node-wasm/cp_sat_runtime_node_asyncify.js'),
+];
+const webRuntimePaths = [
+  path.join(repoRoot, 'build/javascript/wasm/cp_sat_runtime.js'),
+  path.join(repoRoot, 'build/javascript/wasm/cp_sat_runtime_asyncify.js'),
 ];
 
-function applyPatch(code, patch) {
-  let patched = code;
-  const preludeMarker = patch.prelude.trim().split('\n')[0];
-  if (!patched.includes(preludeMarker)) {
-    patched = `${patch.prelude}\n${patched}`;
+const replacements = [
+  ['import("module")', 'import("node:module")'],
+  ['import("worker_threads")', 'import("node:worker_threads")'],
+  ['require("worker_threads")', 'require("node:worker_threads")'],
+  ['require("fs")', 'require("node:fs")'],
+  ['require("path")', 'require("node:path")'],
+  ['require("url")', 'require("node:url")'],
+  ['require("util")', 'require("node:util")'],
+  [
+    'postMessage:msg=>parentPort["postMessage"](msg)',
+    'postMessage:msg=>parentPort["postMessage"].call(parentPort,msg)',
+  ],
+  [
+    'parentPort.on("message",msg=>global.onmessage?.({data:msg}));Object.assign(globalThis,{self:global,postMessage:msg=>parentPort["postMessage"].call(parentPort,msg)});',
+    'parentPort.on("message",msg=>global.onmessage?.({data:msg}));Object.assign(globalThis,{self:global});globalThis.postMessage??=(msg=>parentPort["postMessage"].call(parentPort,msg));',
+  ],
+  [
+    'if(cmd==="load"){workerID=msgData.workerID;',
+    'if(cmd==="load"){if(runtimeInitialized){postMessage({cmd:"loaded"});return}workerID=msgData.workerID;',
+  ],
+];
+
+for (const nodeRuntimePath of nodeRuntimePaths) {
+  let runtime = await readFile(nodeRuntimePath, 'utf8');
+  const original = runtime;
+
+  for (const [from, to] of replacements) {
+    runtime = runtime.replaceAll(from, to);
   }
-  for (const [from, to] of patch.replacements) {
-    const alternatives = Array.isArray(from) ? from : [from];
-    const found = alternatives.find((snippet) => patched.includes(snippet));
-    if (!found && !patched.includes(to)) {
-      throw new Error(`Could not find Emscripten snippet for ${patch.name}: ${alternatives[0]}`);
-    }
-    if (found) {
-      patched = patched.replace(found, to);
-    }
+
+  if (runtime !== original) {
+    await writeFile(nodeRuntimePath, runtime);
+    console.log(`Patched ${path.basename(nodeRuntimePath)}: node-runtime-compatibility`);
   }
-  return patched;
 }
 
-for (const fileName of runtimeFiles) {
-  const filePath = path.join(wasmDir, fileName);
-  const original = await readFile(filePath, 'utf8');
-  const patched = patches.reduce((code, patch) => applyPatch(code, patch), original);
-  if (patched !== original) {
-    await writeFile(filePath, patched);
-    console.log(`Patched ${fileName}: ${patches.map((patch) => patch.name).join(', ')}`);
+const webRuntimeReplacements = [
+  [
+    'var currentNodeVersion=typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
+    'var currentNodeVersion=globalThis.__ORTOOLS_WASM_PTHREAD!==true&&typeof Deno==="undefined"&&typeof Bun==="undefined"&&typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
+  ],
+  [
+    'var currentNodeVersion=typeof Deno==="undefined"&&typeof Bun==="undefined"&&typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
+    'var currentNodeVersion=globalThis.__ORTOOLS_WASM_PTHREAD!==true&&typeof Deno==="undefined"&&typeof Bun==="undefined"&&typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
+  ],
+  [
+    'var Module=moduleArg;var ENVIRONMENT_IS_WEB=!!globalThis.window;var ENVIRONMENT_IS_WORKER=!!globalThis.WorkerGlobalScope;var ENVIRONMENT_IS_NODE=globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";var ENVIRONMENT_IS_SHELL=!ENVIRONMENT_IS_WEB&&!ENVIRONMENT_IS_NODE&&!ENVIRONMENT_IS_WORKER;var ENVIRONMENT_IS_PTHREAD=ENVIRONMENT_IS_WORKER&&self.name?.startsWith("em-pthread");',
+    'var Module=moduleArg;var ORTOOLS_WASM_WEB_HOST=typeof Deno!=="undefined"||typeof Bun!=="undefined";var ORTOOLS_WASM_PTHREAD_URL=typeof import.meta.url==="string"&&import.meta.url.includes("?em-pthread=");var ORTOOLS_WASM_PTHREAD_MARKER=globalThis.__ORTOOLS_WASM_PTHREAD===true;if(ORTOOLS_WASM_WEB_HOST&&!globalThis.window&&!ORTOOLS_WASM_PTHREAD_URL&&!ORTOOLS_WASM_PTHREAD_MARKER)globalThis.window=globalThis;var ENVIRONMENT_IS_WEB=!!globalThis.window;var ENVIRONMENT_IS_WORKER=!!globalThis.WorkerGlobalScope||ORTOOLS_WASM_PTHREAD_URL||ORTOOLS_WASM_PTHREAD_MARKER;var ENVIRONMENT_IS_NODE=!ORTOOLS_WASM_WEB_HOST&&globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";var ENVIRONMENT_IS_SHELL=!ENVIRONMENT_IS_WEB&&!ENVIRONMENT_IS_NODE&&!ENVIRONMENT_IS_WORKER;var ENVIRONMENT_IS_PTHREAD=ENVIRONMENT_IS_WORKER&&(ORTOOLS_WASM_PTHREAD_URL||ORTOOLS_WASM_PTHREAD_MARKER||self.name?.startsWith("em-pthread"));',
+  ],
+  [
+    'if(!(globalThis.window||globalThis.WorkerGlobalScope))throw new Error("not compiled for this environment (did you build to HTML and try to run it not on the web, or set ENVIRONMENT to something - like node - and run it someplace else - like on the web?)");',
+    'if(!(globalThis.window||globalThis.WorkerGlobalScope||ORTOOLS_WASM_PTHREAD_MARKER))throw new Error("not compiled for this environment (did you build to HTML and try to run it not on the web, or set ENVIRONMENT to something - like node - and run it someplace else - like on the web?)");',
+  ],
+  [
+    'var Module=moduleArg;var ORTOOLS_WASM_WEB_HOST=typeof Deno!=="undefined"||typeof Bun!=="undefined";var ORTOOLS_WASM_PTHREAD_URL=typeof import.meta.url==="string"&&import.meta.url.includes("?em-pthread=");if(ORTOOLS_WASM_WEB_HOST&&!globalThis.window&&!ORTOOLS_WASM_PTHREAD_URL)globalThis.window=globalThis;var ENVIRONMENT_IS_WEB=!!globalThis.window;var ENVIRONMENT_IS_WORKER=!!globalThis.WorkerGlobalScope||ORTOOLS_WASM_PTHREAD_URL;var ENVIRONMENT_IS_NODE=!ORTOOLS_WASM_WEB_HOST&&globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";var ENVIRONMENT_IS_SHELL=!ENVIRONMENT_IS_WEB&&!ENVIRONMENT_IS_NODE&&!ENVIRONMENT_IS_WORKER;var ENVIRONMENT_IS_PTHREAD=ENVIRONMENT_IS_WORKER&&(ORTOOLS_WASM_PTHREAD_URL||self.name?.startsWith("em-pthread"));',
+    'var Module=moduleArg;var ORTOOLS_WASM_WEB_HOST=typeof Deno!=="undefined"||typeof Bun!=="undefined";var ORTOOLS_WASM_PTHREAD_URL=typeof import.meta.url==="string"&&import.meta.url.includes("?em-pthread=");var ORTOOLS_WASM_PTHREAD_MARKER=globalThis.__ORTOOLS_WASM_PTHREAD===true;if(ORTOOLS_WASM_WEB_HOST&&!globalThis.window&&!ORTOOLS_WASM_PTHREAD_URL&&!ORTOOLS_WASM_PTHREAD_MARKER)globalThis.window=globalThis;var ENVIRONMENT_IS_WEB=!!globalThis.window;var ENVIRONMENT_IS_WORKER=!!globalThis.WorkerGlobalScope||ORTOOLS_WASM_PTHREAD_URL||ORTOOLS_WASM_PTHREAD_MARKER;var ENVIRONMENT_IS_NODE=!ORTOOLS_WASM_WEB_HOST&&globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";var ENVIRONMENT_IS_SHELL=!ENVIRONMENT_IS_WEB&&!ENVIRONMENT_IS_NODE&&!ENVIRONMENT_IS_WORKER;var ENVIRONMENT_IS_PTHREAD=ENVIRONMENT_IS_WORKER&&(ORTOOLS_WASM_PTHREAD_URL||ORTOOLS_WASM_PTHREAD_MARKER||self.name?.startsWith("em-pthread"));',
+  ],
+  [
+    'new Worker(new URL("cp_sat_runtime.js",import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})',
+    '(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("cp_sat_runtime.js",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("cp_sat_runtime.js"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))',
+  ],
+  [
+    'new Worker(new URL("cp_sat_runtime_asyncify.js",import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})',
+    '(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("cp_sat_runtime_asyncify.js",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("cp_sat_runtime_asyncify.js"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))',
+  ],
+  [
+    'new Worker(new URL("cp_sat_runtime.js?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})',
+    '(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("cp_sat_runtime.js",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("cp_sat_runtime.js"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))',
+  ],
+  [
+    'new Worker(new URL("cp_sat_runtime_asyncify.js?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})',
+    '(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("cp_sat_runtime_asyncify.js",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("cp_sat_runtime_asyncify.js"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))',
+  ],
+  [
+    'worker.workerID=PThread.nextWorkerID++;PThread.unusedWorkers.push(worker)',
+    'worker.unref?.();worker.workerID=PThread.nextWorkerID++;PThread.unusedWorkers.push(worker)',
+  ],
+  [
+    'PThread.init();FS.createPreloadedFile=FS_createPreloadedFile;',
+    'Module["PThread"]=PThread;PThread.init();FS.createPreloadedFile=FS_createPreloadedFile;',
+  ],
+  [
+    'var isPthread=globalThis.self?.name?.startsWith("em-pthread");isPthread&&cpSatModule();',
+    'var isPthread=globalThis.self?.name?.startsWith("em-pthread")||import.meta.url.includes("?em-pthread=")||globalThis.__ORTOOLS_WASM_PTHREAD===true;isPthread&&cpSatModule();',
+  ],
+  [
+    'var isPthread=globalThis.self?.name?.startsWith("em-pthread")||import.meta.url.includes("?em-pthread=");isPthread&&cpSatModule();',
+    'var isPthread=globalThis.self?.name?.startsWith("em-pthread")||import.meta.url.includes("?em-pthread=")||globalThis.__ORTOOLS_WASM_PTHREAD===true;isPthread&&cpSatModule();',
+  ],
+];
+
+for (const webRuntimePath of webRuntimePaths) {
+  let runtime = await readFile(webRuntimePath, 'utf8');
+  const original = runtime;
+
+  for (const [from, to] of webRuntimeReplacements) {
+    runtime = runtime.replaceAll(from, to);
+  }
+  runtime = runtime.replace(/(?:worker\.unref\?\.\(\);)+worker\.workerID/g, 'worker.unref?.();worker.workerID');
+
+  if (runtime !== original) {
+    await writeFile(webRuntimePath, runtime);
+    console.log(`Patched ${path.basename(webRuntimePath)}: deno-bun-web-worker-runtime`);
   }
 }

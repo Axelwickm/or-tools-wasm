@@ -46,9 +46,8 @@ export type CpSatApi = {
 export type CpSatModelInstance = Uint8Array;
 
 const isBrowserMainThread = typeof window !== 'undefined' && typeof document !== 'undefined';
-const isDenoMainThread = 'Deno' in globalThis && typeof WorkerGlobalScope === 'undefined';
 const workerCapable = typeof Worker !== 'undefined';
-const workerBridgeAvailable = (isBrowserMainThread || isDenoMainThread) && workerCapable;
+const workerBridgeAvailable = isBrowserMainThread && workerCapable;
 let worker: Worker | null = null;
 let workerReadyPromise: Promise<void> | null = null;
 const pendingWorkerRequests = new Map<

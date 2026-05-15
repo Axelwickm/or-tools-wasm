@@ -1,9 +1,9 @@
 {
-  "name": "or-tools-wasm-deno-basic-fixture",
+  "name": "or-tools-wasm-bun-basic-fixture",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "deno test --no-lock --node-modules-dir=manual --allow-read --allow-sys=cpus basic.test.ts"
+    "test": "../../../node_modules/.bin/tsc --noEmit && bun basic.test.ts"
   },
   "dependencies": {
     "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.7.1.tgz"

@@ -17,6 +17,9 @@
   "exports": {
     ".": {
       "types": "./build/javascript/lib/cp_sat_api.d.ts",
+      "bun": "./build/javascript/node/index.js",
+      "deno": "./build/javascript/node/index.js",
+      "node": "./build/javascript/node/index.js",
       "browser": "./build/javascript/browser/index.js",
       "import": "./build/javascript/lib/cp_sat_api.js",
       "default": "./build/javascript/lib/cp_sat_api.js"
@@ -30,7 +33,7 @@
     "build:wasm": "bash scripts/build_wasm.sh",
     "gen:sat-parameters": "node scripts/generate_sat_parameters_types.mjs",
     "patch:wasm-runtime": "node scripts/patch_emscripten_runtime.mjs",
-    "build:lib": "npm run build:wasm && npm run patch:wasm-runtime && npm run gen:sat-parameters && tsc && vite build --config vite.lib.config.ts && node scripts/build_browser_sources.mjs",
+    "build:lib": "npm run build:wasm && npm run patch:wasm-runtime && npm run gen:sat-parameters && tsc && vite build --config vite.lib.config.ts && node scripts/build_browser_sources.mjs && node scripts/build_node_sources.mjs",
     "build:site": "vite build --config vite.site.config.ts",
     "build": "npm run build:lib && npm run build:site",
     "dev": "npm run build:lib && vite --config vite.site.config.ts dev --host",
@@ -55,7 +58,11 @@
     "test:fixture:rollup": "npm run test:fixture:rollup:build && FIXTURE_GROUP=rollup playwright test --config tests/playwright.config.ts --project=rollup-static-chromium --project=rollup-static-firefox",
     "test:fixture:deno:install": "node tests/fixtures/install-packed-package.mjs deno-basic",
     "test:fixture:deno": "npm run test:fixture:deno:install && npm --prefix tests/fixtures/deno-basic run test",
-    "test:fixtures": "npm run test:fixture:vite && npm run test:fixture:webpack && npm run test:fixture:rollup && npm run test:fixture:deno"
+    "test:fixture:node:install": "node tests/fixtures/install-packed-package.mjs node-basic",
+    "test:fixture:node": "npm run test:fixture:node:install && npm --prefix tests/fixtures/node-basic run test",
+    "test:fixture:bun:install": "node tests/fixtures/install-packed-package.mjs bun-basic",
+    "test:fixture:bun": "npm run test:fixture:bun:install && npm --prefix tests/fixtures/bun-basic run test",
+    "test:fixtures": "npm run test:fixture:vite && npm run test:fixture:webpack && npm run test:fixture:rollup && npm run test:fixture:deno && npm run test:fixture:node && npm run test:fixture:bun"
   },
   "files": [
     "build/javascript/lib/assets",
@@ -64,6 +71,8 @@
     "build/javascript/lib/cp_sat_api.js",
     "build/javascript/lib/cp_sat_api.js.map",
     "build/javascript/browser",
+    "build/javascript/node",
+    "build/javascript/node-wasm",
     "javascript/lib"
   ],
   "dependencies": {

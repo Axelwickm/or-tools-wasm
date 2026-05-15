@@ -55,8 +55,10 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
   const parsedStatus = JSON.parse(await status.textContent() ?? '{}') as {
     results?: Array<{
       mode?: string;
+      workerProfile?: string;
       ok?: boolean;
       solverStatus?: string;
+      params?: Record<string, unknown>;
       cases?: Array<{
         name?: string;
         ok?: boolean;
@@ -68,13 +70,14 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       };
     }>;
   };
-  expect(parsedStatus.results).toHaveLength(2);
+  expect(parsedStatus.results).toHaveLength(4);
   expect(parsedStatus.results).toEqual([
-    expect.objectContaining({ mode: 'direct', ok: true }),
-    expect.objectContaining({ mode: 'worker', ok: true }),
+    expect.objectContaining({ mode: 'direct', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
+    expect.objectContaining({ mode: 'direct', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
+    expect.objectContaining({ mode: 'worker', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
+    expect.objectContaining({ mode: 'worker', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
   ]);
-  const [directResult, workerResult] = parsedStatus.results ?? [];
-  expect(workerResult?.cases).toEqual(directResult?.cases);
+  const [directResult] = parsedStatus.results ?? [];
   expect(directResult?.cases?.length).toBeGreaterThan(0);
   for (const result of parsedStatus.results ?? []) {
     expect(result.cases).toEqual(
@@ -88,9 +91,9 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
   }
   expect(parsedStatus.results?.[0].workerStats).toEqual(
     expect.objectContaining({
-      total: 2,
-      pthread: 2,
+      total: 4,
+      pthread: 4,
     }),
   );
-  expect(parsedStatus.results?.[1].workerStats?.total).toBeGreaterThanOrEqual(3);
+  expect(parsedStatus.results?.[2].workerStats?.total).toBeGreaterThanOrEqual(5);
 });

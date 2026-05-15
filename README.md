@@ -21,7 +21,9 @@ Used in [PragmaPlanner.com](https://pragmaplanner.com/?utm_source=or-tools-wasm&
 [![Webpack 5 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Firefox&nameFilter=Webpack%205%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Rollup 4 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Chromium&nameFilter=Rollup%204%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Rollup 4 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Firefox&nameFilter=Rollup%204%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Node 22](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Node%2022&nameFilter=Node%2022%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Deno](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno&nameFilter=Deno%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Bun](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Bun&nameFilter=Bun%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 
 ## Install
 
@@ -40,7 +42,9 @@ Verified with:
 - Vite 7 in browser contexts
 - Webpack 5 in browser contexts
 - Rollup 4 static browser builds
+- Node 22 runtime solves
 - Deno runtime solves
+- Bun runtime solves
 
 The CP-SAT contract tests mirror the public OR-Tools Python CP-SAT API tests
 where they map to this package's proto-first TypeScript API.

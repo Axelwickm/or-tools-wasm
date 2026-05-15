@@ -203,8 +203,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     DEPENDS "${PROTO_SCHEMA_HEADER}")
 
   set(JS_OUTPUT_DIR "${PROJECT_BINARY_DIR}/javascript/wasm")
+  set(JS_NODE_OUTPUT_DIR "${PROJECT_BINARY_DIR}/javascript/node-wasm")
   set(JS_EXAMPLES_DIR "${JS_OUTPUT_DIR}/examples")
   file(MAKE_DIRECTORY "${JS_OUTPUT_DIR}")
+  file(MAKE_DIRECTORY "${JS_NODE_OUTPUT_DIR}")
   file(MAKE_DIRECTORY "${JS_EXAMPLES_DIR}")
 
   set(CP_SAT_COMMON_SOURCES
@@ -215,22 +217,30 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
     "-sEXPORT_NAME=cpSatModule"
-    "-sENVIRONMENT=web,worker"
     "-sASSERTIONS=1"
     "-sALLOW_MEMORY_GROWTH=1"
-    "-sUSE_PTHREADS=1"
-    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency"
-    "-sPTHREAD_POOL_SIZE_STRICT=2"
     "--bind"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free','_solve_model','_solve_model_with_callback_events','_free_buffer','_validate_model','_interrupt_solve','_get_cp_model_schema','_get_sat_parameters_schema']"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8"
     "-sNODEJS_CATCH_REJECTION=0"
     "-sNODEJS_CATCH_EXIT=0"
-    "-pthread"
-    "--shared-memory"
     "--no-entry"
     "-gsource-map"
     "--source-map-base=./")
+
+  set(CP_SAT_PTHREAD_LINK_OPTIONS
+    "-sUSE_PTHREADS=1"
+    "-sPTHREAD_POOL_SIZE_STRICT=2"
+    "-pthread"
+    "--shared-memory")
+
+  set(CP_SAT_BROWSER_LINK_OPTIONS
+    "-sENVIRONMENT=web,worker"
+    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
+
+  set(CP_SAT_NODE_LINK_OPTIONS
+    "-sENVIRONMENT=node"
+    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
 
   set(CP_SAT_JSPI_LINK_OPTIONS
     "-sJSPI=2"
@@ -251,6 +261,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     RUNTIME_OUTPUT_DIRECTORY "${JS_OUTPUT_DIR}")
   target_link_options(cp_sat_runtime PRIVATE
     ${CP_SAT_COMMON_LINK_OPTIONS}
+    ${CP_SAT_PTHREAD_LINK_OPTIONS}
+    ${CP_SAT_BROWSER_LINK_OPTIONS}
     ${CP_SAT_JSPI_LINK_OPTIONS}
     "--emit-tsd"
     "${JS_OUTPUT_DIR}/cp_sat_runtime.d.ts")
@@ -267,10 +279,43 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     RUNTIME_OUTPUT_DIRECTORY "${JS_OUTPUT_DIR}")
   target_link_options(cp_sat_runtime_asyncify PRIVATE
     ${CP_SAT_COMMON_LINK_OPTIONS}
+    ${CP_SAT_PTHREAD_LINK_OPTIONS}
+    ${CP_SAT_BROWSER_LINK_OPTIONS}
     ${CP_SAT_ASYNCIFY_LINK_OPTIONS})
 
+  add_executable(cp_sat_runtime_node_asyncify
+    ${CP_SAT_COMMON_SOURCES})
+  add_dependencies(cp_sat_runtime_node_asyncify generate_proto_schemas)
+  target_link_libraries(cp_sat_runtime_node_asyncify PRIVATE ${PROJECT_NAMESPACE}::ortools)
+  target_include_directories(cp_sat_runtime_node_asyncify PRIVATE "${PROJECT_BINARY_DIR}/javascript")
+  target_compile_definitions(cp_sat_runtime_node_asyncify PRIVATE
+    ORTOOLS_WASM_ALLOWED_ORIGINS="${EMSCRIPTEN_ALLOWED_ORIGINS_ESCAPED}")
+  set_target_properties(cp_sat_runtime_node_asyncify PROPERTIES
+    OUTPUT_NAME "cp_sat_runtime_node_asyncify"
+    RUNTIME_OUTPUT_DIRECTORY "${JS_NODE_OUTPUT_DIR}")
+  target_link_options(cp_sat_runtime_node_asyncify PRIVATE
+    ${CP_SAT_COMMON_LINK_OPTIONS}
+    ${CP_SAT_PTHREAD_LINK_OPTIONS}
+    ${CP_SAT_NODE_LINK_OPTIONS}
+    ${CP_SAT_ASYNCIFY_LINK_OPTIONS})
+
+  add_executable(cp_sat_runtime_node
+    ${CP_SAT_COMMON_SOURCES})
+  add_dependencies(cp_sat_runtime_node generate_proto_schemas)
+  target_link_libraries(cp_sat_runtime_node PRIVATE ${PROJECT_NAMESPACE}::ortools)
+  target_include_directories(cp_sat_runtime_node PRIVATE "${PROJECT_BINARY_DIR}/javascript")
+  target_compile_definitions(cp_sat_runtime_node PRIVATE
+    ORTOOLS_WASM_ALLOWED_ORIGINS="${EMSCRIPTEN_ALLOWED_ORIGINS_ESCAPED}")
+  set_target_properties(cp_sat_runtime_node PROPERTIES
+    OUTPUT_NAME "cp_sat_runtime_node"
+    RUNTIME_OUTPUT_DIRECTORY "${JS_NODE_OUTPUT_DIR}")
+  target_link_options(cp_sat_runtime_node PRIVATE
+    ${CP_SAT_COMMON_LINK_OPTIONS}
+    ${CP_SAT_PTHREAD_LINK_OPTIONS}
+    ${CP_SAT_NODE_LINK_OPTIONS})
+
   add_custom_target(cp_sat_runtime_site ALL
-    DEPENDS cp_sat_runtime cp_sat_runtime_asyncify
+    DEPENDS cp_sat_runtime cp_sat_runtime_asyncify cp_sat_runtime_node cp_sat_runtime_node_asyncify
     COMMENT "Building cp_sat_runtime runtimes")
 endif()
 
