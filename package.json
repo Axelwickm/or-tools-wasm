@@ -64,7 +64,6 @@
     "build/javascript/lib/cp_sat_api.js",
     "build/javascript/lib/cp_sat_api.js.map",
     "build/javascript/browser",
-    "build/javascript/wasm",
     "javascript/lib"
   ],
   "dependencies": {

@@ -1,10 +1,11 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { build, transform } from 'esbuild';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
 const sourceDir = path.join(rootDir, 'javascript/lib');
 const outDir = path.join(rootDir, 'build/javascript/browser');
+const wasmBuildDir = path.join(rootDir, 'build/javascript/wasm');
 
 async function transpileSource(relativePath) {
   const sourcePath = path.join(sourceDir, relativePath);
@@ -44,11 +45,24 @@ async function bundleEntry(entryPoint, outfile) {
   });
 }
 
+async function copyBrowserRuntime(fileName) {
+  const outputPath = path.join(outDir, fileName);
+  await copyFile(path.join(wasmBuildDir, fileName), outputPath);
+  const code = await readFile(outputPath, 'utf8');
+  await writeFile(
+    outputPath,
+    code.replace(
+      /new URL\((["'])(cp_sat_runtime(?:_asyncify)?\.wasm)\1,\s*import\.meta\.url\)/g,
+      (_match, quote, wasmFile) => `${quote}${wasmFile}${quote}`,
+    ),
+  );
+}
+
 const browserLoader = `let modulePromise = null;
 let selectedFlavor = null;
 
-const cpSatRuntimeWasmUrl = new URL('../wasm/cp_sat_runtime.wasm', import.meta.url).href;
-const cpSatRuntimeAsyncifyWasmUrl = new URL('../wasm/cp_sat_runtime_asyncify.wasm', import.meta.url).href;
+const cpSatRuntimeWasmUrl = new URL('../lib/assets/cp_sat_runtime.wasm', import.meta.url).href;
+const cpSatRuntimeAsyncifyWasmUrl = new URL('../lib/assets/cp_sat_runtime_asyncify.wasm', import.meta.url).href;
 
 function isJspiSupported() {
   const wasm = WebAssembly;
@@ -71,10 +85,10 @@ function selectRuntimeFlavor() {
 async function loadFactory() {
   const flavor = selectRuntimeFlavor();
   if (flavor === 'jspi') {
-    const { default: createModule } = await import('../wasm/cp_sat_runtime.js');
+    const { default: createModule } = await import('./cp_sat_runtime.js');
     return createModule;
   }
-  const { default: createModule } = await import('../wasm/cp_sat_runtime_asyncify.js');
+  const { default: createModule } = await import('./cp_sat_runtime_asyncify.js');
   return createModule;
 }
 
@@ -104,4 +118,6 @@ await mkdir(outDir, { recursive: true });
 await bundleEntry('index.ts', 'index.js');
 await bundleEntry('cpsat_worker.ts', 'cpsat_worker.js');
 await transpileSource('cpsat_worker_types.ts');
+await copyBrowserRuntime('cp_sat_runtime.js');
+await copyBrowserRuntime('cp_sat_runtime_asyncify.js');
 await writeFile(path.join(outDir, 'cp_sat_module_loader.js'), browserLoader);
