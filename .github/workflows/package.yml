@@ -50,6 +50,10 @@ jobs:
       - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
 
+      - name: Prepare package README for release tag
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: node scripts/prepare_package_readme.mjs "$GITHUB_REF_NAME"
+
       - name: Build and pack library
         run: npm run pack:lib
 
