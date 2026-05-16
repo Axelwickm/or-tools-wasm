@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>OR-Tools WASM • Vehicle Routing Problem</title>
+		<link rel="stylesheet" href="./example.css">
+		<style>
+			#route-output { margin: 0.75rem 0; }
+			#status { min-height: 10rem; }
+		</style>
+	</head>
+	<body>
+		<nav>
+			<a href="../index.html">← All examples</a>
+			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+		</nav>
+		<h1>Vehicle Routing Problem (OR-Tools WASM)</h1>
+		<p>This adapts <code>vrp.py</code>: four vehicles route across a 17-location distance matrix.</p>
+		<div class="controls">
+			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<button id="run">Solve VRP</button>
+		</div>
+		<div id="route-output">Run the solver to view vehicle routes.</div>
+		<p>Status / Response:</p>
+		<pre id="status"></pre>
+
+		<script type="module" src="./routing_vrp.ts"></script>
+	</body>
+</html>

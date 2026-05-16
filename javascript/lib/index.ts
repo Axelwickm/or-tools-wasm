@@ -6,6 +6,24 @@ export { CpSat } from './cp_sat_api.js';
 export { default } from './cp_sat_api.js';
 export type { CpSatApi, CpSatModelInstance, CpSatSolveCallbacks, CpSatSolveResult } from './cp_sat_api.js';
 export {
+  Assignment,
+  BOOL_FALSE,
+  BOOL_TRUE,
+  BOOL_UNSPECIFIED,
+  BoundCost,
+  DefaultRoutingModelParameters,
+  DefaultRoutingSearchParameters,
+  FindErrorInRoutingSearchParameters,
+  FirstSolutionStrategy,
+  initRouting,
+  LocalSearchMetaheuristic,
+  RoutingDimension,
+  RoutingIndexManager,
+  RoutingModel,
+  RoutingSearchStatus,
+} from './routing_api.js';
+export type { RoutingModelParameters, RoutingSearchParameters } from './routing_api.js';
+export {
   CpSolverStatus,
   DecisionStrategyProto_DomainReductionStrategy,
   DecisionStrategyProto_VariableSelectionStrategy,

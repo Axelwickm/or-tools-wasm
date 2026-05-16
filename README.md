@@ -1,6 +1,6 @@
 # or-tools-wasm - solve complex constraint problems in browser
 
-Solve complex models directly in the browser with Google OR-Tools CP-SAT
+Solve complex optimization models directly in the browser with Google OR-Tools
 running as multithreaded WebAssembly.
 
 ## [Try Online](https://axelwickman.com/or-tools-wasm)
@@ -35,7 +35,7 @@ npm install or-tools-wasm
 import { CpSat } from 'or-tools-wasm';
 ```
 
-Currently supported solvers: CP-SAT.
+Currently supported solvers: CP-SAT and routing.
 
 Verified with:
 
@@ -46,14 +46,20 @@ Verified with:
 - Deno runtime solves
 - Bun runtime solves
 
-The CP-SAT contract tests mirror the public OR-Tools Python CP-SAT API tests
-where they map to this package's proto-first TypeScript API.
+The TypeScript API intentionally mirrors the public OR-Tools API shape where it
+maps cleanly to WebAssembly, so upstream examples and tests are useful contract
+references. CP-SAT stays proto-first, while routing exposes familiar
+`RoutingIndexManager`, `RoutingModel`, callback, dimension, and search-parameter
+entry points.
 
 ## What is included
 
-- A CP-SAT WebAssembly runtime built with Emscripten pthread support.
+- A CP-SAT and routing WebAssembly runtime built with Emscripten pthread
+  support.
 - A TypeScript API for solving, validating models, interrupting solves, and
   reading embedded proto schemas.
+- An OR-Tools-style routing API for `RoutingIndexManager`, `RoutingModel`,
+  transit callbacks, search parameters, and solution traversal.
 - A worker bridge for keeping browser UI threads responsive while solving.
 - Generated TypeScript definitions for SAT parameters.
 - Demo pages for Magic Square, Sports Scheduling, Steel Mill Slab, and schema
@@ -100,6 +106,40 @@ const result = await CpSat.solve(modelBytes, {
 });
 
 console.log(result.response);
+```
+
+```ts
+import {
+  DefaultRoutingSearchParameters,
+  FirstSolutionStrategy,
+  initRouting,
+  RoutingIndexManager,
+  RoutingModel,
+} from 'or-tools-wasm';
+
+await initRouting();
+
+const manager = new RoutingIndexManager(5, 1, 0);
+const routing = new RoutingModel(manager);
+
+const transit = routing.RegisterTransitCallback((from, to) => {
+  const fromNode = manager.IndexToNode(from);
+  const toNode = manager.IndexToNode(to);
+  return Math.abs(toNode - fromNode);
+});
+
+routing.SetArcCostEvaluatorOfAllVehicles(transit);
+
+const parameters = DefaultRoutingSearchParameters();
+parameters.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
+
+const assignment = await routing.SolveWithParameters(parameters);
+
+if (!assignment) {
+  throw new Error('No routing solution found');
+}
+
+console.log(assignment.ObjectiveValue());
 ```
 
 ## Browser hosting requirements
@@ -272,8 +312,8 @@ npm run preview
 ```
 
 `npm run build` runs the full pipeline: Emscripten/CMake builds the low-level
-CP-SAT WebAssembly runtime, Vite builds the package bundle, and Vite builds the
-static demo site.
+WebAssembly runtime, Vite builds the package bundle, and Vite builds the static
+demo site.
 
 The Emscripten SDK is tracked as a pinned `emsdk` git submodule. The build
 script initializes that submodule automatically if needed, so a normal clone can
@@ -294,8 +334,12 @@ submodules up front, clone with `--recurse-submodules` or run
 ## Project layout
 
 - `javascript/lib` contains the TypeScript package API and worker bridge.
+- `javascript/lib/runtime_loader.ts` selects the JSPI or Asyncify WebAssembly runtime.
+- `javascript/lib/worker_bridge.ts` owns the hidden browser worker bridge used by browser solves.
+- `javascript/lib/worker_protocol.ts` defines the internal worker message protocol shared by solvers.
 - `javascript/site` contains the demo pages.
-- `javascript/cp_sat_api.cc` contains the C++ binding layer compiled into WebAssembly.
+- `javascript/cp_sat_api.cc` contains the CP-SAT C++ binding layer compiled into WebAssembly.
+- `javascript/routing_api.cc` contains the routing C++ binding layer compiled into WebAssembly.
 - `scripts/embed_proto.cmake` embeds CP-SAT proto schemas into the runtime.
 - `scripts/generate_sat_parameters_types.mjs` generates TypeScript SAT parameter definitions.
 - `vite.lib.config.ts` builds the distributable JS package.
@@ -309,17 +353,23 @@ submodules up front, clone with `--recurse-submodules` or run
 
 ## JSPI and Asyncify
 
-The package ships two CP-SAT runtime builds:
+The package ships two runtime builds:
 
 - `cp_sat_runtime` uses Emscripten JSPI support (`-sJSPI=2`) for browsers that expose `WebAssembly.promising`.
 - `cp_sat_runtime_asyncify` uses classic Asyncify stack rewriting for browsers without JSPI support.
 
-`javascript/lib/cp_sat_module_loader.ts` chooses the runtime at startup. If
+`javascript/lib/runtime_loader.ts` chooses the runtime at startup. If
 `WebAssembly.promising` is available, it imports the JSPI runtime, which is the
 more modern and faster path. Otherwise it falls back to the Asyncify runtime.
 Both paths expose the same TypeScript API, so application code does not need to
 choose one manually. Current browser support for JSPI is tracked at
 [caniuse.com/wf-wasm-jspi](https://caniuse.com/wf-wasm-jspi).
+
+Browser solves use the hidden worker bridge by default. Routing transit
+callbacks are precomputed into a serializable transit matrix before being sent
+to that worker, so application code does not manage worker wiring. The worker
+tries the JSPI runtime first and falls back to Asyncify if the browser reports a
+JSPI suspend error.
 
 ## Upstream OR-Tools
 

@@ -13,12 +13,17 @@ declare module '*.d.ts?url' {
   export default src;
 }
 
+declare module '*.js?url&no-inline' {
+  const src: string;
+  export default src;
+}
+
 declare module '*.js?worker&url' {
   const src: string;
   export default src;
 }
 
-declare module './cpsat_worker?worker' {
+declare module '*.ts?worker' {
   type WorkerClass = new () => Worker;
   const WorkerCtor: WorkerClass;
   export default WorkerCtor;

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>OR-Tools WASM • Simple Routing</title>
+		<link rel="stylesheet" href="./example.css">
+		<style>
+			#route-output { margin: 0.75rem 0; }
+			#status { min-height: 9rem; }
+		</style>
+	</head>
+	<body>
+		<nav>
+			<a href="../index.html">← All examples</a>
+			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+		</nav>
+		<h1>Simple Routing (OR-Tools WASM)</h1>
+		<p>This adapts <code>simple_routing_program.py</code>: one vehicle visits five locations and minimizes arc distance.</p>
+		<div class="controls">
+			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<button id="run">Solve route</button>
+		</div>
+		<div id="route-output">Run the solver to view the route.</div>
+		<p>Status / Response:</p>
+		<pre id="status"></pre>
+
+		<script type="module" src="./routing_simple.ts"></script>
+	</body>
+</html>

@@ -211,6 +211,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_COMMON_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/cp_sat_api.cc"
+    "${PROJECT_SOURCE_DIR}/javascript/routing_api.cc"
     "${PROTO_SCHEMA_HEADER}")
 
   set(CP_SAT_COMMON_LINK_OPTIONS
@@ -219,8 +220,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-sEXPORT_NAME=cpSatModule"
     "-sASSERTIONS=1"
     "-sALLOW_MEMORY_GROWTH=1"
+    "-sWASM_BIGINT=1"
     "--bind"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_solve_model','_solve_model_with_callback_events','_free_buffer','_validate_model','_interrupt_solve','_get_cp_model_schema','_get_sat_parameters_schema']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_solve_model','_solve_model_with_callback_events','_free_buffer','_validate_model','_interrupt_solve','_get_cp_model_schema','_get_sat_parameters_schema','_routing_create_index_manager','_routing_delete_index_manager','_routing_manager_index_to_node','_routing_manager_node_to_index','_routing_manager_num_indices','_routing_create_model','_routing_delete_model','_routing_register_transit_callback','_routing_register_matrix_transit_callback','_routing_set_arc_cost_evaluator_of_all_vehicles','_routing_solve_with_parameters','_routing_assignment_objective_value','_routing_start','_routing_is_end','_routing_next_value','_routing_get_arc_cost_for_vehicle']"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8"
     "-sNODEJS_CATCH_REJECTION=0"
     "-sNODEJS_CATCH_EXIT=0"
@@ -244,7 +246,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_JSPI_LINK_OPTIONS
     "-sJSPI=2"
-    "-sJSPI_EXPORTS=['solve_model','validate_model']")
+    "-sJSPI_EXPORTS=['solve_model','validate_model','routing_solve_with_parameters']")
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")

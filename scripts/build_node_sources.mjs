@@ -7,9 +7,9 @@ const sourceDir = path.join(rootDir, 'javascript/lib');
 const outDir = path.join(rootDir, 'build/javascript/node');
 
 const externalLoaderPlugin = {
-  name: 'external-cp-sat-node-loader',
+  name: 'external-runtime-node-loader',
   setup(buildContext) {
-    buildContext.onResolve({ filter: /^\.\/cp_sat_module_loader\.js$/ }, (args) => ({
+    buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader)\.js$/ }, (args) => ({
       path: args.path,
       external: true,
     }));
@@ -31,12 +31,11 @@ await build({
 });
 
 await writeFile(
-  path.join(outDir, 'cp_sat_module_loader.js'),
+  path.join(outDir, 'runtime_loader.js'),
   `import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import createNodeModule from '../node-wasm/cp_sat_runtime_node.js';
-import createWebAsyncifyModule from '../browser/cp_sat_runtime_asyncify.js';
-import createWebModule from '../browser/cp_sat_runtime.js';
+import createWebAsyncifyModule from '../wasm/cp_sat_runtime_asyncify.js';
 
 let modulePromise = null;
 
@@ -52,28 +51,25 @@ function isWebWorkerRuntimeHost() {
 
 function locateCpSatWebRuntimeFile(fileName) {
   if (fileName === 'cp_sat_runtime.wasm') {
-    return new URL('../lib/assets/cp_sat_runtime.wasm', import.meta.url).href;
+    return new URL('../wasm/cp_sat_runtime.wasm', import.meta.url).href;
   }
   if (fileName === 'cp_sat_runtime_asyncify.wasm') {
-    return new URL('../lib/assets/cp_sat_runtime_asyncify.wasm', import.meta.url).href;
+    return new URL('../wasm/cp_sat_runtime_asyncify.wasm', import.meta.url).href;
   }
   return new URL(\`../browser/\${fileName}\`, import.meta.url).href;
 }
 
 async function loadWebWorkerRuntime() {
-  const isBun = typeof globalThis.Bun !== 'undefined';
-  const wasmFile = isBun
-    ? '../lib/assets/cp_sat_runtime_asyncify.wasm'
-    : '../lib/assets/cp_sat_runtime.wasm';
+  const wasmFile = '../wasm/cp_sat_runtime_asyncify.wasm';
   const wasmBinary = await readFile(new URL(wasmFile, import.meta.url));
-  const createModule = isBun ? createWebAsyncifyModule : createWebModule;
+  const createModule = createWebAsyncifyModule;
   return createModule({
     locateFile: locateCpSatWebRuntimeFile,
     wasmBinary,
   });
 }
 
-export async function loadCpSat() {
+export async function loadRuntime() {
   if (!modulePromise) {
     modulePromise = isWebWorkerRuntimeHost()
       ? loadWebWorkerRuntime()
@@ -81,5 +77,16 @@ export async function loadCpSat() {
   }
   return modulePromise;
 }
+
+export async function loadRuntimeAsyncify() {
+  return loadRuntime();
+}
+
+export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };
 `,
+);
+
+await writeFile(
+  path.join(outDir, 'cp_sat_module_loader.js'),
+  `export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify } from './runtime_loader.js';\n`,
 );

@@ -12,18 +12,25 @@
   </style>
 </head>
 <body>
-  <h1>CP-SAT WASM Examples</h1>
+  <h1>OR-Tools WASM Examples</h1>
   <p>
-    Select an example to launch a demo powered by the <code>cp_sat_api</code> high-level bridge.
+    Select an example to launch a browser demo powered by the OR-Tools WebAssembly package.
     Source code is available on
     <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>.
   </p>
-    <ul>
-      <li><a href="./magic_square.html">Magic Square (model + solve entirely in JS/WASM)</a></li>
-      <li><a href="./model_playground.html">Model Playground (paste JSON CpModelProto text and solve it)</a></li>
-      <li><a href="./schema_viewer.html">Schema Viewer (print embedded proto schemas)</a></li>
-      <li><a href="./sports_scheduling.html">Sports Scheduling (double round-robin minimization)</a></li>
-      <li><a href="./steel_mill_slab.html">Steel Mill Slab (three solver variants)</a></li>
-    </ul>
+  <h2>CP-SAT</h2>
+  <ul>
+    <li><a href="./magic_square.html">Magic Square (model + solve entirely in JS/WASM)</a></li>
+    <li><a href="./model_playground.html">Model Playground (paste JSON CpModelProto text and solve it)</a></li>
+    <li><a href="./schema_viewer.html">Schema Viewer (print embedded proto schemas)</a></li>
+    <li><a href="./sports_scheduling.html">Sports Scheduling (double round-robin minimization)</a></li>
+    <li><a href="./steel_mill_slab.html">Steel Mill Slab (three solver variants)</a></li>
+  </ul>
+  <h2>Routing</h2>
+  <ul>
+    <li><a href="./routing_simple.html">Simple Routing (direct port of the basic OR-Tools example)</a></li>
+    <li><a href="./routing_vrp.html">Vehicle Routing Problem (direct port of the VRP example)</a></li>
+    <li><a href="./routing_dispatch.html">Dispatch Map (multi-depot route planning with animated 2D routes)</a></li>
+  </ul>
 </body>
 </html>

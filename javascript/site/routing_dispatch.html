@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>OR-Tools WASM • Dispatch Map</title>
+		<link rel="stylesheet" href="./example.css">
+		<style>
+			#map {
+				display: block;
+				width: 100%;
+				max-width: 980px;
+				aspect-ratio: 16 / 9;
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				background: #f6f8fa;
+			}
+			#route-output { margin: 0.75rem 0; }
+			#status { min-height: 9rem; }
+		</style>
+	</head>
+	<body>
+		<nav>
+			<a href="../index.html">← All examples</a>
+			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+		</nav>
+		<h1>Dispatch Map (OR-Tools WASM)</h1>
+		<p>A multi-depot last-mile routing problem with three vehicles and deliveries spread across a city grid.</p>
+		<div class="controls">
+			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<button id="run">Plan dispatch</button>
+		</div>
+		<canvas id="map" width="1280" height="720"></canvas>
+		<div id="route-output">Run the solver to animate dispatch routes.</div>
+		<p>Status / Response:</p>
+		<pre id="status"></pre>
+
+		<script type="module" src="./routing_dispatch.ts"></script>
+	</body>
+</html>

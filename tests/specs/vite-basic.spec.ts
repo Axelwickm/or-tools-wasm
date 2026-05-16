@@ -69,6 +69,19 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
         pthread?: number;
       };
     }>;
+    routingResults?: Array<{
+      name?: string;
+      ok?: boolean;
+      objective?: number;
+      routeDistance?: number;
+      route?: number[];
+    }>;
+    routingWorkerStatsBefore?: {
+      routingSolve?: number;
+    };
+    routingWorkerStatsAfter?: {
+      routingSolve?: number;
+    };
   };
   expect(parsedStatus.results).toHaveLength(4);
   expect(parsedStatus.results).toEqual([
@@ -96,4 +109,12 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
     }),
   );
   expect(parsedStatus.results?.[2].workerStats?.total).toBeGreaterThanOrEqual(5);
+  expect(parsedStatus.routingResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      name: 'TestPyWrapRoutingModel.testRoutingSearchParameters',
+      ok: true,
+    }),
+  ]));
+  expect(parsedStatus.routingWorkerStatsBefore?.routingSolve).toBe(0);
+  expect(parsedStatus.routingWorkerStatsAfter?.routingSolve).toBeGreaterThan(1);
 });

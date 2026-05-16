@@ -9,7 +9,6 @@ const rootDir = __dirname;
 const libRoot = path.resolve(__dirname, 'javascript/lib');
 const wasmBuildDir = path.resolve(__dirname, 'build/javascript/wasm');
 const outDir = path.resolve(__dirname, 'build/javascript/lib');
-const bundledLoaderPath = path.join(libRoot, 'cp_sat_module_loader.bundled.ts');
 
 const unwrapDataUrlWorkers = (code: string) =>
   code.replace(
@@ -82,7 +81,9 @@ export default defineConfig({
   assetsInclude: ['**/*.d.ts'],
   resolve: {
     alias: {
-      './cp_sat_module_loader.js': bundledLoaderPath,
+      './runtime_loader.js': path.join(libRoot, 'runtime_loader.ts'),
+      './cp_sat_module_loader.js': path.join(libRoot, 'cp_sat_module_loader.ts'),
+      '#internal-wasm': wasmBuildDir,
       '@internal-wasm': wasmBuildDir
     }
   },
@@ -105,6 +106,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         assetFileNames: 'assets/[name][extname]',
+        chunkFileNames: 'assets/[name].js',
       },
     },
   },
@@ -113,7 +115,7 @@ export default defineConfig({
     lib: {
       entry: path.join(libRoot, 'index.ts'),
       formats: ['es'],
-      fileName: 'cp_sat_api',
+      fileName: 'index',
     },
     outDir,
     emptyOutDir: true,

@@ -1,8 +1,9 @@
 /// <reference lib="webworker" />
 
 import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
-import { loadCpSat } from './cp_sat_module_loader.js';
-import type { WorkerRequest, WorkerResponse } from './cpsat_worker_types.js';
+import { loadRuntime } from './runtime_loader.js';
+import { solveRoutingInWorker } from './worker_routing.js';
+import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
 const workerScope = self as DedicatedWorkerGlobalScope;
 
@@ -13,7 +14,7 @@ const LOG_CALLBACK_EVENT = 3;
 let moduleInstance: MainModule | null = null;
 
 // The loader handles locateFile and mainScriptUrlOrBlob automatically now.
-const moduleReady = loadCpSat()
+const moduleReady = loadRuntime()
   .then((module: MainModule) => {
     moduleInstance = module;
     workerScope.postMessage({ type: 'ready' } satisfies WorkerResponse);
@@ -199,6 +200,14 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         type: 'solveResult',
         id: message.id,
         bytes,
+      } satisfies WorkerResponse);
+      return;
+    } else if (message.type === 'routingSolve') {
+      const result = await solveRoutingInWorker(moduleInstance, message);
+      workerScope.postMessage({
+        type: 'routingSolveResult',
+        id: message.id,
+        result,
       } satisfies WorkerResponse);
       return;
     } else if (message.type === "getSchemas") {

@@ -522,6 +522,7 @@ endif()
 set(ORTOOLS_CPP_SUBPROJECTS
  algorithms
  base
+ constraint_solver
  init
  glop
  graph

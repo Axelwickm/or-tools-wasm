@@ -12,21 +12,25 @@
     "url": "https://github.com/Axelwickm/or-tools-wasm/issues"
   },
   "type": "module",
-  "main": "./build/javascript/lib/cp_sat_api.js",
-  "types": "./build/javascript/lib/cp_sat_api.d.ts",
+  "main": "./build/javascript/node/index.js",
+  "types": "./build/javascript/lib/index.d.ts",
   "exports": {
     ".": {
-      "types": "./build/javascript/lib/cp_sat_api.d.ts",
+      "types": "./build/javascript/lib/index.d.ts",
       "bun": "./build/javascript/node/index.js",
       "deno": "./build/javascript/node/index.js",
       "node": "./build/javascript/node/index.js",
       "browser": "./build/javascript/browser/index.js",
-      "import": "./build/javascript/lib/cp_sat_api.js",
-      "default": "./build/javascript/lib/cp_sat_api.js"
+      "import": "./build/javascript/browser/index.js",
+      "default": "./build/javascript/browser/index.js"
     },
     "./build/javascript/lib/*": "./build/javascript/lib/*"
   },
   "imports": {
+    "#internal-wasm/cp_sat_runtime.js": "./build/javascript/wasm/cp_sat_runtime.js",
+    "#internal-wasm/cp_sat_runtime_asyncify.js": "./build/javascript/wasm/cp_sat_runtime_asyncify.js",
+    "#internal-wasm/cp_sat_runtime.wasm": "./build/javascript/wasm/cp_sat_runtime.wasm",
+    "#internal-wasm/cp_sat_runtime_asyncify.wasm": "./build/javascript/wasm/cp_sat_runtime_asyncify.wasm",
     "#internal-wasm/*": "./build/javascript/wasm/*"
   },
   "scripts": {
@@ -65,11 +69,8 @@
     "test:fixtures": "npm run test:fixture:vite && npm run test:fixture:webpack && npm run test:fixture:rollup && npm run test:fixture:deno && npm run test:fixture:node && npm run test:fixture:bun"
   },
   "files": [
-    "build/javascript/lib/assets",
-    "build/javascript/lib/chunks",
-    "build/javascript/lib/cp_sat_api.d.ts",
-    "build/javascript/lib/cp_sat_api.js",
-    "build/javascript/lib/cp_sat_api.js.map",
+    "build/javascript/lib/index.d.ts",
+    "build/javascript/wasm",
     "build/javascript/browser",
     "build/javascript/node",
     "build/javascript/node-wasm",
