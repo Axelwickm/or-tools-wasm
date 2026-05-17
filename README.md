@@ -79,6 +79,10 @@ manual copying into `public/` or `static/` required.
 
 ## Usage
 
+The smallest flow is: create or serialize an OR-Tools proto model, validate it,
+then solve it. The same package also exposes routing, MPSolver, and MathOpt APIs;
+see the online demos for complete examples of those solvers.
+
 ```ts
 const model = {
   name: 'choose_one',
@@ -114,115 +118,6 @@ const result = await CpSat.solve(modelBytes, {
 });
 
 console.log(result.response);
-```
-
-```ts
-import {
-  DefaultRoutingSearchParameters,
-  FirstSolutionStrategy,
-  initRouting,
-  RoutingIndexManager,
-  RoutingModel,
-} from 'or-tools-wasm';
-
-await initRouting();
-
-const manager = new RoutingIndexManager(5, 1, 0);
-const routing = new RoutingModel(manager);
-
-const transit = routing.RegisterTransitCallback((from, to) => {
-  const fromNode = manager.IndexToNode(from);
-  const toNode = manager.IndexToNode(to);
-  return Math.abs(toNode - fromNode);
-});
-
-routing.SetArcCostEvaluatorOfAllVehicles(transit);
-
-const parameters = DefaultRoutingSearchParameters();
-parameters.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-
-const assignment = await routing.SolveWithParameters(parameters);
-
-if (!assignment) {
-  throw new Error('No routing solution found');
-}
-
-console.log(assignment.ObjectiveValue());
-```
-
-```ts
-import { initMPSolver, MPSolver, MPSolverParameters } from 'or-tools-wasm';
-
-await initMPSolver();
-
-const solver = MPSolver.CreateSolver('GLOP');
-if (!solver) {
-  throw new Error('GLOP is not available');
-}
-
-const infinity = solver.infinity();
-const x = solver.NumVar(0, infinity, 'x');
-const y = solver.NumVar(0, infinity, 'y');
-
-const c0 = solver.Constraint(-infinity, 17.5);
-c0.SetCoefficient(x, 1);
-c0.SetCoefficient(y, 7);
-
-const c1 = solver.Constraint(-infinity, 3.5);
-c1.SetCoefficient(x, 1);
-
-const objective = solver.Objective();
-objective.SetCoefficient(x, 1);
-objective.SetCoefficient(y, 10);
-objective.SetMaximization();
-
-const params = new MPSolverParameters();
-params.SetIntegerParam(MPSolverParameters.PRESOLVE, MPSolverParameters.PRESOLVE_ON);
-
-const status = solver.Solve(params);
-if (status !== MPSolver.OPTIMAL) {
-  throw new Error(`Solve failed with status ${status}`);
-}
-
-console.log(objective.Value(), x.solution_value(), y.solution_value());
-params.delete();
-solver.delete();
-```
-
-```ts
-import { initMathOpt, MathOpt } from 'or-tools-wasm';
-
-await initMathOpt();
-
-const model = MathOpt.Model('production');
-const x = model.addVariable({ lowerBound: 0, name: 'x' });
-const y = model.addVariable({ lowerBound: 0, name: 'y' });
-
-model.addLinearConstraint({
-  upperBound: 14,
-  terms: [
-    { variable: x, coefficient: 1 },
-    { variable: y, coefficient: 1 },
-  ],
-});
-model.addLinearConstraint({
-  upperBound: 20,
-  terms: [
-    { variable: x, coefficient: 2 },
-    { variable: y, coefficient: 1 },
-  ],
-});
-model.maximize([
-  { variable: x, coefficient: 3 },
-  { variable: y, coefficient: 4 },
-]);
-
-const result = await MathOpt.solve(model, {
-  solverType: MathOpt.SolverType.GLOP,
-  threads: 4,
-});
-
-console.log(result.objectiveValue, result.variableValues);
 ```
 
 ## Browser hosting requirements
@@ -406,7 +301,7 @@ submodules up front, clone with `--recurse-submodules` or run
 
 ## npm scripts
 
-- `npm run build:wasm` rebuilds the `cp_sat_runtime` wasm/js bundle via emsdk + CMake.
+- `npm run build:wasm` rebuilds the WebAssembly runtimes via emsdk + CMake.
 - `npm run build:lib` regenerates SAT parameter types, type-checks with `tsc`, and builds the library bundle with `vite.lib.config.ts`.
 - `npm run build:site` builds the demo site with `vite.site.config.ts`. The site imports `or-tools-wasm` directly, so Vite emits the worker/runtime/wasm assets from the package bundle automatically.
 - `npm run build` runs `build:wasm`, `build:lib`, and `build:site`.
@@ -417,7 +312,7 @@ submodules up front, clone with `--recurse-submodules` or run
 ## Project layout
 
 - `javascript/lib` contains the TypeScript package API and worker bridge.
-- `javascript/lib/runtime_loader.ts` selects the JSPI or Asyncify WebAssembly runtime.
+- `javascript/lib/runtime_loader.ts` loads solver-specific browser runtimes and the compatibility runtime used by Node, Deno, and Bun.
 - `javascript/lib/worker_bridge.ts` owns the hidden browser worker bridge used by browser solves.
 - `javascript/lib/worker_protocol.ts` defines the internal worker message protocol shared by solvers.
 - `javascript/site` contains the demo pages.
@@ -438,16 +333,19 @@ submodules up front, clone with `--recurse-submodules` or run
 
 ## JSPI and Asyncify
 
-The package ships two runtime builds:
+The package ships separate browser runtime builds so importing one solver does
+not force every solver runtime into the first solve path:
 
 - `cp_sat_runtime` uses Emscripten JSPI support (`-sJSPI=2`) for browsers that expose `WebAssembly.promising`.
 - `cp_sat_runtime_asyncify` uses classic Asyncify stack rewriting for browsers without JSPI support.
+- `routing_runtime_asyncify`, `mp_solver_runtime`, and `mathopt_runtime` are loaded on demand when those APIs are used in browser bundles.
+- `ortools_runtime_asyncify` keeps a combined compatibility runtime for Deno and Bun.
 
-`javascript/lib/runtime_loader.ts` chooses the runtime at startup. If
-`WebAssembly.promising` is available, it imports the JSPI runtime, which is the
-more modern and faster path. Otherwise it falls back to the Asyncify runtime.
-Both paths expose the same TypeScript API, so application code does not need to
-choose one manually. Current browser support for JSPI is tracked at
+For CP-SAT, `javascript/lib/runtime_loader.ts` chooses the runtime at startup.
+If `WebAssembly.promising` is available, it imports the JSPI runtime, which is
+the more modern and faster path. Otherwise it falls back to the Asyncify
+runtime. Both paths expose the same TypeScript API, so application code does
+not need to choose one manually. Current browser support for JSPI is tracked at
 [caniuse.com/wf-wasm-jspi](https://caniuse.com/wf-wasm-jspi).
 
 Browser solves use the hidden worker bridge by default. Routing transit
