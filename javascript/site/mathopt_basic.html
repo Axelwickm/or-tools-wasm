@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>MathOpt - Basic Model</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 8rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+      <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>
+    </nav>
+    <h1>MathOpt - basic model sample</h1>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code><span class="kw">import</span> { MathOpt, initMathOpt } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+MathOpt.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
+<span class="kw">await</span> <span class="fn">initMathOpt</span>();
+
+<span class="kw">const</span> model = MathOpt.<span class="fn">Model</span>(<span class="str">'Basic MathOpt example'</span>);
+<span class="kw">const</span> x = model.<span class="fn">addVariable</span>({ lowerBound: <span class="num">0</span>, upperBound: <span class="num">1</span>, name: <span class="str">'x'</span> });
+<span class="kw">const</span> y = model.<span class="fn">addVariable</span>({ lowerBound: <span class="num">0</span>, upperBound: <span class="num">2.5</span>, name: <span class="str">'y'</span> });
+
+model.<span class="fn">addLinearConstraint</span>({ upperBound: <span class="num">1.5</span>, terms: [
+  { variable: x, coefficient: <span class="num">1</span> },
+  { variable: y, coefficient: <span class="num">1</span> },
+]});
+model.<span class="fn">maximize</span>([
+  { variable: x, coefficient: <span class="num">2</span> },
+  { variable: y, coefficient: <span class="num">1</span> },
+]);
+
+<span class="kw">const</span> result = <span class="kw">await</span> MathOpt.<span class="fn">solve</span>(model, {
+  solverType: MathOpt.SolverType.GLOP,
+  threads: <span class="num">4</span>,
+});
+console.<span class="fn">log</span>(result.objectiveValue, result.variableValues);</code></pre>
+      </details>
+    </div>
+    <p>
+      Adapted from <code>ortools/math_opt/samples/python/basic_example.py</code>.
+      The browser demo solves the same two-variable linear model with GLOP.
+    </p>
+    <div class="controls">
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>
+      <button id="run" data-idle-label="Solve model">Solve model</button>
+    </div>
+    <div id="solution-output">Run the solver to view the solution.</div>
+    <p>Status / Response:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./mathopt_basic.ts"></script>
+  </body>
+</html>

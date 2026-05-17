@@ -29,6 +29,20 @@ export type {
   MPSolverSolutionResponse,
 } from './mp_solver_api.js';
 export {
+  initMathOpt,
+  MathOpt,
+  MathOptModel,
+  MathOptSolverType,
+} from './mathopt_api.js';
+export type {
+  MathOptLinearConstraint,
+  MathOptLinearTerm,
+  MathOptSolveOptions,
+  MathOptSolveResult,
+  MathOptVariable,
+  MathOptVariableOptions,
+} from './mathopt_api.js';
+export {
   Assignment,
   BOOL_FALSE,
   BOOL_TRUE,

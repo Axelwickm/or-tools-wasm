@@ -108,7 +108,20 @@ export type MPSolverSolveRequest = {
   requestBytes: Uint8Array;
 };
 
-export type WorkerRequest = SolveRequest | ValidateRequest | SchemaRequest | RoutingSolveRequest | MPSolverSolveRequest | CancelSolve;
+export type MathOptSolveRequest = {
+  type: 'mathOptSolve';
+  id: number;
+  requestBytes: Uint8Array;
+};
+
+export type WorkerRequest =
+  | SolveRequest
+  | ValidateRequest
+  | SchemaRequest
+  | RoutingSolveRequest
+  | MPSolverSolveRequest
+  | MathOptSolveRequest
+  | CancelSolve;
 
 export type WorkerResponse =
   | { type: 'ready' }
@@ -120,5 +133,6 @@ export type WorkerResponse =
   | { type: 'schemaResult'; id: number; schemas: { cp_model: string; sat_parameters: string; linear_solver: string; optional_boolean: string } }
   | { type: 'routingSolveResult'; id: number; result: RoutingSolveResult | null }
   | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
+  | { type: 'mathOptSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'solved_cancelled'; id: number }
   | { type: 'error'; id: number; error: string };

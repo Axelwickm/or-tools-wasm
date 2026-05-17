@@ -47,7 +47,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   endif()
 
   set(BUILD_FLATZINC OFF CACHE BOOL "Build flatzinc" FORCE)
-  set(BUILD_MATH_OPT OFF CACHE BOOL "Build the MATH_OPT" FORCE)
+  set(BUILD_MATH_OPT ON CACHE BOOL "Build the MATH_OPT" FORCE)
   set(BUILD_SAMPLES OFF CACHE BOOL "Build samples" FORCE)
   set(BUILD_EXAMPLES OFF CACHE BOOL "Build examples" FORCE)
   set(USE_GUROBI OFF CACHE BOOL "Use the Gurobi solver" FORCE)
@@ -215,6 +215,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_COMMON_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/cp_sat_api.cc"
+    "${PROJECT_SOURCE_DIR}/javascript/mathopt_api.cc"
     "${PROJECT_SOURCE_DIR}/javascript/mp_solver_api.cc"
     "${PROJECT_SOURCE_DIR}/javascript/routing_api.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/glop_interface.cc"

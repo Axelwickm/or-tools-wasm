@@ -7,15 +7,18 @@ import {
   DefaultRoutingModelParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
+  initMathOpt,
   initMPSolver,
   initRouting,
   LocalSearchMetaheuristic,
+  MathOpt,
   MPSolver,
   MPSolverParameters,
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
+import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
@@ -55,4 +58,9 @@ if (!mpSolverResults.every((result) => result.ok)) {
   throw new Error(`bun MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
 }
 
-console.log(`bun ran ${cpSatCases.length} CP-SAT cases, ${routingResults.length} routing cases, and ${mpSolverResults.length} MPSolver cases across ${results.length} worker profiles`);
+const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+if (!mathOptResults.every((result) => result.ok)) {
+  throw new Error(`bun MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
+}
+
+console.log(`bun ran ${cpSatCases.length} CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, and ${mathOptResults.length} MathOpt cases across ${results.length} worker profiles`);

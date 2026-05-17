@@ -31,6 +31,10 @@ export default defineConfig({
       input: {
         index: path.resolve(siteRoot, 'index.html'),
         magic_square: path.resolve(siteRoot, 'magic_square.html'),
+        mathopt_basic: path.resolve(siteRoot, 'mathopt_basic.html'),
+        mathopt_integer: path.resolve(siteRoot, 'mathopt_integer.html'),
+        mathopt_scheduling: path.resolve(siteRoot, 'mathopt_scheduling.html'),
+        mathopt_simple: path.resolve(siteRoot, 'mathopt_simple.html'),
         model_playground: path.resolve(siteRoot, 'model_playground.html'),
         mp_simple_lp: path.resolve(siteRoot, 'mp_simple_lp.html'),
         mp_simple_mip: path.resolve(siteRoot, 'mp_simple_mip.html'),

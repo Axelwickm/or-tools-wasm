@@ -238,6 +238,34 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         moduleInstance._free(lenPtr);
       }
       return;
+    } else if (message.type === 'mathOptSolve') {
+      const lenPtr = moduleInstance._malloc(4);
+      const requestPtr = copyBytesToHeap(message.requestBytes);
+      let responsePtr = 0;
+      try {
+        responsePtr = moduleInstance.ccall(
+          'mathopt_solve_request',
+          'number',
+          ['number', 'number', 'number'],
+          [requestPtr, message.requestBytes.length, lenPtr],
+        ) as number;
+        const responseLen = readUint32LE(moduleInstance.HEAPU8.buffer, lenPtr);
+        const bytes = responsePtr && responseLen
+          ? moduleInstance.HEAPU8.slice(responsePtr, responsePtr + responseLen)
+          : new Uint8Array();
+        workerScope.postMessage({
+          type: 'mathOptSolveResult',
+          id: message.id,
+          bytes,
+        } satisfies WorkerResponse);
+      } finally {
+        if (responsePtr) {
+          moduleInstance.ccall('free_buffer', undefined, ['number'], [responsePtr]);
+        }
+        if (requestPtr) moduleInstance._free(requestPtr);
+        moduleInstance._free(lenPtr);
+      }
+      return;
     } else if (message.type === "getSchemas") {
       const schemas = {
         cp_model: moduleInstance.ccall('get_cp_model_schema', 'string', [], []),

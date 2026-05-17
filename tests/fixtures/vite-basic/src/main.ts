@@ -1,4 +1,5 @@
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
+import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
 
@@ -21,6 +22,7 @@ type WorkerStats = {
   pthread: number;
   routingSolve: number;
   mpSolverSolve: number;
+  mathOptSolve: number;
 };
 
 type CpSatApi = typeof import('or-tools-wasm')['CpSat'];
@@ -73,6 +75,7 @@ function installWorkerSpy() {
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
+        mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
       };
     },
   };
@@ -101,8 +104,10 @@ async function main() {
     initRouting,
     LocalSearchMetaheuristic,
     initMPSolver,
+    initMathOpt,
     MPSolver,
     MPSolverParameters,
+    MathOpt,
     RoutingIndexManager,
     RoutingModel,
   } = await import('or-tools-wasm');
@@ -135,15 +140,21 @@ async function main() {
     isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
   });
   const mpSolverWorkerStatsAfter = workerSpy.snapshot();
+  const mathOptWorkerStatsBefore = workerSpy.snapshot();
+  const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+  const mathOptWorkerStatsAfter = workerSpy.snapshot();
   setStatus({
     ok: true,
     results,
     routingResults,
     mpSolverResults,
+    mathOptResults,
     routingWorkerStatsBefore,
     routingWorkerStatsAfter,
     mpSolverWorkerStatsBefore,
     mpSolverWorkerStatsAfter,
+    mathOptWorkerStatsBefore,
+    mathOptWorkerStatsAfter,
   });
 }
 

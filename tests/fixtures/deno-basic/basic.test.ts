@@ -7,15 +7,18 @@ import {
   DefaultRoutingModelParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
+  initMathOpt,
   initMPSolver,
   initRouting,
   LocalSearchMetaheuristic,
+  MathOpt,
   MPSolver,
   MPSolverParameters,
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
+import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
@@ -50,5 +53,10 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   const mpSolverResults = await runMPSolverCases({ initMPSolver, MPSolver, MPSolverParameters });
   if (!mpSolverResults.every((result) => result.ok)) {
     throw new Error(`deno MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
+  }
+
+  const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+  if (!mathOptResults.every((result) => result.ok)) {
+    throw new Error(`deno MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
   }
 });

@@ -35,8 +35,9 @@ npm install or-tools-wasm
 import { CpSat } from 'or-tools-wasm';
 ```
 
-Currently supported solvers: CP-SAT, routing, and MPSolver with the GLOP LP
-and SAT MIP backends.
+Currently supported solvers: CP-SAT, routing, MPSolver with the GLOP LP and
+SAT MIP backends, and MathOpt with GLOP and CP-SAT through its unified solve
+request path.
 
 Verified with:
 
@@ -53,21 +54,24 @@ references. CP-SAT stays proto-first, while routing exposes familiar
 `RoutingIndexManager`, `RoutingModel`, callback, dimension, and search-parameter
 entry points. MPSolver exposes the familiar `pywraplp`-style solver, variable,
 constraint, objective, and parameter entry points for linear and mixed-integer
-models.
+models. MathOpt exposes a TypeScript model builder that serializes native
+MathOpt solve requests.
 
 ## What is included
 
-- A CP-SAT, routing, and MPSolver WebAssembly runtime built with Emscripten pthread
-  support.
+- A CP-SAT, routing, MPSolver, and MathOpt WebAssembly runtime built with
+  Emscripten pthread support.
 - A TypeScript API for solving, validating models, interrupting solves, and
   reading embedded proto schemas.
 - An OR-Tools-style routing API for `RoutingIndexManager`, `RoutingModel`,
   transit callbacks, search parameters, and solution traversal.
 - An OR-Tools-style MPSolver API for `MPSolver`, `MPSolverParameters`,
   `MPVariable`, `MPConstraint`, and `MPObjective` using GLOP and SAT.
+- A MathOpt API for building linear models and solving them through GLOP or
+  CP-SAT.
 - A worker bridge for keeping browser UI threads responsive while solving.
 - Generated TypeScript definitions for SAT parameters.
-- Demo pages for CP-SAT, routing, MPSolver, and schema inspection.
+- Demo pages for CP-SAT, routing, MPSolver, MathOpt, and schema inspection.
 
 This flow is verified with Vite, Webpack, and Rollup. The worker script and
 WebAssembly files are emitted automatically from the package import, with no
@@ -183,6 +187,42 @@ if (status !== MPSolver.OPTIMAL) {
 console.log(objective.Value(), x.solution_value(), y.solution_value());
 params.delete();
 solver.delete();
+```
+
+```ts
+import { initMathOpt, MathOpt } from 'or-tools-wasm';
+
+await initMathOpt();
+
+const model = MathOpt.Model('production');
+const x = model.addVariable({ lowerBound: 0, name: 'x' });
+const y = model.addVariable({ lowerBound: 0, name: 'y' });
+
+model.addLinearConstraint({
+  upperBound: 14,
+  terms: [
+    { variable: x, coefficient: 1 },
+    { variable: y, coefficient: 1 },
+  ],
+});
+model.addLinearConstraint({
+  upperBound: 20,
+  terms: [
+    { variable: x, coefficient: 2 },
+    { variable: y, coefficient: 1 },
+  ],
+});
+model.maximize([
+  { variable: x, coefficient: 3 },
+  { variable: y, coefficient: 4 },
+]);
+
+const result = await MathOpt.solve(model, {
+  solverType: MathOpt.SolverType.GLOP,
+  threads: 4,
+});
+
+console.log(result.objectiveValue, result.variableValues);
 ```
 
 ## Browser hosting requirements
@@ -384,6 +424,7 @@ submodules up front, clone with `--recurse-submodules` or run
 - `javascript/cp_sat_api.cc` contains the CP-SAT C++ binding layer compiled into WebAssembly.
 - `javascript/routing_api.cc` contains the routing C++ binding layer compiled into WebAssembly.
 - `javascript/mp_solver_api.cc` contains the MPSolver C++ binding layer compiled into WebAssembly.
+- `javascript/mathopt_api.cc` contains the MathOpt C++ solve-request bridge compiled into WebAssembly.
 - `scripts/embed_proto.cmake` embeds CP-SAT proto schemas into the runtime.
 - `scripts/generate_sat_parameters_types.mjs` generates TypeScript SAT parameter definitions.
 - `vite.lib.config.ts` builds the distributable JS package.
