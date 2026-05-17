@@ -23,7 +23,7 @@ async function findPackedTarballs() {
 
   const tarballs = await Promise.all(
     entries
-      .filter((entry) => /^or-tools-wasm-.*\.tgz$/.test(entry))
+      .filter((entry) => /^or-tools-wasm-\d.*\.tgz$/.test(entry))
       .map(async (entry) => {
         const tarballPath = path.join(packageDir, entry);
         return {
