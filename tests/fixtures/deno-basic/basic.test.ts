@@ -26,7 +26,7 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   if (CpSat.isWorkerBridgeEnabled()) {
     throw new Error('Deno should use the direct runtime by default');
   }
-  const results = await runCpSatCases(CpSat, { modes: ['direct'] });
+  const results = await runCpSatCases(CpSat);
   for (const result of results) {
     if (result.cases.length !== cpSatCases.length) {
       throw new Error(`${result.mode} ran ${result.cases.length} cases, expected ${cpSatCases.length}`);
@@ -50,7 +50,13 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
     throw new Error(`deno routing case failed: ${JSON.stringify(routingResults)}`);
   }
 
-  const mpSolverResults = await runMPSolverCases({ initMPSolver, MPSolver, MPSolverParameters });
+  const mpSolverResults = await runMPSolverCases({
+    initMPSolver,
+    MPSolver,
+    MPSolverParameters,
+    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+  });
   if (!mpSolverResults.every((result) => result.ok)) {
     throw new Error(`deno MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
   }

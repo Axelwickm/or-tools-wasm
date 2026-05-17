@@ -30,6 +30,44 @@ await build({
   plugins: [externalLoaderPlugin],
 });
 
+await build({
+  entryPoints: [path.join(sourceDir, 'ortools_worker.ts')],
+  outfile: path.join(outDir, 'ortools_worker.js'),
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node22',
+  sourcemap: false,
+  plugins: [externalLoaderPlugin],
+});
+
+await writeFile(
+  path.join(outDir, 'node_worker_bridge.js'),
+  `import { parentPort } from 'node:worker_threads';
+
+if (!parentPort) {
+  throw new Error('OR-Tools worker bridge must run inside a Node worker thread.');
+}
+
+const postToParent = parentPort.postMessage.bind(parentPort);
+const hasWorkerGlobalMessaging = typeof globalThis.postMessage === 'function' && 'onmessage' in globalThis;
+
+Object.assign(globalThis, { self: globalThis });
+
+if (!hasWorkerGlobalMessaging) {
+  Object.assign(globalThis, {
+    postMessage: (message) => postToParent(message),
+  });
+
+  parentPort.on('message', (message) => {
+    globalThis.onmessage?.({ data: message });
+  });
+}
+
+await import('./ortools_worker.js');
+`,
+);
+
 await writeFile(
   path.join(outDir, 'runtime_loader.js'),
   `import { readFile } from 'node:fs/promises';
@@ -99,11 +137,18 @@ function isWebWorkerRuntimeHost() {
   return isDeno || isBun;
 }
 
+function isDenoRuntime() {
+  return typeof globalThis.Deno !== 'undefined';
+}
+
 function isJspiSupported() {
   return typeof WebAssembly !== 'undefined' && typeof WebAssembly.promising === 'function';
 }
 
-function selectRuntimeFlavor() {
+function selectRuntimeFlavor(runtimeName) {
+  if (runtimeName === 'routing_runtime' && isDenoRuntime()) {
+    return 'asyncify';
+  }
   selectedFlavor ??= isJspiSupported() ? 'jspi' : 'asyncify';
   return selectedFlavor;
 }
@@ -112,7 +157,7 @@ function locateWebRuntimeFile(fileName) {
   return new URL(\`../wasm/\${fileName}\`, import.meta.url).href;
 }
 
-async function createRuntime(runtimeName, flavor = selectRuntimeFlavor()) {
+async function createRuntime(runtimeName, flavor = selectRuntimeFlavor(runtimeName)) {
   const key = \`\${runtimeName}:\${flavor}\`;
   if (!modulePromises.has(key)) {
     modulePromises.set(key, (async () => {

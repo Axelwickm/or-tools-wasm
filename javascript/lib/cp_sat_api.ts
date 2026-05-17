@@ -381,7 +381,7 @@ async function solveRawDirect(
 
   try {
     if (useCallbackEnvelope) {
-      responsePtr = Module.ccall(
+      responsePtr = (await Module.ccall(
         'solve_model_with_callback_events',
         'number',
         ['number', 'number', 'number', 'number', 'number', 'number'],
@@ -393,7 +393,8 @@ async function solveRawDirect(
           flags,
           lenPtr,
         ],
-      ) as number;
+        { async: true },
+      )) as number;
     } else {
       responsePtr = (await Module.ccall(
         'solve_model',

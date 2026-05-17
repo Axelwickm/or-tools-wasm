@@ -22,7 +22,7 @@ import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
-const results = await runCpSatCases(CpSat, { modes: ['direct'] });
+const results = await runCpSatCases(CpSat);
 
 for (const result of results) {
   if (result.cases.length !== cpSatCases.length) {
@@ -53,7 +53,13 @@ if (!routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.tes
   throw new Error(`node routing case failed: ${JSON.stringify(routingResults)}`);
 }
 
-const mpSolverResults = await runMPSolverCases({ initMPSolver, MPSolver, MPSolverParameters });
+const mpSolverResults = await runMPSolverCases({
+  initMPSolver,
+  MPSolver,
+  MPSolverParameters,
+  setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+  isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+});
 if (!mpSolverResults.every((result) => result.ok)) {
   throw new Error(`node MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
 }

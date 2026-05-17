@@ -1464,12 +1464,13 @@ async function solveDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
   const requestPtr = copyBytesToHeap(module, requestBytes);
   const lenPtr = module._malloc(4);
   try {
-    const ptr = module.ccall(
+    const ptr = (await module.ccall(
       'mathopt_solve_request',
       'number',
       ['number', 'number', 'number'],
       [requestPtr, requestBytes.length, lenPtr],
-    ) as number;
+      { async: true },
+    )) as number;
     const length = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
     const bytes = ptr && length > 0 ? new Uint8Array(module.HEAPU8.subarray(ptr, ptr + length)) : new Uint8Array();
     if (ptr) module._free(ptr);

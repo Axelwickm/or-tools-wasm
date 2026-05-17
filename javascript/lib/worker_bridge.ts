@@ -1,12 +1,24 @@
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
 const isBrowserMainThread = typeof window !== 'undefined' && typeof document !== 'undefined';
-const workerCapable = typeof Worker !== 'undefined';
-const workerBridgeAvailable = isBrowserMainThread && workerCapable;
+const isDeno = 'Deno' in globalThis;
+const isBun = 'Bun' in globalThis;
+const isNode = typeof process !== 'undefined' && typeof process.versions?.node === 'string' && !isDeno && !isBun;
+const workerBridgeAvailable = ((isBrowserMainThread || isDeno || isBun) && typeof Worker !== 'undefined') || isNode;
 
-let worker: Worker | null = null;
+type BridgeWorker = {
+  postMessage(message: WorkerRequest): void;
+  terminate(): void | Promise<number>;
+  unref?(): void;
+  onmessage?: ((event: MessageEvent<WorkerResponse>) => void) | null;
+  onerror?: ((event: ErrorEvent) => void) | null;
+  on?(event: 'message', listener: (message: WorkerResponse) => void): void;
+  on?(event: 'error', listener: (error: Error) => void): void;
+};
+
+let worker: BridgeWorker | null = null;
 let workerReadyPromise: Promise<void> | null = null;
-let workerBridgePreferred = workerBridgeAvailable;
+let workerBridgePreferred = isBrowserMainThread && workerBridgeAvailable;
 let nextRequestId = 1;
 
 const pendingWorkerRequests = new Map<
@@ -26,6 +38,8 @@ export function setWorkerBridgeEnabled(enabled: boolean) {
   workerBridgePreferred = Boolean(enabled);
   if (workerBridgePreferred && !workerBridgeAvailable) {
     console.warn('Worker bridge requested but no worker is initialized in this environment.');
+  } else if (!workerBridgePreferred) {
+    terminateWorkerBridge('OR-Tools worker bridge disabled.');
   }
 }
 
@@ -45,18 +59,27 @@ export function terminateWorkerBridge(reason?: string) {
   pendingWorkerRequests.clear();
 }
 
-function ensureWorker(): Worker {
+async function createBridgeWorker(): Promise<BridgeWorker> {
+  if (isNode || isDeno) {
+    const workerThreadsSpecifier = 'node:worker_threads';
+    const { Worker: NodeWorker } = await import(workerThreadsSpecifier);
+    return new NodeWorker(new URL('./node_worker_bridge.js', import.meta.url)) as BridgeWorker;
+  }
+  return new Worker(new URL('./ortools_worker.js', import.meta.url), { type: 'module' }) as BridgeWorker;
+}
+
+async function ensureWorker(): Promise<BridgeWorker> {
   if (!workerBridgeAvailable) {
     throw new Error('Worker bridge is not available.');
   }
   if (worker) {
     return worker;
   }
-  const instance = new Worker(new URL('./cpsat_worker.js', import.meta.url), { type: 'module' });
+  const instance = await createBridgeWorker();
+  instance.unref?.();
   worker = instance;
   workerReadyPromise = new Promise<void>((resolve, reject) => {
-    instance.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      const message = event.data;
+    const handleMessage = (message: WorkerResponse) => {
       if (message.type === 'ready') {
         resolve();
         return;
@@ -81,14 +104,23 @@ function ensureWorker(): Worker {
         pending.resolve(message);
       }
     };
-    instance.onerror = (event: ErrorEvent) => {
-      const detail = event.error instanceof Error
-        ? event.error.message
-        : event.message || 'The browser blocked or failed to load the worker module.';
+    const handleError = (errorLike: Error | ErrorEvent) => {
+      const detail = errorLike instanceof Error
+        ? errorLike.message
+        : errorLike.error instanceof Error
+          ? errorLike.error.message
+          : errorLike.message || 'The runtime blocked or failed to load the worker module.';
       const error = new Error(`OR-Tools worker failed to load: ${detail}`);
       reject(error);
       terminateWorkerBridge(error.message);
     };
+    if (typeof instance.on === 'function') {
+      instance.on('message', handleMessage);
+      instance.on('error', handleError);
+    } else {
+      instance.onmessage = (event: MessageEvent<WorkerResponse>) => handleMessage(event.data);
+      instance.onerror = handleError;
+    }
   });
   return instance;
 }
@@ -97,7 +129,7 @@ async function waitForWorkerReady() {
   if (!workerBridgeAvailable) {
     throw new Error('Worker bridge is not available.');
   }
-  ensureWorker();
+  await ensureWorker();
   if (!workerReadyPromise) {
     throw new Error('Worker ready state unavailable.');
   }
@@ -111,7 +143,7 @@ export async function postWorkerRequest<T extends WorkerResponse>(
   if (!workerBridgeAvailable) {
     throw new Error('Worker bridge is not available.');
   }
-  const workerInstance = ensureWorker();
+  const workerInstance = await ensureWorker();
   await waitForWorkerReady();
   return new Promise<T>((resolve, reject) => {
     pendingWorkerRequests.set(request.id, {

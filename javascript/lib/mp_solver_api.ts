@@ -1065,11 +1065,11 @@ export class MPSolver {
     return this.objective;
   }
 
-  Solve(parameters?: MPSolverParameters): MPSolverResultStatus {
+  async Solve(parameters?: MPSolverParameters): Promise<MPSolverResultStatus> {
     if (parameters) {
-      return this.exports.solverSolveWithParameters(this.handle, parameters.nativeHandle);
+      return await this.exports.solverSolveWithParameters(this.handle, parameters.nativeHandle);
     }
-    return this.exports.solverSolve(this.handle);
+    return await this.exports.solverSolve(this.handle);
   }
 
   exportModelProto(): Promise<Uint8Array> {

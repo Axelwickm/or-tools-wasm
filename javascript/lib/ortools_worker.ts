@@ -83,7 +83,7 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
 
   try {
     if (callbackFlags) {
-      responsePtr = module.ccall(
+      responsePtr = (await module.ccall(
         'solve_model_with_callback_events',
         'number',
         ['number', 'number', 'number', 'number', 'number', 'number'],
@@ -95,7 +95,8 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
           callbackFlags,
           lenPtr,
         ],
-      ) as number;
+        { async: true },
+      )) as number;
     } else {
       responsePtr = (await module.ccall(
         'solve_model',
@@ -197,12 +198,13 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       const requestPtr = copyBytesToHeap(module, message.requestBytes);
       let responsePtr = 0;
       try {
-        responsePtr = module.ccall(
+        responsePtr = (await module.ccall(
           'mp_solver_solve_model_request',
           'number',
           ['number', 'number', 'number'],
           [requestPtr, message.requestBytes.length, lenPtr],
-        ) as number;
+          { async: true },
+        )) as number;
         const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
         const bytes = responsePtr && responseLen
           ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
@@ -226,12 +228,13 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       const requestPtr = copyBytesToHeap(module, message.requestBytes);
       let responsePtr = 0;
       try {
-        responsePtr = module.ccall(
+        responsePtr = (await module.ccall(
           'mathopt_solve_request',
           'number',
           ['number', 'number', 'number'],
           [requestPtr, message.requestBytes.length, lenPtr],
-        ) as number;
+          { async: true },
+        )) as number;
         const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
         const bytes = responsePtr && responseLen
           ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
@@ -267,7 +270,7 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       return
     }
   } catch (error) {
-    console.error('[cpsat_worker] request failed', message?.type, error);
+    console.error('[ortools_worker] request failed', message?.type, error);
     workerScope.postMessage({
       type: 'error',
       id: message?.id ?? 0,

@@ -97,7 +97,7 @@ type MPSolverLike = {
   RowConstraint(name: string): MPConstraintLike;
   RowConstraint(lb: number, ub: number, name?: string): MPConstraintLike;
   Objective(): MPObjectiveLike;
-  Solve(parameters?: MPSolverParametersLike): number;
+  Solve(parameters?: MPSolverParametersLike): Promise<number>;
   SolveWithProto(options?: {
     solverSpecificParameters?: string;
     loadSolution?: boolean;
@@ -220,7 +220,7 @@ async function runSimpleProgram(
     objective.SetCoefficient(y, 10);
     objective.SetMaximization();
 
-    const status = solver.Solve();
+    const status = await solver.Solve();
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
     const values = {
       x: x.solution_value(),
@@ -264,7 +264,7 @@ async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCa
 
     assert(solver.NumVariables() === 2, `${name}: expected 2 variables`);
     assert(solver.NumConstraints() === 2, `${name}: expected 2 constraints`);
-    const status = solver.Solve();
+    const status = await solver.Solve();
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
     assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
     assert(near(objective.Value(), 23), `${name}: objective mismatch ${objective.Value()}`);
@@ -391,7 +391,7 @@ async function runExternalApiCase(api: MPSolverApi): Promise<MpSolverCaseResult>
       params.SetIntegerParam(api.MPSolverParameters.INCREMENTALITY, api.MPSolverParameters.INCREMENTALITY_ON);
       params.SetIntegerParam(api.MPSolverParameters.LP_ALGORITHM, api.MPSolverParameters.PRIMAL);
       params.Reset();
-      status = solver.Solve(params);
+      status = await solver.Solve(params);
     } finally {
       params.delete();
     }
@@ -450,7 +450,7 @@ async function runLinearCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseResu
 
     assert(solver.NumVariables() === 3, `${name}: expected 3 variables`);
     assert(solver.NumConstraints() === 3, `${name}: expected 3 constraints`);
-    const status = solver.Solve();
+    const status = await solver.Solve();
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
     assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
     assert(near(objective.Value(), 733.3333333333333, 1e-5), `${name}: objective mismatch ${objective.Value()}`);
@@ -498,7 +498,7 @@ async function runBooleanCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseRes
     assert(c0.is_lazy(), `${name}: laziness mismatch`);
     solver.SetHint([x1, x2], [1, 0]);
 
-    const status = solver.Solve();
+    const status = await solver.Solve();
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
     assert(near(objective.Value(), 1), `${name}: objective mismatch`);
     assert(near(x1.solution_value(), 0), `${name}: x1 mismatch`);

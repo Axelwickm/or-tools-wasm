@@ -56,12 +56,19 @@ const runtimeAssets: Record<RuntimeName, Record<RuntimeFlavor, RuntimeAsset>> = 
 const modulePromises: Partial<Record<RuntimeKey, Promise<OrToolsWasmModule>>> = {};
 let selectedFlavor: RuntimeFlavor | null = null;
 
+function isDenoRuntime(): boolean {
+  return 'Deno' in globalThis;
+}
+
 function isJspiSupported(): boolean {
   const wasm = WebAssembly as typeof WebAssembly & { promising?: unknown };
   return typeof wasm !== 'undefined' && typeof wasm.promising === 'function';
 }
 
-function selectRuntimeFlavor(): RuntimeFlavor {
+function selectRuntimeFlavor(runtimeName: RuntimeName): RuntimeFlavor {
+  if (runtimeName === 'routing_runtime' && isDenoRuntime()) {
+    return 'asyncify';
+  }
   if (selectedFlavor) {
     return selectedFlavor;
   }
@@ -89,7 +96,7 @@ function locateRuntimeFile(fileName: string) {
   return fileName;
 }
 
-function createRuntime(runtimeName: RuntimeName, flavor = selectRuntimeFlavor()): Promise<OrToolsWasmModule> {
+function createRuntime(runtimeName: RuntimeName, flavor = selectRuntimeFlavor(runtimeName)): Promise<OrToolsWasmModule> {
   const key: RuntimeKey = `${runtimeName}:${flavor}`;
   modulePromises[key] ??= (async () => {
     const asset = runtimeAssets[runtimeName][flavor];

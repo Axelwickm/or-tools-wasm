@@ -1,7 +1,8 @@
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadRoutingRuntime } from './runtime_loader.js';
+import { loadRoutingRuntime, loadRoutingRuntimeAsyncify } from './runtime_loader.js';
 import type { RoutingSolveRequest, RoutingSolveResult } from './worker_protocol.js';
 
+let modulePromise: Promise<OrToolsWasmModule> | null = null;
 let asyncifyModulePromise: Promise<OrToolsWasmModule> | null = null;
 
 function toNumber(value: unknown): number {
@@ -12,8 +13,13 @@ function toInt64(value: number): bigint {
   return globalThis.BigInt(value);
 }
 
+function loadModule() {
+  modulePromise ??= loadRoutingRuntime();
+  return modulePromise;
+}
+
 function loadAsyncifyModule() {
-  asyncifyModulePromise ??= loadRoutingRuntime();
+  asyncifyModulePromise ??= loadRoutingRuntimeAsyncify();
   return asyncifyModulePromise;
 }
 
@@ -74,6 +80,10 @@ function registerTransitMatrix(
 
 function isJspiSuspendError(error: unknown) {
   return error instanceof Error && error.name === 'SuspendError';
+}
+
+function isDenoRuntime() {
+  return 'Deno' in globalThis;
 }
 
 async function solveRoutingWithModule(
@@ -268,5 +278,16 @@ async function solveRoutingWithModule(
 }
 
 export async function solveRoutingInWorker(message: RoutingSolveRequest): Promise<RoutingSolveResult | null> {
-  return await solveRoutingWithModule(await loadAsyncifyModule(), message);
+  if (isDenoRuntime()) {
+    return await solveRoutingWithModule(await loadAsyncifyModule(), message);
+  }
+
+  try {
+    return await solveRoutingWithModule(await loadModule(), message);
+  } catch (error) {
+    if (!isJspiSuspendError(error)) {
+      throw error;
+    }
+    return await solveRoutingWithModule(await loadAsyncifyModule(), message);
+  }
 }
