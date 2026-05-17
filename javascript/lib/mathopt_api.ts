@@ -1,5 +1,5 @@
-import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
-import { loadRuntime } from './runtime_loader.js';
+import type { OrToolsWasmModule } from './wasm_module_types.js';
+import { loadMathOptRuntime } from './runtime_loader.js';
 import type { WorkerResponse } from './worker_protocol.js';
 import {
   setWorkerBridgeEnabled,
@@ -378,10 +378,10 @@ const terminationReasonNames: Record<number, string> = {
   9: 'TERMINATION_REASON_FEASIBLE',
 };
 
-let mathOptModulePromise: Promise<MainModule> | null = null;
+let mathOptModulePromise: Promise<OrToolsWasmModule> | null = null;
 
-function loadMathOptModule(): Promise<MainModule> {
-  mathOptModulePromise ??= loadRuntime();
+function loadMathOptModule(): Promise<OrToolsWasmModule> {
+  mathOptModulePromise ??= loadMathOptRuntime();
   return mathOptModulePromise;
 }
 
@@ -1480,7 +1480,7 @@ async function solveDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
   }
 }
 
-function copyBytesToHeap(module: MainModule, bytes: Uint8Array): number {
+function copyBytesToHeap(module: OrToolsWasmModule, bytes: Uint8Array): number {
   if (bytes.length === 0) return 0;
   const ptr = module._malloc(bytes.length);
   module.HEAPU8.set(bytes, ptr);

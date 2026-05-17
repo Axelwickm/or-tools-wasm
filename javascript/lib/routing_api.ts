@@ -1,11 +1,11 @@
-import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
-import { loadRuntimeAsyncify } from './runtime_loader.js';
+import type { OrToolsWasmModule } from './wasm_module_types.js';
+import { loadRoutingRuntimeAsyncify } from './runtime_loader.js';
 import { nextWorkerBridgeRequestId, postWorkerRequest, shouldUseWorkerBridge } from './worker_bridge.js';
 import type { RoutingModelOperation, RoutingSolveResult, WorkerResponse } from './worker_protocol.js';
 
 type RoutingTransitCallback = (fromIndex: number, toIndex: number) => number;
 
-type RoutingModule = MainModule & {
+type RoutingModule = OrToolsWasmModule & {
   __routingTransitCallbacks?: Map<number, RoutingTransitCallback>;
 };
 
@@ -46,7 +46,7 @@ function canDeleteNativeRoutingModel(): boolean {
 }
 
 async function loadRoutingModule(): Promise<RoutingModule> {
-  routingModulePromise ??= loadRuntimeAsyncify() as Promise<RoutingModule>;
+  routingModulePromise ??= loadRoutingRuntimeAsyncify() as Promise<RoutingModule>;
   routingModule = await routingModulePromise;
   return routingModule;
 }

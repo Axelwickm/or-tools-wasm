@@ -112,6 +112,10 @@ uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
 
 extern "C" {
 
+#ifndef ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER
+EMSCRIPTEN_KEEPALIVE void free_buffer(uint8_t* ptr) { std::free(ptr); }
+#endif
+
 EMSCRIPTEN_KEEPALIVE const char* get_linear_solver_schema() {
   return kLinearSolverProtoSchema;
 }

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
-import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
-import { loadRuntime } from './runtime_loader.js';
+import type { OrToolsWasmModule } from './wasm_module_types.js';
+import { loadMathOptRuntime, loadMPSolverRuntime, loadRuntime } from './runtime_loader.js';
 import { solveRoutingInWorker } from './worker_routing.js';
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
@@ -11,26 +11,16 @@ const SOLUTION_CALLBACK_EVENT = 1;
 const BEST_BOUND_CALLBACK_EVENT = 2;
 const LOG_CALLBACK_EVENT = 3;
 
-let moduleInstance: MainModule | null = null;
+let moduleInstance: OrToolsWasmModule | null = null;
 
-// The loader handles locateFile and mainScriptUrlOrBlob automatically now.
-const moduleReady = loadRuntime()
-  .then((module: MainModule) => {
-    moduleInstance = module;
-    workerScope.postMessage({ type: 'ready' } satisfies WorkerResponse);
-    return module;
-  })
-  .catch((error: unknown) => {
-    console.error('[cpsat_worker] cpSatModule init failed:', error);
-    workerScope.postMessage({
-      type: 'error',
-      id: 0,
-      error: String(error),
-    } satisfies WorkerResponse);
-    throw error;
-  });
+workerScope.postMessage({ type: 'ready' } satisfies WorkerResponse);
 
-const readUint32LE = (buffer: ArrayBuffer, ptr: number) =>
+async function loadCpSatModule() {
+  moduleInstance ??= await loadRuntime();
+  return moduleInstance;
+}
+
+const readUint32LE = (buffer: ArrayBufferLike, ptr: number) =>
   new DataView(buffer, ptr, 4).getUint32(0, true);
 
 function readUint32FromBytes(bytes: Uint8Array, offset: number) {
@@ -75,27 +65,25 @@ function postCallbackEnvelopeEvents(id: number, bytes: Uint8Array) {
   return bytes.slice(offset, offset + responseLength);
 }
 
-const copyBytesToHeap = (bytes: Uint8Array | null) => {
-  if (!moduleInstance || !bytes?.length) {
+const copyBytesToHeap = (module: OrToolsWasmModule, bytes: Uint8Array | null) => {
+  if (!bytes?.length) {
     return 0;
   }
-  const ptr = moduleInstance._malloc(bytes.length);
-  moduleInstance.HEAPU8.set(bytes, ptr);
+  const ptr = module._malloc(bytes.length);
+  module.HEAPU8.set(bytes, ptr);
   return ptr;
 };
 
 async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requestId = 0, callbackFlags = 0) {
-  if (!moduleInstance) {
-    throw new Error('Module not initialized.');
-  }
-  const lenPtr = moduleInstance._malloc(4);
-  const modelPtr = copyBytesToHeap(modelBytes);
-  const paramsPtr = copyBytesToHeap(paramsBytes ?? null);
+  const module = await loadCpSatModule();
+  const lenPtr = module._malloc(4);
+  const modelPtr = copyBytesToHeap(module, modelBytes);
+  const paramsPtr = copyBytesToHeap(module, paramsBytes ?? null);
   let responsePtr = 0;
 
   try {
     if (callbackFlags) {
-      responsePtr = moduleInstance.ccall(
+      responsePtr = module.ccall(
         'solve_model_with_callback_events',
         'number',
         ['number', 'number', 'number', 'number', 'number', 'number'],
@@ -109,7 +97,7 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
         ],
       ) as number;
     } else {
-      responsePtr = (await moduleInstance.ccall(
+      responsePtr = (await module.ccall(
         'solve_model',
         'number',
         ['number', 'number', 'number', 'number', 'number'],
@@ -124,20 +112,20 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
       )) as number;
     }
   } finally {
-    if (modelPtr) moduleInstance._free(modelPtr);
-    if (paramsPtr) moduleInstance._free(paramsPtr);
+    if (modelPtr) module._free(modelPtr);
+    if (paramsPtr) module._free(paramsPtr);
   }
 
-  const len = readUint32LE(moduleInstance.HEAPU8.buffer, lenPtr);
-  moduleInstance._free(lenPtr);
+  const len = readUint32LE(module.HEAPU8.buffer, lenPtr);
+  module._free(lenPtr);
 
   if (!responsePtr || len === 0) {
-    if (responsePtr) moduleInstance._free_buffer(responsePtr);
+    if (responsePtr) module._free_buffer(responsePtr);
     return new Uint8Array();
   }
 
-  const bytes = moduleInstance.HEAPU8.slice(responsePtr, responsePtr + len);
-  moduleInstance._free_buffer(responsePtr);
+  const bytes = module.HEAPU8.slice(responsePtr, responsePtr + len);
+  module._free_buffer(responsePtr);
   if (callbackFlags) {
     return postCallbackEnvelopeEvents(requestId, bytes);
   }
@@ -145,34 +133,32 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
 }
 
 async function validateModel(modelBytes: Uint8Array) {
-  if (!moduleInstance) {
-    throw new Error('Module not initialized.');
-  }
-  const lenPtr = moduleInstance._malloc(4);
-  const modelPtr = copyBytesToHeap(modelBytes);
+  const module = await loadCpSatModule();
+  const lenPtr = module._malloc(4);
+  const modelPtr = copyBytesToHeap(module, modelBytes);
   let msgPtr = 0;
 
   try {
-    msgPtr = moduleInstance.ccall(
+    msgPtr = module.ccall(
       'validate_model',
       'number',
       ['number', 'number', 'number'],
       [modelPtr, modelBytes.length, lenPtr],
     ) as number;
   } finally {
-    if (modelPtr) moduleInstance._free(modelPtr);
+    if (modelPtr) module._free(modelPtr);
   }
 
-  const len = readUint32LE(moduleInstance.HEAPU8.buffer, lenPtr);
-  moduleInstance._free(lenPtr);
+  const len = readUint32LE(module.HEAPU8.buffer, lenPtr);
+  module._free(lenPtr);
 
   if (!msgPtr || len === 0) {
-    if (msgPtr) moduleInstance._free_buffer(msgPtr);
+    if (msgPtr) module._free_buffer(msgPtr);
     return { ok: true, message: '' };
   }
 
-  const messageBytes = moduleInstance.HEAPU8.slice(msgPtr, msgPtr + len);
-  moduleInstance._free_buffer(msgPtr);
+  const messageBytes = module.HEAPU8.slice(msgPtr, msgPtr + len);
+  module._free_buffer(msgPtr);
   const message = new TextDecoder().decode(messageBytes);
   return { ok: false, message };
 }
@@ -180,11 +166,6 @@ async function validateModel(modelBytes: Uint8Array) {
 workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const message = event.data as WorkerRequest;
   try {
-    await moduleReady;
-    if (!moduleInstance) {
-      throw new Error('Module not initialized.');
-    }
-
     if (message.type === 'validate') {
       const validation = await validateModel(message.modelBytes);
       workerScope.postMessage({
@@ -203,7 +184,7 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       } satisfies WorkerResponse);
       return;
     } else if (message.type === 'routingSolve') {
-      const result = await solveRoutingInWorker(moduleInstance, message);
+      const result = await solveRoutingInWorker(message);
       workerScope.postMessage({
         type: 'routingSolveResult',
         id: message.id,
@@ -211,19 +192,20 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       } satisfies WorkerResponse);
       return;
     } else if (message.type === 'mpSolverSolve') {
-      const lenPtr = moduleInstance._malloc(4);
-      const requestPtr = copyBytesToHeap(message.requestBytes);
+      const module = await loadMPSolverRuntime();
+      const lenPtr = module._malloc(4);
+      const requestPtr = copyBytesToHeap(module, message.requestBytes);
       let responsePtr = 0;
       try {
-        responsePtr = moduleInstance.ccall(
+        responsePtr = module.ccall(
           'mp_solver_solve_model_request',
           'number',
           ['number', 'number', 'number'],
           [requestPtr, message.requestBytes.length, lenPtr],
         ) as number;
-        const responseLen = readUint32LE(moduleInstance.HEAPU8.buffer, lenPtr);
+        const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
         const bytes = responsePtr && responseLen
-          ? moduleInstance.HEAPU8.slice(responsePtr, responsePtr + responseLen)
+          ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
           : new Uint8Array();
         workerScope.postMessage({
           type: 'mpSolverSolveResult',
@@ -232,26 +214,27 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         } satisfies WorkerResponse);
       } finally {
         if (responsePtr) {
-          moduleInstance.ccall('free_buffer', undefined, ['number'], [responsePtr]);
+          module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
         }
-        if (requestPtr) moduleInstance._free(requestPtr);
-        moduleInstance._free(lenPtr);
+        if (requestPtr) module._free(requestPtr);
+        module._free(lenPtr);
       }
       return;
     } else if (message.type === 'mathOptSolve') {
-      const lenPtr = moduleInstance._malloc(4);
-      const requestPtr = copyBytesToHeap(message.requestBytes);
+      const module = await loadMathOptRuntime();
+      const lenPtr = module._malloc(4);
+      const requestPtr = copyBytesToHeap(module, message.requestBytes);
       let responsePtr = 0;
       try {
-        responsePtr = moduleInstance.ccall(
+        responsePtr = module.ccall(
           'mathopt_solve_request',
           'number',
           ['number', 'number', 'number'],
           [requestPtr, message.requestBytes.length, lenPtr],
         ) as number;
-        const responseLen = readUint32LE(moduleInstance.HEAPU8.buffer, lenPtr);
+        const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
         const bytes = responsePtr && responseLen
-          ? moduleInstance.HEAPU8.slice(responsePtr, responsePtr + responseLen)
+          ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
           : new Uint8Array();
         workerScope.postMessage({
           type: 'mathOptSolveResult',
@@ -260,23 +243,26 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         } satisfies WorkerResponse);
       } finally {
         if (responsePtr) {
-          moduleInstance.ccall('free_buffer', undefined, ['number'], [responsePtr]);
+          module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
         }
-        if (requestPtr) moduleInstance._free(requestPtr);
-        moduleInstance._free(lenPtr);
+        if (requestPtr) module._free(requestPtr);
+        module._free(lenPtr);
       }
       return;
     } else if (message.type === "getSchemas") {
+      const module = await loadCpSatModule();
+      const mpModule = await loadMPSolverRuntime();
       const schemas = {
-        cp_model: moduleInstance.ccall('get_cp_model_schema', 'string', [], []),
-        sat_parameters: moduleInstance.ccall('get_sat_parameters_schema', 'string', [], []),
-        linear_solver: moduleInstance.ccall('get_linear_solver_schema', 'string', [], []),
-        optional_boolean: moduleInstance.ccall('get_optional_boolean_schema', 'string', [], []),
+        cp_model: module.ccall('get_cp_model_schema', 'string', [], []),
+        sat_parameters: module.ccall('get_sat_parameters_schema', 'string', [], []),
+        linear_solver: mpModule.ccall('get_linear_solver_schema', 'string', [], []),
+        optional_boolean: mpModule.ccall('get_optional_boolean_schema', 'string', [], []),
       };
       self.postMessage({ type: 'schemaResult', id: message.id, schemas });
       return
     } else if (message.type === "cancel_solve") {
-      moduleInstance.ccall('interrupt_solve', 'void', [], []);
+      const module = await loadCpSatModule();
+      module.ccall('interrupt_solve', 'void', [], []);
       self.postMessage({ type: 'solved_cancelled', id: message.id });
       return
     }

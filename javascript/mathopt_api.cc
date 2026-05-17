@@ -64,6 +64,10 @@ void EnsureMathOptSolversRegistered() {
 
 extern "C" {
 
+#ifndef ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER
+EMSCRIPTEN_KEEPALIVE void free_buffer(uint8_t* ptr) { std::free(ptr); }
+#endif
+
 EMSCRIPTEN_KEEPALIVE
 uint8_t* mathopt_solve_request(const uint8_t* request_data, size_t request_len,
                                size_t* out_len) {

@@ -19,7 +19,7 @@ const unwrapDataUrlWorkers = (code: string) =>
 const patchEmscriptenWasmPlugin = (): Plugin => ({
   name: 'patch-emscripten-no-inline',
   transform(code, id) {
-    if (id.includes('cp_sat_runtime') && id.endsWith('.js')) {
+    if (/_runtime(?:_asyncify)?(?:_node)?(?:_asyncify)?\.js/.test(id)) {
       let modifiedCode = code;
 
       if (modifiedCode.includes('.wasm')) {
@@ -65,7 +65,14 @@ const patchEmscriptenWasmPlugin = (): Plugin => ({
 const emitWasmSourceMapsPlugin = (): Plugin => ({
   name: 'emit-wasm-source-maps',
   generateBundle() {
-    for (const fileName of ['cp_sat_runtime.wasm.map', 'cp_sat_runtime_asyncify.wasm.map']) {
+    for (const fileName of [
+      'cp_sat_runtime.wasm.map',
+      'cp_sat_runtime_asyncify.wasm.map',
+      'routing_runtime_asyncify.wasm.map',
+      'mp_solver_runtime.wasm.map',
+      'mathopt_runtime.wasm.map',
+      'ortools_runtime_asyncify.wasm.map',
+    ]) {
       this.emitFile({
         type: 'asset',
         fileName: `assets/${fileName}`,

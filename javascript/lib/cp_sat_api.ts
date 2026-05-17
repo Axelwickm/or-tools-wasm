@@ -1,4 +1,4 @@
-import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
+import type { OrToolsWasmModule } from './wasm_module_types.js';
 import { loadRuntime } from './runtime_loader.js';
 import type { WorkerResponse } from './worker_protocol.js';
 import {
@@ -23,8 +23,8 @@ export type { SatParameters } from './generated/sat_parameters.js';
 type SchemaPair = {
   cp_model: string;
   sat_parameters: string;
-  linear_solver: string;
-  optional_boolean: string;
+  linear_solver?: string;
+  optional_boolean?: string;
 };
 
 export type CpSatSolveResult = {
@@ -77,7 +77,7 @@ function callbackFlags(callbacks?: CpSatSolveCallbacks) {
 }
 
 
-let modulePromise: Promise<MainModule> | null = null;
+let modulePromise: Promise<OrToolsWasmModule> | null = null;
 
 function loadModule() {
   if (shouldUseWorkerBridge()) {
@@ -92,7 +92,7 @@ function loadModule() {
 
 let schemaPromise: Promise<SchemaPair> | null = null;
 
-function getSchemas() {
+function getSchemas(): Promise<SchemaPair> {
   if (!schemaPromise) {
     schemaPromise = (async () => {
       if (shouldUseWorkerBridge()) {
@@ -107,12 +107,10 @@ function getSchemas() {
       return {
         cp_model: Module.ccall('get_cp_model_schema', 'string', [], []),
         sat_parameters: Module.ccall('get_sat_parameters_schema', 'string', [], []),
-        linear_solver: Module.ccall('get_linear_solver_schema', 'string', [], []),
-        optional_boolean: Module.ccall('get_optional_boolean_schema', 'string', [], []),
       };
     })();
   }
-  return schemaPromise;
+  return schemaPromise!;
 }
 
 type ProtobufRoot = import('protobufjs').Root;
@@ -278,7 +276,7 @@ async function createModel(model: CpModelProto): Promise<Uint8Array> {
   return type.encode(message).finish();
 }
 
-const readUint32LE = (buffer: ArrayBuffer, ptr: number) =>
+const readUint32LE = (buffer: ArrayBufferLike, ptr: number) =>
   new DataView(buffer, ptr, 4).getUint32(0, true);
 
 function readUint32FromBytes(bytes: Uint8Array, offset: number) {
@@ -312,7 +310,7 @@ function parseCallbackEnvelope(bytes: Uint8Array) {
   return { events, responseBytes: bytes.slice(offset, offset + responseLength) };
 }
 
-function copyBytesToHeap(Module: MainModule, bytes: Uint8Array | null) {
+function copyBytesToHeap(Module: OrToolsWasmModule, bytes: Uint8Array | null) {
   if (!bytes || !bytes.length) {
     return 0;
   }

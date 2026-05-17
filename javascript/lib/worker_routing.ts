@@ -1,8 +1,8 @@
-import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
-import { loadRuntimeAsyncify } from './runtime_loader.js';
+import type { OrToolsWasmModule } from './wasm_module_types.js';
+import { loadRoutingRuntimeAsyncify } from './runtime_loader.js';
 import type { RoutingSolveRequest, RoutingSolveResult } from './worker_protocol.js';
 
-let asyncifyModulePromise: Promise<MainModule> | null = null;
+let asyncifyModulePromise: Promise<OrToolsWasmModule> | null = null;
 
 function toNumber(value: unknown): number {
   return typeof value === 'number' ? value : Number(value);
@@ -13,18 +13,18 @@ function toInt64(value: number): bigint {
 }
 
 function loadAsyncifyModule() {
-  asyncifyModulePromise ??= loadRuntimeAsyncify();
+  asyncifyModulePromise ??= loadRoutingRuntimeAsyncify();
   return asyncifyModulePromise;
 }
 
-function copyInt32Array(module: MainModule, values: number[]): number {
+function copyInt32Array(module: OrToolsWasmModule, values: number[]): number {
   const array = new Int32Array(values);
   const ptr = module._malloc(array.byteLength);
   module.HEAPU8.set(new Uint8Array(array.buffer), ptr);
   return ptr;
 }
 
-function copyInt64Array(module: MainModule, values: BigInt64Array | number[]): { ptr: number; length: number } {
+function copyInt64Array(module: OrToolsWasmModule, values: BigInt64Array | number[]): { ptr: number; length: number } {
   const array = values instanceof BigInt64Array
     ? values
     : new BigInt64Array(values.map((value) => BigInt(value)));
@@ -33,14 +33,14 @@ function copyInt64Array(module: MainModule, values: BigInt64Array | number[]): {
   return { ptr, length: array.length };
 }
 
-function copyString(module: MainModule, value: string): number {
+function copyString(module: OrToolsWasmModule, value: string): number {
   const bytes = new TextEncoder().encode(`${value}\0`);
   const ptr = module._malloc(bytes.byteLength);
   module.HEAPU8.set(bytes, ptr);
   return ptr;
 }
 
-function withString<T>(module: MainModule, value: string, fn: (ptr: number) => T): T {
+function withString<T>(module: OrToolsWasmModule, value: string, fn: (ptr: number) => T): T {
   const ptr = copyString(module, value);
   try {
     return fn(ptr);
@@ -50,7 +50,7 @@ function withString<T>(module: MainModule, value: string, fn: (ptr: number) => T
 }
 
 function registerTransitMatrix(
-  module: MainModule,
+  module: OrToolsWasmModule,
   modelHandle: number,
   matrix: BigInt64Array,
   dimension: number,
@@ -77,7 +77,7 @@ function isJspiSuspendError(error: unknown) {
 }
 
 async function solveRoutingWithModule(
-  module: MainModule,
+  module: OrToolsWasmModule,
   message: RoutingSolveRequest,
 ): Promise<RoutingSolveResult | null> {
   let managerHandle = 0;
@@ -267,16 +267,6 @@ async function solveRoutingWithModule(
   }
 }
 
-export async function solveRoutingInWorker(
-  module: MainModule,
-  message: RoutingSolveRequest,
-): Promise<RoutingSolveResult | null> {
-  try {
-    return await solveRoutingWithModule(module, message);
-  } catch (error) {
-    if (!isJspiSuspendError(error)) {
-      throw error;
-    }
-    return await solveRoutingWithModule(await loadAsyncifyModule(), message);
-  }
+export async function solveRoutingInWorker(message: RoutingSolveRequest): Promise<RoutingSolveResult | null> {
+  return await solveRoutingWithModule(await loadAsyncifyModule(), message);
 }

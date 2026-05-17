@@ -1,5 +1,5 @@
-import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
-import { loadRuntimeAsyncify } from './runtime_loader.js';
+import type { OrToolsWasmModule } from './wasm_module_types.js';
+import { loadMPSolverRuntime } from './runtime_loader.js';
 import type { WorkerResponse } from './worker_protocol.js';
 import {
   nextWorkerBridgeRequestId,
@@ -8,8 +8,8 @@ import {
 } from './worker_bridge.js';
 import * as protobufModule from 'protobufjs';
 
-let mpSolverModulePromise: Promise<MainModule> | null = null;
-let mpSolverModule: MainModule | null = null;
+let mpSolverModulePromise: Promise<OrToolsWasmModule> | null = null;
+let mpSolverModule: OrToolsWasmModule | null = null;
 let mpSolverExports: MpSolverExports | null = null;
 
 type CReturn = 'number' | 'bigint' | undefined;
@@ -136,15 +136,15 @@ function stringBytes(value: string): Uint8Array {
 }
 
 function wrap<T extends (...args: never[]) => unknown>(
-  module: MainModule,
+  module: OrToolsWasmModule,
   name: string,
   returnType: CReturn,
   argTypes: CArg[],
 ): T {
-  return module.cwrap(name, returnType, argTypes) as T;
+  return module.cwrap(name, returnType, argTypes) as unknown as T;
 }
 
-function createMpSolverExports(module: MainModule): MpSolverExports {
+function createMpSolverExports(module: OrToolsWasmModule): MpSolverExports {
   return {
     solverInfinity: wrap(module, 'mp_solver_infinity', 'number', []),
     solverSupportsProblemType: wrap(module, 'mp_solver_supports_problem_type', 'number', ['number']),
@@ -251,14 +251,14 @@ function createMpSolverExports(module: MainModule): MpSolverExports {
   };
 }
 
-async function loadMpSolverModule(): Promise<MainModule> {
-  mpSolverModulePromise ??= loadRuntimeAsyncify();
+async function loadMpSolverModule(): Promise<OrToolsWasmModule> {
+  mpSolverModulePromise ??= loadMPSolverRuntime();
   mpSolverModule = await mpSolverModulePromise;
   mpSolverExports ??= createMpSolverExports(mpSolverModule);
   return mpSolverModule;
 }
 
-function getMpSolverModule(): MainModule {
+function getMpSolverModule(): OrToolsWasmModule {
   if (!mpSolverModule) {
     throw new Error('MPSolver API is not initialized. Call await initMPSolver() before constructing MPSolver objects.');
   }
@@ -272,7 +272,7 @@ function getMpSolverExports(): MpSolverExports {
   return mpSolverExports;
 }
 
-function withCString<T>(module: MainModule, value: string, fn: (ptr: number) => T): T {
+function withCString<T>(module: OrToolsWasmModule, value: string, fn: (ptr: number) => T): T {
   const bytes = stringBytes(value);
   const ptr = module._malloc(bytes.byteLength);
   module.HEAPU8.set(bytes, ptr);
@@ -283,11 +283,11 @@ function withCString<T>(module: MainModule, value: string, fn: (ptr: number) => 
   }
 }
 
-function readUint32LE(buffer: ArrayBuffer, ptr: number) {
+function readUint32LE(buffer: ArrayBufferLike, ptr: number) {
   return new DataView(buffer, ptr, 4).getUint32(0, true);
 }
 
-function copyBytesToHeap(module: MainModule, bytes: Uint8Array | null) {
+function copyBytesToHeap(module: OrToolsWasmModule, bytes: Uint8Array | null) {
   if (!bytes?.length) return 0;
   const ptr = module._malloc(bytes.length);
   module.HEAPU8.set(bytes, ptr);
@@ -295,7 +295,7 @@ function copyBytesToHeap(module: MainModule, bytes: Uint8Array | null) {
 }
 
 async function readNativeBytes(
-  module: MainModule,
+  module: OrToolsWasmModule,
   fn: (lenPtr: number) => number | Promise<number>,
 ) {
   const lenPtr = module._malloc(4);
@@ -434,7 +434,7 @@ async function solveModelRequestBytes(requestBytes: Uint8Array): Promise<Uint8Ar
   return solveModelRequestDirect(requestBytes);
 }
 
-function readCString(module: MainModule, ptr: number): string {
+function readCString(module: OrToolsWasmModule, ptr: number): string {
   return ptr === 0 ? '' : module.UTF8ToString(ptr);
 }
 
@@ -853,15 +853,15 @@ export class MPSolver {
   static readonly BASIC = BasisStatus.BASIC;
 
   readonly ready: Promise<void> = Promise.resolve();
-  private readonly module: MainModule;
+  private readonly module: OrToolsWasmModule;
   private readonly exports: MpSolverExports;
   private handle = 0;
   private readonly objective: MPObjective;
 
   constructor(name: string, problemType: OptimizationProblemType);
-  constructor(module: MainModule, exports: MpSolverExports, handle: number);
+  constructor(module: OrToolsWasmModule, exports: MpSolverExports, handle: number);
   constructor(
-    nameOrModule: string | MainModule,
+    nameOrModule: string | OrToolsWasmModule,
     problemTypeOrExports: OptimizationProblemType | MpSolverExports,
     maybeHandle?: number,
   ) {

@@ -9,6 +9,7 @@ const nodeRuntimePaths = [
 const webRuntimePaths = [
   path.join(repoRoot, 'build/javascript/wasm/cp_sat_runtime.js'),
   path.join(repoRoot, 'build/javascript/wasm/cp_sat_runtime_asyncify.js'),
+  path.join(repoRoot, 'build/javascript/wasm/ortools_runtime_asyncify.js'),
 ];
 
 const replacements = [
@@ -83,6 +84,14 @@ const webRuntimeReplacements = [
   [
     'new Worker(new URL("cp_sat_runtime_asyncify.js?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})',
     '(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("cp_sat_runtime_asyncify.js",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("cp_sat_runtime_asyncify.js"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))',
+  ],
+  [
+    'new Worker(new URL("ortools_runtime_asyncify.js",import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})',
+    '(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("ortools_runtime_asyncify.js",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("ortools_runtime_asyncify.js"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))',
+  ],
+  [
+    'new Worker(new URL("ortools_runtime_asyncify.js?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})',
+    '(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("ortools_runtime_asyncify.js",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("ortools_runtime_asyncify.js"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))',
   ],
   [
     'worker.workerID=PThread.nextWorkerID++;PThread.unusedWorkers.push(worker)',
