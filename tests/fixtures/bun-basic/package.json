@@ -6,6 +6,6 @@
     "test": "../../../node_modules/.bin/tsc --noEmit && bun basic.test.ts"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.7.1.tgz"
+    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-local.tgz"
   }
 }

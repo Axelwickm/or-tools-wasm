@@ -8,7 +8,7 @@
     "serve-static": "node static-server.mjs"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-0.7.1.tgz",
+    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-local.tgz",
     "protobufjs": "^7.5.4"
   },
   "devDependencies": {

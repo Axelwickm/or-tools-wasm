@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises';
+import { copyFile, readdir, stat } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
@@ -13,6 +13,7 @@ if (!fixtureName) {
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const fixtureDir = path.join(repoRoot, 'tests/fixtures', fixtureName);
 const packageDir = path.join(repoRoot, 'build/javascript/lib');
+const stableTarballPath = path.join(packageDir, 'or-tools-wasm-local.tgz');
 
 async function findPackedTarballs() {
   const entries = await readdir(packageDir).catch(() => {
@@ -50,9 +51,10 @@ if (!tarballs.length) {
 }
 
 const tarball = tarballs[0].path;
-console.log(`Installing ${tarball} into ${fixtureDir}`);
+await copyFile(tarball, stableTarballPath);
+console.log(`Installing ${stableTarballPath} into ${fixtureDir}`);
 
-const install = spawn('npm', ['install', '--force', '--no-audit', '--no-fund', tarball], {
+const install = spawn('npm', ['install', '--force', '--no-audit', '--no-fund', '--no-package-lock'], {
   cwd: fixtureDir,
   stdio: 'inherit',
 });

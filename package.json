@@ -27,10 +27,6 @@
     "./build/javascript/lib/*": "./build/javascript/lib/*"
   },
   "imports": {
-    "#internal-wasm/cp_sat_runtime.js": "./build/javascript/wasm/cp_sat_runtime.js",
-    "#internal-wasm/cp_sat_runtime_asyncify.js": "./build/javascript/wasm/cp_sat_runtime_asyncify.js",
-    "#internal-wasm/cp_sat_runtime.wasm": "./build/javascript/wasm/cp_sat_runtime.wasm",
-    "#internal-wasm/cp_sat_runtime_asyncify.wasm": "./build/javascript/wasm/cp_sat_runtime_asyncify.wasm",
     "#internal-wasm/*": "./build/javascript/wasm/*"
   },
   "scripts": {

@@ -34,12 +34,12 @@ await writeFile(
   path.join(outDir, 'runtime_loader.js'),
   `import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import createNodeModule from '../node-wasm/cp_sat_runtime_node.js';
+import createNodeModule from '../node-wasm/ortools_runtime_node.js';
 import createWebAsyncifyModule from '../wasm/ortools_runtime_asyncify.js';
 
 let modulePromise = null;
 
-function locateCpSatNodeRuntimeFile(fileName) {
+function locateNodeRuntimeFile(fileName) {
   return fileURLToPath(new URL(\`../node-wasm/\${fileName}\`, import.meta.url));
 }
 
@@ -49,7 +49,7 @@ function isWebWorkerRuntimeHost() {
   return isDeno || isBun;
 }
 
-function locateCpSatWebRuntimeFile(fileName) {
+function locateWebRuntimeFile(fileName) {
   if (fileName === 'ortools_runtime_asyncify.wasm') {
     return new URL('../wasm/ortools_runtime_asyncify.wasm', import.meta.url).href;
   }
@@ -61,7 +61,7 @@ async function loadWebWorkerRuntime() {
   const wasmBinary = await readFile(new URL(wasmFile, import.meta.url));
   const createModule = createWebAsyncifyModule;
   return createModule({
-    locateFile: locateCpSatWebRuntimeFile,
+    locateFile: locateWebRuntimeFile,
     wasmBinary,
   });
 }
@@ -70,7 +70,7 @@ export async function loadRuntime() {
   if (!modulePromise) {
     modulePromise = isWebWorkerRuntimeHost()
       ? loadWebWorkerRuntime()
-      : createNodeModule({ locateFile: locateCpSatNodeRuntimeFile });
+      : createNodeModule({ locateFile: locateNodeRuntimeFile });
   }
   return modulePromise;
 }

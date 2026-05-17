@@ -354,27 +354,27 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     ${CP_SAT_BROWSER_LINK_OPTIONS}
     ${CP_SAT_ASYNCIFY_LINK_OPTIONS})
 
-  add_executable(cp_sat_runtime_node_asyncify
+  add_executable(ortools_runtime_node_asyncify
     ${CP_SAT_FULL_SOURCES})
-  configure_ortools_wasm_target(cp_sat_runtime_node_asyncify "cp_sat_runtime_node_asyncify" "${JS_NODE_OUTPUT_DIR}")
-  target_compile_definitions(cp_sat_runtime_node_asyncify PRIVATE ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER)
-  target_link_options(cp_sat_runtime_node_asyncify PRIVATE
+  configure_ortools_wasm_target(ortools_runtime_node_asyncify "ortools_runtime_node_asyncify" "${JS_NODE_OUTPUT_DIR}")
+  target_compile_definitions(ortools_runtime_node_asyncify PRIVATE ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER)
+  target_link_options(ortools_runtime_node_asyncify PRIVATE
     ${CP_SAT_COMMON_LINK_OPTIONS}
     ${CP_SAT_PTHREAD_LINK_OPTIONS}
     ${CP_SAT_NODE_LINK_OPTIONS}
     ${CP_SAT_ASYNCIFY_LINK_OPTIONS})
 
-  add_executable(cp_sat_runtime_node
+  add_executable(ortools_runtime_node
     ${CP_SAT_FULL_SOURCES})
-  configure_ortools_wasm_target(cp_sat_runtime_node "cp_sat_runtime_node" "${JS_NODE_OUTPUT_DIR}")
-  target_compile_definitions(cp_sat_runtime_node PRIVATE ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER)
-  target_link_options(cp_sat_runtime_node PRIVATE
+  configure_ortools_wasm_target(ortools_runtime_node "ortools_runtime_node" "${JS_NODE_OUTPUT_DIR}")
+  target_compile_definitions(ortools_runtime_node PRIVATE ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER)
+  target_link_options(ortools_runtime_node PRIVATE
     ${CP_SAT_COMMON_LINK_OPTIONS}
     ${CP_SAT_PTHREAD_LINK_OPTIONS}
     ${CP_SAT_NODE_LINK_OPTIONS})
 
   add_custom_target(cp_sat_runtime_site ALL
-    DEPENDS cp_sat_runtime cp_sat_runtime_asyncify routing_runtime_asyncify mp_solver_runtime mathopt_runtime ortools_runtime_asyncify cp_sat_runtime_node cp_sat_runtime_node_asyncify
+    DEPENDS cp_sat_runtime cp_sat_runtime_asyncify routing_runtime_asyncify mp_solver_runtime mathopt_runtime ortools_runtime_asyncify ortools_runtime_node ortools_runtime_node_asyncify
     COMMENT "Building cp_sat_runtime runtimes")
 endif()
 

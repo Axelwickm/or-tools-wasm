@@ -27,6 +27,7 @@ or-tools*.zip
 *.swp
 *.swo
 *.tgz
+tests/fixtures/*/package-lock.json
 
 build*.log
 test.log

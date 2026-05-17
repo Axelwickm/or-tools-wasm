@@ -23,4 +23,6 @@ cmake -S . -B build \
   -DCMAKE_TOOLCHAIN_FILE="${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
   ${CMAKE_ARGS:-}
 
+rm -rf build/javascript/wasm build/javascript/node-wasm
+mkdir -p build/javascript/wasm build/javascript/node-wasm
 cmake --build build --target cp_sat_runtime_site --parallel "${build_parallel_level}"
