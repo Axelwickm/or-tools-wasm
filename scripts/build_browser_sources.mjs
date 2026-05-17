@@ -31,6 +31,7 @@ async function transpileSource(sourcePath) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   const code = relativePath === 'runtime_loader.ts'
     ? result.code.replaceAll('#internal-wasm/', '../wasm/')
+      .replaceAll('?no-inline', '')
     : result.code;
 
   await writeFile(outputPath, code);

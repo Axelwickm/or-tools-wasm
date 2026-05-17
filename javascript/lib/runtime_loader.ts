@@ -3,10 +3,10 @@ import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
 type RuntimeModuleFactory = (moduleOverrides?: Record<string, unknown>) => Promise<MainModule>;
 type RuntimeFlavor = 'jspi' | 'asyncify';
 
-const cpSatRuntimeJsUrl = new URL('#internal-wasm/cp_sat_runtime.js', import.meta.url).href;
-const cpSatRuntimeAsyncifyJsUrl = new URL('#internal-wasm/cp_sat_runtime_asyncify.js', import.meta.url).href;
-const cpSatRuntimeWasmUrl = new URL('#internal-wasm/cp_sat_runtime.wasm', import.meta.url).href;
-const cpSatRuntimeAsyncifyWasmUrl = new URL('#internal-wasm/cp_sat_runtime_asyncify.wasm', import.meta.url).href;
+const cpSatRuntimeJsUrl = new URL('#internal-wasm/cp_sat_runtime.js?no-inline', import.meta.url).href;
+const cpSatRuntimeAsyncifyJsUrl = new URL('#internal-wasm/cp_sat_runtime_asyncify.js?no-inline', import.meta.url).href;
+const cpSatRuntimeWasmUrl = new URL('#internal-wasm/cp_sat_runtime.wasm?no-inline', import.meta.url).href;
+const cpSatRuntimeAsyncifyWasmUrl = new URL('#internal-wasm/cp_sat_runtime_asyncify.wasm?no-inline', import.meta.url).href;
 
 const modulePromises: Partial<Record<RuntimeFlavor, Promise<MainModule>>> = {};
 let selectedFlavor: RuntimeFlavor | null = null;
@@ -30,11 +30,8 @@ function selectRuntimeFlavor(): RuntimeFlavor {
 }
 
 async function loadFactory(flavor = selectRuntimeFlavor()): Promise<RuntimeModuleFactory> {
-  if (flavor === 'jspi') {
-    const { default: createModule } = await import('#internal-wasm/cp_sat_runtime.js');
-    return createModule as RuntimeModuleFactory;
-  }
-  const { default: createModule } = await import('#internal-wasm/cp_sat_runtime_asyncify.js');
+  const runtimeUrl = flavor === 'jspi' ? cpSatRuntimeJsUrl : cpSatRuntimeAsyncifyJsUrl;
+  const { default: createModule } = await import(/* webpackIgnore: true */ /* @vite-ignore */ runtimeUrl);
   return createModule as RuntimeModuleFactory;
 }
 

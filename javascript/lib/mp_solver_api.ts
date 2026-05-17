@@ -1,5 +1,12 @@
 import type { MainModule } from '#internal-wasm/cp_sat_runtime.js';
 import { loadRuntimeAsyncify } from './runtime_loader.js';
+import type { WorkerResponse } from './worker_protocol.js';
+import {
+  nextWorkerBridgeRequestId,
+  postWorkerRequest,
+  shouldUseWorkerBridge,
+} from './worker_bridge.js';
+import * as protobufModule from 'protobufjs';
 
 let mpSolverModulePromise: Promise<MainModule> | null = null;
 let mpSolverModule: MainModule | null = null;
@@ -58,6 +65,17 @@ type MpSolverExports = {
   objectiveMinimization(solverHandle: number): number;
   solverSolve(solverHandle: number): MPSolverResultStatus;
   solverSolveWithParameters(solverHandle: number, parametersHandle: number): MPSolverResultStatus;
+  solverExportModelProto(solverHandle: number, lenPtr: number): number;
+  solverExportModelRequestProto(
+    solverHandle: number,
+    solverType: number,
+    timeLimitSeconds: number,
+    enableOutput: number,
+    solverSpecificParametersPtr: number,
+    lenPtr: number,
+  ): number;
+  solverSolveModelRequest(requestPtr: number, requestLength: number, lenPtr: number): number;
+  solverLoadSolutionProto(solverHandle: number, responsePtr: number, responseLength: number, tolerance: number): number;
   solverVerifySolution(solverHandle: number, tolerance: number, logErrors: number): number;
   solverReset(solverHandle: number): void;
   solverInterruptSolve(solverHandle: number): number;
@@ -177,6 +195,10 @@ function createMpSolverExports(module: MainModule): MpSolverExports {
     objectiveMinimization: wrap(module, 'mp_objective_minimization', 'number', ['number']),
     solverSolve: wrap(module, 'mp_solver_solve', 'number', ['number']),
     solverSolveWithParameters: wrap(module, 'mp_solver_solve_with_parameters', 'number', ['number', 'number']),
+    solverExportModelProto: wrap(module, 'mp_solver_export_model_proto', 'number', ['number', 'number']),
+    solverExportModelRequestProto: wrap(module, 'mp_solver_export_model_request_proto', 'number', ['number', 'number', 'number', 'number', 'number', 'number']),
+    solverSolveModelRequest: wrap(module, 'mp_solver_solve_model_request', 'number', ['number', 'number', 'number']),
+    solverLoadSolutionProto: wrap(module, 'mp_solver_load_solution_proto', 'number', ['number', 'number', 'number', 'number']),
     solverVerifySolution: wrap(module, 'mp_solver_verify_solution', 'number', ['number', 'number', 'number']),
     solverReset: wrap(module, 'mp_solver_reset', undefined, ['number']),
     solverInterruptSolve: wrap(module, 'mp_solver_interrupt_solve', 'number', ['number']),
@@ -259,6 +281,157 @@ function withCString<T>(module: MainModule, value: string, fn: (ptr: number) => 
   } finally {
     module._free(ptr);
   }
+}
+
+function readUint32LE(buffer: ArrayBuffer, ptr: number) {
+  return new DataView(buffer, ptr, 4).getUint32(0, true);
+}
+
+function copyBytesToHeap(module: MainModule, bytes: Uint8Array | null) {
+  if (!bytes?.length) return 0;
+  const ptr = module._malloc(bytes.length);
+  module.HEAPU8.set(bytes, ptr);
+  return ptr;
+}
+
+async function readNativeBytes(
+  module: MainModule,
+  fn: (lenPtr: number) => number | Promise<number>,
+) {
+  const lenPtr = module._malloc(4);
+  let responsePtr = 0;
+  try {
+    responsePtr = await fn(lenPtr);
+    const len = readUint32LE(module.HEAPU8.buffer, lenPtr);
+    return responsePtr && len ? module.HEAPU8.slice(responsePtr, responsePtr + len) : new Uint8Array();
+  } finally {
+    if (responsePtr) {
+      module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
+    }
+    module._free(lenPtr);
+  }
+}
+
+export type LinearSolverSchemas = {
+  linear_solver: string;
+  optional_boolean: string;
+};
+
+export type MPSolverModelRequest = Record<string, unknown>;
+export type MPSolverSolutionResponse = Record<string, unknown>;
+
+export type MPSolverProtoSolveResult = {
+  bytes: Uint8Array;
+  response: MPSolverSolutionResponse;
+};
+
+export type MPSolverProtoSolveOptions = {
+  solverType?: OptimizationProblemType;
+  timeLimitSeconds?: number;
+  enableOutput?: boolean;
+  solverSpecificParameters?: string;
+  loadSolution?: boolean;
+  tolerance?: number;
+};
+
+type ProtobufRoot = import('protobufjs').Root;
+type ProtobufType = import('protobufjs').Type;
+
+let linearSolverSchemasPromise: Promise<LinearSolverSchemas> | null = null;
+let linearSolverRootPromise: Promise<ProtobufRoot> | null = null;
+let mpModelRequestTypePromise: Promise<ProtobufType> | null = null;
+let mpSolutionResponseTypePromise: Promise<ProtobufType> | null = null;
+
+async function getLinearSolverSchemas(): Promise<LinearSolverSchemas> {
+  linearSolverSchemasPromise ??= (async () => {
+    if (shouldUseWorkerBridge()) {
+      const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'schemaResult' }>>({
+        type: 'getSchemas',
+        id: nextWorkerBridgeRequestId(),
+      });
+      return {
+        linear_solver: response.schemas.linear_solver,
+        optional_boolean: response.schemas.optional_boolean,
+      };
+    }
+    const module = await loadMpSolverModule();
+    return {
+      linear_solver: module.ccall('get_linear_solver_schema', 'string', [], []) as string,
+      optional_boolean: module.ccall('get_optional_boolean_schema', 'string', [], []) as string,
+    };
+  })();
+  return linearSolverSchemasPromise;
+}
+
+async function resolveLinearSolverRoot(): Promise<ProtobufRoot> {
+  linearSolverRootPromise ??= (async () => {
+    const schemas = await getLinearSolverSchemas();
+    const optionalRoot = protobufModule.parse(schemas.optional_boolean).root;
+    const linearSolverSource = schemas.linear_solver.replace(/^import "ortools\/util\/optional_boolean\.proto";\s*$/m, '');
+    return protobufModule.parse(linearSolverSource, optionalRoot).root;
+  })();
+  return linearSolverRootPromise;
+}
+
+async function resolveMPModelRequestType(): Promise<ProtobufType> {
+  mpModelRequestTypePromise ??= (async () => {
+    const root = await resolveLinearSolverRoot();
+    return root.lookupType('operations_research.MPModelRequest');
+  })();
+  return mpModelRequestTypePromise;
+}
+
+async function resolveMPSolutionResponseType(): Promise<ProtobufType> {
+  mpSolutionResponseTypePromise ??= (async () => {
+    const root = await resolveLinearSolverRoot();
+    return root.lookupType('operations_research.MPSolutionResponse');
+  })();
+  return mpSolutionResponseTypePromise;
+}
+
+async function encodeMPModelRequest(request: MPSolverModelRequest): Promise<Uint8Array> {
+  const type = await resolveMPModelRequestType();
+  const error = type.verify(request);
+  if (error) {
+    throw new Error(`MPSolver.createModelRequest: ${error}`);
+  }
+  return type.encode(type.create(request)).finish();
+}
+
+async function decodeMPSolutionResponse(bytes: Uint8Array): Promise<MPSolverSolutionResponse> {
+  const type = await resolveMPSolutionResponseType();
+  return type.toObject(type.decode(bytes), {
+    enums: String,
+    longs: Number,
+    defaults: true,
+    arrays: true,
+    objects: true,
+  }) as MPSolverSolutionResponse;
+}
+
+async function solveModelRequestDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
+  const module = await loadMpSolverModule();
+  const exports = getMpSolverExports();
+  const requestPtr = copyBytesToHeap(module, requestBytes);
+  try {
+    return readNativeBytes(module, (lenPtr) => {
+      return exports.solverSolveModelRequest(requestPtr, requestBytes.length, lenPtr);
+    });
+  } finally {
+    if (requestPtr) module._free(requestPtr);
+  }
+}
+
+async function solveModelRequestBytes(requestBytes: Uint8Array): Promise<Uint8Array> {
+  if (shouldUseWorkerBridge()) {
+    const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'mpSolverSolveResult' }>>({
+      type: 'mpSolverSolve',
+      id: nextWorkerBridgeRequestId(),
+      requestBytes,
+    });
+    return new Uint8Array(response.bytes);
+  }
+  return solveModelRequestDirect(requestBytes);
 }
 
 function readCString(module: MainModule, ptr: number): string {
@@ -742,6 +915,27 @@ export class MPSolver {
     return MPSolver.SupportsProblemType(problemType) ? problemType : null;
   }
 
+  static getLinearSolverSchemas(): Promise<LinearSolverSchemas> {
+    return getLinearSolverSchemas();
+  }
+
+  static createModelRequest(request: MPSolverModelRequest): Promise<Uint8Array> {
+    return encodeMPModelRequest(request);
+  }
+
+  static decodeSolutionResponse(bytes: Uint8Array): Promise<MPSolverSolutionResponse> {
+    return decodeMPSolutionResponse(bytes);
+  }
+
+  static async solveModelRequest(request: Uint8Array | MPSolverModelRequest): Promise<MPSolverProtoSolveResult> {
+    const requestBytes = request instanceof Uint8Array ? request : await encodeMPModelRequest(request);
+    const bytes = await solveModelRequestBytes(requestBytes);
+    return {
+      bytes,
+      response: await decodeMPSolutionResponse(bytes),
+    };
+  }
+
   Name(): string {
     return readCString(this.module, this.exports.solverName(this.handle));
   }
@@ -876,6 +1070,47 @@ export class MPSolver {
       return this.exports.solverSolveWithParameters(this.handle, parameters.nativeHandle);
     }
     return this.exports.solverSolve(this.handle);
+  }
+
+  exportModelProto(): Promise<Uint8Array> {
+    return readNativeBytes(this.module, (lenPtr) => this.exports.solverExportModelProto(this.handle, lenPtr));
+  }
+
+  exportModelRequestProto(options: MPSolverProtoSolveOptions = {}): Promise<Uint8Array> {
+    const solverType = options.solverType ?? this.ProblemType();
+    const parameters = options.solverSpecificParameters ?? '';
+    return withCString(this.module, parameters, (parametersPtr) => {
+      return readNativeBytes(this.module, (lenPtr) => {
+        return this.exports.solverExportModelRequestProto(
+          this.handle,
+          solverType,
+          options.timeLimitSeconds ?? 0,
+          options.enableOutput ? 1 : 0,
+          parametersPtr,
+          lenPtr,
+        );
+      });
+    });
+  }
+
+  async SolveWithProto(options: MPSolverProtoSolveOptions = {}): Promise<MPSolverProtoSolveResult & { loaded: boolean }> {
+    const requestBytes = await this.exportModelRequestProto(options);
+    const result = await MPSolver.solveModelRequest(requestBytes);
+    let loaded = false;
+    if (options.loadSolution ?? true) {
+      const responsePtr = copyBytesToHeap(this.module, result.bytes);
+      try {
+        loaded = this.exports.solverLoadSolutionProto(
+          this.handle,
+          responsePtr,
+          result.bytes.length,
+          options.tolerance ?? 1e-7,
+        ) === 1;
+      } finally {
+        if (responsePtr) this.module._free(responsePtr);
+      }
+    }
+    return { ...result, loaded };
   }
 
   VerifySolution(tolerance: number, logErrors: boolean): boolean {

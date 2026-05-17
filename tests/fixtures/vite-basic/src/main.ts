@@ -20,6 +20,7 @@ type WorkerStats = {
   total: number;
   pthread: number;
   routingSolve: number;
+  mpSolverSolve: number;
 };
 
 type CpSatApi = typeof import('or-tools-wasm')['CpSat'];
@@ -71,6 +72,7 @@ function installWorkerSpy() {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
+        mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
       };
     },
   };
@@ -124,8 +126,25 @@ async function main() {
   const routingWorkerStatsBefore = workerSpy.snapshot();
   const routingResults = await runRoutingCases(routingApi as never);
   const routingWorkerStatsAfter = workerSpy.snapshot();
-  const mpSolverResults = await runMPSolverCases({ initMPSolver, MPSolver, MPSolverParameters });
-  setStatus({ ok: true, results, routingResults, mpSolverResults, routingWorkerStatsBefore, routingWorkerStatsAfter });
+  const mpSolverWorkerStatsBefore = workerSpy.snapshot();
+  const mpSolverResults = await runMPSolverCases({
+    initMPSolver,
+    MPSolver,
+    MPSolverParameters,
+    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+  });
+  const mpSolverWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({
+    ok: true,
+    results,
+    routingResults,
+    mpSolverResults,
+    routingWorkerStatsBefore,
+    routingWorkerStatsAfter,
+    mpSolverWorkerStatsBefore,
+    mpSolverWorkerStatsAfter,
+  });
 }
 
 void main();

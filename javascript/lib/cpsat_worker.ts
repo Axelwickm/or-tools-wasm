@@ -210,10 +210,40 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         result,
       } satisfies WorkerResponse);
       return;
+    } else if (message.type === 'mpSolverSolve') {
+      const lenPtr = moduleInstance._malloc(4);
+      const requestPtr = copyBytesToHeap(message.requestBytes);
+      let responsePtr = 0;
+      try {
+        responsePtr = moduleInstance.ccall(
+          'mp_solver_solve_model_request',
+          'number',
+          ['number', 'number', 'number'],
+          [requestPtr, message.requestBytes.length, lenPtr],
+        ) as number;
+        const responseLen = readUint32LE(moduleInstance.HEAPU8.buffer, lenPtr);
+        const bytes = responsePtr && responseLen
+          ? moduleInstance.HEAPU8.slice(responsePtr, responsePtr + responseLen)
+          : new Uint8Array();
+        workerScope.postMessage({
+          type: 'mpSolverSolveResult',
+          id: message.id,
+          bytes,
+        } satisfies WorkerResponse);
+      } finally {
+        if (responsePtr) {
+          moduleInstance.ccall('free_buffer', undefined, ['number'], [responsePtr]);
+        }
+        if (requestPtr) moduleInstance._free(requestPtr);
+        moduleInstance._free(lenPtr);
+      }
+      return;
     } else if (message.type === "getSchemas") {
       const schemas = {
         cp_model: moduleInstance.ccall('get_cp_model_schema', 'string', [], []),
-        sat_parameters: moduleInstance.ccall('get_sat_parameters_schema', 'string', [], [])
+        sat_parameters: moduleInstance.ccall('get_sat_parameters_schema', 'string', [], []),
+        linear_solver: moduleInstance.ccall('get_linear_solver_schema', 'string', [], []),
+        optional_boolean: moduleInstance.ccall('get_optional_boolean_schema', 'string', [], []),
       };
       self.postMessage({ type: 'schemaResult', id: message.id, schemas });
       return

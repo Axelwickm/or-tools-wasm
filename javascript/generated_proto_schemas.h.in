@@ -1,4 +1,4 @@
-// Generated from cp_model.proto and sat_parameters.proto. Do not edit.
+// Generated from OR-Tools proto schemas. Do not edit.
 #pragma once
 
 namespace operations_research::sat::wasm {
@@ -9,6 +9,14 @@ inline constexpr const char kCpModelProtoSchema[] = R"ORTOOLS_PROTO(
 
 inline constexpr const char kSatParametersProtoSchema[] = R"ORTOOLS_PROTO(
 @SAT_PARAMETERS_PROTO_TEXT@
+)ORTOOLS_PROTO";
+
+inline constexpr const char kLinearSolverProtoSchema[] = R"ORTOOLS_PROTO(
+@LINEAR_SOLVER_PROTO_TEXT@
+)ORTOOLS_PROTO";
+
+inline constexpr const char kOptionalBooleanProtoSchema[] = R"ORTOOLS_PROTO(
+@OPTIONAL_BOOLEAN_PROTO_TEXT@
 )ORTOOLS_PROTO";
 
 }  // namespace operations_research::sat::wasm

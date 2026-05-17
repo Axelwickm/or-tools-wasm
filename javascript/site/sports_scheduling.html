@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>CP-SAT WASM • Sports Scheduling</title>
+		<title>CP-SAT - Sports Scheduling</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
 			#status { min-height: 12rem; }
@@ -19,7 +19,29 @@
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
-		<h1>Sports Scheduling (CP-SAT WASM)</h1>
+		<h1>CP-SAT - Sports Scheduling</h1>
+		<div class="code-toggle">
+			<details>
+				<summary>Show code</summary>
+				<pre class="code-block"><code><span class="kw">import</span> { CpSat, <span class="kw">type</span> SatParameters } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+<span class="kw">const</span> model = <span class="kw">await</span> CpSat.<span class="fn">createModel</span>({
+  name: <span class="str">'sports_schedule'</span>,
+  variables: [
+    <span class="comment">// Boolean fixture variables: fixture_day_home_away.</span>
+  ],
+  constraints: [
+    <span class="comment">// Each team plays once per day, each pairing appears once per half-season, and breaks are minimized.</span>
+  ],
+  objective: { vars: breakVariables, coeffs: breakVariables.<span class="fn">map</span>(() =&gt; <span class="num">1</span>) },
+});
+
+CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
+<span class="kw">const</span> params: SatParameters = { numWorkers: <span class="num">4</span>, maxTimeInSeconds: <span class="num">10</span> };
+<span class="kw">const</span> result = <span class="kw">await</span> CpSat.<span class="fn">solve</span>(model, params);
+console.<span class="fn">log</span>(result.response?.objectiveValue);</code></pre>
+			</details>
+		</div>
 		<p>This demo adapts the <code>sports_scheduling_sat</code>
 			sample to the browser using the <code>cp_sat_api</code>
 			WebAssembly module. It builds a double round-robin schedule where teams play each opponent once per half-season

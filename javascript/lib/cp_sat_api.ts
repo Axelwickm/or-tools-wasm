@@ -23,6 +23,8 @@ export type { SatParameters } from './generated/sat_parameters.js';
 type SchemaPair = {
   cp_model: string;
   sat_parameters: string;
+  linear_solver: string;
+  optional_boolean: string;
 };
 
 export type CpSatSolveResult = {
@@ -105,6 +107,8 @@ function getSchemas() {
       return {
         cp_model: Module.ccall('get_cp_model_schema', 'string', [], []),
         sat_parameters: Module.ccall('get_sat_parameters_schema', 'string', [], []),
+        linear_solver: Module.ccall('get_linear_solver_schema', 'string', [], []),
+        optional_boolean: Module.ccall('get_optional_boolean_schema', 'string', [], []),
       };
     })();
   }

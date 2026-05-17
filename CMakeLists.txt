@@ -191,6 +191,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     COMMAND "${CMAKE_COMMAND}"
             -DCP_MODEL_PROTO="${PROJECT_SOURCE_DIR}/ortools/sat/cp_model.proto"
             -DSAT_PARAMETERS_PROTO="${PROJECT_SOURCE_DIR}/ortools/sat/sat_parameters.proto"
+            -DLINEAR_SOLVER_PROTO="${PROJECT_SOURCE_DIR}/ortools/linear_solver/linear_solver.proto"
+            -DOPTIONAL_BOOLEAN_PROTO="${PROJECT_SOURCE_DIR}/ortools/util/optional_boolean.proto"
             -DTEMPLATE_FILE="${PROJECT_SOURCE_DIR}/javascript/generated_proto_schemas.h.in"
             -DOUTPUT_FILE="${PROTO_SCHEMA_HEADER}"
             -P "${PROJECT_SOURCE_DIR}/scripts/embed_proto.cmake"
@@ -198,7 +200,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       "${PROJECT_SOURCE_DIR}/scripts/embed_proto.cmake"
       "${PROJECT_SOURCE_DIR}/javascript/generated_proto_schemas.h.in"
       "${PROJECT_SOURCE_DIR}/ortools/sat/cp_model.proto"
-      "${PROJECT_SOURCE_DIR}/ortools/sat/sat_parameters.proto")
+      "${PROJECT_SOURCE_DIR}/ortools/sat/sat_parameters.proto"
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/linear_solver.proto"
+      "${PROJECT_SOURCE_DIR}/ortools/util/optional_boolean.proto")
   add_custom_target(generate_proto_schemas
     DEPENDS "${PROTO_SCHEMA_HEADER}")
 

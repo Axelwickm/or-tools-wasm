@@ -2,20 +2,70 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>OR-Tools WASM • Dispatch Map</title>
+		<title>Routing - Dispatch Map</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
 			#map {
 				display: block;
 				width: 100%;
-				max-width: 980px;
-				aspect-ratio: 16 / 9;
+				max-width: 820px;
+				aspect-ratio: 1 / 1;
 				border: 1px solid #d0d7de;
 				border-radius: 6px;
 				background: #f6f8fa;
 			}
-			#route-output { margin: 0.75rem 0; }
+			.scenario-note {
+				max-width: 1120px;
+				color: #57606a;
+			}
+			#dispatch-summary {
+				display: grid;
+				grid-template-columns: repeat(4, minmax(0, 1fr));
+				gap: 0.75rem;
+				max-width: 1120px;
+				margin: 0.75rem 0;
+			}
+			#dispatch-summary div,
+			.route-card {
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				padding: 0.65rem 0.75rem;
+				background: #fff;
+			}
+			#dispatch-summary strong {
+				display: block;
+				font-size: 1.25rem;
+			}
+			#dispatch-summary span,
+			.route-card small {
+				color: #57606a;
+			}
+			#route-output { margin: 0.75rem 0; max-width: 1120px; }
+			.route-cards {
+				display: grid;
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+				gap: 0.75rem;
+			}
+			.route-card {
+				border-left-width: 5px;
+			}
+			.route-card h2 {
+				font-size: 1rem;
+				margin: 0 0 0.25rem;
+			}
+			.route-card p {
+				margin-bottom: 0.35rem;
+			}
+			.dropped-stops {
+				color: #b3261e;
+			}
 			#status { min-height: 9rem; }
+			@media (max-width: 760px) {
+				#dispatch-summary,
+				.route-cards {
+					grid-template-columns: 1fr;
+				}
+			}
 		</style>
 	</head>
 	<body>
@@ -23,13 +73,58 @@
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
-		<h1>Dispatch Map (OR-Tools WASM)</h1>
-		<p>A multi-depot last-mile routing problem with three vehicles and deliveries spread across a city grid.</p>
+		<h1>Routing - Dispatch Map</h1>
+		<div class="code-toggle">
+			<details>
+				<summary>Show code</summary>
+				<pre class="code-block"><code><span class="kw">import</span> {
+  CpSat,
+  DefaultRoutingSearchParameters,
+  FirstSolutionStrategy,
+  initRouting,
+  RoutingIndexManager,
+  RoutingModel,
+} <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
+<span class="kw">await</span> <span class="fn">initRouting</span>();
+
+<span class="kw">const</span> vehicleCapacities = [<span class="num">20</span>, <span class="num">20</span>, <span class="num">24</span>];
+<span class="kw">const</span> starts = [<span class="num">0</span>, <span class="num">1</span>, <span class="num">2</span>];
+<span class="kw">const</span> manager = <span class="kw">new</span> <span class="type">RoutingIndexManager</span>(stops.length, <span class="num">3</span>, starts, starts);
+<span class="kw">const</span> routing = <span class="kw">new</span> <span class="type">RoutingModel</span>(manager);
+<span class="kw">const</span> transit = routing.<span class="fn">RegisterTransitCallback</span>((from, to) =&gt; {
+  <span class="kw">const</span> a = stops[manager.<span class="fn">IndexToNode</span>(from)];
+  <span class="kw">const</span> b = stops[manager.<span class="fn">IndexToNode</span>(to)];
+  <span class="kw">return</span> Math.<span class="fn">round</span>(Math.<span class="fn">hypot</span>(a.x - b.x, a.y - b.y));
+});
+routing.<span class="fn">SetArcCostEvaluatorOfAllVehicles</span>(transit);
+<span class="kw">const</span> demand = routing.<span class="fn">RegisterUnaryTransitCallback</span>((from) =&gt;
+  stops[manager.<span class="fn">IndexToNode</span>(from)].demand,
+);
+routing.<span class="fn">AddDimensionWithVehicleCapacity</span>(demand, <span class="num">0</span>, vehicleCapacities, <span class="kw">true</span>, <span class="str">'load'</span>);
+routing.<span class="fn">AddDimension</span>(transit, <span class="num">0</span>, <span class="num">2200</span>, <span class="kw">true</span>, <span class="str">'distance'</span>);
+
+<span class="kw">const</span> params = <span class="fn">DefaultRoutingSearchParameters</span>();
+params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
+<span class="kw">const</span> assignment = <span class="kw">await</span> routing.<span class="fn">SolveWithParameters</span>(params);</code></pre>
+			</details>
+		</div>
+		<p>A capacitated multi-depot delivery problem: three trucks leave separate depots to deliver pallet orders across a city grid.</p>
+		<p class="scenario-note">
+			Each customer has a pallet demand, each truck has a pallet capacity, and the solver minimizes total travel while keeping every route under the distance limit. Drop penalties are configured as a safety valve, but this default scenario has enough capacity to serve every stop.
+		</p>
 		<div class="controls">
 			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
 			<button id="run">Plan dispatch</button>
 		</div>
-		<canvas id="map" width="1280" height="720"></canvas>
+		<div id="dispatch-summary">
+			<div><strong>3</strong><span>available vehicles</span></div>
+			<div><strong>57</strong><span>pallets requested</span></div>
+			<div><strong>64</strong><span>pallet capacity</span></div>
+			<div><strong>2200m</strong><span>route distance cap</span></div>
+		</div>
+		<canvas id="map" width="900" height="900"></canvas>
 		<div id="route-output">Run the solver to animate dispatch routes.</div>
 		<p>Status / Response:</p>
 		<pre id="status"></pre>

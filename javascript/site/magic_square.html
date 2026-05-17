@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>CP-SAT WASM • Magic Square</title>
+		<title>CP-SAT - Magic Square</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
 			textarea { width: 100%; height: 18rem; }
@@ -32,7 +32,27 @@
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
-		<h1>Magic Square (CP-SAT WASM)</h1>
+		<h1>CP-SAT - Magic Square</h1>
+		<div class="code-toggle">
+			<details>
+				<summary>Show code</summary>
+				<pre class="code-block"><code><span class="kw">import</span> { CpSat, <span class="kw">type</span> SatParameters } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+<span class="kw">const</span> model = <span class="kw">await</span> CpSat.<span class="fn">createModel</span>({
+  name: <span class="str">'magic_square_3'</span>,
+  variables: Array.<span class="fn">from</span>({ length: <span class="num">9</span> }, (_, i) =&gt; ({ name: <span class="str">`cell_${i}`</span>, domain: [<span class="num">1</span>, <span class="num">9</span>] })),
+  constraints: [
+    { all_diff: { exprs: Array.<span class="fn">from</span>({ length: <span class="num">9</span> }, (_, i) =&gt; ({ vars: [i], coeffs: [<span class="num">1</span>] })) } },
+    <span class="comment">// Add row, column, and diagonal linear constraints with domain [15, 15].</span>
+  ],
+});
+
+CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
+<span class="kw">const</span> params: SatParameters = { numWorkers: <span class="num">4</span>, logSearchProgress: <span class="kw">true</span> };
+<span class="kw">const</span> result = <span class="kw">await</span> CpSat.<span class="fn">solve</span>(model, params);
+console.<span class="fn">log</span>(result.response?.solution);</code></pre>
+			</details>
+		</div>
 		<p>This page exercises the <code>cp_sat_api</code>
 			WASM module by building and solving a magic square model directly in the browser.</p>
 		<div class="controls">

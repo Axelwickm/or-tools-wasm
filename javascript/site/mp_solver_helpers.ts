@@ -1,4 +1,4 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm';
+import { CpSat, initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm';
 
 type VariableKind = 'continuous' | 'integer';
 
@@ -6,10 +6,11 @@ export type SimpleMpConfig = {
   solverId: 'GLOP' | 'SAT';
   variableKind: VariableKind;
   expectedObjective: number;
+  workerCount?: number;
 };
 
 type SimpleMpResult = {
-  status: number;
+  status: number | string;
   objective: number;
   x: number;
   y: number;
@@ -18,6 +19,8 @@ type SimpleMpResult = {
   wallTime: number;
   iterations: number;
   nodes: number;
+  usedWorkerBridge: boolean;
+  workerCount?: number;
 };
 
 export function setRunning(button: HTMLButtonElement | null, running: boolean): void {
@@ -29,6 +32,15 @@ export function setRunning(button: HTMLButtonElement | null, running: boolean): 
 export function appendStatus(element: HTMLElement | null, message: string): void {
   if (!element) return;
   element.textContent += `${message}\n`;
+}
+
+export function configureWorkerBridge(toggle: HTMLInputElement | null): void {
+  if (!toggle) return;
+  toggle.checked = true;
+  CpSat.setWorkerBridgeEnabled(true);
+  toggle.addEventListener('change', () => {
+    CpSat.setWorkerBridgeEnabled(toggle.checked);
+  });
 }
 
 export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<SimpleMpResult> {
@@ -60,9 +72,19 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
     objective.SetCoefficient(y, 10);
     objective.SetMaximization();
 
-    const status = solver.Solve();
+    const workerCount = config.workerCount && config.workerCount > 1
+      ? Math.floor(config.workerCount)
+      : undefined;
+    const protoResult = await solver.SolveWithProto({
+      solverSpecificParameters: config.solverId === 'SAT' && workerCount
+        ? `num_workers: ${workerCount}`
+        : undefined,
+    });
+    if (!protoResult.loaded) {
+      throw new Error('Solver returned a solution response that could not be loaded.');
+    }
     const result = {
-      status,
+      status: protoResult.response.status ?? MPSolver.OPTIMAL,
       objective: objective.Value(),
       x: x.solution_value(),
       y: y.solution_value(),
@@ -71,6 +93,10 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       wallTime: solver.WallTime(),
       iterations: solver.Iterations(),
       nodes: solver.nodes(),
+      usedWorkerBridge: typeof CpSat.isWorkerBridgeEnabled === 'function'
+        ? CpSat.isWorkerBridgeEnabled()
+        : true,
+      workerCount,
     };
     assertExpectedObjective(result, config.expectedObjective);
     return result;
@@ -81,11 +107,15 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
 
 export function renderSimpleMpResult(element: HTMLElement | null, result: SimpleMpResult): void {
   if (!element) return;
-  const status = result.status === MPSolver.OPTIMAL ? 'OPTIMAL' : `status ${result.status}`;
+  const status = result.status === MPSolver.OPTIMAL || result.status === 'MPSOLVER_OPTIMAL'
+    ? 'OPTIMAL'
+    : `status ${result.status}`;
   element.innerHTML = `
     <table>
       <tbody>
         <tr><th>Status</th><td>${status}</td></tr>
+        <tr><th>Worker bridge</th><td>${result.usedWorkerBridge ? 'enabled' : 'disabled'}</td></tr>
+        ${result.workerCount ? `<tr><th>Solver workers</th><td>${result.workerCount}</td></tr>` : ''}
         <tr><th>Objective</th><td>${formatNumber(result.objective)}</td></tr>
         <tr><th>x</th><td>${formatNumber(result.x)}</td></tr>
         <tr><th>y</th><td>${formatNumber(result.y)}</td></tr>

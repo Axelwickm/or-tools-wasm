@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>OR-Tools WASM • Simple Routing</title>
+		<title>Routing - Simple Routing</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
 			#route-output { margin: 0.75rem 0; }
@@ -14,7 +14,34 @@
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
-		<h1>Simple Routing (OR-Tools WASM)</h1>
+		<h1>Routing - Simple Routing</h1>
+		<div class="code-toggle">
+			<details>
+				<summary>Show code</summary>
+				<pre class="code-block"><code><span class="kw">import</span> {
+  CpSat,
+  DefaultRoutingSearchParameters,
+  FirstSolutionStrategy,
+  initRouting,
+  RoutingIndexManager,
+  RoutingModel,
+} <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
+<span class="kw">await</span> <span class="fn">initRouting</span>();
+
+<span class="kw">const</span> manager = <span class="kw">new</span> <span class="type">RoutingIndexManager</span>(<span class="num">5</span>, <span class="num">1</span>, <span class="num">0</span>);
+<span class="kw">const</span> routing = <span class="kw">new</span> <span class="type">RoutingModel</span>(manager);
+<span class="kw">const</span> transit = routing.<span class="fn">RegisterTransitCallback</span>((from, to) =&gt;
+  Math.<span class="fn">abs</span>(manager.<span class="fn">IndexToNode</span>(to) - manager.<span class="fn">IndexToNode</span>(from)),
+);
+routing.<span class="fn">SetArcCostEvaluatorOfAllVehicles</span>(transit);
+
+<span class="kw">const</span> params = <span class="fn">DefaultRoutingSearchParameters</span>();
+params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
+<span class="kw">const</span> assignment = <span class="kw">await</span> routing.<span class="fn">SolveWithParameters</span>(params);</code></pre>
+			</details>
+		</div>
 		<p>This adapts <code>simple_routing_program.py</code>: one vehicle visits five locations and minimizes arc distance.</p>
 		<div class="controls">
 			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>

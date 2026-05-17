@@ -102,7 +102,13 @@ export type RoutingSolveResult = {
   dimensionCumulValues: Record<string, number[]>;
 };
 
-export type WorkerRequest = SolveRequest | ValidateRequest | SchemaRequest | RoutingSolveRequest | CancelSolve;
+export type MPSolverSolveRequest = {
+  type: 'mpSolverSolve';
+  id: number;
+  requestBytes: Uint8Array;
+};
+
+export type WorkerRequest = SolveRequest | ValidateRequest | SchemaRequest | RoutingSolveRequest | MPSolverSolveRequest | CancelSolve;
 
 export type WorkerResponse =
   | { type: 'ready' }
@@ -111,7 +117,8 @@ export type WorkerResponse =
   | { type: 'solveCallback'; id: number; eventType: 'bestBound'; bound: number }
   | { type: 'solveCallback'; id: number; eventType: 'log'; message: string }
   | { type: 'validateResult'; id: number; ok: boolean; message: string }
-  | { type: 'schemaResult'; id: number; schemas: { cp_model: string; sat_parameters: string } }
+  | { type: 'schemaResult'; id: number; schemas: { cp_model: string; sat_parameters: string; linear_solver: string; optional_boolean: string } }
   | { type: 'routingSolveResult'; id: number; result: RoutingSolveResult | null }
+  | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'solved_cancelled'; id: number }
   | { type: 'error'; id: number; error: string };

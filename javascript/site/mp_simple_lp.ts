@@ -1,5 +1,6 @@
 import {
   appendStatus,
+  configureWorkerBridge,
   formatNumber,
   renderSimpleMpResult,
   setRunning,
@@ -8,7 +9,10 @@ import {
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
+const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+
+configureWorkerBridge(workerBridgeToggle);
 
 async function runSimpleLp() {
   setRunning(runButton, true);

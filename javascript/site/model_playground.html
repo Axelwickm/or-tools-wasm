@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>CP-SAT WASM • Model Playground</title>
+  <title>CP-SAT - Model Playground</title>
   <link rel="stylesheet" href="./example.css">
   <style>
     textarea, pre {
@@ -19,7 +19,27 @@
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
-    <h1>Model Playground</h1>
+    <h1>CP-SAT - Model Playground</h1>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code><span class="kw">import</span> { CpSat, <span class="kw">type</span> SatParameters } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+<span class="kw">const</span> modelJson = JSON.<span class="fn">parse</span>(textarea.value);
+<span class="kw">const</span> params: SatParameters = {
+  ...JSON.<span class="fn">parse</span>(paramsTextarea.value),
+  numWorkers: <span class="num">4</span>,
+};
+
+CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
+<span class="kw">const</span> model = <span class="kw">await</span> CpSat.<span class="fn">createModel</span>(modelJson);
+<span class="kw">const</span> validation = <span class="kw">await</span> CpSat.<span class="fn">validate</span>(model);
+<span class="kw">if</span> (!validation.ok) <span class="kw">throw</span> <span class="kw">new</span> Error(validation.message);
+
+<span class="kw">const</span> result = <span class="kw">await</span> CpSat.<span class="fn">solve</span>(model, params);
+console.<span class="fn">log</span>(result.response);</code></pre>
+      </details>
+    </div>
     <p>Paste a JSON-shaped <code>CpModelProto</code>, optionally edit SAT parameters, then validate or solve it in the browser.</p>
 
     <div class="controls">
@@ -27,6 +47,7 @@
       <button id="validate">Validate</button>
       <button id="solve">Solve</button>
       <button id="cancel" disabled>Cancel</button>
+      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1"></label>
       <label><input id="use-worker-bridge" type="checkbox" checked /> Use worker bridge</label>
     </div>
     <div id="status" class="status-line" role="status" aria-live="polite"></div>

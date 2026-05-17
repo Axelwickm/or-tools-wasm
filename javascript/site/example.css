@@ -83,6 +83,39 @@ pre,
 	border-radius: 6px;
 }
 
+.code-toggle {
+	margin: 0.5rem 0 0.75rem;
+}
+
+.code-toggle summary {
+	cursor: pointer;
+	color: #0b57d0;
+	font-weight: 600;
+}
+
+.code-block {
+	overflow-x: auto;
+	white-space: pre;
+	background: #0d1117;
+	color: #e6edf3;
+	border-radius: 6px;
+	padding: 0.85rem;
+	margin-top: 0.5rem;
+}
+
+.code-block code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.9rem;
+	line-height: 1.45;
+}
+
+.code-block .kw { color: #ff7b72; }
+.code-block .fn { color: #d2a8ff; }
+.code-block .str { color: #a5d6ff; }
+.code-block .num { color: #79c0ff; }
+.code-block .type { color: #ffa657; }
+.code-block .comment { color: #8b949e; }
+
 #status:not(.status-line) {
 	min-height: 10rem;
 }

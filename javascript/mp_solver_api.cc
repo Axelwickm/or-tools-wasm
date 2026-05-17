@@ -1,4 +1,6 @@
 // Minimal C API surface for MPSolver over WASM.
+#include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -6,15 +8,22 @@
 
 #include <emscripten/emscripten.h>
 
+#include "generated_proto_schemas.h"
 #include "ortools/linear_solver/linear_solver.h"
+#include "ortools/linear_solver/linear_solver.pb.h"
 
 namespace {
 
 using operations_research::MPConstraint;
+using operations_research::MPModelRequest;
+using operations_research::MPModelProto;
 using operations_research::MPObjective;
+using operations_research::MPSolutionResponse;
 using operations_research::MPSolver;
 using operations_research::MPSolverParameters;
 using operations_research::MPVariable;
+using operations_research::sat::wasm::kLinearSolverProtoSchema;
+using operations_research::sat::wasm::kOptionalBooleanProtoSchema;
 
 struct VariableHandle {
   int solver_handle = 0;
@@ -80,9 +89,36 @@ const char* StoreString(std::string value) {
   return g_string_result.c_str();
 }
 
+uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
+                           size_t* out_len) {
+  if (out_len == nullptr) return nullptr;
+  std::string data;
+  if (!message.SerializeToString(&data)) {
+    *out_len = 0;
+    return nullptr;
+  }
+  auto* buffer =
+      static_cast<uint8_t*>(std::malloc(sizeof(uint8_t) * data.size()));
+  if (buffer == nullptr) {
+    *out_len = 0;
+    return nullptr;
+  }
+  std::memcpy(buffer, data.data(), data.size());
+  *out_len = data.size();
+  return buffer;
+}
+
 }  // namespace
 
 extern "C" {
+
+EMSCRIPTEN_KEEPALIVE const char* get_linear_solver_schema() {
+  return kLinearSolverProtoSchema;
+}
+
+EMSCRIPTEN_KEEPALIVE const char* get_optional_boolean_schema() {
+  return kOptionalBooleanProtoSchema;
+}
 
 EMSCRIPTEN_KEEPALIVE double mp_solver_infinity() {
   return MPSolver::infinity();
@@ -430,6 +466,77 @@ EMSCRIPTEN_KEEPALIVE int mp_solver_solve_with_parameters(
   MPSolverParameters* parameters = GetParameters(parameters_handle);
   if (solver == nullptr || parameters == nullptr) return MPSolver::ABNORMAL;
   return solver->Solve(*parameters);
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_export_model_proto(
+    int solver_handle, size_t* out_len) {
+  MPSolver* solver = GetSolver(solver_handle);
+  if (solver == nullptr) {
+    if (out_len != nullptr) *out_len = 0;
+    StoreString("MPSolver: solver handle not found.");
+    return nullptr;
+  }
+  MPModelProto model;
+  solver->ExportModelToProto(&model);
+  return CopyProtoToBuffer(model, out_len);
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_export_model_request_proto(
+    int solver_handle, int solver_type, double time_limit_seconds,
+    int enable_output, const char* solver_specific_parameters,
+    size_t* out_len) {
+  MPSolver* solver = GetSolver(solver_handle);
+  if (solver == nullptr) {
+    if (out_len != nullptr) *out_len = 0;
+    StoreString("MPSolver: solver handle not found.");
+    return nullptr;
+  }
+  MPModelRequest request;
+  solver->ExportModelToProto(request.mutable_model());
+  request.set_solver_type(static_cast<MPModelRequest::SolverType>(solver_type));
+  if (time_limit_seconds > 0) {
+    request.set_solver_time_limit_seconds(time_limit_seconds);
+  }
+  request.set_enable_internal_solver_output(enable_output != 0);
+  if (solver_specific_parameters != nullptr &&
+      solver_specific_parameters[0] != '\0') {
+    request.set_solver_specific_parameters(solver_specific_parameters);
+  }
+  return CopyProtoToBuffer(request, out_len);
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request(
+    const uint8_t* request_data, size_t request_len, size_t* out_len) {
+  if (out_len == nullptr) return nullptr;
+  MPModelRequest request;
+  MPSolutionResponse response;
+  if (request_data == nullptr ||
+      !request.ParseFromArray(request_data, static_cast<int>(request_len))) {
+    response.set_status(operations_research::MPSOLVER_MODEL_INVALID);
+    response.set_status_str("MPSolver: failed to parse MPModelRequest bytes.");
+    return CopyProtoToBuffer(response, out_len);
+  }
+  MPSolver::SolveWithProto(request, &response);
+  return CopyProtoToBuffer(response, out_len);
+}
+
+EMSCRIPTEN_KEEPALIVE int mp_solver_load_solution_proto(
+    int solver_handle, const uint8_t* response_data, size_t response_len,
+    double tolerance) {
+  MPSolver* solver = GetSolver(solver_handle);
+  if (solver == nullptr) {
+    StoreString("MPSolver: solver handle not found.");
+    return 0;
+  }
+  MPSolutionResponse response;
+  if (response_data == nullptr ||
+      !response.ParseFromArray(response_data, static_cast<int>(response_len))) {
+    StoreString("MPSolver: failed to parse MPSolutionResponse bytes.");
+    return 0;
+  }
+  const absl::Status status = solver->LoadSolutionFromProto(response, tolerance);
+  StoreString(status.ok() ? "" : std::string(status.message()));
+  return status.ok() ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE int mp_solver_verify_solution(int solver_handle,

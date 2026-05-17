@@ -54,6 +54,7 @@ function installWorkerSpy() {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
+        mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
       };
     },
   };
@@ -107,12 +108,25 @@ async function main() {
   const routingWorkerStatsBefore = workerSpy.snapshot();
   const routingResults = await runRoutingCases(routingApi as never);
   const routingWorkerStatsAfter = workerSpy.snapshot();
+  const mpSolverWorkerStatsBefore = workerSpy.snapshot();
   const mpSolverResults = await runMPSolverCases({
     initMPSolver: initMPSolver as typeof initMPSolverValue,
     MPSolver: MPSolver as typeof MPSolverValue,
     MPSolverParameters: MPSolverParameters as typeof MPSolverParametersValue,
+    setWorkerBridgeEnabled: typedCpSat.setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: typedCpSat.isWorkerBridgeEnabled,
   });
-  setStatus({ ok: true, results, routingResults, mpSolverResults, routingWorkerStatsBefore, routingWorkerStatsAfter });
+  const mpSolverWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({
+    ok: true,
+    results,
+    routingResults,
+    mpSolverResults,
+    routingWorkerStatsBefore,
+    routingWorkerStatsAfter,
+    mpSolverWorkerStatsBefore,
+    mpSolverWorkerStatsAfter,
+  });
 }
 
 void main();

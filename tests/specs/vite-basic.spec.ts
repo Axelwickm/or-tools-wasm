@@ -89,6 +89,12 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
     routingWorkerStatsAfter?: {
       routingSolve?: number;
     };
+    mpSolverWorkerStatsBefore?: {
+      mpSolverSolve?: number;
+    };
+    mpSolverWorkerStatsAfter?: {
+      mpSolverSolve?: number;
+    };
   };
   expect(parsedStatus.results).toHaveLength(4);
   expect(parsedStatus.results).toEqual([
@@ -124,7 +130,21 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
   ]));
   expect(parsedStatus.routingWorkerStatsBefore?.routingSolve).toBe(0);
   expect(parsedStatus.routingWorkerStatsAfter?.routingSolve).toBeGreaterThan(1);
+  expect(parsedStatus.mpSolverWorkerStatsBefore?.mpSolverSolve).toBe(0);
+  expect(parsedStatus.mpSolverWorkerStatsAfter?.mpSolverSolve).toBeGreaterThanOrEqual(2);
   expect(parsedStatus.mpSolverResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      name: 'MPSolver: MPModelRequest solve (direct, 1 worker)',
+      ok: true,
+      objective: 23,
+      values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: MPModelRequest solve (worker, 4 workers)',
+      ok: true,
+      objective: 23,
+      values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
     expect.objectContaining({
       name: 'MPSolver: simple_lp_program.py',
       ok: true,

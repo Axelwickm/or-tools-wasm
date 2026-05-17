@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>OR-Tools WASM • Simple LP</title>
+    <title>MPSolver - Linear Programming</title>
     <link rel="stylesheet" href="./example.css">
     <style>
       #solution-output { margin: 0.75rem 0; }
@@ -14,12 +14,40 @@
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
-    <h1>Linear Programming (OR-Tools WASM)</h1>
+    <h1>MPSolver - Linear Programming</h1>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code><span class="kw">import</span> { CpSat, initMPSolver, MPSolver } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
+<span class="kw">await</span> <span class="fn">initMPSolver</span>();
+
+<span class="kw">const</span> solver = MPSolver.<span class="fn">CreateSolver</span>(<span class="str">'GLOP'</span>);
+<span class="kw">if</span> (!solver) <span class="kw">throw</span> <span class="kw">new</span> Error(<span class="str">'GLOP is unavailable'</span>);
+
+<span class="kw">const</span> x = solver.<span class="fn">NumVar</span>(<span class="num">0</span>, solver.<span class="fn">infinity</span>(), <span class="str">'x'</span>);
+<span class="kw">const</span> y = solver.<span class="fn">NumVar</span>(<span class="num">0</span>, solver.<span class="fn">infinity</span>(), <span class="str">'y'</span>);
+<span class="kw">const</span> c0 = solver.<span class="fn">Constraint</span>(-solver.<span class="fn">infinity</span>(), <span class="num">17.5</span>);
+c0.<span class="fn">SetCoefficient</span>(x, <span class="num">1</span>);
+c0.<span class="fn">SetCoefficient</span>(y, <span class="num">7</span>);
+<span class="kw">const</span> c1 = solver.<span class="fn">Constraint</span>(-solver.<span class="fn">infinity</span>(), <span class="num">3.5</span>);
+c1.<span class="fn">SetCoefficient</span>(x, <span class="num">1</span>);
+<span class="kw">const</span> objective = solver.<span class="fn">Objective</span>();
+objective.<span class="fn">SetCoefficient</span>(x, <span class="num">1</span>);
+objective.<span class="fn">SetCoefficient</span>(y, <span class="num">10</span>);
+objective.<span class="fn">SetMaximization</span>();
+
+<span class="kw">await</span> solver.<span class="fn">SolveWithProto</span>();
+console.<span class="fn">log</span>(x.<span class="fn">solution_value</span>(), y.<span class="fn">solution_value</span>());</code></pre>
+      </details>
+    </div>
     <p>
       This adapts <code>simple_lp_program.py</code>: GLOP maximizes
       <code>x + 10y</code> over continuous variables with two linear constraints.
     </p>
     <div class="controls">
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve LP">Solve LP</button>
     </div>
     <div id="solution-output">Run the solver to view the solution.</div>

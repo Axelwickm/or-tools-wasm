@@ -2,40 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>CP-SAT WASM Examples</title>
+  <title>or-tools-wasm examples</title>
   <link rel="stylesheet" href="./example.css">
   <style>
     body { line-height: 1.6; }
     h1 { margin-bottom: 0.5rem; }
+    h2 { margin-bottom: 0.25rem; }
+    .solver-description {
+      color: #57606a;
+      margin-bottom: 0.5rem;
+    }
     ul { padding-left: 1.25rem; }
     li { margin-bottom: 0.4rem; }
   </style>
 </head>
 <body>
-  <h1>OR-Tools WASM Examples</h1>
+  <h1>or-tools-wasm examples</h1>
   <p>
     Select an example to launch a browser demo powered by the OR-Tools WebAssembly package.
     Source code is available on
-    <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>.
+    <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>, and the package is on
+    <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>.
   </p>
   <h2>CP-SAT</h2>
+  <p class="solver-description">
+    Use <a href="https://developers.google.com/optimization/cp/cp_solver" rel="noopener">CP-SAT</a> for discrete optimization problems with integer, Boolean, scheduling, and logical constraints.
+  </p>
   <ul>
-    <li><a href="./magic_square.html">Magic Square (model + solve entirely in JS/WASM)</a></li>
-    <li><a href="./model_playground.html">Model Playground (paste JSON CpModelProto text and solve it)</a></li>
-    <li><a href="./schema_viewer.html">Schema Viewer (print embedded proto schemas)</a></li>
-    <li><a href="./sports_scheduling.html">Sports Scheduling (double round-robin minimization)</a></li>
-    <li><a href="./steel_mill_slab.html">Steel Mill Slab (three solver variants)</a></li>
+    <li><a href="./magic_square.html">Magic Square - fill a grid where every row, column, and diagonal has the same sum</a></li>
+    <li><a href="./model_playground.html">Model Playground - paste JSON CpModelProto text and solve it</a></li>
+    <li><a href="./schema_viewer.html">Schema Viewer - print embedded proto schemas</a></li>
+    <li><a href="./sports_scheduling.html">Sports Scheduling - double round-robin minimization</a></li>
+    <li><a href="./steel_mill_slab.html">Steel Mill Slab - compare three solver variants</a></li>
   </ul>
   <h2>Routing</h2>
+  <p class="solver-description">
+    Use <a href="https://developers.google.com/optimization/routing" rel="noopener">routing</a> for vehicle routing, traveling salesperson, pickups and deliveries, capacities, and route constraints.
+  </p>
   <ul>
-    <li><a href="./routing_simple.html">Simple Routing (direct port of the basic OR-Tools example)</a></li>
-    <li><a href="./routing_vrp.html">Vehicle Routing Problem (direct port of the VRP example)</a></li>
-    <li><a href="./routing_dispatch.html">Dispatch Map (multi-depot route planning with animated 2D routes)</a></li>
+    <li><a href="./routing_simple.html">Simple Routing - direct port of the basic OR-Tools example</a></li>
+    <li><a href="./routing_vrp.html">Vehicle Routing Problem - direct port of the VRP example</a></li>
+    <li><a href="./routing_dispatch.html">Dispatch Map - multi-depot pallet delivery with animated routes</a></li>
   </ul>
   <h2>MPSolver</h2>
+  <p class="solver-description">
+    Use MPSolver for <a href="https://developers.google.com/optimization/lp/mpsolver" rel="noopener">linear programming</a> and <a href="https://developers.google.com/optimization/mip" rel="noopener">mixed-integer programming</a> models with linear objectives and constraints.
+  </p>
   <ul>
-    <li><a href="./mp_simple_lp.html">Linear Programming (direct port of the simple LP example)</a></li>
-    <li><a href="./mp_simple_mip.html">Mixed-Integer Programming (direct port of the simple MIP example)</a></li>
+    <li><a href="./mp_simple_lp.html">Linear Programming - direct port of the simple LP example</a></li>
+    <li><a href="./mp_simple_mip.html">Mixed-Integer Programming - direct port of the simple MIP example</a></li>
   </ul>
 </body>
 </html>

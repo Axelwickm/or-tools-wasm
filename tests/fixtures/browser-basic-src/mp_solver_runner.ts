@@ -98,6 +98,13 @@ type MPSolverLike = {
   RowConstraint(lb: number, ub: number, name?: string): MPConstraintLike;
   Objective(): MPObjectiveLike;
   Solve(parameters?: MPSolverParametersLike): number;
+  SolveWithProto(options?: {
+    solverSpecificParameters?: string;
+    loadSolution?: boolean;
+  }): Promise<{
+    response: Record<string, unknown>;
+    loaded: boolean;
+  }>;
   VerifySolution(tolerance: number, logErrors: boolean): boolean;
   EnableOutput(): void;
   SuppressOutput(): void;
@@ -135,6 +142,11 @@ export type MPSolverApi = {
     ParseSolverType(solverId: string): number | null;
     ParseAndCheckSupportForProblemType(solverId: string): number | null;
     CreateSolver(solverId: string): MPSolverLike | null;
+    createModelRequest(request: Record<string, unknown>): Promise<Uint8Array>;
+    solveModelRequest(request: Uint8Array | Record<string, unknown>): Promise<{
+      bytes: Uint8Array;
+      response: Record<string, unknown>;
+    }>;
   };
   MPSolverParameters: {
     new(): MPSolverParametersLike;
@@ -155,6 +167,8 @@ export type MPSolverApi = {
     SCALING_OFF: number;
     SCALING_ON: number;
   };
+  setWorkerBridgeEnabled?: (enabled: boolean) => void;
+  isWorkerBridgeEnabled?: () => boolean;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -565,22 +579,98 @@ async function runClearSupportCase(api: MPSolverApi): Promise<MpSolverCaseResult
   }
 }
 
+function mpProtoRequest(api: MPSolverApi, numWorkers: number) {
+  return {
+    solverType: api.MPSolver.SAT_INTEGER_PROGRAMMING,
+    solverSpecificParameters: `num_workers: ${numWorkers}`,
+    model: {
+      name: `MPSolver proto ${numWorkers} workers`,
+      maximize: true,
+      variable: [
+        { lowerBound: 0, upperBound: Number.POSITIVE_INFINITY, objectiveCoefficient: 1, isInteger: true, name: 'x' },
+        { lowerBound: 0, upperBound: Number.POSITIVE_INFINITY, objectiveCoefficient: 10, isInteger: true, name: 'y' },
+      ],
+      constraint: [
+        { lowerBound: Number.NEGATIVE_INFINITY, upperBound: 17.5, varIndex: [0, 1], coefficient: [1, 7], name: 'c0' },
+        { lowerBound: Number.NEGATIVE_INFINITY, upperBound: 3.5, varIndex: [0], coefficient: [1], name: 'c1' },
+      ],
+    },
+  };
+}
+
+async function runProtoSolveCase(
+  api: MPSolverApi,
+  mode: 'direct' | 'worker',
+  numWorkers: number,
+  displayName?: string,
+): Promise<MpSolverCaseResult> {
+  const name = displayName ?? `MPSolver: MPModelRequest solve (${mode}, ${numWorkers} worker${numWorkers === 1 ? '' : 's'})`;
+  const result = await api.MPSolver.solveModelRequest(mpProtoRequest(api, numWorkers));
+  const response = result.response;
+  assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+  assert(near(Number(response.objectiveValue), 23), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+  const variableValues = response.variableValue as number[];
+  assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+  assert(near(variableValues[0], 3), `${name}: x mismatch ${variableValues[0]}`);
+  assert(near(variableValues[1], 2), `${name}: y mismatch ${variableValues[1]}`);
+  return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
+}
+
+async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string): Promise<MpSolverCaseResult> {
+  const name = displayName ?? 'MPSolver: SolveWithProto loads solution';
+  const solver = createSolver(api, 'SAT', name);
+  try {
+    const infinity = solver.infinity();
+    const x = solver.IntVar(0, infinity, 'x');
+    const y = solver.IntVar(0, infinity, 'y');
+    const c0 = solver.Constraint(-infinity, 17.5, 'c0');
+    c0.SetCoefficient(x, 1);
+    c0.SetCoefficient(y, 7);
+    const c1 = solver.Constraint(-infinity, 3.5, 'c1');
+    c1.SetCoefficient(x, 1);
+    const objective = solver.Objective();
+    objective.SetCoefficient(x, 1);
+    objective.SetCoefficient(y, 10);
+    objective.SetMaximization();
+
+    const result = await solver.SolveWithProto({ solverSpecificParameters: 'num_workers: 4' });
+    assert(result.loaded, `${name}: solution was not loaded back into the solver`);
+    assert(result.response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL`);
+    assert(near(objective.Value(), 23), `${name}: loaded objective mismatch ${objective.Value()}`);
+    assert(near(x.solution_value(), 3), `${name}: loaded x mismatch ${x.solution_value()}`);
+    assert(near(y.solution_value(), 2), `${name}: loaded y mismatch ${y.solution_value()}`);
+    return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: objective.Value(), values: { x: x.solution_value(), y: y.solution_value() } };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runProtoSolveMatrix(api: MPSolverApi): Promise<MpSolverCaseResult[]> {
+  const results: MpSolverCaseResult[] = [];
+  const modes: Array<'direct' | 'worker'> = api.setWorkerBridgeEnabled ? ['direct', 'worker'] : ['direct'];
+  for (const mode of modes) {
+    api.setWorkerBridgeEnabled?.(mode === 'worker');
+    assert(api.isWorkerBridgeEnabled?.() !== false || mode === 'direct', `MPSolver: worker bridge state mismatch for ${mode}`);
+    for (const numWorkers of [1, 4]) {
+      results.push(await runProtoSolveCase(api, mode, numWorkers));
+    }
+  }
+  api.setWorkerBridgeEnabled?.(false);
+  return results;
+}
+
 export async function runMPSolverCases(api: MPSolverApi): Promise<MpSolverCaseResult[]> {
   await api.initMPSolver();
+  const protoResults = await runProtoSolveMatrix(api);
   return [
-    skipped(
-      'MPSolver: pywraplp_test.py test_proto',
-      'Blocked: MPModelProto LoadModelFromProto/FillSolutionResponseProto is not exposed yet.',
-    ),
+    await runStatefulProtoSolveCase(api),
+    ...protoResults,
     await runExternalApiCase(api),
     skipped(
       'MPSolver: lp_api_test.py test_sum_no_brackets',
       'Not applicable: this tests Python generator/list summation helper behavior, not OR-Tools solver API.',
     ),
-    skipped(
-      'MPSolver: lp_api_test.py test_proto',
-      'Blocked: MPModelRequest proto parsing and LoadModelFromProto are not exposed yet.',
-    ),
+    await runProtoSolveCase(api, 'direct', 1, 'MPSolver: lp_api_test.py test_proto'),
     skipped(
       'MPSolver: lp_test.py RunLinearExampleNaturalLanguageAPI',
       'Blocked: Python operator-overloaded natural expression API is not exposed in TypeScript.',
@@ -597,14 +687,8 @@ export async function runMPSolverCases(api: MPSolverApi): Promise<MpSolverCaseRe
       'MPSolver: lp_test.py testBopInfeasible',
       'Blocked: BOP backend is not linked in this package, and the source test uses Python natural expressions.',
     ),
-    skipped(
-      'MPSolver: lp_test.py testLoadSolutionFromProto',
-      'Blocked: MPSolutionResponse LoadSolutionFromProto is not exposed yet.',
-    ),
-    skipped(
-      'MPSolver: lp_test.py testSolveFromProto',
-      'Blocked: static SolveWithProto and MPModelRequest/MPSolutionResponse APIs are not exposed yet.',
-    ),
+    await runStatefulProtoSolveCase(api, 'MPSolver: lp_test.py testLoadSolutionFromProto'),
+    await runProtoSolveCase(api, 'direct', 4, 'MPSolver: lp_test.py testSolveFromProto'),
     await runExportToMpsCase(api),
     await runClearSupportCase(api),
     await runSimpleProgram(

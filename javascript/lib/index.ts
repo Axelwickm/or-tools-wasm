@@ -21,6 +21,13 @@ export {
   PresolveValues,
   ScalingValues,
 } from './mp_solver_api.js';
+export type {
+  LinearSolverSchemas,
+  MPSolverModelRequest,
+  MPSolverProtoSolveOptions,
+  MPSolverProtoSolveResult,
+  MPSolverSolutionResponse,
+} from './mp_solver_api.js';
 export {
   Assignment,
   BOOL_FALSE,

@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>CP-SAT WASM • Schema Viewer</title>
+		<title>CP-SAT - Schema Viewer</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
 			textarea { min-height: 12rem; }
@@ -13,7 +13,17 @@
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
-		<h1>Schema Viewer</h1>
+		<h1>CP-SAT - Schema Viewer</h1>
+		<div class="code-toggle">
+			<details>
+				<summary>Show code</summary>
+				<pre class="code-block"><code><span class="kw">import</span> { CpSat } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+<span class="kw">const</span> schemas = <span class="kw">await</span> CpSat.<span class="fn">getSchemas</span>();
+console.<span class="fn">log</span>(schemas.cp_model);
+console.<span class="fn">log</span>(schemas.sat_parameters);</code></pre>
+			</details>
+		</div>
 		<p>This demo calls the WASM exports that expose the embedded <code>cp_model.proto</code>
 			and <code>sat_parameters.proto</code>
 			schemas and prints their contents.</p>
