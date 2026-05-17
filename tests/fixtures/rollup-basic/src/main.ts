@@ -1,4 +1,5 @@
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
+import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
 import type { CpSat as CpSatValue } from 'or-tools-wasm';
 import type {
@@ -9,8 +10,11 @@ import type {
   DefaultRoutingModelParameters as DefaultRoutingModelParametersValue,
   FindErrorInRoutingSearchParameters as FindErrorInRoutingSearchParametersValue,
   FirstSolutionStrategy as FirstSolutionStrategyValue,
+  initMPSolver as initMPSolverValue,
   initRouting as initRoutingValue,
   LocalSearchMetaheuristic as LocalSearchMetaheuristicValue,
+  MPSolver as MPSolverValue,
+  MPSolverParameters as MPSolverParametersValue,
   RoutingIndexManager as RoutingIndexManagerValue,
   RoutingModel as RoutingModelValue,
 } from 'or-tools-wasm';
@@ -75,8 +79,11 @@ async function main() {
     DefaultRoutingModelParameters,
     FindErrorInRoutingSearchParameters,
     FirstSolutionStrategy,
+    initMPSolver,
     initRouting,
     LocalSearchMetaheuristic,
+    MPSolver,
+    MPSolverParameters,
     RoutingIndexManager,
     RoutingModel,
   } = await import('or-tools-wasm');
@@ -100,7 +107,12 @@ async function main() {
   const routingWorkerStatsBefore = workerSpy.snapshot();
   const routingResults = await runRoutingCases(routingApi as never);
   const routingWorkerStatsAfter = workerSpy.snapshot();
-  setStatus({ ok: true, results, routingResults, routingWorkerStatsBefore, routingWorkerStatsAfter });
+  const mpSolverResults = await runMPSolverCases({
+    initMPSolver: initMPSolver as typeof initMPSolverValue,
+    MPSolver: MPSolver as typeof MPSolverValue,
+    MPSolverParameters: MPSolverParameters as typeof MPSolverParametersValue,
+  });
+  setStatus({ ok: true, results, routingResults, mpSolverResults, routingWorkerStatsBefore, routingWorkerStatsAfter });
 }
 
 void main();

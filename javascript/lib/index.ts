@@ -6,6 +6,22 @@ export { CpSat } from './cp_sat_api.js';
 export { default } from './cp_sat_api.js';
 export type { CpSatApi, CpSatModelInstance, CpSatSolveCallbacks, CpSatSolveResult } from './cp_sat_api.js';
 export {
+  DoubleParam,
+  IncrementalityValues,
+  initMPSolver,
+  IntegerParam,
+  LpAlgorithmValues,
+  MPConstraint,
+  MPObjective,
+  MPSolver,
+  MPSolverParameters,
+  MPSolverResultStatus,
+  MPVariable,
+  OptimizationProblemType,
+  PresolveValues,
+  ScalingValues,
+} from './mp_solver_api.js';
+export {
   Assignment,
   BOOL_FALSE,
   BOOL_TRUE,

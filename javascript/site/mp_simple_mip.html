@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>OR-Tools WASM • Simple MIP</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 8rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>Mixed-Integer Programming (OR-Tools WASM)</h1>
+    <p>
+      This adapts <code>simple_mip_program.py</code>: the SAT integer backend
+      maximizes <code>x + 10y</code> with integral variables.
+    </p>
+    <div class="controls">
+      <button id="run" data-idle-label="Solve MIP">Solve MIP</button>
+    </div>
+    <div id="solution-output">Run the solver to view the solution.</div>
+    <p>Status / Response:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./mp_simple_mip.ts"></script>
+  </body>
+</html>

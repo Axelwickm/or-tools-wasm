@@ -7,12 +7,16 @@ import {
   DefaultRoutingModelParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
+  initMPSolver,
   initRouting,
   LocalSearchMetaheuristic,
+  MPSolver,
+  MPSolverParameters,
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
+import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
 Deno.test('runs the shared CP-SAT cases in Deno', async () => {
@@ -41,5 +45,10 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   });
   if (!routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.testRoutingSearchParameters' && result.ok)) {
     throw new Error(`deno routing case failed: ${JSON.stringify(routingResults)}`);
+  }
+
+  const mpSolverResults = await runMPSolverCases({ initMPSolver, MPSolver, MPSolverParameters });
+  if (!mpSolverResults.every((result) => result.ok)) {
+    throw new Error(`deno MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
   }
 });

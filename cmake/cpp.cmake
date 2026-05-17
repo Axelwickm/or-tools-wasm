@@ -530,6 +530,7 @@ set(ORTOOLS_CPP_SUBPROJECTS
  ${GSCIP_DIR}
  ${GUROBI_DIR}
  ${PDLP_DIR}
+ linear_solver
  sat
  lp_data
  packing

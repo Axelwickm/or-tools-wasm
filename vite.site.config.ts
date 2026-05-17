@@ -32,6 +32,8 @@ export default defineConfig({
         index: path.resolve(siteRoot, 'index.html'),
         magic_square: path.resolve(siteRoot, 'magic_square.html'),
         model_playground: path.resolve(siteRoot, 'model_playground.html'),
+        mp_simple_lp: path.resolve(siteRoot, 'mp_simple_lp.html'),
+        mp_simple_mip: path.resolve(siteRoot, 'mp_simple_mip.html'),
         routing_dispatch: path.resolve(siteRoot, 'routing_dispatch.html'),
         routing_simple: path.resolve(siteRoot, 'routing_simple.html'),
         routing_vrp: path.resolve(siteRoot, 'routing_vrp.html'),

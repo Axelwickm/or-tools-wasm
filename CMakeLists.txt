@@ -211,7 +211,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_COMMON_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/cp_sat_api.cc"
+    "${PROJECT_SOURCE_DIR}/javascript/mp_solver_api.cc"
     "${PROJECT_SOURCE_DIR}/javascript/routing_api.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/glop_interface.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/glop_proto_solver.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/preprocessor.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_proto_solver.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc"
     "${PROTO_SCHEMA_HEADER}")
 
   set(CP_SAT_COMMON_LINK_OPTIONS
@@ -222,7 +229,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-sALLOW_MEMORY_GROWTH=1"
     "-sWASM_BIGINT=1"
     "--bind"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_solve_model','_solve_model_with_callback_events','_free_buffer','_validate_model','_interrupt_solve','_get_cp_model_schema','_get_sat_parameters_schema','_routing_create_index_manager','_routing_delete_index_manager','_routing_manager_index_to_node','_routing_manager_node_to_index','_routing_manager_num_indices','_routing_create_model','_routing_delete_model','_routing_register_transit_callback','_routing_register_matrix_transit_callback','_routing_set_arc_cost_evaluator_of_all_vehicles','_routing_solve_with_parameters','_routing_assignment_objective_value','_routing_start','_routing_is_end','_routing_next_value','_routing_get_arc_cost_for_vehicle']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_solve_model','_solve_model_with_callback_events','_free_buffer','_validate_model','_interrupt_solve','_get_cp_model_schema','_get_sat_parameters_schema','_mp_solver_infinity','_mp_solver_create','_mp_solver_create_solver','_mp_solver_delete','_mp_solver_num_var','_mp_solver_int_var','_mp_solver_bool_var','_mp_solver_row_constraint','_mp_constraint_set_coefficient','_mp_constraint_lb','_mp_constraint_ub','_mp_constraint_set_bounds','_mp_objective_clear','_mp_objective_set_coefficient','_mp_objective_set_offset','_mp_objective_set_minimization','_mp_objective_set_maximization','_mp_objective_value','_mp_solver_solve','_mp_solver_num_variables','_mp_solver_num_constraints','_mp_solver_wall_time','_mp_solver_iterations','_mp_solver_nodes','_mp_variable_solution_value','_mp_variable_lb','_mp_variable_ub','_mp_variable_integer','_mp_variable_set_bounds','_routing_create_index_manager','_routing_delete_index_manager','_routing_manager_index_to_node','_routing_manager_node_to_index','_routing_manager_num_indices','_routing_create_model','_routing_delete_model','_routing_register_transit_callback','_routing_register_matrix_transit_callback','_routing_set_arc_cost_evaluator_of_all_vehicles','_routing_solve_with_parameters','_routing_assignment_objective_value','_routing_start','_routing_is_end','_routing_next_value','_routing_get_arc_cost_for_vehicle']"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8"
     "-sNODEJS_CATCH_REJECTION=0"
     "-sNODEJS_CATCH_EXIT=0"

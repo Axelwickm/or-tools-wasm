@@ -35,7 +35,8 @@ npm install or-tools-wasm
 import { CpSat } from 'or-tools-wasm';
 ```
 
-Currently supported solvers: CP-SAT and routing.
+Currently supported solvers: CP-SAT, routing, and MPSolver with the GLOP LP
+and SAT MIP backends.
 
 Verified with:
 
@@ -50,20 +51,23 @@ The TypeScript API intentionally mirrors the public OR-Tools API shape where it
 maps cleanly to WebAssembly, so upstream examples and tests are useful contract
 references. CP-SAT stays proto-first, while routing exposes familiar
 `RoutingIndexManager`, `RoutingModel`, callback, dimension, and search-parameter
-entry points.
+entry points. MPSolver exposes the familiar `pywraplp`-style solver, variable,
+constraint, objective, and parameter entry points for linear and mixed-integer
+models.
 
 ## What is included
 
-- A CP-SAT and routing WebAssembly runtime built with Emscripten pthread
+- A CP-SAT, routing, and MPSolver WebAssembly runtime built with Emscripten pthread
   support.
 - A TypeScript API for solving, validating models, interrupting solves, and
   reading embedded proto schemas.
 - An OR-Tools-style routing API for `RoutingIndexManager`, `RoutingModel`,
   transit callbacks, search parameters, and solution traversal.
+- An OR-Tools-style MPSolver API for `MPSolver`, `MPSolverParameters`,
+  `MPVariable`, `MPConstraint`, and `MPObjective` using GLOP and SAT.
 - A worker bridge for keeping browser UI threads responsive while solving.
 - Generated TypeScript definitions for SAT parameters.
-- Demo pages for Magic Square, Sports Scheduling, Steel Mill Slab, and schema
-  inspection.
+- Demo pages for CP-SAT, routing, MPSolver, and schema inspection.
 
 This flow is verified with Vite, Webpack, and Rollup. The worker script and
 WebAssembly files are emitted automatically from the package import, with no
@@ -140,6 +144,45 @@ if (!assignment) {
 }
 
 console.log(assignment.ObjectiveValue());
+```
+
+```ts
+import { initMPSolver, MPSolver, MPSolverParameters } from 'or-tools-wasm';
+
+await initMPSolver();
+
+const solver = MPSolver.CreateSolver('GLOP');
+if (!solver) {
+  throw new Error('GLOP is not available');
+}
+
+const infinity = solver.infinity();
+const x = solver.NumVar(0, infinity, 'x');
+const y = solver.NumVar(0, infinity, 'y');
+
+const c0 = solver.Constraint(-infinity, 17.5);
+c0.SetCoefficient(x, 1);
+c0.SetCoefficient(y, 7);
+
+const c1 = solver.Constraint(-infinity, 3.5);
+c1.SetCoefficient(x, 1);
+
+const objective = solver.Objective();
+objective.SetCoefficient(x, 1);
+objective.SetCoefficient(y, 10);
+objective.SetMaximization();
+
+const params = new MPSolverParameters();
+params.SetIntegerParam(MPSolverParameters.PRESOLVE, MPSolverParameters.PRESOLVE_ON);
+
+const status = solver.Solve(params);
+if (status !== MPSolver.OPTIMAL) {
+  throw new Error(`Solve failed with status ${status}`);
+}
+
+console.log(objective.Value(), x.solution_value(), y.solution_value());
+params.delete();
+solver.delete();
 ```
 
 ## Browser hosting requirements
@@ -286,13 +329,13 @@ worker setting.
 solver should use for a solve. It does not change how many Emscripten pthread
 workers are created when the WebAssembly runtime is initialized.
 
-By default, `CpSat.solve` runs through the package's worker bridge. The bridge
-loads the CP-SAT runtime in a dedicated JavaScript worker, so the browser's main
-thread remains available for rendering, input, progress UI, and cancellation.
-If the worker bridge is disabled, solving runs directly on the main thread. The
-solver still works, but the GUI can freeze until CP-SAT returns because the
-browser cannot repaint or process UI events during the synchronous WebAssembly
-call.
+By default, browser solves run through the package's worker bridge. The bridge
+loads the solver runtime in a dedicated JavaScript worker, so the browser's
+main thread remains available for rendering, input, progress UI, and
+cancellation. If the worker bridge is disabled, solving runs directly on the
+main thread. The solver still works, but the GUI can freeze until the solve
+returns because the browser cannot repaint or process UI events during the
+synchronous WebAssembly call.
 
 ## Local development
 
@@ -340,6 +383,7 @@ submodules up front, clone with `--recurse-submodules` or run
 - `javascript/site` contains the demo pages.
 - `javascript/cp_sat_api.cc` contains the CP-SAT C++ binding layer compiled into WebAssembly.
 - `javascript/routing_api.cc` contains the routing C++ binding layer compiled into WebAssembly.
+- `javascript/mp_solver_api.cc` contains the MPSolver C++ binding layer compiled into WebAssembly.
 - `scripts/embed_proto.cmake` embeds CP-SAT proto schemas into the runtime.
 - `scripts/generate_sat_parameters_types.mjs` generates TypeScript SAT parameter definitions.
 - `vite.lib.config.ts` builds the distributable JS package.

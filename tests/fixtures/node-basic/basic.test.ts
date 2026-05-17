@@ -7,12 +7,16 @@ import {
   DefaultRoutingModelParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
+  initMPSolver,
   initRouting,
   LocalSearchMetaheuristic,
+  MPSolver,
+  MPSolverParameters,
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
+import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
 const results = await runCpSatCases(CpSat, { modes: ['direct'] });
@@ -46,4 +50,9 @@ if (!routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.tes
   throw new Error(`node routing case failed: ${JSON.stringify(routingResults)}`);
 }
 
-console.log(`node ran ${cpSatCases.length} CP-SAT cases and ${routingResults.length} routing cases across ${results.length} worker profiles`);
+const mpSolverResults = await runMPSolverCases({ initMPSolver, MPSolver, MPSolverParameters });
+if (!mpSolverResults.every((result) => result.ok)) {
+  throw new Error(`node MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
+}
+
+console.log(`node ran ${cpSatCases.length} CP-SAT cases, ${routingResults.length} routing cases, and ${mpSolverResults.length} MPSolver cases across ${results.length} worker profiles`);
