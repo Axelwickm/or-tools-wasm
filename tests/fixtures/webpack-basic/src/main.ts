@@ -1,6 +1,7 @@
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
 import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
+import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
 
 const statusEl = document.getElementById('status');
@@ -103,11 +104,13 @@ async function main() {
     FirstSolutionStrategy,
     initMathOpt,
     initMPSolver,
+    initPdlp,
     initRouting,
     LocalSearchMetaheuristic,
     MathOpt,
     MPSolver,
     MPSolverParameters,
+    Pdlp,
     RoutingIndexManager,
     RoutingModel,
   } = await import('or-tools-wasm');
@@ -143,12 +146,19 @@ async function main() {
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
   const mathOptWorkerStatsAfter = workerSpy.snapshot();
+  const pdlpResults = await runPdlpCases({
+    initPdlp,
+    Pdlp,
+    MPSolver,
+    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+  });
   setStatus({
     ok: true,
     results,
     routingResults,
     mpSolverResults,
     mathOptResults,
+    pdlpResults,
     routingWorkerStatsBefore,
     routingWorkerStatsAfter,
     mpSolverWorkerStatsBefore,

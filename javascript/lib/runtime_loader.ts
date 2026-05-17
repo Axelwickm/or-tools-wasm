@@ -2,7 +2,7 @@ import type { OrToolsWasmModule } from './wasm_module_types.js';
 
 type RuntimeModuleFactory = (moduleOverrides?: Record<string, unknown>) => Promise<OrToolsWasmModule>;
 type RuntimeFlavor = 'jspi' | 'asyncify';
-type RuntimeName = 'cp_sat_runtime' | 'routing_runtime' | 'mp_solver_runtime' | 'mathopt_runtime';
+type RuntimeName = 'cp_sat_runtime' | 'routing_runtime' | 'mp_solver_runtime' | 'mathopt_runtime' | 'pdlp_runtime';
 type RuntimeKey = `${RuntimeName}:${RuntimeFlavor}`;
 
 type RuntimeAsset = {
@@ -51,22 +51,32 @@ const runtimeAssets: Record<RuntimeName, Record<RuntimeFlavor, RuntimeAsset>> = 
       wasmUrl: new URL('#internal-wasm/mathopt_runtime_asyncify.wasm?no-inline', import.meta.url).href,
     },
   },
+  pdlp_runtime: {
+    jspi: {
+      jsUrl: new URL('#internal-wasm/pdlp_runtime.js?no-inline', import.meta.url).href,
+      wasmUrl: new URL('#internal-wasm/pdlp_runtime.wasm?no-inline', import.meta.url).href,
+    },
+    asyncify: {
+      jsUrl: new URL('#internal-wasm/pdlp_runtime_asyncify.js?no-inline', import.meta.url).href,
+      wasmUrl: new URL('#internal-wasm/pdlp_runtime_asyncify.wasm?no-inline', import.meta.url).href,
+    },
+  },
 };
 
 const modulePromises: Partial<Record<RuntimeKey, Promise<OrToolsWasmModule>>> = {};
 let selectedFlavor: RuntimeFlavor | null = null;
-
-function isDenoRuntime(): boolean {
-  return 'Deno' in globalThis;
-}
 
 function isJspiSupported(): boolean {
   const wasm = WebAssembly as typeof WebAssembly & { promising?: unknown };
   return typeof wasm !== 'undefined' && typeof wasm.promising === 'function';
 }
 
+function isBrowserRuntimeHost(): boolean {
+  return typeof window !== 'undefined' || typeof WorkerGlobalScope !== 'undefined';
+}
+
 function selectRuntimeFlavor(runtimeName: RuntimeName): RuntimeFlavor {
-  if (runtimeName === 'routing_runtime' && isDenoRuntime()) {
+  if (isBrowserRuntimeHost()) {
     return 'asyncify';
   }
   if (selectedFlavor) {
@@ -86,11 +96,16 @@ async function loadFactory(runtimeUrl: string): Promise<RuntimeModuleFactory> {
   return createModule as RuntimeModuleFactory;
 }
 
+function runtimeAssetName(url: string): string {
+  const fileName = new URL(url).pathname.split('/').pop() ?? '';
+  return fileName.replace(/-[A-Za-z0-9_-]+(?=\.(?:js|wasm)$)/, '');
+}
+
 function locateRuntimeFile(fileName: string) {
   for (const flavors of Object.values(runtimeAssets)) {
     for (const asset of Object.values(flavors)) {
-      if (fileName === new URL(asset.jsUrl).pathname.split('/').pop()) return asset.jsUrl;
-      if (fileName === new URL(asset.wasmUrl).pathname.split('/').pop()) return asset.wasmUrl;
+      if (fileName === runtimeAssetName(asset.jsUrl)) return asset.jsUrl;
+      if (fileName === runtimeAssetName(asset.wasmUrl)) return asset.wasmUrl;
     }
   }
   return fileName;
@@ -139,6 +154,14 @@ export async function loadMathOptRuntime(): Promise<OrToolsWasmModule> {
 
 export async function loadMathOptRuntimeAsyncify(): Promise<OrToolsWasmModule> {
   return createRuntime('mathopt_runtime', 'asyncify');
+}
+
+export async function loadPdlpRuntime(): Promise<OrToolsWasmModule> {
+  return createRuntime('pdlp_runtime');
+}
+
+export async function loadPdlpRuntimeAsyncify(): Promise<OrToolsWasmModule> {
+  return createRuntime('pdlp_runtime', 'asyncify');
 }
 
 export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };

@@ -51,7 +51,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(BUILD_SAMPLES OFF CACHE BOOL "Build samples" FORCE)
   set(BUILD_EXAMPLES OFF CACHE BOOL "Build examples" FORCE)
   set(USE_GUROBI OFF CACHE BOOL "Use the Gurobi solver" FORCE)
-  set(USE_PDLP OFF CACHE BOOL "Use the PDLP solver" FORCE)
+  set(USE_PDLP ON CACHE BOOL "Use the PDLP solver" FORCE)
   set(USE_XPRESS OFF CACHE BOOL "Use the Xpress solver" FORCE)
 endif()
 
@@ -239,11 +239,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc")
 
+  set(PDLP_BROWSER_SOURCES
+    "${PROJECT_SOURCE_DIR}/javascript/pdlp_api.cc")
+
   set(CP_SAT_COMMON_LINK_OPTIONS
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
     "-sEXPORT_NAME=cpSatModule"
     "-sASSERTIONS=1"
+    "-fexceptions"
+    "-sDISABLE_EXCEPTION_CATCHING=0"
     "-sALLOW_MEMORY_GROWTH=1"
     "-sWASM_BIGINT=1"
     "--bind"
@@ -271,7 +276,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_JSPI_LINK_OPTIONS
     "-sJSPI=2"
-    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request']")
+    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request','pdlp_primal_dual_hybrid_gradient']")
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")
@@ -280,6 +285,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     add_dependencies(${TARGET_NAME} generate_proto_schemas)
     target_link_libraries(${TARGET_NAME} PRIVATE ${PROJECT_NAMESPACE}::ortools)
     target_include_directories(${TARGET_NAME} PRIVATE "${PROJECT_BINARY_DIR}/javascript")
+    target_compile_options(${TARGET_NAME} PRIVATE "-fexceptions")
     target_compile_definitions(${TARGET_NAME} PRIVATE
       ORTOOLS_WASM_ALLOWED_ORIGINS="${EMSCRIPTEN_ALLOWED_ORIGINS_ESCAPED}")
     set_target_properties(${TARGET_NAME} PROPERTIES
@@ -302,7 +308,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       "cp_sat_runtime;CP_SAT_BROWSER_SOURCES"
       "routing_runtime;ROUTING_BROWSER_SOURCES"
       "mp_solver_runtime;MP_SOLVER_BROWSER_SOURCES"
-      "mathopt_runtime;MATHOPT_BROWSER_SOURCES")
+      "mathopt_runtime;MATHOPT_BROWSER_SOURCES"
+      "pdlp_runtime;PDLP_BROWSER_SOURCES")
     list(GET RUNTIME_SPEC 0 RUNTIME_NAME)
     list(GET RUNTIME_SPEC 1 RUNTIME_SOURCES)
 

@@ -1,6 +1,7 @@
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
 import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
+import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
 import type { CpSat as CpSatValue } from 'or-tools-wasm';
 import type {
@@ -13,11 +14,13 @@ import type {
   FirstSolutionStrategy as FirstSolutionStrategyValue,
   initMathOpt as initMathOptValue,
   initMPSolver as initMPSolverValue,
+  initPdlp as initPdlpValue,
   initRouting as initRoutingValue,
   LocalSearchMetaheuristic as LocalSearchMetaheuristicValue,
   MathOpt as MathOptValue,
   MPSolver as MPSolverValue,
   MPSolverParameters as MPSolverParametersValue,
+  Pdlp as PdlpValue,
   RoutingIndexManager as RoutingIndexManagerValue,
   RoutingModel as RoutingModelValue,
 } from 'or-tools-wasm';
@@ -86,11 +89,13 @@ async function main() {
     FirstSolutionStrategy,
     initMathOpt,
     initMPSolver,
+    initPdlp,
     initRouting,
     LocalSearchMetaheuristic,
     MathOpt,
     MPSolver,
     MPSolverParameters,
+    Pdlp,
     RoutingIndexManager,
     RoutingModel,
   } = await import('or-tools-wasm');
@@ -129,12 +134,19 @@ async function main() {
     MathOpt: MathOpt as typeof MathOptValue,
   });
   const mathOptWorkerStatsAfter = workerSpy.snapshot();
+  const pdlpResults = await runPdlpCases({
+    initPdlp: initPdlp as typeof initPdlpValue,
+    Pdlp: Pdlp as typeof PdlpValue,
+    MPSolver: MPSolver as typeof MPSolverValue,
+    setWorkerBridgeEnabled: typedCpSat.setWorkerBridgeEnabled,
+  });
   setStatus({
     ok: true,
     results,
     routingResults,
     mpSolverResults,
     mathOptResults,
+    pdlpResults,
     routingWorkerStatsBefore,
     routingWorkerStatsAfter,
     mpSolverWorkerStatsBefore,

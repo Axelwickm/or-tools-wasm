@@ -1,5 +1,9 @@
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
+declare const __ORTOOLS_WASM_BROWSER_BUILD__: boolean | undefined;
+
+const isPackagedBrowserBuild = typeof __ORTOOLS_WASM_BROWSER_BUILD__ !== 'undefined'
+  && __ORTOOLS_WASM_BROWSER_BUILD__;
 const isBrowserMainThread = typeof window !== 'undefined' && typeof document !== 'undefined';
 const isDeno = 'Deno' in globalThis;
 const isBun = 'Bun' in globalThis;
@@ -60,7 +64,7 @@ export function terminateWorkerBridge(reason?: string) {
 }
 
 async function createBridgeWorker(): Promise<BridgeWorker> {
-  if (isNode || isDeno) {
+  if (!isPackagedBrowserBuild && (isNode || isDeno)) {
     const workerThreadsSpecifier = 'node:worker_threads';
     const { Worker: NodeWorker } = await import(workerThreadsSpecifier);
     return new NodeWorker(new URL('./node_worker_bridge.js', import.meta.url)) as BridgeWorker;

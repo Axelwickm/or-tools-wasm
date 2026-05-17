@@ -11,6 +11,8 @@ const runtimeNames = [
   'mp_solver_runtime_asyncify',
   'mathopt_runtime',
   'mathopt_runtime_asyncify',
+  'pdlp_runtime',
+  'pdlp_runtime_asyncify',
 ];
 const nodeRuntimePaths = [
   path.join(repoRoot, 'build/javascript/node-wasm/cp_sat_runtime_node.js'),
@@ -21,6 +23,8 @@ const nodeRuntimePaths = [
   path.join(repoRoot, 'build/javascript/node-wasm/mp_solver_runtime_node_asyncify.js'),
   path.join(repoRoot, 'build/javascript/node-wasm/mathopt_runtime_node.js'),
   path.join(repoRoot, 'build/javascript/node-wasm/mathopt_runtime_node_asyncify.js'),
+  path.join(repoRoot, 'build/javascript/node-wasm/pdlp_runtime_node.js'),
+  path.join(repoRoot, 'build/javascript/node-wasm/pdlp_runtime_node_asyncify.js'),
 ];
 const webRuntimePaths = runtimeNames.map((runtimeName) =>
   path.join(repoRoot, `build/javascript/wasm/${runtimeName}.js`)

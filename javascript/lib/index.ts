@@ -43,6 +43,21 @@ export type {
   MathOptVariableOptions,
 } from './mathopt_api.js';
 export {
+  initPdlp,
+  Pdlp,
+  PrimalAndDualSolution,
+  QuadraticProgram,
+} from './pdlp_api.js';
+export type {
+  PdlpSolveLog,
+  PdlpSolveParams,
+  PdlpSolverResult,
+  PrimalAndDualSolutionInput,
+  QuadraticProgramInput,
+  SparseMatrixEntry,
+  SparseMatrixInput,
+} from './pdlp_api.js';
+export {
   Assignment,
   BOOL_FALSE,
   BOOL_TRUE,

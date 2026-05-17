@@ -9,17 +9,20 @@ import {
   FirstSolutionStrategy,
   initMathOpt,
   initMPSolver,
+  initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
   MathOpt,
   MPSolver,
   MPSolverParameters,
+  Pdlp,
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
+import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
 const results = await runCpSatCases(CpSat);
@@ -69,4 +72,14 @@ if (!mathOptResults.every((result) => result.ok)) {
   throw new Error(`node MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
 }
 
-console.log(`node ran ${cpSatCases.length} CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, and ${mathOptResults.length} MathOpt cases across ${results.length} worker profiles`);
+const pdlpResults = await runPdlpCases({
+  initPdlp,
+  Pdlp,
+  MPSolver,
+  setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+});
+if (!pdlpResults.every((result) => result.ok)) {
+  throw new Error(`node PDLP case failed: ${JSON.stringify(pdlpResults)}`);
+}
+
+console.log(`node ran ${cpSatCases.length} CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`);

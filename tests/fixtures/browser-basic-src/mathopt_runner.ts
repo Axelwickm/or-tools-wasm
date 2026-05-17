@@ -11,6 +11,10 @@ export type MathOptCaseResult = {
   values: Record<string, number>;
 };
 
+type MathOptRunOptions = {
+  onProgress?: (name: string, mode: 'direct' | 'worker', threads: number) => void;
+};
+
 type MathOptVariableLike = {
   readonly id: number;
   readonly name: string;
@@ -222,6 +226,7 @@ export type MathOptApi = {
     solve(model: MathOptModelLike, options?: {
       solverType?: number | string;
       threads?: number;
+      iterationLimit?: number;
     }): Promise<{
       terminationReason: string;
       objectiveValue: number | null;
@@ -326,16 +331,19 @@ async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
   };
 }
 
-export async function runMathOptCases(api: MathOptApi): Promise<MathOptCaseResult[]> {
+export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
   await api.initMathOpt();
   const results: MathOptCaseResult[] = [];
   const modes: Array<'direct' | 'worker'> = api.MathOpt.setWorkerBridgeEnabled ? ['direct', 'worker'] : ['direct'];
   for (const mode of modes) {
     api.MathOpt.setWorkerBridgeEnabled?.(mode === 'worker');
     for (const threads of [1, 4]) {
+      options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
       results.push(await runGlopLp(api, mode, threads));
+      options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
       results.push(await runCpSatMip(api, mode, threads));
       for (const testCase of mathOptExpressionContractCases) {
+        options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
         const output = await testCase.run(api);
         results.push({
           name: `MathOpt.${testCase.name}`,
@@ -347,6 +355,7 @@ export async function runMathOptCases(api: MathOptApi): Promise<MathOptCaseResul
           values: {},
         });
       }
+      options.onProgress?.('MathOpt.modelContract', mode, threads);
       results.push(...await runMathOptModelContractCases(api, mode, threads));
     }
   }

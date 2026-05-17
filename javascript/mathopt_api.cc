@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <string>
 
 #include <emscripten/emscripten.h>
@@ -12,6 +13,7 @@
 #include "ortools/math_opt/rpc.pb.h"
 #include "ortools/math_opt/solvers/cp_sat_solver.h"
 #include "ortools/math_opt/solvers/glop_solver.h"
+#include "ortools/math_opt/solvers/pdlp_solver.h"
 
 namespace {
 
@@ -20,11 +22,14 @@ using operations_research::math_opt::CallbackResultProto;
 using operations_research::math_opt::AllSolversRegistry;
 using operations_research::math_opt::CpSatSolver;
 using operations_research::math_opt::GlopSolver;
+using operations_research::math_opt::PdlpSolver;
 using operations_research::math_opt::SolveRequest;
 using operations_research::math_opt::SolveResponse;
+using operations_research::math_opt::SolveResultProto;
 using operations_research::math_opt::Solver;
 using operations_research::math_opt::SOLVER_TYPE_CP_SAT;
 using operations_research::math_opt::SOLVER_TYPE_GLOP;
+using operations_research::math_opt::SOLVER_TYPE_PDLP;
 
 uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
                            size_t* out_len) {
@@ -58,6 +63,9 @@ void EnsureMathOptSolversRegistered() {
   if (!registry->IsRegistered(SOLVER_TYPE_CP_SAT)) {
     registry->Register(SOLVER_TYPE_CP_SAT, CpSatSolver::New);
   }
+  if (!registry->IsRegistered(SOLVER_TYPE_PDLP)) {
+    registry->Register(SOLVER_TYPE_PDLP, PdlpSolver::New);
+  }
 }
 
 }  // namespace
@@ -86,18 +94,27 @@ uint8_t* mathopt_solve_request(const uint8_t* request_data, size_t request_len,
   }
 
   EnsureMathOptSolversRegistered();
-  auto result = Solver::NonIncrementalSolve(
-      request.model(), request.solver_type(),
-      {.streamable = request.initializer()},
-      {.parameters = request.parameters(),
-       .model_parameters = request.model_parameters(),
-       .message_callback = nullptr,
-       .callback_registration = CallbackRegistrationProto(),
-       .user_cb =
-           [](const operations_research::math_opt::CallbackDataProto&) {
-             return CallbackResultProto();
-           },
-       .interrupter = nullptr});
+  absl::StatusOr<SolveResultProto> result;
+  try {
+    result = Solver::NonIncrementalSolve(
+        request.model(), request.solver_type(),
+        {.streamable = request.initializer()},
+        {.parameters = request.parameters(),
+         .model_parameters = request.model_parameters(),
+         .message_callback = nullptr,
+         .callback_registration = CallbackRegistrationProto(),
+         .user_cb =
+             [](const operations_research::math_opt::CallbackDataProto&) {
+               return CallbackResultProto();
+             },
+         .interrupter = nullptr});
+  } catch (const std::exception& e) {
+    SetStatus(&response, absl::InternalError(e.what()));
+    return CopyProtoToBuffer(response, out_len);
+  } catch (...) {
+    SetStatus(&response, absl::InternalError("MathOpt solve threw an unknown exception."));
+    return CopyProtoToBuffer(response, out_len);
+  }
 
   if (!result.ok()) {
     SetStatus(&response, result.status());

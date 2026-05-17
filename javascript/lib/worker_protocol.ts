@@ -114,6 +114,15 @@ export type MathOptSolveRequest = {
   requestBytes: Uint8Array;
 };
 
+export type PdlpRequest = {
+  type: 'pdlp';
+  id: number;
+  operation: 'validate' | 'isLinear' | 'fromMpModel' | 'toMpModel' | 'solve';
+  bytes: Uint8Array;
+  relaxIntegerVariables?: boolean;
+  includeNames?: boolean;
+};
+
 export type WorkerRequest =
   | SolveRequest
   | ValidateRequest
@@ -121,6 +130,7 @@ export type WorkerRequest =
   | RoutingSolveRequest
   | MPSolverSolveRequest
   | MathOptSolveRequest
+  | PdlpRequest
   | CancelSolve;
 
 export type WorkerResponse =
@@ -134,5 +144,6 @@ export type WorkerResponse =
   | { type: 'routingSolveResult'; id: number; result: RoutingSolveResult | null }
   | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'mathOptSolveResult'; id: number; bytes: Uint8Array }
+  | { type: 'pdlpResult'; id: number; bytes: Uint8Array; value?: number }
   | { type: 'solved_cancelled'; id: number }
   | { type: 'error'; id: number; error: string };

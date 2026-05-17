@@ -122,6 +122,18 @@ const runtimeSpecs = {
       wasm: 'mathopt_runtime_asyncify.wasm',
     },
   },
+  pdlp_runtime: {
+    jspi: {
+      nodeJs: '../node-wasm/pdlp_runtime_node.js',
+      webJs: '../wasm/pdlp_runtime.js',
+      wasm: 'pdlp_runtime.wasm',
+    },
+    asyncify: {
+      nodeJs: '../node-wasm/pdlp_runtime_node_asyncify.js',
+      webJs: '../wasm/pdlp_runtime_asyncify.js',
+      wasm: 'pdlp_runtime_asyncify.wasm',
+    },
+  },
 };
 
 const modulePromises = new Map();
@@ -207,6 +219,14 @@ export async function loadMathOptRuntime() {
 
 export async function loadMathOptRuntimeAsyncify() {
   return createRuntime('mathopt_runtime', 'asyncify');
+}
+
+export async function loadPdlpRuntime() {
+  return createRuntime('pdlp_runtime');
+}
+
+export async function loadPdlpRuntimeAsyncify() {
+  return createRuntime('pdlp_runtime', 'asyncify');
 }
 
 export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };

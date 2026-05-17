@@ -9,17 +9,20 @@ import {
   FirstSolutionStrategy,
   initMathOpt,
   initMPSolver,
+  initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
   MathOpt,
   MPSolver,
   MPSolverParameters,
+  Pdlp,
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
+import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
 Deno.test('runs the shared CP-SAT cases in Deno', async () => {
@@ -64,5 +67,15 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
   if (!mathOptResults.every((result) => result.ok)) {
     throw new Error(`deno MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
+  }
+
+  const pdlpResults = await runPdlpCases({
+    initPdlp,
+    Pdlp,
+    MPSolver,
+    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+  });
+  if (!pdlpResults.every((result) => result.ok)) {
+    throw new Error(`deno PDLP case failed: ${JSON.stringify(pdlpResults)}`);
   }
 });

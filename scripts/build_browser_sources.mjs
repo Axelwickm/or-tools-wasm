@@ -25,6 +25,10 @@ async function transpileSource(sourcePath) {
     loader: 'ts',
     format: 'esm',
     target: 'es2020',
+    define: {
+      __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
+    },
+    minifySyntax: true,
     sourcemap: false,
   });
 
@@ -55,6 +59,10 @@ async function bundleBrowserEntry() {
     format: 'esm',
     platform: 'browser',
     target: 'es2020',
+    define: {
+      __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
+    },
+    minifySyntax: true,
     sourcemap: false,
     plugins: [externalRuntimeLoaderPlugin],
   });

@@ -50,6 +50,7 @@ export type MathOptVariableOptions = {
 export type MathOptSolveOptions = {
   solverType?: MathOptSolverType | keyof typeof MathOptSolverType;
   threads?: number;
+  iterationLimit?: number;
 };
 
 export type MathOptSolveResult = {
@@ -58,6 +59,13 @@ export type MathOptSolveResult = {
   variableValues: Record<string, number>;
   variableValuesById: Record<number, number>;
   rawResponse: Uint8Array;
+};
+
+type MathOptObjectiveData = {
+  maximize: boolean;
+  linearTerms: MathOptLinearTerm[];
+  quadraticTerms: MathOptQuadraticTerm[];
+  offset: number;
 };
 
 export class MathOptVarEqVar {
@@ -389,9 +397,10 @@ export class MathOptModel {
   readonly name: string;
   private readonly variableData: VariableData[] = [];
   private readonly constraints: LinearConstraintData[] = [];
-  private objective: { maximize: boolean; terms: MathOptLinearTerm[]; offset: number } = {
+  private objective: MathOptObjectiveData = {
     maximize: false,
-    terms: [],
+    linearTerms: [],
+    quadraticTerms: [],
     offset: 0,
   };
 
@@ -463,7 +472,10 @@ export class MathOptModel {
     for (const constraint of this.constraints) {
       constraint.terms = constraint.terms.filter((term) => term.variable.id !== variable.id);
     }
-    this.objective.terms = this.objective.terms.filter((term) => term.variable.id !== variable.id);
+    this.objective.linearTerms = this.objective.linearTerms.filter((term) => term.variable.id !== variable.id);
+    this.objective.quadraticTerms = this.objective.quadraticTerms.filter((term) => {
+      return term.firstVariable.id !== variable.id && term.secondVariable.id !== variable.id;
+    });
   }
 
   delete_variable(variable: MathOptVariable): void {
@@ -608,18 +620,12 @@ export class MathOptModel {
     return constraint;
   }
 
-  maximize(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
-    const expression = Array.isArray(terms)
-      ? new MathOptLinearExpression(terms, offset)
-      : asFlatLinearExpression(terms).add(offset);
-    this.objective = { maximize: true, terms: linearTermEntries(expression), offset: expression.offset };
+  maximize(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], offset = 0): void {
+    this.objective = objectiveData(true, terms, offset);
   }
 
-  minimize(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
-    const expression = Array.isArray(terms)
-      ? new MathOptLinearExpression(terms, offset)
-      : asFlatLinearExpression(terms).add(offset);
-    this.objective = { maximize: false, terms: linearTermEntries(expression), offset: expression.offset };
+  minimize(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], offset = 0): void {
+    this.objective = objectiveData(false, terms, offset);
   }
 
   variableName(id: number): string {
@@ -663,7 +669,12 @@ export class MathOptModel {
     return message([
       fieldBool(1, this.objective.maximize),
       fieldDouble(2, this.objective.offset),
-      fieldMessage(3, encodeSparseDoubleVector(this.objective.terms)),
+      fieldMessage(3, encodeSparseDoubleVector(this.objective.linearTerms)),
+      fieldMessage(4, encodeSparseDoubleMatrix(this.objective.quadraticTerms.map((term) => {
+        const rowId = Math.min(term.firstVariable.id, term.secondVariable.id);
+        const columnId = Math.max(term.firstVariable.id, term.secondVariable.id);
+        return { rowId, columnId, coefficient: term.coefficient };
+      }))),
     ]);
   }
 
@@ -1495,8 +1506,37 @@ function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): 
   return message([
     fieldVarint(1, solverType),
     fieldMessage(2, model.encodeModelProto()),
-    options.threads ? fieldMessage(4, message([fieldVarint(4, options.threads)])) : empty(),
+    options.threads || options.iterationLimit
+      ? fieldMessage(4, message([
+        options.iterationLimit ? fieldVarint(2, options.iterationLimit) : empty(),
+        options.threads ? fieldVarint(4, options.threads) : empty(),
+      ]))
+      : empty(),
   ]);
+}
+
+function objectiveData(
+  maximize: boolean,
+  terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[],
+  offset: number,
+): MathOptObjectiveData {
+  const expression = Array.isArray(terms)
+    ? new MathOptLinearExpression(terms, offset)
+    : asFlatQuadraticExpression(terms).add(offset);
+  if (expression instanceof MathOptLinearExpression) {
+    return {
+      maximize,
+      linearTerms: linearTermEntries(expression),
+      quadraticTerms: [],
+      offset: expression.offset,
+    };
+  }
+  return {
+    maximize,
+    linearTerms: linearTermEntriesFromMap(expression.linearTerms),
+    quadraticTerms: quadraticTermEntries(expression),
+    offset: expression.offset,
+  };
 }
 
 function encodeSparseDoubleVector(terms: MathOptLinearTerm[]): Uint8Array {
@@ -1504,6 +1544,17 @@ function encodeSparseDoubleVector(terms: MathOptLinearTerm[]): Uint8Array {
   return message([
     fieldPackedVarints(1, sortedTerms.map((term) => term.variable.id)),
     fieldPackedDoubles(2, sortedTerms.map((term) => term.coefficient)),
+  ]);
+}
+
+function encodeSparseDoubleMatrix(
+  terms: Array<{ rowId: number; columnId: number; coefficient: number }>,
+): Uint8Array {
+  const sortedTerms = [...terms].sort((a, b) => a.rowId - b.rowId || a.columnId - b.columnId);
+  return message([
+    fieldPackedVarints(1, sortedTerms.map((term) => term.rowId)),
+    fieldPackedVarints(2, sortedTerms.map((term) => term.columnId)),
+    fieldPackedDoubles(3, sortedTerms.map((term) => term.coefficient)),
   ]);
 }
 

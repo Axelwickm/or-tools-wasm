@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadMathOptRuntime, loadMPSolverRuntime, loadRuntime } from './runtime_loader.js';
+import { loadMathOptRuntime, loadMPSolverRuntime, loadPdlpRuntime, loadRuntime } from './runtime_loader.js';
 import { solveRoutingInWorker } from './worker_routing.js';
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
@@ -243,6 +243,77 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           type: 'mathOptSolveResult',
           id: message.id,
           bytes,
+        } satisfies WorkerResponse);
+      } finally {
+        if (responsePtr) {
+          module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
+        }
+        if (requestPtr) module._free(requestPtr);
+        module._free(lenPtr);
+      }
+      return;
+    } else if (message.type === 'pdlp') {
+      const module = await loadPdlpRuntime();
+      const requestPtr = copyBytesToHeap(module, message.bytes);
+      const lenPtr = module._malloc(4);
+      let responsePtr = 0;
+      try {
+        let bytes = new Uint8Array();
+        let value: number | undefined;
+        if (message.operation === 'isLinear') {
+          value = module.ccall(
+            'pdlp_is_linear_program',
+            'number',
+            ['number', 'number'],
+            [requestPtr, message.bytes.length],
+          ) as number;
+        } else {
+          if (message.operation === 'validate') {
+            responsePtr = module.ccall(
+              'pdlp_validate_quadratic_program',
+              'number',
+              ['number', 'number', 'number'],
+              [requestPtr, message.bytes.length, lenPtr],
+            ) as number;
+          } else if (message.operation === 'fromMpModel') {
+            responsePtr = module.ccall(
+              'pdlp_qp_from_mpmodel_proto',
+              'number',
+              ['number', 'number', 'number', 'number', 'number'],
+              [
+                requestPtr,
+                message.bytes.length,
+                message.relaxIntegerVariables ? 1 : 0,
+                message.includeNames ? 1 : 0,
+                lenPtr,
+              ],
+            ) as number;
+          } else if (message.operation === 'toMpModel') {
+            responsePtr = module.ccall(
+              'pdlp_qp_to_mpmodel_proto',
+              'number',
+              ['number', 'number', 'number'],
+              [requestPtr, message.bytes.length, lenPtr],
+            ) as number;
+          } else {
+            responsePtr = await module.ccall(
+              'pdlp_primal_dual_hybrid_gradient',
+              'number',
+              ['number', 'number', 'number'],
+              [requestPtr, message.bytes.length, lenPtr],
+              { async: true },
+            ) as number;
+          }
+          const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
+          bytes = responsePtr && responseLen
+            ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
+            : new Uint8Array();
+        }
+        workerScope.postMessage({
+          type: 'pdlpResult',
+          id: message.id,
+          bytes,
+          value,
         } satisfies WorkerResponse);
       } finally {
         if (responsePtr) {
