@@ -1,5 +1,5 @@
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadRoutingRuntimeAsyncify } from './runtime_loader.js';
+import { loadRoutingRuntime } from './runtime_loader.js';
 import { nextWorkerBridgeRequestId, postWorkerRequest, shouldUseWorkerBridge } from './worker_bridge.js';
 import type { RoutingModelOperation, RoutingSolveResult, WorkerResponse } from './worker_protocol.js';
 
@@ -46,7 +46,7 @@ function canDeleteNativeRoutingModel(): boolean {
 }
 
 async function loadRoutingModule(): Promise<RoutingModule> {
-  routingModulePromise ??= loadRoutingRuntimeAsyncify() as Promise<RoutingModule>;
+  routingModulePromise ??= loadRoutingRuntime() as Promise<RoutingModule>;
   routingModule = await routingModulePromise;
   return routingModule;
 }

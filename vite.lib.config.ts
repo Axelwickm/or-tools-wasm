@@ -68,10 +68,12 @@ const emitWasmSourceMapsPlugin = (): Plugin => ({
     for (const fileName of [
       'cp_sat_runtime.wasm.map',
       'cp_sat_runtime_asyncify.wasm.map',
+      'routing_runtime.wasm.map',
       'routing_runtime_asyncify.wasm.map',
       'mp_solver_runtime.wasm.map',
+      'mp_solver_runtime_asyncify.wasm.map',
       'mathopt_runtime.wasm.map',
-      'ortools_runtime_asyncify.wasm.map',
+      'mathopt_runtime_asyncify.wasm.map',
     ]) {
       this.emitFile({
         type: 'asset',

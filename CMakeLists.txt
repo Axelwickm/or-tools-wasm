@@ -239,18 +239,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc")
 
-  set(CP_SAT_FULL_SOURCES
-    ${CP_SAT_BROWSER_SOURCES}
-    "${PROJECT_SOURCE_DIR}/javascript/mathopt_api.cc"
-    "${PROJECT_SOURCE_DIR}/javascript/mp_solver_api.cc"
-    "${PROJECT_SOURCE_DIR}/javascript/routing_api.cc"
-    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/glop_interface.cc"
-    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/glop_proto_solver.cc"
-    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/preprocessor.cc"
-    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_proto_solver.cc"
-    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
-    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc")
-
   set(CP_SAT_COMMON_LINK_OPTIONS
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
@@ -283,7 +271,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_JSPI_LINK_OPTIONS
     "-sJSPI=2"
-    "-sJSPI_EXPORTS=['solve_model','validate_model','routing_solve_with_parameters']")
+    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request']")
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")
@@ -299,72 +287,63 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_DIR}")
   endfunction()
 
-  add_executable(cp_sat_runtime
-    ${CP_SAT_BROWSER_SOURCES})
-  configure_ortools_wasm_target(cp_sat_runtime "cp_sat_runtime" "${JS_OUTPUT_DIR}")
+  function(add_ortools_wasm_runtime TARGET_NAME OUTPUT_DIR ENV_LINK_OPTIONS FLAVOR_LINK_OPTIONS)
+    add_executable(${TARGET_NAME} ${ARGN})
+    configure_ortools_wasm_target(${TARGET_NAME} "${TARGET_NAME}" "${OUTPUT_DIR}")
+    target_link_options(${TARGET_NAME} PRIVATE
+      ${CP_SAT_COMMON_LINK_OPTIONS}
+      ${CP_SAT_PTHREAD_LINK_OPTIONS}
+      ${${ENV_LINK_OPTIONS}}
+      ${${FLAVOR_LINK_OPTIONS}})
+  endfunction()
+
+  set(ORTOOLS_WASM_RUNTIME_TARGETS)
+  foreach(RUNTIME_SPEC
+      "cp_sat_runtime;CP_SAT_BROWSER_SOURCES"
+      "routing_runtime;ROUTING_BROWSER_SOURCES"
+      "mp_solver_runtime;MP_SOLVER_BROWSER_SOURCES"
+      "mathopt_runtime;MATHOPT_BROWSER_SOURCES")
+    list(GET RUNTIME_SPEC 0 RUNTIME_NAME)
+    list(GET RUNTIME_SPEC 1 RUNTIME_SOURCES)
+
+    add_ortools_wasm_runtime(
+      ${RUNTIME_NAME}
+      "${JS_OUTPUT_DIR}"
+      CP_SAT_BROWSER_LINK_OPTIONS
+      CP_SAT_JSPI_LINK_OPTIONS
+      ${${RUNTIME_SOURCES}})
+    add_ortools_wasm_runtime(
+      ${RUNTIME_NAME}_asyncify
+      "${JS_OUTPUT_DIR}"
+      CP_SAT_BROWSER_LINK_OPTIONS
+      CP_SAT_ASYNCIFY_LINK_OPTIONS
+      ${${RUNTIME_SOURCES}})
+    add_ortools_wasm_runtime(
+      ${RUNTIME_NAME}_node
+      "${JS_NODE_OUTPUT_DIR}"
+      CP_SAT_NODE_LINK_OPTIONS
+      CP_SAT_JSPI_LINK_OPTIONS
+      ${${RUNTIME_SOURCES}})
+    add_ortools_wasm_runtime(
+      ${RUNTIME_NAME}_node_asyncify
+      "${JS_NODE_OUTPUT_DIR}"
+      CP_SAT_NODE_LINK_OPTIONS
+      CP_SAT_ASYNCIFY_LINK_OPTIONS
+      ${${RUNTIME_SOURCES}})
+
+    list(APPEND ORTOOLS_WASM_RUNTIME_TARGETS
+      ${RUNTIME_NAME}
+      ${RUNTIME_NAME}_asyncify
+      ${RUNTIME_NAME}_node
+      ${RUNTIME_NAME}_node_asyncify)
+  endforeach()
+
   target_link_options(cp_sat_runtime PRIVATE
-    ${CP_SAT_COMMON_LINK_OPTIONS}
-    ${CP_SAT_PTHREAD_LINK_OPTIONS}
-    ${CP_SAT_BROWSER_LINK_OPTIONS}
-    ${CP_SAT_JSPI_LINK_OPTIONS}
     "--emit-tsd"
     "${JS_OUTPUT_DIR}/cp_sat_runtime.d.ts")
 
-  add_executable(cp_sat_runtime_asyncify
-    ${CP_SAT_BROWSER_SOURCES})
-  configure_ortools_wasm_target(cp_sat_runtime_asyncify "cp_sat_runtime_asyncify" "${JS_OUTPUT_DIR}")
-  target_link_options(cp_sat_runtime_asyncify PRIVATE
-    ${CP_SAT_COMMON_LINK_OPTIONS}
-    ${CP_SAT_PTHREAD_LINK_OPTIONS}
-    ${CP_SAT_BROWSER_LINK_OPTIONS}
-    ${CP_SAT_ASYNCIFY_LINK_OPTIONS})
-
-  add_executable(routing_runtime_asyncify
-    ${ROUTING_BROWSER_SOURCES})
-  configure_ortools_wasm_target(routing_runtime_asyncify "routing_runtime_asyncify" "${JS_OUTPUT_DIR}")
-  target_link_options(routing_runtime_asyncify PRIVATE
-    ${CP_SAT_COMMON_LINK_OPTIONS}
-    ${CP_SAT_PTHREAD_LINK_OPTIONS}
-    ${CP_SAT_BROWSER_LINK_OPTIONS}
-    ${CP_SAT_ASYNCIFY_LINK_OPTIONS})
-
-  add_executable(mp_solver_runtime
-    ${MP_SOLVER_BROWSER_SOURCES})
-  configure_ortools_wasm_target(mp_solver_runtime "mp_solver_runtime" "${JS_OUTPUT_DIR}")
-  target_link_options(mp_solver_runtime PRIVATE
-    ${CP_SAT_COMMON_LINK_OPTIONS}
-    ${CP_SAT_PTHREAD_LINK_OPTIONS}
-    ${CP_SAT_BROWSER_LINK_OPTIONS})
-
-  add_executable(mathopt_runtime
-    ${MATHOPT_BROWSER_SOURCES})
-  configure_ortools_wasm_target(mathopt_runtime "mathopt_runtime" "${JS_OUTPUT_DIR}")
-  target_link_options(mathopt_runtime PRIVATE
-    ${CP_SAT_COMMON_LINK_OPTIONS}
-    ${CP_SAT_PTHREAD_LINK_OPTIONS}
-    ${CP_SAT_BROWSER_LINK_OPTIONS})
-
-  add_executable(ortools_runtime_asyncify
-    ${CP_SAT_FULL_SOURCES})
-  configure_ortools_wasm_target(ortools_runtime_asyncify "ortools_runtime_asyncify" "${JS_OUTPUT_DIR}")
-  target_compile_definitions(ortools_runtime_asyncify PRIVATE ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER)
-  target_link_options(ortools_runtime_asyncify PRIVATE
-    ${CP_SAT_COMMON_LINK_OPTIONS}
-    ${CP_SAT_PTHREAD_LINK_OPTIONS}
-    ${CP_SAT_BROWSER_LINK_OPTIONS}
-    ${CP_SAT_ASYNCIFY_LINK_OPTIONS})
-
-  add_executable(ortools_runtime_node
-    ${CP_SAT_FULL_SOURCES})
-  configure_ortools_wasm_target(ortools_runtime_node "ortools_runtime_node" "${JS_NODE_OUTPUT_DIR}")
-  target_compile_definitions(ortools_runtime_node PRIVATE ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER)
-  target_link_options(ortools_runtime_node PRIVATE
-    ${CP_SAT_COMMON_LINK_OPTIONS}
-    ${CP_SAT_PTHREAD_LINK_OPTIONS}
-    ${CP_SAT_NODE_LINK_OPTIONS})
-
   add_custom_target(cp_sat_runtime_site ALL
-    DEPENDS cp_sat_runtime cp_sat_runtime_asyncify routing_runtime_asyncify mp_solver_runtime mathopt_runtime ortools_runtime_asyncify ortools_runtime_node
+    DEPENDS ${ORTOOLS_WASM_RUNTIME_TARGETS}
     COMMENT "Building cp_sat_runtime runtimes")
 endif()
 

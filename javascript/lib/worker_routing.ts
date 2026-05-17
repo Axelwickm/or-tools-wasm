@@ -1,5 +1,5 @@
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadRoutingRuntimeAsyncify } from './runtime_loader.js';
+import { loadRoutingRuntime } from './runtime_loader.js';
 import type { RoutingSolveRequest, RoutingSolveResult } from './worker_protocol.js';
 
 let asyncifyModulePromise: Promise<OrToolsWasmModule> | null = null;
@@ -13,7 +13,7 @@ function toInt64(value: number): bigint {
 }
 
 function loadAsyncifyModule() {
-  asyncifyModulePromise ??= loadRoutingRuntimeAsyncify();
+  asyncifyModulePromise ??= loadRoutingRuntime();
   return asyncifyModulePromise;
 }
 
