@@ -4,7 +4,6 @@ import path from 'node:path';
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const nodeRuntimePaths = [
   path.join(repoRoot, 'build/javascript/node-wasm/ortools_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/ortools_runtime_node_asyncify.js'),
 ];
 const webRuntimePaths = [
   path.join(repoRoot, 'build/javascript/wasm/cp_sat_runtime.js'),
