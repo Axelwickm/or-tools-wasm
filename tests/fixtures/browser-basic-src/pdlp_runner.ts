@@ -1,10 +1,3 @@
-import * as protobufModule from 'protobufjs';
-
-const protobuf = (
-  (protobufModule as unknown as { default?: typeof protobufModule }).default ??
-  protobufModule
-);
-
 type PdlpApi = {
   initPdlp(): Promise<void>;
   Pdlp: {
@@ -15,9 +8,6 @@ type PdlpApi = {
     qp_from_mpmodel_proto(proto: Uint8Array, relaxIntegerVariables?: boolean, includeNames?: boolean): Promise<QuadraticProgramLike>;
     qp_to_mpmodel_proto(qp: QuadraticProgramLike): Promise<Uint8Array>;
     primal_dual_hybrid_gradient(qp: QuadraticProgramLike, params?: PdlpParams, initialSolution?: PrimalAndDualSolutionLike): Promise<PdlpResultLike>;
-  };
-  MPSolver: {
-    getLinearSolverSchemas(): Promise<{ linear_solver: string; optional_boolean: string }>;
   };
   setWorkerBridgeEnabled?: (enabled: boolean) => void;
 };
@@ -69,36 +59,309 @@ export type PdlpCaseResult = {
   ok: boolean;
 };
 
-type ProtobufRoot = import('protobufjs').Root;
+type MPVariableProto = {
+  lowerBound?: number;
+  upperBound?: number;
+  objectiveCoefficient?: number;
+  name?: string;
+};
 
-let linearSolverRootPromise: Promise<ProtobufRoot> | null = null;
+type MPConstraintProto = {
+  varIndex?: number[];
+  coefficient?: number[];
+  lowerBound?: number;
+  upperBound?: number;
+};
 
-async function resolveLinearSolverRoot(api: PdlpApi): Promise<ProtobufRoot> {
-  linearSolverRootPromise ??= (async () => {
-    const schemas = await api.MPSolver.getLinearSolverSchemas();
-    const optionalRoot = protobuf.parse(schemas.optional_boolean).root;
-    const linearSolverSource = schemas.linear_solver.replace(/^import "ortools\/util\/optional_boolean\.proto";\s*$/m, '');
-    return protobuf.parse(linearSolverSource, optionalRoot).root;
-  })();
-  return linearSolverRootPromise;
+type MPQuadraticObjective = {
+  qvar1Index?: number[];
+  qvar2Index?: number[];
+  coefficient?: number[];
+};
+
+type MPModelProto = {
+  maximize?: boolean;
+  objectiveOffset?: number;
+  variable?: MPVariableProto[];
+  constraint?: MPConstraintProto[];
+  quadraticObjective?: MPQuadraticObjective;
+};
+
+class ProtoWriter {
+  private readonly parts: Uint8Array[] = [];
+
+  field(fieldNumber: number, wireType: number): void {
+    this.varint((fieldNumber << 3) | wireType);
+  }
+
+  varint(value: number): void {
+    const bytes = [];
+    let current = value >>> 0;
+    while (current > 0x7f) {
+      bytes.push((current & 0x7f) | 0x80);
+      current >>>= 7;
+    }
+    bytes.push(current);
+    this.parts.push(Uint8Array.from(bytes));
+  }
+
+  double(value: number): void {
+    const bytes = new Uint8Array(8);
+    new DataView(bytes.buffer).setFloat64(0, value, true);
+    this.parts.push(bytes);
+  }
+
+  string(value: string): void {
+    const bytes = new TextEncoder().encode(value);
+    this.varint(bytes.length);
+    this.parts.push(bytes);
+  }
+
+  bytes(value: Uint8Array): void {
+    this.varint(value.length);
+    this.parts.push(value);
+  }
+
+  finish(): Uint8Array {
+    const size = this.parts.reduce((sum, part) => sum + part.length, 0);
+    const output = new Uint8Array(size);
+    let offset = 0;
+    for (const part of this.parts) {
+      output.set(part, offset);
+      offset += part.length;
+    }
+    return output;
+  }
 }
 
-async function encodeMPModelProto(api: PdlpApi, value: Record<string, unknown>): Promise<Uint8Array> {
-  const root = await resolveLinearSolverRoot(api);
-  const type = root.lookupType('operations_research.MPModelProto');
-  const message = type.create(value);
-  return type.encode(message).finish();
+class ProtoReader {
+  private offset = 0;
+  private readonly bytes: Uint8Array;
+
+  constructor(bytes: Uint8Array) {
+    this.bytes = bytes;
+  }
+
+  done(): boolean {
+    return this.offset >= this.bytes.length;
+  }
+
+  varint(): number {
+    let value = 0;
+    let shift = 0;
+    while (true) {
+      const byte = this.bytes[this.offset++];
+      value |= (byte & 0x7f) << shift;
+      if ((byte & 0x80) === 0) return value >>> 0;
+      shift += 7;
+    }
+  }
+
+  double(): number {
+    const value = new DataView(this.bytes.buffer, this.bytes.byteOffset + this.offset, 8).getFloat64(0, true);
+    this.offset += 8;
+    return value;
+  }
+
+  string(): string {
+    const size = this.varint();
+    const value = new TextDecoder().decode(this.bytes.slice(this.offset, this.offset + size));
+    this.offset += size;
+    return value;
+  }
+
+  bytesField(): Uint8Array {
+    const size = this.varint();
+    const value = this.bytes.slice(this.offset, this.offset + size);
+    this.offset += size;
+    return value;
+  }
+
+  skip(wireType: number): void {
+    if (wireType === 0) {
+      this.varint();
+    } else if (wireType === 1) {
+      this.offset += 8;
+    } else if (wireType === 2) {
+      this.offset += this.varint();
+    } else {
+      throw new Error(`Unsupported protobuf wire type ${wireType}`);
+    }
+  }
 }
 
-async function decodeMPModelProto(api: PdlpApi, bytes: Uint8Array): Promise<Record<string, unknown>> {
-  const root = await resolveLinearSolverRoot(api);
-  const type = root.lookupType('operations_research.MPModelProto');
-  return type.toObject(type.decode(bytes), {
-    defaults: true,
-    arrays: true,
-    longs: Number,
-    enums: String,
-  }) as Record<string, unknown>;
+function encodePackedInt32(values: number[]): Uint8Array {
+  const writer = new ProtoWriter();
+  for (const value of values) writer.varint(value);
+  return writer.finish();
+}
+
+function encodePackedDouble(values: number[]): Uint8Array {
+  const writer = new ProtoWriter();
+  for (const value of values) writer.double(value);
+  return writer.finish();
+}
+
+function readPackedInt32(bytes: Uint8Array): number[] {
+  const reader = new ProtoReader(bytes);
+  const values = [];
+  while (!reader.done()) values.push(reader.varint());
+  return values;
+}
+
+function readPackedDouble(bytes: Uint8Array): number[] {
+  const reader = new ProtoReader(bytes);
+  const values = [];
+  while (!reader.done()) values.push(reader.double());
+  return values;
+}
+
+function encodeVariableProto(variable: MPVariableProto): Uint8Array {
+  const writer = new ProtoWriter();
+  if (variable.lowerBound !== undefined) {
+    writer.field(1, 1);
+    writer.double(variable.lowerBound);
+  }
+  if (variable.upperBound !== undefined) {
+    writer.field(2, 1);
+    writer.double(variable.upperBound);
+  }
+  if (variable.objectiveCoefficient !== undefined) {
+    writer.field(3, 1);
+    writer.double(variable.objectiveCoefficient);
+  }
+  if (variable.name !== undefined) {
+    writer.field(5, 2);
+    writer.string(variable.name);
+  }
+  return writer.finish();
+}
+
+function decodeVariableProto(bytes: Uint8Array): MPVariableProto {
+  const reader = new ProtoReader(bytes);
+  const variable: MPVariableProto = {};
+  while (!reader.done()) {
+    const tag = reader.varint();
+    const field = tag >>> 3;
+    const wire = tag & 7;
+    if (field === 1) variable.lowerBound = reader.double();
+    else if (field === 2) variable.upperBound = reader.double();
+    else if (field === 3) variable.objectiveCoefficient = reader.double();
+    else if (field === 5) variable.name = reader.string();
+    else reader.skip(wire);
+  }
+  return variable;
+}
+
+function encodeConstraintProto(constraint: MPConstraintProto): Uint8Array {
+  const writer = new ProtoWriter();
+  if (constraint.lowerBound !== undefined) {
+    writer.field(2, 1);
+    writer.double(constraint.lowerBound);
+  }
+  if (constraint.upperBound !== undefined) {
+    writer.field(3, 1);
+    writer.double(constraint.upperBound);
+  }
+  if (constraint.varIndex?.length) {
+    writer.field(6, 2);
+    writer.bytes(encodePackedInt32(constraint.varIndex));
+  }
+  if (constraint.coefficient?.length) {
+    writer.field(7, 2);
+    writer.bytes(encodePackedDouble(constraint.coefficient));
+  }
+  return writer.finish();
+}
+
+function decodeConstraintProto(bytes: Uint8Array): MPConstraintProto {
+  const reader = new ProtoReader(bytes);
+  const constraint: MPConstraintProto = {};
+  while (!reader.done()) {
+    const tag = reader.varint();
+    const field = tag >>> 3;
+    const wire = tag & 7;
+    if (field === 2) constraint.lowerBound = reader.double();
+    else if (field === 3) constraint.upperBound = reader.double();
+    else if (field === 6) constraint.varIndex = readPackedInt32(reader.bytesField());
+    else if (field === 7) constraint.coefficient = readPackedDouble(reader.bytesField());
+    else reader.skip(wire);
+  }
+  return constraint;
+}
+
+function encodeQuadraticObjective(objective: MPQuadraticObjective): Uint8Array {
+  const writer = new ProtoWriter();
+  if (objective.qvar1Index?.length) {
+    writer.field(1, 2);
+    writer.bytes(encodePackedInt32(objective.qvar1Index));
+  }
+  if (objective.qvar2Index?.length) {
+    writer.field(2, 2);
+    writer.bytes(encodePackedInt32(objective.qvar2Index));
+  }
+  if (objective.coefficient?.length) {
+    writer.field(3, 2);
+    writer.bytes(encodePackedDouble(objective.coefficient));
+  }
+  return writer.finish();
+}
+
+function decodeQuadraticObjective(bytes: Uint8Array): MPQuadraticObjective {
+  const reader = new ProtoReader(bytes);
+  const objective: MPQuadraticObjective = {};
+  while (!reader.done()) {
+    const tag = reader.varint();
+    const field = tag >>> 3;
+    const wire = tag & 7;
+    if (field === 1) objective.qvar1Index = wire === 2 ? readPackedInt32(reader.bytesField()) : [reader.varint()];
+    else if (field === 2) objective.qvar2Index = wire === 2 ? readPackedInt32(reader.bytesField()) : [reader.varint()];
+    else if (field === 3) objective.coefficient = wire === 2 ? readPackedDouble(reader.bytesField()) : [reader.double()];
+    else reader.skip(wire);
+  }
+  return objective;
+}
+
+function encodeMPModelProto(value: MPModelProto): Uint8Array {
+  const writer = new ProtoWriter();
+  if (value.maximize !== undefined) {
+    writer.field(1, 0);
+    writer.varint(value.maximize ? 1 : 0);
+  }
+  if (value.objectiveOffset !== undefined) {
+    writer.field(2, 1);
+    writer.double(value.objectiveOffset);
+  }
+  for (const variable of value.variable ?? []) {
+    writer.field(3, 2);
+    writer.bytes(encodeVariableProto(variable));
+  }
+  for (const constraint of value.constraint ?? []) {
+    writer.field(4, 2);
+    writer.bytes(encodeConstraintProto(constraint));
+  }
+  if (value.quadraticObjective) {
+    writer.field(8, 2);
+    writer.bytes(encodeQuadraticObjective(value.quadraticObjective));
+  }
+  return writer.finish();
+}
+
+function decodeMPModelProto(bytes: Uint8Array): MPModelProto {
+  const reader = new ProtoReader(bytes);
+  const model: MPModelProto = { variable: [], constraint: [] };
+  while (!reader.done()) {
+    const tag = reader.varint();
+    const field = tag >>> 3;
+    const wire = tag & 7;
+    if (field === 1) model.maximize = reader.varint() !== 0;
+    else if (field === 2) model.objectiveOffset = reader.double();
+    else if (field === 3) model.variable?.push(decodeVariableProto(reader.bytesField()));
+    else if (field === 4) model.constraint?.push(decodeConstraintProto(reader.bytesField()));
+    else if (field === 8) model.quadraticObjective = decodeQuadraticObjective(reader.bytesField());
+    else reader.skip(wire);
+  }
+  return model;
 }
 
 function smallProtoLp(): Record<string, unknown> {
@@ -236,7 +499,7 @@ const pdlpCases: PdlpCase[] = [
   {
     name: 'QuadraticProgramTest.test_converts_from_tiny_mpmodel_lp',
     async run(api) {
-      const qp = await api.Pdlp.qp_from_mpmodel_proto(await encodeMPModelProto(api, smallProtoLp()), false);
+      const qp = await api.Pdlp.qp_from_mpmodel_proto(encodeMPModelProto(smallProtoLp()), false);
       await api.Pdlp.validate_quadratic_program_dimensions(qp);
       assert(await api.Pdlp.is_linear_program(qp), 'expected LP to be linear');
       assertSameElements(qp.objective_vector, [0, -2], 'objective_vector');
@@ -245,7 +508,7 @@ const pdlpCases: PdlpCase[] = [
   {
     name: 'QuadraticProgramTest.test_converts_from_tiny_mpmodel_qp',
     async run(api) {
-      const qp = await api.Pdlp.qp_from_mpmodel_proto(await encodeMPModelProto(api, smallProtoQp()), false);
+      const qp = await api.Pdlp.qp_from_mpmodel_proto(encodeMPModelProto(smallProtoQp()), false);
       await api.Pdlp.validate_quadratic_program_dimensions(qp);
       assert(!(await api.Pdlp.is_linear_program(qp)), 'expected QP not to be linear');
       assertSameElements(qp.objective_vector, [0, 0], 'objective_vector');
@@ -262,7 +525,7 @@ const pdlpCases: PdlpCase[] = [
       qp.variable_lower_bounds = [0, 0];
       qp.variable_upper_bounds = [Infinity, Infinity];
       qp.variable_names = ['x', 'y'];
-      assertProtoLp(await decodeMPModelProto(api, await api.Pdlp.qp_to_mpmodel_proto(qp)));
+      assertProtoLp(decodeMPModelProto(await api.Pdlp.qp_to_mpmodel_proto(qp)));
     },
   },
   {
@@ -277,7 +540,7 @@ const pdlpCases: PdlpCase[] = [
       qp.variable_lower_bounds = [0, 0];
       qp.variable_upper_bounds = [Infinity, Infinity];
       qp.variable_names = ['x', 'y'];
-      assertProtoQp(await decodeMPModelProto(api, await api.Pdlp.qp_to_mpmodel_proto(qp)));
+      assertProtoQp(decodeMPModelProto(await api.Pdlp.qp_to_mpmodel_proto(qp)));
     },
   },
   {

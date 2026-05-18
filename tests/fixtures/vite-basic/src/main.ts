@@ -162,7 +162,6 @@ async function main() {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    MPSolver,
     setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
   });
   setStatus({

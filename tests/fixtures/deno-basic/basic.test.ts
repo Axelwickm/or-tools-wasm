@@ -72,7 +72,6 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    MPSolver,
     setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
   });
   if (!pdlpResults.every((result) => result.ok)) {

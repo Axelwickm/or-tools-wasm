@@ -137,7 +137,6 @@ async function main() {
   const pdlpResults = await runPdlpCases({
     initPdlp: initPdlp as typeof initPdlpValue,
     Pdlp: Pdlp as typeof PdlpValue,
-    MPSolver: MPSolver as typeof MPSolverValue,
     setWorkerBridgeEnabled: typedCpSat.setWorkerBridgeEnabled,
   });
   setStatus({

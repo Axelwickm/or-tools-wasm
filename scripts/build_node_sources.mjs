@@ -153,12 +153,16 @@ function isDenoRuntime() {
   return typeof globalThis.Deno !== 'undefined';
 }
 
+function isBunRuntime() {
+  return typeof globalThis.Bun !== 'undefined';
+}
+
 function isJspiSupported() {
   return typeof WebAssembly !== 'undefined' && typeof WebAssembly.promising === 'function';
 }
 
 function selectRuntimeFlavor(runtimeName) {
-  if (runtimeName === 'routing_runtime' && isDenoRuntime()) {
+  if (isDenoRuntime() || isBunRuntime()) {
     return 'asyncify';
   }
   selectedFlavor ??= isJspiSupported() ? 'jspi' : 'asyncify';

@@ -336,10 +336,10 @@ submodules up front, clone with `--recurse-submodules` or run
 The package ships separate browser runtime builds so importing one solver does
 not force every solver runtime into the first solve path:
 
-- `cp_sat_runtime` uses Emscripten JSPI support (`-sJSPI=2`) for browsers that expose `WebAssembly.promising`.
-- `cp_sat_runtime_asyncify` uses classic Asyncify stack rewriting for browsers without JSPI support.
-- `routing_runtime_asyncify`, `mp_solver_runtime`, and `mathopt_runtime` are loaded on demand when those APIs are used in browser bundles.
-- `ortools_runtime_asyncify` keeps a combined compatibility runtime for Deno and Bun.
+- Each solver has a JSPI runtime and an Asyncify runtime.
+- The browser package loads the selected solver runtime on demand and passes the emitted `.wasm` asset to Emscripten explicitly, so bundlers do not need root-relative wasm files.
+- Node uses the node-targeted runtime builds.
+- Deno and Bun use the web-hosted Asyncify runtimes because their JSPI support is not compatible with these Emscripten runtimes yet.
 
 For CP-SAT, `javascript/lib/runtime_loader.ts` chooses the runtime at startup.
 If `WebAssembly.promising` is available, it imports the JSPI runtime, which is

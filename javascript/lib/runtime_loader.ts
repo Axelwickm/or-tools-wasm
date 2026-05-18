@@ -66,6 +66,14 @@ const runtimeAssets: Record<RuntimeName, Record<RuntimeFlavor, RuntimeAsset>> = 
 const modulePromises: Partial<Record<RuntimeKey, Promise<OrToolsWasmModule>>> = {};
 let selectedFlavor: RuntimeFlavor | null = null;
 
+function isDenoRuntimeHost(): boolean {
+  return 'Deno' in globalThis;
+}
+
+function isBunRuntimeHost(): boolean {
+  return 'Bun' in globalThis;
+}
+
 function isJspiSupported(): boolean {
   const wasm = WebAssembly as typeof WebAssembly & { promising?: unknown };
   return typeof wasm !== 'undefined' && typeof wasm.promising === 'function';
@@ -77,6 +85,9 @@ function isBrowserRuntimeHost(): boolean {
 
 function selectRuntimeFlavor(runtimeName: RuntimeName): RuntimeFlavor {
   if (isBrowserRuntimeHost()) {
+    return 'asyncify';
+  }
+  if (isDenoRuntimeHost() || isBunRuntimeHost()) {
     return 'asyncify';
   }
   if (selectedFlavor) {
@@ -116,8 +127,10 @@ function createRuntime(runtimeName: RuntimeName, flavor = selectRuntimeFlavor(ru
   modulePromises[key] ??= (async () => {
     const asset = runtimeAssets[runtimeName][flavor];
     const createModule = await loadFactory(asset.jsUrl);
+    const wasmBinary = new Uint8Array(await (await fetch(asset.wasmUrl)).arrayBuffer());
     return createModule({
       locateFile: locateRuntimeFile,
+      wasmBinary,
       mainScriptUrlOrBlob: asset.jsUrl,
     });
   })();

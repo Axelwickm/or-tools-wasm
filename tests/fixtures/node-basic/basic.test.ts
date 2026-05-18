@@ -75,7 +75,6 @@ if (!mathOptResults.every((result) => result.ok)) {
 const pdlpResults = await runPdlpCases({
   initPdlp,
   Pdlp,
-  MPSolver,
   setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
 });
 if (!pdlpResults.every((result) => result.ok)) {
