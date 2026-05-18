@@ -1,0 +1,854 @@
+# TypeScript API
+
+This page documents the public exports from `or-tools-wasm`. The package is ESM
+only:
+
+```ts
+import { CpSat, initRouting, RoutingIndexManager, RoutingModel } from 'or-tools-wasm';
+```
+
+Most solver runtimes are loaded lazily. Browser solves use the package worker
+bridge by default so the main thread stays responsive. Browser pages still need
+cross-origin isolation headers; see [Browser requirements](../README.md#browser-requirements).
+
+## CP-SAT
+
+Import:
+
+```ts
+import { CpSat, type CpModelProto, type SatParameters } from 'or-tools-wasm';
+```
+
+CP-SAT is the proto-first API. Build or serialize a `CpModelProto`, validate it,
+then solve it.
+
+```ts
+const modelBytes = await CpSat.createModel(model);
+const validation = await CpSat.validate(modelBytes);
+if (!validation.ok) throw new Error(validation.message);
+
+const result = await CpSat.solve(modelBytes, {
+  numSearchWorkers: 4,
+  logSearchProgress: true,
+});
+```
+
+### `CpSat`
+
+`CpSat.createModel(model: CpModelProto): Promise<Uint8Array>`
+
+Encodes a JSON-like `CpModelProto` object into binary protobuf bytes. The input
+uses the generated TypeScript `CpModelProto` shape from OR-Tools.
+
+`CpSat.validate(model: Uint8Array): Promise<{ ok: boolean; message: string }>`
+
+Runs native CP-SAT model validation. `ok` is `false` when OR-Tools rejects the
+model; `message` contains the native validation message.
+
+`CpSat.solve(model: Uint8Array, params?: Uint8Array | SatParameters | null, callbacks?: CpSatSolveCallbacks): Promise<CpSatSolveResult>`
+
+Solves a binary `CpModelProto`. `params` can be binary `SatParameters`, a
+JSON-like `SatParameters` object, or `null`. The returned `CpSatSolveResult`
+contains:
+
+- `response`: decoded `CpSolverResponse | null`
+- `bytes`: raw binary `CpSolverResponse`
+
+`callbacks` may contain:
+
+- `onSolution(response, bytes)`: called for intermediate solutions when enabled
+  by compatible solver parameters.
+- `onBestBound(bound)`: called on best-bound updates.
+- `onLog(message)`: called for solver log output.
+
+`CpSat.solveRaw(model: Uint8Array, params?: Uint8Array | null): Promise<Uint8Array>`
+
+Low-level solve that returns raw `CpSolverResponse` bytes and accepts only raw
+parameter bytes.
+
+`CpSat.cancelSolve(): Promise<void>`
+
+Requests cancellation of the active CP-SAT solve.
+
+`CpSat.getSchemas(): Promise<{ cp_model: string; sat_parameters: string; linear_solver?: string; optional_boolean?: string }>`
+
+Returns embedded `.proto` schemas. CP-SAT always returns `cp_model` and
+`sat_parameters`; MPSolver-related schemas may be present when fetched through
+the worker path.
+
+`CpSat.loadModule(): Promise<unknown>`
+
+Loads the CP-SAT WebAssembly module directly. This is mostly an escape hatch;
+normal application code should use `solve()`.
+
+`CpSat.setWorkerBridgeEnabled(enabled: boolean): void`
+
+Enables or disables the browser worker bridge for CP-SAT and shared worker-based
+solvers.
+
+`CpSat.isWorkerBridgeEnabled(): boolean`
+
+Returns the current worker bridge preference.
+
+### CP-SAT Types And Enums
+
+The package exports generated CP-SAT protobuf types and enums, including:
+
+- `CpModelProto`
+- `CpSolverResponse`
+- `SatParameters`
+- `CpSolverStatus`
+- `DecisionStrategyProto_DomainReductionStrategy`
+- `DecisionStrategyProto_VariableSelectionStrategy`
+
+It also re-exports the generated `cp_model` symbols, so generated nested
+message types are available from the package entrypoint.
+
+## Routing
+
+Import:
+
+```ts
+import {
+  initRouting,
+  RoutingIndexManager,
+  RoutingModel,
+  DefaultRoutingSearchParameters,
+  FirstSolutionStrategy,
+} from 'or-tools-wasm';
+```
+
+Always initialize the routing runtime before constructing routing objects:
+
+```ts
+await initRouting();
+
+const manager = new RoutingIndexManager(distanceMatrix.length, 1, 0);
+const routing = new RoutingModel(manager);
+const transit = routing.RegisterTransitCallback((from, to) => {
+  return distanceMatrix[manager.IndexToNode(from)][manager.IndexToNode(to)];
+});
+routing.SetArcCostEvaluatorOfAllVehicles(transit);
+
+const params = DefaultRoutingSearchParameters();
+params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
+const assignment = await routing.SolveWithParameters(params);
+```
+
+### Initialization
+
+`initRouting(): Promise<void>`
+
+Loads the routing WebAssembly runtime. Construction of `RoutingIndexManager` or
+`RoutingModel` before this resolves will throw.
+
+### `RoutingIndexManager`
+
+Constructors:
+
+```ts
+new RoutingIndexManager(numLocations, numVehicles, depot)
+new RoutingIndexManager(numLocations, numVehicles, starts, ends)
+```
+
+Methods:
+
+- `IndexToNode(index): number`
+- `NodeToIndex(node): number`
+- `GetNumberOfNodes(): number`
+- `GetNumberOfVehicles(): number`
+- `GetNumberOfIndices(): number`
+- `GetStartIndex(vehicle): number`
+- `GetEndIndex(vehicle): number`
+- `delete(): void`
+
+Async aliases `indexToNode()` and `nodeToIndex()` are also available.
+
+### `RoutingModel`
+
+Construction:
+
+```ts
+const routing = new RoutingModel(manager, parameters?);
+```
+
+Callbacks and costs:
+
+- `RegisterTransitCallback((fromIndex, toIndex) => number): number`
+- `RegisterTransitMatrix(matrix: number[][]): number`
+- `RegisterUnaryTransitCallback((fromIndex) => number): number`
+- `RegisterUnaryTransitVector(values: number[]): number`
+- `SetArcCostEvaluatorOfAllVehicles(evaluatorIndex): void`
+- `GetArcCostForVehicle(fromIndex, toIndex, vehicle): number`
+
+Dimensions:
+
+- `AddDimension(transitIndex, slackMax, capacity, fixStartCumulToZero, name): boolean`
+- `AddDimensionWithVehicleCapacity(transitIndex, slackMax, capacities, fixStartCumulToZero, name): boolean`
+- `AddDimensionWithVehicleTransits(transitIndices, slackMax, capacity, fixStartCumulToZero, name): boolean`
+- `AddConstantDimension(value, capacity, fixStartCumulToZero, name): [number, boolean]`
+- `AddVectorDimension(values, capacity, fixStartCumulToZero, name): [number, boolean]`
+- `AddMatrixDimension(matrix, capacity, fixStartCumulToZero, name): [number, boolean]`
+- `GetDimensionOrDie(name): RoutingDimension`
+
+Search and assignments:
+
+- `Solve(): Promise<Assignment | null>`
+- `SolveWithParameters(parameters): Promise<Assignment | null>`
+- `solveWithParametersSync(parameters): Assignment | null`
+- `SolveFromAssignmentWithParameters(assignment, parameters): Promise<Assignment | null>`
+- `ReadAssignmentFromRoutes(routes, ignoreInactiveIndices): Assignment`
+- `CloseModelWithParameters(parameters): void`
+- `status(): RoutingSearchStatus`
+
+Route structure and model helpers:
+
+- `Start(vehicle): number`
+- `End(vehicle): number`
+- `IsEnd(index): boolean`
+- `NextVar(index): number`
+- `vehicles(): number`
+- `AddDisjunction(indices, penalty?): number`
+- `AddPickupAndDelivery(pickup, delivery): void`
+- `AddAtSolutionCallback(callback): void`
+- `GetAutomaticFirstSolutionStrategy(): FirstSolutionStrategy`
+- `GetNumberOfDecisionsInFirstSolution(parameters): number`
+- `GetNumberOfRejectsInFirstSolution(parameters): number`
+- `CostVar(): { Max(): number }`
+- `solver(): { Parameters(): { trace_propagation: boolean }; LocalSearchProfile(): string; Add(...): void }`
+- `delete(): void`
+
+### `RoutingDimension`
+
+- `CumulVar(index): RoutingCumulVar`
+- `HasSoftSpanUpperBounds(): boolean`
+- `SetSoftSpanUpperBoundForVehicle(boundCost, vehicle): void`
+- `GetSoftSpanUpperBoundForVehicle(vehicle): BoundCost`
+- `HasQuadraticCostSoftSpanUpperBounds(): boolean`
+- `SetQuadraticCostSoftSpanUpperBoundForVehicle(boundCost, vehicle): void`
+- `GetQuadraticCostSoftSpanUpperBoundForVehicle(vehicle): BoundCost`
+
+`BoundCost` is a small class with `bound` and `cost` fields.
+
+### `Assignment`
+
+- `ObjectiveValue(): number`
+- `Value(indexOrVar): number`
+- `Min(indexOrVar): number`
+
+For `NextVar(index)`, pass the returned value into `assignment.Value()` to get
+the next index. For dimensions, pass `dimension.CumulVar(index)`.
+
+### Routing Parameters And Enums
+
+- `DefaultRoutingSearchParameters(): RoutingSearchParameters`
+- `DefaultRoutingModelParameters(): RoutingModelParameters`
+- `FindErrorInRoutingSearchParameters(params): string`
+- `FirstSolutionStrategy`
+- `LocalSearchMetaheuristic`
+- `RoutingSearchStatus`
+- `BOOL_FALSE`, `BOOL_TRUE`, `BOOL_UNSPECIFIED`
+
+The routing parameter object currently exposes the subset used by the bridge:
+`firstSolutionStrategy`, `solution_limit`, `local_search_operators`, and
+`local_search_metaheuristic`.
+
+## MPSolver
+
+Import:
+
+```ts
+import { initMPSolver, MPSolver, MPSolverParameters } from 'or-tools-wasm';
+```
+
+Initialize before constructing solvers:
+
+```ts
+await initMPSolver();
+
+const solver = MPSolver.CreateSolver('GLOP');
+if (!solver) throw new Error('GLOP unavailable');
+
+const x = solver.NumVar(0, solver.infinity(), 'x');
+const y = solver.NumVar(0, solver.infinity(), 'y');
+const c = solver.Constraint(-solver.infinity(), 14, 'c');
+c.SetCoefficient(x, 1);
+c.SetCoefficient(y, 2);
+solver.Objective().SetCoefficient(x, 3);
+solver.Objective().SetCoefficient(y, 1);
+solver.Objective().SetMaximization();
+
+const status = await solver.Solve();
+```
+
+### Initialization
+
+`initMPSolver(): Promise<void>`
+
+Loads the MPSolver WebAssembly runtime.
+
+### Solver Types And Status
+
+`OptimizationProblemType` contains OR-Tools MPSolver problem type ids, including
+`GLOP_LINEAR_PROGRAMMING`, `PDLP_LINEAR_PROGRAMMING`, `SAT_INTEGER_PROGRAMMING`,
+`CLP_LINEAR_PROGRAMMING`, `GLPK_LINEAR_PROGRAMMING`,
+`SCIP_MIXED_INTEGER_PROGRAMMING`, `GLPK_MIXED_INTEGER_PROGRAMMING`,
+`CBC_MIXED_INTEGER_PROGRAMMING`, and others. Only problem types compiled into
+the WebAssembly runtime will be supported at runtime; use
+`MPSolver.SupportsProblemType()`.
+
+`MPSolverResultStatus` contains `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
+`UNBOUNDED`, `ABNORMAL`, `MODEL_INVALID`, and `NOT_SOLVED`.
+
+Basis status values are returned by `basis_status()` and are also exposed as
+static constants on `MPSolver`: `FREE`, `AT_LOWER_BOUND`, `AT_UPPER_BOUND`,
+`FIXED_VALUE`, and `BASIC`.
+
+### `MPSolver`
+
+Static helpers:
+
+- `CreateSolver(solverId): MPSolver | null`
+- `Infinity(): number`
+- `SupportsProblemType(problemType): boolean`
+- `ParseSolverType(solverId): OptimizationProblemType | null`
+- `ParseAndCheckSupportForProblemType(solverId): OptimizationProblemType | null`
+- `getLinearSolverSchemas(): Promise<LinearSolverSchemas>`
+- `createModelRequest(request): Promise<Uint8Array>`
+- `decodeSolutionResponse(bytes): Promise<MPSolverSolutionResponse>`
+- `solveModelRequest(request): Promise<MPSolverProtoSolveResult>`
+
+Construction:
+
+```ts
+new MPSolver(name, problemType)
+```
+
+Core model methods:
+
+- `Name(): string`
+- `ProblemType(): OptimizationProblemType`
+- `IsMIP()` / `IsMip(): boolean`
+- `Clear(): void`
+- `infinity(): number`
+- `NumVariables(): number`
+- `NumConstraints(): number`
+- `variable(index): MPVariable`
+- `variables(): MPVariable[]`
+- `constraint(index): MPConstraint`
+- `constraints(): MPConstraint[]`
+- `LookupVariableOrNull(name): MPVariable | null`
+- `LookupVariable(name): MPVariable | null`
+- `LookupConstraintOrNull(name): MPConstraint | null`
+- `LookupConstraint(name): MPConstraint | null`
+- `Objective(): MPObjective`
+
+Variables:
+
+- `Var(lb, ub, integer, name): MPVariable`
+- `NumVar(lb, ub, name): MPVariable`
+- `IntVar(lb, ub, name): MPVariable`
+- `BoolVar(name): MPVariable`
+
+Constraints:
+
+- `Constraint(): MPConstraint`
+- `Constraint(name): MPConstraint`
+- `Constraint(lb, ub, name?): MPConstraint`
+- `RowConstraint(...)`: same overloads as `Constraint`
+
+Solving and solution loading:
+
+- `Solve(parameters?): Promise<MPSolverResultStatus>`
+- `SolveWithProto(options?): Promise<MPSolverProtoSolveResult & { loaded: boolean }>`
+- `exportModelProto(): Promise<Uint8Array>`
+- `exportModelRequestProto(options?): Promise<Uint8Array>`
+- `VerifySolution(tolerance, logErrors): boolean`
+- `Reset(): void`
+- `InterruptSolve(): boolean`
+- `NextSolution(): boolean`
+
+Options and output:
+
+- `EnableOutput(): void`
+- `SuppressOutput(): void`
+- `OutputIsEnabled(): boolean`
+- `SetTimeLimit(milliseconds): void`
+- `set_time_limit(milliseconds): void`
+- `time_limit(): number`
+- `SetNumThreads(numThreads): boolean`
+- `GetNumThreads(): number`
+- `SetSolverSpecificParametersAsString(parameters): boolean`
+- `GetSolverSpecificParametersAsString(): string`
+- `SolverVersion(): string`
+- `ComputeConstraintActivities(): number[]`
+- `ComputeExactConditionNumber(): number`
+- `SetHint(variables, values): void`
+- `ExportModelAsLpFormat(obfuscate): string`
+- `ExportModelAsMpsFormat(fixedFormat, obfuscate): string`
+- `WallTime()` / `wall_time(): number`
+- `Iterations()` / `iterations(): number`
+- `nodes(): number`
+- `delete(): void`
+
+### `MPVariable`
+
+- `SolutionValue()` / `solution_value(): number`
+- `unrounded_solution_value(): number`
+- `ReducedCost()` / `reduced_cost(): number`
+- `basis_status(): number`
+- `index(): number`
+- `name(): string`
+- `Lb(): number`
+- `Ub(): number`
+- `SetBounds(lb, ub): void`
+- `SetLb()` / `SetLB(lb): void`
+- `SetUb()` / `SetUB(ub): void`
+- `Integer(): boolean`
+- `SetInteger(integer): void`
+- `branching_priority(): number`
+- `SetBranchingPriority(priority): void`
+
+### `MPConstraint`
+
+- `SetCoefficient(variable, coefficient): void`
+- `GetCoefficient(variable): number`
+- `Clear(): void`
+- `index(): number`
+- `name(): string`
+- `Lb(): number`
+- `Ub(): number`
+- `SetBounds(lb, ub): void`
+- `SetLb()` / `SetLB(lb): void`
+- `SetUb()` / `SetUB(ub): void`
+- `DualValue()` / `dual_value(): number`
+- `basis_status(): number`
+- `is_lazy(): boolean`
+- `set_is_lazy(laziness): void`
+
+### `MPObjective`
+
+- `Clear(): void`
+- `SetCoefficient(variable, coefficient): void`
+- `GetCoefficient(variable): number`
+- `SetOffset(offset): void`
+- `AddOffset(offset): void`
+- `Offset()` / `offset(): number`
+- `SetOptimizationDirection(maximize): void`
+- `SetMinimization(): void`
+- `SetMaximization(): void`
+- `Value(): number`
+- `BestBound(): number`
+- `maximization(): boolean`
+- `minimization(): boolean`
+
+### `MPSolverParameters`
+
+Use `new MPSolverParameters()` and pass it to `solver.Solve(parameters)`.
+
+- `SetDoubleParam(param, value): void`
+- `GetDoubleParam(param): number`
+- `ResetDoubleParam(param): void`
+- `SetIntegerParam(param, value): void`
+- `GetIntegerParam(param): number`
+- `ResetIntegerParam(param): void`
+- `Reset(): void`
+- `delete(): void`
+
+Parameter enums:
+
+- `DoubleParam`: `RELATIVE_MIP_GAP`, `PRIMAL_TOLERANCE`, `DUAL_TOLERANCE`
+- `IntegerParam`: `PRESOLVE`, `LP_ALGORITHM`, `INCREMENTALITY`, `SCALING`
+- `PresolveValues`: `PRESOLVE_OFF`, `PRESOLVE_ON`
+- `LpAlgorithmValues`: `DUAL`, `PRIMAL`, `BARRIER`
+- `IncrementalityValues`: `INCREMENTALITY_OFF`, `INCREMENTALITY_ON`
+- `ScalingValues`: `SCALING_OFF`, `SCALING_ON`
+
+## MathOpt
+
+Import:
+
+```ts
+import { initMathOpt, MathOpt } from 'or-tools-wasm';
+```
+
+Initialize, build a model, and solve:
+
+```ts
+await initMathOpt();
+
+const model = MathOpt.Model('basic');
+const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
+const y = model.addVariable({ lowerBound: 0, upperBound: 2, name: 'y' });
+model.addLinearConstraint({
+  upperBound: 1.5,
+  terms: [MathOpt.linearTerm(x), MathOpt.linearTerm(y)],
+});
+model.maximize([MathOpt.linearTerm(x, 2), MathOpt.linearTerm(y)]);
+
+const result = await MathOpt.solve(model, { solverType: MathOpt.SolverType.GLOP });
+```
+
+### Initialization
+
+`initMathOpt(): Promise<void>`
+
+Loads the MathOpt WebAssembly runtime.
+
+### `MathOpt`
+
+Static constructors and aliases:
+
+- `MathOpt.Model(name?): MathOptModel`
+- `MathOpt.SolverType`
+- `MathOpt.LinearExpression`
+- `MathOpt.QuadraticExpression`
+- `MathOpt.QuadraticTermKey`
+- `MathOpt.BoundedExpression`
+- `MathOpt.LowerBoundedExpression`
+- `MathOpt.UpperBoundedExpression`
+- `MathOpt.setWorkerBridgeEnabled(enabled): void`
+
+Solving:
+
+- `MathOpt.solve(model, options?): Promise<MathOptSolveResult>`
+
+`MathOptSolveOptions`:
+
+- `solverType?: MathOptSolverType | keyof typeof MathOptSolverType`
+- `threads?: number`
+- `iterationLimit?: number`
+
+`MathOptSolveResult`:
+
+- `terminationReason: string`
+- `objectiveValue: number | null`
+- `variableValues: Record<string, number>`
+- `variableValuesById: Record<number, number>`
+- `rawResponse: Uint8Array`
+
+Solver type enum:
+
+- `GSCIP`
+- `GUROBI`
+- `GLOP`
+- `CP_SAT`
+- `PDLP`
+- `GLPK`
+- `OSQP`
+- `ECOS`
+- `SCS`
+- `HIGHS`
+- `SANTORINI`
+- `XPRESS`
+
+Only solver types compiled into the WebAssembly runtime are available at
+runtime.
+
+Expression helpers:
+
+- `linearTerm(variable, coefficient?)`
+- `quadraticTerm(firstVariable, secondVariable, coefficient?)`
+- `linearExpression(terms?, offset?)`
+- `quadraticExpression(linearTerms?, quadraticTerms?, offset?)`
+- `asFlatLinearExpression(input)`
+- `asFlatQuadraticExpression(input)`
+- `fastSum(inputs)`
+- `multiplyLinearExpressions(lhs, rhs)`
+- `evaluateExpression(expression, variableValues)`
+- `boundedExpression(lowerBound, expression, upperBound)`
+- `lowerBoundedExpression(lowerBound, expression)`
+- `upperBoundedExpression(expression, upperBound)`
+- `eq(lhs, rhs)`
+- `ne(lhs, rhs)` throws, because `!=` constraints are unsupported.
+- `le(lhs, rhs)`
+- `ge(lhs, rhs)`
+- `completeUpperBound(lowerBounded, upperBound)`
+- `completeLowerBound(lowerBound, upperBounded)`
+- `variableEq(lhs, rhs)`
+- `variableNe(lhs, rhs)`
+
+These helpers are available as `MathOpt.*` static methods. Some helper classes
+are exposed as `MathOpt.LinearExpression`, `MathOpt.QuadraticExpression`, etc.,
+rather than as top-level value exports.
+
+### `MathOptModel`
+
+Variables:
+
+- `addVariable(options?): MathOptVariable`
+- `add_variable(options?): MathOptVariable`
+- `addIntegerVariable(options?): MathOptVariable`
+- `add_integer_variable(options?): MathOptVariable`
+- `addBinaryVariable(options?): MathOptVariable`
+- `add_binary_variable(options?): MathOptVariable`
+- `deleteVariable(variable): void`
+- `delete_variable(variable): void`
+- `variablesList(): MathOptVariable[]`
+- `variables(): MathOptVariable[]`
+- `getNumVariables()` / `get_num_variables(): number`
+- `getNextVariableId()` / `get_next_variable_id(): number`
+- `ensureNextVariableIdAtLeast(id): void`
+- `ensure_next_variable_id_at_least(id): void`
+- `hasVariable(id)` / `has_variable(id): boolean`
+- `getVariable(id): MathOptVariable | undefined`
+- `get_variable(id): MathOptVariable`
+
+Linear constraints:
+
+- `addLinearConstraint(options?): MathOptLinearConstraint`
+- `add_linear_constraint(options?): MathOptLinearConstraint`
+- `deleteLinearConstraint(constraint): void`
+- `delete_linear_constraint(constraint): void`
+- `linearConstraints()` / `linear_constraints(): MathOptLinearConstraint[]`
+- `getNumLinearConstraints()` / `get_num_linear_constraints(): number`
+- `getNextLinearConstraintId()` / `get_next_linear_constraint_id(): number`
+- `ensureNextLinearConstraintIdAtLeast(id): void`
+- `ensure_next_linear_constraint_id_at_least(id): void`
+- `hasLinearConstraint(id)` / `has_linear_constraint(id): boolean`
+- `getLinearConstraint(id): MathOptLinearConstraint | undefined`
+- `get_linear_constraint(id): MathOptLinearConstraint`
+
+Objective and encoding:
+
+- `maximize(terms, offset?): void`
+- `minimize(terms, offset?): void`
+- `variableName(id): string`
+- `encodeModelProto(): Uint8Array`
+
+`MathOptVariableOptions`:
+
+- `lowerBound?: number`
+- `upperBound?: number`
+- `integer?: boolean`
+- `name?: string`
+
+`addLinearConstraint()` accepts:
+
+- `lowerBound?: number`
+- `upperBound?: number`
+- `terms?: MathOptLinearTerm[]`
+- `expression?: number | MathOptVariable | MathOptLinearTerm | linear expression`
+- `name?: string`
+
+### `MathOptVariable`
+
+Properties:
+
+- `id: number`
+- `name: string`
+- `lowerBound` / `lower_bound`
+- `upperBound` / `upper_bound`
+- `integer` / `is_integer`
+
+Methods:
+
+- `equals(other): boolean`
+- `toString(): string`
+
+### `MathOptLinearConstraint`
+
+Properties:
+
+- `id: number`
+- `name: string`
+- `lowerBound` / `lower_bound`
+- `upperBound` / `upper_bound`
+
+Methods:
+
+- `setCoefficient(variable, coefficient): void`
+- `set_coefficient(variable, coefficient): void`
+- `getCoefficient(variable): number`
+- `get_coefficient(variable): number`
+- `terms(): MathOptLinearTerm[]`
+- `equals(other): boolean`
+- `toString(): string`
+
+### MathOpt Expression Classes
+
+`MathOptLinearExpression`
+
+- Construct from a number, variable, linear term, iterable of terms, or another
+  expression.
+- Properties: `offset`, `terms`.
+- Methods: `add(input)`, `subtract(input)`, `multiply(coefficient)`,
+  `evaluate(variableValues)`, `toString()`.
+
+`MathOptQuadraticExpression`
+
+- Construct from linear inputs plus optional quadratic terms.
+- Properties: `offset`, `linearTerms`, `quadraticTerms`.
+- Methods: `add(input)`, `subtract(input)`, `multiply(coefficient)`,
+  `evaluate(variableValues)`, `toString()`.
+
+Bounded expression classes represent constraints produced by `eq`, `le`, and
+`ge`:
+
+- `MathOptBoundedExpression`
+- `MathOptLowerBoundedExpression`
+- `MathOptUpperBoundedExpression`
+
+They expose `lowerBound`/`lower_bound`, `upperBound`/`upper_bound`, and
+`toString()`.
+
+## PDLP
+
+Import:
+
+```ts
+import { initPdlp, Pdlp, QuadraticProgram } from 'or-tools-wasm';
+```
+
+PDLP exposes the primal-dual hybrid gradient solver for LP and convex diagonal
+quadratic programs.
+
+```ts
+const qp = new QuadraticProgram({
+  objectiveVector: [1, 2],
+  variableLowerBounds: [0, 0],
+  variableUpperBounds: [10, 10],
+});
+
+const result = await Pdlp.primalDualHybridGradient(qp, {
+  terminationCriteria: { iterationLimit: 1000 },
+});
+```
+
+### Initialization
+
+`initPdlp(): Promise<void>`
+
+Loads the PDLP WebAssembly runtime. The `Pdlp` async helpers will initialize the
+runtime automatically if needed, but `initPdlp()` is available for explicit
+warmup.
+
+### `QuadraticProgram`
+
+Constructor:
+
+```ts
+new QuadraticProgram(input?: QuadraticProgramInput)
+```
+
+Fields are available in both camelCase and snake_case:
+
+- `problemName` / `problem_name`
+- `objectiveOffset` / `objective_offset`
+- `objectiveScalingFactor` / `objective_scaling_factor`
+- `objectiveVector` / `objective_vector`
+- `objectiveMatrixDiagonal` / `objective_matrix_diagonal`
+- `constraintMatrix` / `constraint_matrix`
+- `constraintLowerBounds` / `constraint_lower_bounds`
+- `constraintUpperBounds` / `constraint_upper_bounds`
+- `variableLowerBounds` / `variable_lower_bounds`
+- `variableUpperBounds` / `variable_upper_bounds`
+- `variableNames` / `variable_names`
+- `constraintNames` / `constraint_names`
+
+Methods:
+
+- `resizeAndInitialize(numVariables, numConstraints): void`
+- `resize_and_initialize(numVariables, numConstraints): void`
+- `setObjectiveMatrixDiagonal(values): void`
+- `set_objective_matrix_diagonal(values): void`
+- `clearObjectiveMatrix(): void`
+- `clear_objective_matrix(): void`
+- `toBytes(): Uint8Array`
+
+Sparse matrix input accepts either:
+
+```ts
+{ numRows?: number; numColumns?: number; entries?: Array<{ row: number; column: number; value: number }> }
+```
+
+or a dense `number[][]`.
+
+### `PrimalAndDualSolution`
+
+Constructor:
+
+```ts
+new PrimalAndDualSolution({ primalSolution?: number[]; dualSolution?: number[] })
+```
+
+Fields are also exposed as `primal_solution` and `dual_solution`.
+
+### `Pdlp`
+
+- `Pdlp.QuadraticProgram`
+- `Pdlp.PrimalAndDualSolution`
+- `validateQuadraticProgramDimensions(qp): Promise<void>`
+- `validate_quadratic_program_dimensions(qp): Promise<void>`
+- `isLinearProgram(qp): Promise<boolean>`
+- `is_linear_program(qp): Promise<boolean>`
+- `qpFromMpModelProto(proto, options?): Promise<QuadraticProgram>`
+- `qp_from_mpmodel_proto(proto, relaxIntegerVariables?, includeNames?): Promise<QuadraticProgram>`
+- `qpToMpModelProto(qp): Promise<Uint8Array>`
+- `qp_to_mpmodel_proto(qp): Promise<Uint8Array>`
+- `primalDualHybridGradient(qp, params?, initialSolution?): Promise<PdlpSolverResult>`
+- `primal_dual_hybrid_gradient(qp, params?, initialSolution?): Promise<PdlpSolverResult>`
+
+`PdlpSolveParams` supports camelCase and snake_case forms:
+
+- `terminationCriteria.iterationLimit`
+- `terminationCriteria.simpleOptimalityCriteria.epsOptimalRelative`
+- `terminationCriteria.simpleOptimalityCriteria.epsOptimalAbsolute`
+- `terminationCheckFrequency`
+- `lInfRuizIterations`
+- `l2NormRescaling`
+
+`PdlpSolverResult` contains:
+
+- `primalSolution` / `primal_solution`
+- `dualSolution` / `dual_solution`
+- `reducedCosts` / `reduced_costs`
+- `solveLog` / `solve_log`
+
+`solveLog` contains `terminationReason` / `termination_reason` and
+`iterationCount` / `iteration_count`.
+
+## Browser Worker Bridge
+
+The CP-SAT, MathOpt, Routing, MPSolver proto-solve, and PDLP paths can use the
+browser worker bridge. CP-SAT exposes the public controls:
+
+```ts
+CpSat.setWorkerBridgeEnabled(true);
+CpSat.isWorkerBridgeEnabled();
+```
+
+MathOpt also exposes:
+
+```ts
+MathOpt.setWorkerBridgeEnabled(true);
+```
+
+The worker bridge is intended for browser UI responsiveness. In non-browser
+runtimes, direct runtime paths are used.
+
+## Generated Protobuf Types
+
+The package exports generated CP-SAT model and response types from
+`generated/cp_model`, plus `SatParameters` from `generated/sat_parameters`.
+These are large generated definitions matching OR-Tools protobuf schemas. Use
+them to type JSON-like model and parameter objects passed to `CpSat.createModel`
+and `CpSat.solve`.
+
+For raw protobuf workflows, use the schema helpers:
+
+- `CpSat.getSchemas()`
+- `MPSolver.getLinearSolverSchemas()`
+
+## Memory Management
+
+Objects backed by native WebAssembly handles expose `delete()` when explicit
+cleanup is supported:
+
+- `RoutingIndexManager.delete()`
+- `RoutingModel.delete()`
+- `MPSolver.delete()`
+- `MPSolverParameters.delete()`
+
+For long-running applications that create many native objects, call `delete()`
+when a model is no longer needed.
