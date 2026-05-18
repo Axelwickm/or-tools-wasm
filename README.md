@@ -36,8 +36,37 @@ import { CpSat } from 'or-tools-wasm';
 ```
 
 Currently supported solvers: CP-SAT, routing, MPSolver with the GLOP LP and
-SAT MIP backends, and MathOpt with GLOP and CP-SAT through its unified solve
-request path.
+SAT MIP backends, MathOpt with GLOP, CP-SAT, and PDLP through its unified solve
+request path, and a direct PDLP runtime.
+
+## Solver coverage
+
+| OR-Tools solver | or-tools-wasm | Description |
+| --- | --- | --- |
+| CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
+| Routing | ✅ | Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search. |
+| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP and SAT MIP backends. |
+| MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, CP-SAT, and PDLP backends. |
+| GLOP | ✅ | Google's simplex linear programming solver. |
+| PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
+| SAT integer programming | ✅ | CP-SAT-backed integer programming backend for pure integer linear models. |
+| CLP |  | COIN-OR linear programming backend. |
+| GLPK |  | GNU linear and mixed-integer programming backend. |
+| SCIP / GSCIP |  | SCIP-based LP, MIP, and nonconvex integer quadratic backend. |
+| CBC |  | COIN-OR branch-and-cut mixed-integer programming backend. |
+| HiGHS |  | Linear and mixed-integer programming backend. |
+| BOP |  | Boolean optimization backend for mostly Boolean integer models. |
+| Knapsack |  | Dedicated knapsack mixed-integer programming backend. |
+| Gurobi |  | Commercial LP, MIP, and nonconvex integer quadratic backend. |
+| CPLEX |  | Commercial linear and mixed-integer programming backend. |
+| XPRESS |  | Commercial LP, MIP, and nonconvex integer quadratic backend. |
+| COPT |  | Commercial linear and mixed-integer programming backend exposed by MPSolver. |
+| OSQP |  | Continuous convex quadratic programming backend exposed by MathOpt. |
+| ECOS |  | Conic optimization backend exposed by MathOpt. |
+| SCS |  | First-order conic optimization backend exposed by MathOpt. |
+| Santorini |  | MathOpt reference MIP solver, intended for testing rather than production. |
+| Network flow algorithms |  | Max-flow and min-cost-flow graph optimization algorithms. |
+| Assignment algorithms |  | Linear-sum assignment and related assignment optimization algorithms. |
 
 Verified with:
 
