@@ -1,0 +1,734 @@
+# Temporary Solver Python Test Roster
+
+Totals: 613 upstream tests; 198 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 127 🔴 relevant missing or checked mismatch; 263 ⚪ not applicable. Double-checked so far: 227; mismatches found: 59.
+Legend and classification guide:
+
+- ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
+- 🔎 Double-checked: appended after a status once the upstream Python test body has been compared with our TS/WASM parity implementation.
+- ⚠️ Checked mismatch: appended when a current TS/WASM case exists in the same area, but it does not match the upstream Python test behavior closely enough to count as parity.
+- 🟨 Placeholder/API gap: our fixtures already acknowledge this test, but it is skipped/TODO because an exposed solver surface is missing a supporting API, such as MathOpt filters or IncrementalSolver.
+- ➖ Backend-blocked: the upstream test depends on a solver backend we do not currently link or expose, such as CBC, BOP, SCIP/GSCIP, or Gurobi.
+- 🔴 Relevant missing: the test appears relevant to a solver/API surface we do expose or claim, but no matching parity fixture was found. These are the likely follow-up candidates.
+- ⚪ Not applicable: the test is in a solver-family Python file, but it targets Python-only conveniences, internal wrappers, export/update-tracker helpers, or APIs outside the current TypeScript/WASM contract.
+
+Decision rule: this is a contract relevance pass, not a promise that every Python test should be ported line-for-line. When a test mixes solver behavior with Python-only syntax, it is marked by the part that determines whether a useful TS/WASM parity test should exist.
+
+## ortools/sat/python/cp_model_helper_test.py
+- CpModelHelperTest
+  - ✅ 🔎 CpModelHelperTest.test_simple_solve
+  - ✅ 🔎 CpModelHelperTest.test_simple_solve_with_core
+  - ✅ 🔎 CpModelHelperTest.test_simple_solve_with_proto_api
+  - ✅ 🔎 CpModelHelperTest.test_solution_callback
+  - ✅ 🔎 CpModelHelperTest.test_best_bound_callback
+  - 🔴 CpModelHelperTest.test_model_stats - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelHelperTest.test_int_lin_expr - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelHelperTest.test_float_lin_expr - relevant CP-SAT proto/solve/callback/statistics parity gap
+- CpModelBuilderTest
+  - ⚪ CpModelBuilderTest.test_basic - outside current TS contract unless we add a Python-style CP-SAT builder API
+- SatParametersBuilderTest
+  - ⚪ SatParametersBuilderTest.test_basic_api - outside current TS contract unless we add a Python-style CP-SAT builder API
+
+## ortools/sat/python/cp_model_test.py
+- CpModelTest
+  - ⚪ CpModelTest.test_is_boolean - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_create_integer_variable - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_hash_int_var - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_literal - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_negation - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_issue4654 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_equality_overload - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_linear - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_none_argument - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - 🔴 CpModelTest.test_empty_linear_constraint - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ⚪ CpModelTest.test_linear_non_equal - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_eq - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - 🔴 CpModelTest.test_large_constants - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ⚪ CpModelTest.testGe - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_gt - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_le - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_lt - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_eq_var - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_ge_var - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_gt_var - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_le_var - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_lt_var - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_linear_non_equal_with_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_linear_with_enforcement - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_names - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_natural_api_minimize - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_natural_api_maximize_float - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_natural_api_maximize_complex - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_natural_api_maximize - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_minimize_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_maximize_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_add_true - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_add_false - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_sum - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_sum_parsing - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_weighted_sum_parsing - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_sum_with_api - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_weighted_sum - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - 🔴 ⚠️ CpModelTest.test_all_different - current parity case mismatch: current TS case solves a smaller all-different model; upstream checks Python builder proto shape
+  - ⚪ CpModelTest.test_all_different_gen - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_all_different_list - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - 🔴 ⚠️ CpModelTest.test_element - current parity case mismatch: current TS case solves a simplified element model; upstream checks mixed var/constant exprs and empty-list error
+  - 🔴 CpModelTest.test_fixed_element - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_affine_element - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.testCircuit - current parity case mismatch: current TS case solves a 3-arc circuit; upstream checks 5-arc proto shape and empty-arc error
+  - 🔴 ⚠️ CpModelTest.test_multiple_circuit - current parity case mismatch: current TS case solves a 3-arc route constraint; upstream checks 5-arc proto shape and empty-arc error
+  - 🔴 ⚠️ CpModelTest.test_allowed_assignments - current parity case mismatch: current TS case solves a smaller table; upstream checks 5-column table proto shape and arity errors
+  - 🔴 ⚠️ CpModelTest.test_forbidden_assignments - current parity case mismatch: current TS case solves a smaller negated table; upstream checks 5-column proto shape and arity errors
+  - 🔴 ⚠️ CpModelTest.test_automaton - current parity case mismatch: current TS case solves a shorter fixed automaton; upstream checks proto sizes and invalid-input errors
+  - 🔴 ⚠️ CpModelTest.test_inverse - current parity case mismatch: current TS case solves a fixed inverse; upstream checks builder proto shape for 5 direct/inverse vars
+  - 🔴 ⚠️ CpModelTest.test_max_equality - current parity case mismatch: current TS case solves fixed values; upstream checks add_max_equality proto target/expr structure
+  - 🔴 CpModelTest.test_max_equality_list - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_max_equality_tuple - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_max_equality_generator - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_max_equality_args - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_max_equality_with_constant - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.test_min_equality - current parity case mismatch: current TS case solves fixed values; upstream checks add_min_equality proto target/expr structure
+  - 🔴 CpModelTest.test_min_equality_list - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_min_equality_tuple - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_min_equality_generator - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_min_equality_args - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_min_equality_with_constant - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.test_abs - current parity case mismatch: current TS case solves abs value only; upstream also checks proto expr signs and abs() error message
+  - ⚪ CpModelTest.test_issue4568 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - 🔴 ⚠️ CpModelTest.test_division - current parity case mismatch: current TS case solves division only; upstream also checks proto exprs and division operator error message
+  - 🔴 CpModelTest.testModulo - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.test_multiplication_equality - current parity case mismatch: current TS case uses two factors and solves; upstream checks 5-factor proto structure
+  - ⚪ CpModelTest.test_multiplication_equality_generator - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - 🔴 ⚠️ CpModelTest.test_implication - current parity case mismatch: current TS case solves implication; upstream checks enforcement/bool_and proto structure
+  - 🔴 ⚠️ CpModelTest.test_bool_or - current parity case mismatch: current TS case solves one bool_or; upstream checks proto length, constants, and TypeErrors
+  - ⚪ CpModelTest.test_bool_or_list_or_get - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_at_least_one - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - 🔴 ⚠️ CpModelTest.test_at_most_one - current parity case mismatch: current TS case solves one at_most_one; upstream checks proto length, constants, and TypeErrors
+  - 🔴 ⚠️ CpModelTest.test_exactly_one - current parity case mismatch: current TS case solves one exactly_one; upstream checks proto length, constants, and TypeErrors
+  - 🔴 ⚠️ CpModelTest.test_bool_and - current parity case mismatch: current TS case solves one bool_and; upstream checks proto literals including negated and true literal
+  - 🔴 ⚠️ CpModelTest.test_bool_x_or - current parity case mismatch: current TS case solves fixed xor; upstream checks 5-literal proto shape
+  - 🔴 CpModelTest.test_map_domain - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.test_interval - current parity case mismatch: current TS case solves one interval; upstream checks interval object indexes and start/size/end expressions
+  - ⚪ CpModelTest.test_rebuild_from_linear_expression_proto - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_absent_interval - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - 🔴 ⚠️ CpModelTest.test_optional_interval - current parity case mismatch: current TS case solves one absent optional interval; upstream checks four optional interval forms and TypeErrors
+  - 🔴 ⚠️ CpModelTest.test_no_overlap - current parity case mismatch: current TS case solves compatible intervals; upstream checks no_overlap interval indexes in proto
+  - ⚪ CpModelTest.test_no_overlap2d - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - 🔴 ⚠️ CpModelTest.test_cumulative - current parity case mismatch: current TS case solves a 2-interval cumulative; upstream checks 10-interval proto shape and TypeError
+  - ⚪ CpModelTest.test_get_or_make_index_from_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_str - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_repr - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_integer_expression_errors - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_model_errors - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_solver_errors - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - 🔴 ⚠️ CpModelTest.test_has_objective_minimize - current parity case mismatch: current TS case solves objective value; upstream only checks has_objective() before/after minimize
+  - 🔴 ⚠️ CpModelTest.test_has_objective_maximize - current parity case mismatch: current TS case solves objective value; upstream only checks has_objective() before/after maximize
+  - 🔴 CpModelTest.test_search_for_all_solutions - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.test_solve_with_solution_callback - current parity case mismatch: current TS case counts enumerated solutions; upstream callback sums one solution values to 6
+  - 🔴 CpModelTest.test_solve_with_float_value_in_callback - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ✅ 🔎 CpModelTest.test_best_bound_callback
+  - 🔴 ⚠️ CpModelTest.test_value - current parity case mismatch: current TS case solves x=2,y=3; upstream solves x=9,y=10 and checks solver.value(2)
+  - 🔴 CpModelTest.test_float_value - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.test_boolean_value - current parity case mismatch: current TS case checks x/y only; upstream also checks negated literals and bool/int constants
+  - ⚪ CpModelTest.test_unsupported_operators - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_is_literal_true_false - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - 🔴 CpModelTest.test_solve_minimize_with_solution_callback - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_solution_value - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ✅ 🔎 CpModelTest.test_solution_hinting
+  - 🔴 CpModelTest.test_solution_hinting_with_booleans - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 ⚠️ CpModelTest.test_assumptions - current parity case mismatch: current TS case solves with assumptions; upstream checks add/clear assumptions proto behavior
+  - 🔴 ⚠️ CpModelTest.test_stats - current parity case mismatch: current TS case solves an empty model; upstream solves a constrained objective model and checks wall_time > 0
+  - 🔴 ⚠️ CpModelTest.test_search_strategy - current parity case mismatch: current TS case solves a search-strategy model; upstream checks exact decision strategy proto fields
+  - 🔴 CpModelTest.test_model_and_response_stats - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - 🔴 CpModelTest.test_validate_model - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ✅ 🔎 CpModelTest.test_validate_model_with_overflow
+  - ⚪ CpModelTest.test_copy_model - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - 🔴 CpModelTest.test_custom_log - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ✅ 🔎 CpModelTest.test_log_to_response
+  - ⚪ CpModelTest.test_issue2762 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - 🔴 ⚠️ CpModelTest.test_model_error - current parity case mismatch: current TS case checks invalid status only; upstream also checks exact solution_info for invalid domains
+  - ⚪ CpModelTest.test_int_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_bool_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_fixed_size_interval_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_interval_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_compare_with_none - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_small_series - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_issue4376_sat_model - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_issue4376_minimize_model - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_issue4434 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_raise_python_exception_in_callback - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_in_place_sum_modifications - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_large_sum - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ CpModelTest.test_large_iadd - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_complex_iadd - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_large_isub - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_complex_isub - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_radd - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification1 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification2 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification3 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification4 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification5 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification6 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification7 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification8 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification9 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_simplification10 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_issue4759 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ⚪ CpModelTest.test_pre_pep8 - outside current TS contract: Python cp_model builder/operator convenience behavior
+
+## ortools/constraint_solver/python/pywraprouting_test.py
+- TestPyWrapRoutingIndexManager
+  - 🔴 ⚠️ TestPyWrapRoutingIndexManager.testCtor - current parity case mismatch: current test uses numLocations/numVehicles and routing.Start; upstream checks GetNumberOfNodes/GetNumberOfVehicles/GetStartIndex/GetEndIndex directly
+  - 🔴 🔎 TestPyWrapRoutingIndexManager.testCtorMultiDepotSame - confirmed missing: current fixtures do not cover same-start/same-end multi-depot manager constructor
+  - 🔴 🔎 TestPyWrapRoutingIndexManager.testCtorMultiDepotAllDiff - confirmed missing: current fixtures do not cover all-different multi-depot manager constructor
+- TestPyWrapRoutingModel
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testCtor - current parity case mismatch: current test checks Start only; upstream also checks End for each vehicle
+  - 🔴 🔎 TestPyWrapRoutingModel.testSolve - confirmed missing: current fixtures do not cover bare Solve() status/objective behavior
+  - 🔴 🔎 TestPyWrapRoutingModel.testSolveMultiDepot - confirmed missing: current fixtures do not cover bare Solve() with multi-depot manager
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testTransitCallback - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testTransitLambda - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testTransitMatrix - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testUnaryTransitCallback - current parity case mismatch: current test omits callback index and routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testUnaryTransitLambda - current parity case mismatch: current test omits callback index and routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testUnaryTransitVector - current parity case mismatch: current test omits callback index and routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testTSP - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - ✅ 🔎 TestPyWrapRoutingModel.testVRP
+  - ✅ 🔎 TestPyWrapRoutingModel.testDimensionTSP
+  - ✅ 🔎 TestPyWrapRoutingModel.testDimensionWithVehicleCapacitiesTSP
+  - ✅ 🔎 TestPyWrapRoutingModel.testDimensionWithVehicleTransitsTSP
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testDimensionWithVehicleTransitsVRP - current parity case mismatch: current TS callbacks all return 1; upstream uses per-vehicle One/Two/Three transits and checks cumul by vehicle + 1
+  - ✅ 🔎 TestPyWrapRoutingModel.testConstantDimensionTSP
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testVectorDimensionTSP - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testMatrixDimensionTSP - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testMatrixDimensionVRP - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - ✅ 🔎 TestPyWrapRoutingModel.testDisjunctionTSP
+  - ✅ 🔎 TestPyWrapRoutingModel.testDisjunctionPenaltyTSP
+  - ✅ 🔎 TestPyWrapRoutingModel.testRoutingModelParameters
+  - ✅ 🔎 TestPyWrapRoutingModel.testRoutingLocalSearchFiltering
+  - ✅ 🔎 TestPyWrapRoutingModel.testRoutingSearchParameters
+  - ✅ 🔎 TestPyWrapRoutingModel.testFindErrorInRoutingSearchParameters
+  - ✅ 🔎 TestPyWrapRoutingModel.testCallback
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testReadAssignment - current parity case mismatch: current test checks objective only; upstream also verifies every route node against input routes
+  - ✅ 🔎 TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_simple
+  - 🔴 ⚠️ TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd - current parity case mismatch: current test does not add the same vehicle/cumul constraints; it calls solver.Add(null), so pickup-delivery setup is not equivalent
+- TestBoundCost
+  - ✅ 🔎 TestBoundCost.testCtor
+- TestRoutingDimension
+  - ✅ 🔎 TestRoutingDimension.testCtor
+  - ✅ 🔎 TestRoutingDimension.testSoftSpanUpperBound
+  - ✅ 🔎 TestRoutingDimension.testQuadraticCostSoftSpanUpperBound
+
+## ortools/linear_solver/python/pywraplp_test.py
+- PyWrapLp
+  - ➖ 🔎 PyWrapLp.test_proto - CBC backend is not linked/exposed
+  - ✅ 🔎 PyWrapLp.test_external_api
+
+## ortools/linear_solver/python/lp_test.py
+- PyWrapLpTest
+  - ➖ 🔎 PyWrapLpTest.testApi - SCIP-only upstream loop; SCIP is not linked/exposed
+  - ✅ 🔎 PyWrapLpTest.testSetHint
+  - ➖ 🔎 PyWrapLpTest.testBopInfeasible - BOP backend is not linked/exposed
+  - 🔴 ⚠️ PyWrapLpTest.testLoadSolutionFromProto - current parity case mismatch: current TS case solves and loads a SAT solution; upstream only calls LoadSolutionFromProto(empty response) on a GLOP solver
+  - 🔴 ⚠️ PyWrapLpTest.testSolveFromProto - current parity case mismatch: current TS case solves a different SAT integer request; upstream solves a specific 3-variable GLOP MPModelRequest and checks status
+  - ✅ 🔎 PyWrapLpTest.testExportToMps
+
+## ortools/linear_solver/python/lp_api_test.py
+- 🟨 🔎 test_sum_no_brackets - placeholder: Python generator/list summation helper behavior only
+- 🔴 ⚠️ test_proto - current parity case mismatch: current TS case uses a SAT integer request; upstream lp_api_test.py uses a specific GLOP proto load/fill-solution flow
+
+## ortools/linear_solver/python/model_builder_test.py
+- ModelBuilderTest
+  - ⚪ ModelBuilderTest.test_minimal_linear_example - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_import_from_mps_string - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_import_from_mps_file - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_import_from_lp_string - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_import_from_lp_file - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_class_api - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_large_iadd - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_complex_iadd - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_large_isub - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_complex_sub - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_variables - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_duplicate_variables - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_add_term - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_issue_3614 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_create_false_ct - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_create_true_ct - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- InternalHelperTest
+  - ⚪ InternalHelperTest.test_anonymous_variables - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ InternalHelperTest.test_anonymous_constraints - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- LinearBaseTest
+  - ⚪ LinearBaseTest.test_str - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- LinearBaseErrorsTest
+  - ⚪ LinearBaseErrorsTest.test_unknown_linear_type - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ LinearBaseErrorsTest.test_division_by_zero - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ LinearBaseErrorsTest.test_boolean_expression - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- BoundedLinearBaseTest
+  - ⚪ BoundedLinearBaseTest.test_str - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ BoundedLinearBaseTest.test_doublesided_bounded_expressions - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ BoundedLinearBaseTest.test_free_bounded_expressions - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ BoundedLinearBaseTest.test_var_eq_var_as_bool - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- BoundedLinearBaseErrorsTest
+  - ⚪ BoundedLinearBaseErrorsTest.test_single_var_bounded_linear_expression_as_bool - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ BoundedLinearBaseErrorsTest.test_bounded_linear_expression_as_bool - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- ModelBuilderErrorsTest
+  - ⚪ ModelBuilderErrorsTest.test_new_var_series_errors - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderErrorsTest.test_add_linear_constraints_errors - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- ModelBuilderVariablesTest
+  - ⚪ ModelBuilderVariablesTest.test_new_var_series - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderVariablesTest.test_get_variable_lower_bounds - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderVariablesTest.test_get_variable_upper_bounds - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- ModelBuilderLinearConstraintsTest
+  - ⚪ ModelBuilderLinearConstraintsTest.test_get_linear_constraints - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderLinearConstraintsTest.test_get_linear_constraints_empty - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderLinearConstraintsTest.test_get_linear_constraint_lower_bounds - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderLinearConstraintsTest.test_get_linear_constraint_upper_bounds - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderLinearConstraintsTest.test_get_linear_constraint_expressions - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- ModelBuilderObjectiveTest
+  - ⚪ ModelBuilderObjectiveTest.test_set_objective - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderObjectiveTest.test_set_new_objective - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderObjectiveTest.test_minimize - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderObjectiveTest.test_maximize - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- ModelBuilderProtoTest
+  - ⚪ ModelBuilderProtoTest.test_export_to_proto - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- SolverTest
+  - ⚪ SolverTest.test_solve_status - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ SolverTest.test_get_variable_values - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ SolverTest.test_get_objective_value - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+- ModelBuilderExamplesTest
+  - ⚪ ModelBuilderExamplesTest.test_simple_problem - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.test_graph_k_color - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.test_knapsack_problem - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.test_max_flow_problem - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.test_add_enforced - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testInPlaceSumModifications - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testLargeSum - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification1 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification2 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification3 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification4 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification5 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification6 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification7 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification8 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification9 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification10 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification11 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderExamplesTest.testSimplification12 - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+
+## ortools/linear_solver/python/model_builder_helper_test.py
+- PywrapModelBuilderHelperTest
+  - ⚪ PywrapModelBuilderHelperTest.test_export_model_proto_to_mps_string - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_export_model_proto_to_lp_string - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_import_from_mps_string - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_import_from_mps_file - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_import_from_lp_string - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_solve_with_glop - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_solve_with_glop_direct - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_solve_with_pdlp - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_interrupt_solve - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_build_model - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ PywrapModelBuilderHelperTest.test_set_coefficient - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+
+## ortools/math_opt/python/model_test.py
+- ModelTest
+  - ✅ 🔎 ModelTest.test_name
+  - ✅ 🔎 ModelTest.test_name_empty
+  - 🔴 ⚠️ ModelTest.test_add_and_read_variables - current parity case mismatch: current test omits initial lower/upper/integer checks for both variables, repr checks, full variables() ordering, and get_variable(1)
+  - 🔴 ⚠️ ModelTest.test_add_integer_variable - current parity case mismatch: current test solves with CP-SAT but does not check variable lower/upper/integer/name/id like upstream
+  - 🔴 ⚠️ ModelTest.test_add_binary_variable - current parity case mismatch: current test solves with CP-SAT but does not check binary variable bounds/integer/name/id like upstream
+  - ✅ 🔎 ModelTest.test_update_variable
+  - 🔴 ModelTest.test_read_deleted_variable - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_update_deleted_variable - relevant MathOpt model API parity gap
+  - 🔴 ⚠️ ModelTest.test_add_and_read_linear_constraints - current parity case mismatch: current test solves a different model and does not check linear constraint bounds/name/id/repr/list/get accessors
+  - 🔴 ModelTest.test_linear_constraint_as_bounded_expression - relevant MathOpt model API parity gap
+  - ✅ 🔎 ModelTest.test_update_linear_constraint
+  - 🔴 ModelTest.test_read_deleted_linear_constraint - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_update_deleted_linear_constraint - relevant MathOpt model API parity gap
+  - 🔴 ⚠️ ModelTest.test_linear_constraint_matrix - current parity case mismatch: current test checks coefficients and term lengths only; upstream also checks names, row/column nonzeros, term reprs, and matrix entries
+  - 🔴 ModelTest.test_linear_constraint_expression - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_bounded_expression - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_upper_bounded_expression - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_lower_bounded_expression - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_number_eq_expression - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_expression_eq_expression - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_variable_eq_variable - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_errors - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_matrix_with_variable_deletion - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_matrix_with_linear_constraint_deletion - relevant MathOpt model API parity gap
+  - 🔴 ModelTest.test_linear_constraint_matrix_wrong_model - relevant MathOpt model API parity gap
+  - ⚪ ModelTest.test_export - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ ModelTest.test_from_model_proto - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ ModelTest.test_update_tracker_simple - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ ModelTest.test_two_update_trackers - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ ModelTest.test_remove_tracker - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+- WrongAttributeTest
+  - ⚪ WrongAttributeTest.test_variable - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ WrongAttributeTest.test_linear_constraint - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ WrongAttributeTest.test_objective - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ WrongAttributeTest.test_aux_objective - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+  - ⚪ WrongAttributeTest.test_model - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
+
+## ortools/math_opt/python/model_objective_test.py
+- ModelSetObjectiveTest
+  - 🔴 ModelSetObjectiveTest.test_maximize - relevant MathOpt objective-setting parity gap
+  - 🔴 ⚠️ ModelSetObjectiveTest.test_maximize_linear_obj - current parity case mismatch: current test solves an objective but upstream checks objective replacement semantics, offset, linear terms, and old-term removal
+  - 🔴 ModelSetObjectiveTest.test_maximize_linear_obj_type_error_quadratic - relevant MathOpt objective-setting parity gap
+  - 🔴 ModelSetObjectiveTest.test_maximize_quadratic_objective - relevant MathOpt objective-setting parity gap
+  - 🔴 ModelSetObjectiveTest.test_minimize - relevant MathOpt objective-setting parity gap
+  - 🔴 ⚠️ ModelSetObjectiveTest.test_minimize_linear_obj - current parity case mismatch: current test solves an objective but upstream checks objective replacement semantics, direction, offset, linear terms, and old-term removal
+  - 🔴 ModelSetObjectiveTest.test_minimize_linear_obj_type_error_quadratic - relevant MathOpt objective-setting parity gap
+  - 🔴 ModelSetObjectiveTest.test_minimize_quadratic_objective - relevant MathOpt objective-setting parity gap
+  - 🔴 ModelSetObjectiveTest.test_set_objective - relevant MathOpt objective-setting parity gap
+  - 🔴 ModelSetObjectiveTest.test_set_objective_linear_obj - relevant MathOpt objective-setting parity gap
+  - 🔴 ModelSetObjectiveTest.test_set_objective_linear_obj_type_error_quadratic - relevant MathOpt objective-setting parity gap
+  - 🔴 ModelSetObjectiveTest.test_set_objective_quadratic_objective - relevant MathOpt objective-setting parity gap
+- ModelAuxObjTest
+  - ⚪ ModelAuxObjTest.test_add_aux_obj_with_expr - outside current TS contract: auxiliary objective/export-update API is not exposed
+  - ⚪ ModelAuxObjTest.test_add_aux_obj_with_maximize - outside current TS contract: auxiliary objective/export-update API is not exposed
+  - ⚪ ModelAuxObjTest.test_add_aux_obj_with_minimize - outside current TS contract: auxiliary objective/export-update API is not exposed
+- ModelObjectiveExportProtoIntegrationTest
+  - ⚪ ModelObjectiveExportProtoIntegrationTest.test_export_model_with_objective - outside current TS contract: auxiliary objective/export-update API is not exposed
+  - ⚪ ModelObjectiveExportProtoIntegrationTest.test_export_model_update_with_objective - outside current TS contract: auxiliary objective/export-update API is not exposed
+  - ⚪ ModelObjectiveExportProtoIntegrationTest.test_export_model_with_auxiliary_objective - outside current TS contract: auxiliary objective/export-update API is not exposed
+  - ⚪ ModelObjectiveExportProtoIntegrationTest.test_export_model_update_with_aux_obj_update - outside current TS contract: auxiliary objective/export-update API is not exposed
+
+## ortools/math_opt/python/objectives_test.py
+- LinearObjectiveTest
+  - ⚪ LinearObjectiveTest.test_same_model - outside current TS contract: Python objective object API is not exposed directly
+  - 🔴 ⚠️ LinearObjectiveTest.test_name - current parity case mismatch: current test checks model name/solve result; upstream checks objective object name for primary/auxiliary objective
+  - ⚪ LinearObjectiveTest.test_maximize - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_offset - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_priority - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_linear_coefficients_basic - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_linear_coefficients_restore_to_zero - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_clear - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_as_linear_expression - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_add_linear - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_add - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_add_linear_rejects_quadratic - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_set_to_linear - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_set_to_linear_rejects_quadratic - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_set_to_expression - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_get_linear_coef_of_deleted_variable - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_set_linear_coef_of_deleted_variable - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_get_quadratic_coef_of_deleted_variable - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_delete_variable_terms_removed - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_objective_wrong_model_linear - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ LinearObjectiveTest.test_objective_wrong_model_get_quadratic - outside current TS contract: Python objective object API is not exposed directly
+- PrimaryObjectiveTest
+  - ⚪ PrimaryObjectiveTest.test_eq - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_quadratic_coefficients_basic - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_quadratic_coefficients_restore_to_zero - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_clear - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_as_linear_expression_fails - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_as_quadratic_expression - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_add_quadratic - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_add - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_set_to_quadratic_expression - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_set_to_expression - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_set_quadratic_coef_of_deleted_variable - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_delete_variable_quad_terms_removed - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ PrimaryObjectiveTest.test_objective_wrong_model_set_quadratic - outside current TS contract: Python objective object API is not exposed directly
+- AuxiliaryObjectiveTest
+  - ⚪ AuxiliaryObjectiveTest.test_invalid_id_type - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_eq - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_id - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_get_quadratic_coefficients_is_zero - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_set_quadratic_coefficients_is_error - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_as_quadratic_expression_with_linear_no_crash - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_add_quadratic_errors - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_add_is_error_if_quad - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_set_to_quadratic_expression_error - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_set_to_expression_error_when_quadratic - outside current TS contract: Python objective object API is not exposed directly
+
+## ortools/math_opt/python/model_element_test.py
+- ModelElementTest
+  - 🔴 ModelElementTest.test_no_elements - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_add_element - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_get_invalid_element - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_delete_element - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_delete_invalid_element_error - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_delete_element_twice_error - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_delete_element_wrong_model_error - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_get_deleted_element_error - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_ensure_next_id_with_effect - relevant MathOpt model element API parity gap
+  - 🔴 ModelElementTest.test_ensure_next_id_no_effect - relevant MathOpt model element API parity gap
+
+## ortools/math_opt/python/linear_expression_test.py
+- BoundedLinearExprTest
+  - ✅ 🔎 BoundedLinearExprTest.test_eq_float
+  - ✅ 🔎 BoundedLinearExprTest.test_eq_float_explicit
+  - ✅ 🔎 BoundedLinearExprTest.test_eq_expr
+  - ✅ 🔎 BoundedLinearExprTest.test_eq_expr_explicit
+  - ✅ 🔎 BoundedLinearExprTest.test_var_eq_var
+  - ✅ 🔎 BoundedLinearExprTest.test_var_eq_var_explicit
+  - ✅ 🔎 BoundedLinearExprTest.test_var_neq_var
+  - ✅ 🔎 BoundedLinearExprTest.test_var_neq_var_explicit
+  - ✅ 🔎 BoundedLinearExprTest.test_var_dict
+  - ✅ 🔎 BoundedLinearExprTest.test_leq_float
+  - ✅ 🔎 BoundedLinearExprTest.test_leq_float_rev
+  - ✅ 🔎 BoundedLinearExprTest.test_geq_float
+  - ✅ 🔎 BoundedLinearExprTest.test_geq_float_rev
+  - ✅ 🔎 BoundedLinearExprTest.test_geq_leq_float
+  - ✅ 🔎 BoundedLinearExprTest.test_geq_leq_float_rev
+  - ✅ 🔎 BoundedLinearExprTest.test_leq_geq_float
+  - ✅ 🔎 BoundedLinearExprTest.test_leq_geq_float_rev
+  - ✅ 🔎 BoundedLinearExprTest.test_leq_expr
+  - ✅ 🔎 BoundedLinearExprTest.test_geq_expr
+- BoundedLinearExprErrorTest
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_ne
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_eq
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_float_le_expr_le_float
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_float_ge_expr_ge_float
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_expr_le_expr_le_float
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_expr_ge_expr_ge_float
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_lower_bounded_expr_leq_expr
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_lower_bounded_expr_geq_expr
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_lower_bounded_expr_geq_float
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_upper_bounded_expr_geq_expr
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_upper_bounded_expr_leq_expr
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_upper_bounded_expr_leq_float
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_bounded_expr_leq_expr
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_bounded_expr_leq_float
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_bounded_expr_geq_expr
+  - ✅ 🔎 BoundedLinearExprErrorTest.test_bounded_expr_geq_float
+- BoundedQuadraticExpressionTest
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_eq_float
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_float_eq_quad
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_eq_lin
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_lin_eq_quad
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_eq_str_raises_error
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_ne_raises_error
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_le_float
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_float_ge_quad
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_le_lin
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_lin_ge_quad
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_le_str_raises_error
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_ge_float
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_float_le_quad
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_ge_lin
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_lin_le_quad
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_quad_ge_str_raises_error
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_ge_twice
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_ge_twice_fails_when_ambiguous
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_no_quad_ge_bounded_expr
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_le_twice
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_le_twice_fails_when_ambiguous
+  - ✅ 🔎 BoundedQuadraticExpressionTest.test_no_quad_le_bounded_expr
+- LinearStrAndReprTest
+  - ✅ 🔎 LinearStrAndReprTest.test_sorting_ok
+  - ✅ 🔎 LinearStrAndReprTest.test_simple_expressions
+  - ✅ 🔎 LinearStrAndReprTest.test_sum_expressions
+- QuadraticStrAndReprTest
+  - ✅ 🔎 QuadraticStrAndReprTest.test_sorting_ok
+  - ✅ 🔎 QuadraticStrAndReprTest.test_simple_expressions
+  - ✅ 🔎 QuadraticStrAndReprTest.test_sum_expressions
+- LinearNumberOpTestsParameters
+  - ✅ 🔎 LinearNumberOpTestsParameters.test_suffix
+- LinearNumberOpTests
+  - ✅ 🔎 LinearNumberOpTests.test_mult
+  - ✅ 🔎 LinearNumberOpTests.test_div
+  - ✅ 🔎 LinearNumberOpTests.test_add
+  - ✅ 🔎 LinearNumberOpTests.test_sub
+- QuadraticTermKey
+  - ✅ 🔎 QuadraticTermKey.test_var_dict
+- QuadraticNumberOpTestsParameters
+  - ✅ 🔎 QuadraticNumberOpTestsParameters.test_suffix
+- QuadraticNumberOpTests
+  - ✅ 🔎 QuadraticNumberOpTests.test_mult
+  - ✅ 🔎 QuadraticNumberOpTests.test_div
+  - ✅ 🔎 QuadraticNumberOpTests.test_add
+  - ✅ 🔎 QuadraticNumberOpTests.test_sub
+- LinearLinearAddSubTestParams
+  - ✅ 🔎 LinearLinearAddSubTestParams.test_suffix
+- LinearLinearAddSubTest
+  - ✅ 🔎 LinearLinearAddSubTest.test_add_and_sub
+- LinearQuadraticAddSubTestParams
+  - ✅ 🔎 LinearQuadraticAddSubTestParams.test_suffix
+- LinearQuadraticAddSubTest
+  - ✅ 🔎 LinearQuadraticAddSubTest.test_add_and_sub
+- LinearLinearMulTest
+  - ✅ 🔎 LinearLinearMulTest.test_var_var
+  - ✅ 🔎 LinearLinearMulTest.test_term_term
+  - ✅ 🔎 LinearLinearMulTest.test_expr_expr
+  - ✅ 🔎 LinearLinearMulTest.test_sum_sum
+  - ✅ 🔎 LinearLinearMulTest.test_prod_prod
+  - ✅ 🔎 LinearLinearMulTest.test_var_term
+  - ✅ 🔎 LinearLinearMulTest.test_var_expr
+  - ✅ 🔎 LinearLinearMulTest.test_var_sum
+  - ✅ 🔎 LinearLinearMulTest.test_var_prod
+  - ✅ 🔎 LinearLinearMulTest.test_term_expr
+  - ✅ 🔎 LinearLinearMulTest.test_term_sum
+  - ✅ 🔎 LinearLinearMulTest.test_term_prod
+  - ✅ 🔎 LinearLinearMulTest.test_expr_sum
+  - ✅ 🔎 LinearLinearMulTest.test_expr_prod
+  - ✅ 🔎 LinearLinearMulTest.test_sum_prod
+- NegateTest
+  - ✅ 🔎 NegateTest.test_negate_var
+  - ✅ 🔎 NegateTest.test_negate_linear_term
+  - ✅ 🔎 NegateTest.test_negate_linear_expression
+  - ✅ 🔎 NegateTest.test_negate_linear_sum
+  - ✅ 🔎 NegateTest.test_negate_ast_product
+  - ✅ 🔎 NegateTest.test_negate_quadratic_term
+  - ✅ 🔎 NegateTest.test_negate_quadratic_expression
+  - ✅ 🔎 NegateTest.test_negate_quadratic_sum
+  - ✅ 🔎 NegateTest.test_negate_linear_linear_product
+  - ✅ 🔎 NegateTest.test_negate_quadratic_product
+- UnsupportedProductOperandTestParams
+  - ✅ 🔎 UnsupportedProductOperandTestParams.test_suffix
+- UnsupportedProductOperandTest
+  - ✅ 🔎 UnsupportedProductOperandTest.test_mult
+  - ✅ 🔎 UnsupportedProductOperandTest.test_div
+- UnsupportedAdditionOperandTestParams
+  - ✅ 🔎 UnsupportedAdditionOperandTestParams.test_suffix
+- UnsupportedAdditionOperandTest
+  - ✅ 🔎 UnsupportedAdditionOperandTest.test_add
+  - ✅ 🔎 UnsupportedAdditionOperandTest.test_sub
+- UnsupportedInitializationTest
+  - ✅ 🔎 UnsupportedInitializationTest.test_linear_sum_not_tuple
+  - ✅ 🔎 UnsupportedInitializationTest.test_linear_sum_not_linear_in_tuple
+  - ✅ 🔎 UnsupportedInitializationTest.test_quadratic_sum_not_tuple
+  - ✅ 🔎 UnsupportedInitializationTest.test_quadratic_sum_not_linear_in_tuple
+  - ✅ 🔎 UnsupportedInitializationTest.test_linear_product_not_scalar
+  - ✅ 🔎 UnsupportedInitializationTest.test_linear_product_not_linear
+  - ✅ 🔎 UnsupportedInitializationTest.test_quadratic_product_not_scalar
+  - ✅ 🔎 UnsupportedInitializationTest.test_quadratic_product_not_quadratic
+  - ✅ 🔎 UnsupportedInitializationTest.test_linear_linear_product_first_not_linear
+  - ✅ 🔎 UnsupportedInitializationTest.test_linear_linear_product_second_not_linear
+- SumTest
+  - ✅ 🔎 SumTest.test_sum_vars
+  - ✅ 🔎 SumTest.test_sum_linear_terms
+  - ✅ 🔎 SumTest.test_sum_quadratic_terms
+  - ✅ 🔎 SumTest.test_sum_linear_expression
+  - ✅ 🔎 SumTest.test_sum_quadratic_expression
+  - ✅ 🔎 SumTest.test_generator_sum_vars
+  - ✅ 🔎 SumTest.test_generator_sum_terms
+  - ✅ 🔎 SumTest.test_generator_sum_quadratic_terms
+  - ✅ 🔎 SumTest.test_generator_sum_expression
+  - ✅ 🔎 SumTest.test_generator_quadratic_sum_expression
+- AstTest
+  - ✅ 🔎 AstTest.test_simple_linear_ast
+  - ✅ 🔎 AstTest.test_simple_quadratic_ast
+  - ✅ 🔎 AstTest.test_linear_sum_ast
+  - ✅ 🔎 AstTest.test_quadratic_sum_ast
+- LinearExpressionTest
+  - ✅ 🔎 LinearExpressionTest.test_init_to_zero
+  - ✅ 🔎 LinearExpressionTest.test_terms_read_only
+  - ✅ 🔎 LinearExpressionTest.test_no_copy_of_linear_expression
+  - ✅ 🔎 LinearExpressionTest.test_number_as_flat_linear_expression
+  - ✅ 🔎 LinearExpressionTest.test_evaluate
+- QuadraticExpressionTest
+  - ✅ 🔎 QuadraticExpressionTest.test_terms_read_only
+  - ✅ 🔎 QuadraticExpressionTest.test_no_copy_of_quadratic_expression
+  - ✅ 🔎 QuadraticExpressionTest.test_number_as_flat_quadratic_expression
+  - ✅ 🔎 QuadraticExpressionTest.test_evaluate
+
+## ortools/math_opt/python/expressions_test.py
+- FastSumTest
+  - ✅ 🔎 FastSumTest.test_variables
+  - ✅ 🔎 FastSumTest.test_numbers
+  - ✅ 🔎 FastSumTest.test_heterogeneous_linear
+  - ✅ 🔎 FastSumTest.test_heterogeneous_quad
+  - ✅ 🔎 FastSumTest.test_all_quad
+- EvaluateExpressionTest
+  - ✅ 🔎 EvaluateExpressionTest.test_scalar_expression
+  - ✅ 🔎 EvaluateExpressionTest.test_linear
+  - ✅ 🔎 EvaluateExpressionTest.test_quadratic
+
+## ortools/math_opt/python/bounded_expressions_test.py
+- BoundedExpressionTest
+  - ✅ 🔎 BoundedExpressionTest.test_bounded_expression_read
+  - ✅ 🔎 BoundedExpressionTest.test_lower_bounded_expression_read
+  - ✅ 🔎 BoundedExpressionTest.test_upper_bounded_expression_read
+  - ✅ 🔎 BoundedExpressionTest.test_lower_bounded_to_bounded
+  - ✅ 🔎 BoundedExpressionTest.test_upper_bounded_to_bounded
+
+## ortools/math_opt/python/solve_test.py
+- SolveTest
+  - ✅ 🔎 SolveTest.test_solve_error
+  - 🔴 ⚠️ SolveTest.test_lp_solve - current parity case mismatch: current TS test checks primal objective/values only; upstream also checks termination primal bound, primal solution object, dual objective, dual values, and reduced costs
+  - ➖ 🔎 SolveTest.test_indicator - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
+  - 🟨 🔎 SolveTest.test_filters - placeholder: model/solve filters not exposed in TS MathOpt API
+  - ➖ 🔎 SolveTest.test_message_callback - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
+  - ➖ 🔎 SolveTest.test_solve_interrupter - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
+  - ➖ 🔎 SolveTest.test_solve_duplicated_names - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
+  - ➖ 🔎 SolveTest.test_solve_remove_names - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
+  - 🟨 🔎 SolveTest.test_incremental_solve_remove_names - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solve_init_error - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solve_error - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solve_error_on_reject - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_lp - placeholder: IncrementalSolver API not available in TS MathOpt
+  - ➖ 🔎 SolveTest.test_incremental_mip - uses incremental GSCIP; GSCIP/SCIP is not linked/exposed
+  - ➖ 🔎 SolveTest.test_incremental_mip_with_message_cb - uses incremental GSCIP; GSCIP/SCIP is not linked/exposed
+  - ➖ 🔎 SolveTest.test_incremental_solve_interrupter - uses incremental GSCIP; GSCIP/SCIP is not linked/exposed
+  - 🟨 🔎 SolveTest.test_incremental_solve_rejected - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_multiple_incremental_lps - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solver_delete - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solver_close - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solver_close_twice - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solver_context_manager - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solver_context_manager_exception - placeholder: IncrementalSolver API not available in TS MathOpt
+
+## ortools/math_opt/python/result_test.py
+- TerminationTest
+  - ⚪ TerminationTest.test_termination_unspecified - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ TerminationTest.test_termination_limit_but_not_limit_reason - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ TerminationTest.test_termination_limit_reason_but_no_limit - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ TerminationTest.test_termination_ok_proto_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+- ParseProblemStatus
+  - ⚪ ParseProblemStatus.test_problem_status_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ ParseProblemStatus.test_problem_status_unspecified_primal_status - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ ParseProblemStatus.test_problem_status_unspecified_dual_status - outside current TS contract: Python result parser/proto object API is not exposed
+- ParseObjectiveBounds
+  - ⚪ ParseObjectiveBounds.test_objective_bounds_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+- ParseSolveStats
+  - ⚪ ParseSolveStats.test_problem_status_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+- SolveResultAuxiliaryFunctionsTest
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_solve_time - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_best_objective_bound - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_has_feasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_feasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_primal - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_has_feasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_feasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_dual_in_best_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_ray_has_ray - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_ray_no_ray - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_ray_has_ray - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_ray_no_ray - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_has_basis - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_no_basis_in_best_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_bounded - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_not_bounded_primal_infeasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultAuxiliaryFunctionsTest.test_not_bounded_dual_infeasible - outside current TS contract: Python result parser/proto object API is not exposed
+- SolveResultTest
+  - ⚪ SolveResultTest.test_solve_result_gscip_output - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_solve_result_osqp_output - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_solve_result_pdlp_output - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_multiple_solver_specific_outputs_error - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_solve_result_from_proto_missing_bounds_in_termination - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_solve_result_from_proto_missing_status_in_termination - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_solve_result_from_proto_double_infeasible_multiple_rays - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_solve_result_from_feasible_multiple_solutions - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_to_proto_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_solution_validation - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_primal_ray_validation - outside current TS contract: Python result parser/proto object API is not exposed
+  - ⚪ SolveResultTest.test_dual_ray_validation - outside current TS contract: Python result parser/proto object API is not exposed
+
+## ortools/pdlp/python/pdlp_test.py
+- QuadraticProgramTest
+  - ✅ 🔎 QuadraticProgramTest.test_validate_quadratic_program_dimensions_for_empty_qp
+  - ✅ 🔎 QuadraticProgramTest.test_converts_from_tiny_mpmodel_lp
+  - ✅ 🔎 QuadraticProgramTest.test_converts_from_tiny_mpmodel_qp
+  - ✅ 🔎 QuadraticProgramTest.test_build_lp
+  - ✅ 🔎 QuadraticProgramTest.test_build_qp
+- PrimalDualHybridGradientTest
+  - ✅ 🔎 PrimalDualHybridGradientTest.test_iteration_limit
+  - ✅ 🔎 PrimalDualHybridGradientTest.test_solution
+  - ✅ 🔎 PrimalDualHybridGradientTest.test_solution_2
+  - ✅ 🔎 PrimalDualHybridGradientTest.test_starting_point
+
