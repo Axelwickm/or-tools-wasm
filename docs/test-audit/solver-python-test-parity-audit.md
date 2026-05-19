@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 346 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 46 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 353; mismatches found: 13.
+Totals: 613 upstream tests; 390 ✅ implemented; 15 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 1 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 4.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -334,29 +334,29 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 - ModelTest
   - ✅ 🔎 ModelTest.test_name
   - ✅ 🔎 ModelTest.test_name_empty
-  - 🔴 ⚠️ ModelTest.test_add_and_read_variables - current parity case mismatch: current test omits initial lower/upper/integer checks for both variables, repr checks, full variables() ordering, and get_variable(1)
-  - 🔴 ⚠️ ModelTest.test_add_integer_variable - current parity case mismatch: current test solves with CP-SAT but does not check variable lower/upper/integer/name/id like upstream
-  - 🔴 ⚠️ ModelTest.test_add_binary_variable - current parity case mismatch: current test solves with CP-SAT but does not check binary variable bounds/integer/name/id like upstream
+  - ✅ 🔎 ModelTest.test_add_and_read_variables
+  - ✅ 🔎 ModelTest.test_add_integer_variable
+  - ✅ 🔎 ModelTest.test_add_binary_variable
   - ✅ 🔎 ModelTest.test_update_variable
-  - 🔴 ModelTest.test_read_deleted_variable - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_update_deleted_variable - relevant MathOpt model API parity gap
-  - 🔴 ⚠️ ModelTest.test_add_and_read_linear_constraints - current parity case mismatch: current test solves a different model and does not check linear constraint bounds/name/id/repr/list/get accessors
-  - 🔴 ModelTest.test_linear_constraint_as_bounded_expression - relevant MathOpt model API parity gap
+  - ✅ 🔎 ModelTest.test_read_deleted_variable
+  - ✅ 🔎 ModelTest.test_update_deleted_variable
+  - ✅ 🔎 ModelTest.test_add_and_read_linear_constraints
+  - ✅ 🔎 ModelTest.test_linear_constraint_as_bounded_expression
   - ✅ 🔎 ModelTest.test_update_linear_constraint
-  - 🔴 ModelTest.test_read_deleted_linear_constraint - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_update_deleted_linear_constraint - relevant MathOpt model API parity gap
-  - 🔴 ⚠️ ModelTest.test_linear_constraint_matrix - current parity case mismatch: current test checks coefficients and term lengths only; upstream also checks names, row/column nonzeros, term reprs, and matrix entries
-  - 🔴 ModelTest.test_linear_constraint_expression - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_bounded_expression - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_upper_bounded_expression - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_lower_bounded_expression - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_number_eq_expression - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_expression_eq_expression - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_variable_eq_variable - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_errors - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_matrix_with_variable_deletion - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_matrix_with_linear_constraint_deletion - relevant MathOpt model API parity gap
-  - 🔴 ModelTest.test_linear_constraint_matrix_wrong_model - relevant MathOpt model API parity gap
+  - ✅ 🔎 ModelTest.test_read_deleted_linear_constraint
+  - ✅ 🔎 ModelTest.test_update_deleted_linear_constraint
+  - ✅ 🔎 ModelTest.test_linear_constraint_matrix
+  - ✅ 🔎 ModelTest.test_linear_constraint_expression
+  - ✅ 🔎 ModelTest.test_linear_constraint_bounded_expression
+  - ✅ 🔎 ModelTest.test_linear_constraint_upper_bounded_expression
+  - ✅ 🔎 ModelTest.test_linear_constraint_lower_bounded_expression
+  - ✅ 🔎 ModelTest.test_linear_constraint_number_eq_expression
+  - ✅ 🔎 ModelTest.test_linear_constraint_expression_eq_expression
+  - ✅ 🔎 ModelTest.test_linear_constraint_variable_eq_variable
+  - 🟨 🔎 ModelTest.test_linear_constraint_errors - placeholder/API gap: most assertions validate Python operator-overload error paths, chained comparisons, and keyword conflicts that the current TS public API cannot express directly; direct TS helper errors are covered elsewhere
+  - ✅ 🔎 ModelTest.test_linear_constraint_matrix_with_variable_deletion
+  - ✅ 🔎 ModelTest.test_linear_constraint_matrix_with_linear_constraint_deletion
+  - ✅ 🔎 ModelTest.test_linear_constraint_matrix_wrong_model
   - ⚪ ModelTest.test_export - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
   - ⚪ ModelTest.test_from_model_proto - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
   - ⚪ ModelTest.test_update_tracker_simple - outside current TS contract: Python internal/export/update-tracker/wrong-attribute behavior
@@ -371,18 +371,18 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 
 ## ortools/math_opt/python/model_objective_test.py
 - ModelSetObjectiveTest
-  - 🔴 ModelSetObjectiveTest.test_maximize - relevant MathOpt objective-setting parity gap
-  - 🔴 ⚠️ ModelSetObjectiveTest.test_maximize_linear_obj - current parity case mismatch: current test solves an objective but upstream checks objective replacement semantics, offset, linear terms, and old-term removal
-  - 🔴 ModelSetObjectiveTest.test_maximize_linear_obj_type_error_quadratic - relevant MathOpt objective-setting parity gap
-  - 🔴 ModelSetObjectiveTest.test_maximize_quadratic_objective - relevant MathOpt objective-setting parity gap
-  - 🔴 ModelSetObjectiveTest.test_minimize - relevant MathOpt objective-setting parity gap
-  - 🔴 ⚠️ ModelSetObjectiveTest.test_minimize_linear_obj - current parity case mismatch: current test solves an objective but upstream checks objective replacement semantics, direction, offset, linear terms, and old-term removal
-  - 🔴 ModelSetObjectiveTest.test_minimize_linear_obj_type_error_quadratic - relevant MathOpt objective-setting parity gap
-  - 🔴 ModelSetObjectiveTest.test_minimize_quadratic_objective - relevant MathOpt objective-setting parity gap
-  - 🔴 ModelSetObjectiveTest.test_set_objective - relevant MathOpt objective-setting parity gap
-  - 🔴 ModelSetObjectiveTest.test_set_objective_linear_obj - relevant MathOpt objective-setting parity gap
-  - 🔴 ModelSetObjectiveTest.test_set_objective_linear_obj_type_error_quadratic - relevant MathOpt objective-setting parity gap
-  - 🔴 ModelSetObjectiveTest.test_set_objective_quadratic_objective - relevant MathOpt objective-setting parity gap
+  - ✅ 🔎 ModelSetObjectiveTest.test_maximize
+  - ✅ 🔎 ModelSetObjectiveTest.test_maximize_linear_obj
+  - ✅ 🔎 ModelSetObjectiveTest.test_maximize_linear_obj_type_error_quadratic
+  - ✅ 🔎 ModelSetObjectiveTest.test_maximize_quadratic_objective
+  - ✅ 🔎 ModelSetObjectiveTest.test_minimize
+  - ✅ 🔎 ModelSetObjectiveTest.test_minimize_linear_obj
+  - ✅ 🔎 ModelSetObjectiveTest.test_minimize_linear_obj_type_error_quadratic
+  - ✅ 🔎 ModelSetObjectiveTest.test_minimize_quadratic_objective
+  - ✅ 🔎 ModelSetObjectiveTest.test_set_objective
+  - ✅ 🔎 ModelSetObjectiveTest.test_set_objective_linear_obj
+  - ✅ 🔎 ModelSetObjectiveTest.test_set_objective_linear_obj_type_error_quadratic
+  - ✅ 🔎 ModelSetObjectiveTest.test_set_objective_quadratic_objective
 - ModelAuxObjTest
   - ⚪ ModelAuxObjTest.test_add_aux_obj_with_expr - outside current TS contract: auxiliary objective/export-update API is not exposed
   - ⚪ ModelAuxObjTest.test_add_aux_obj_with_maximize - outside current TS contract: auxiliary objective/export-update API is not exposed
@@ -396,7 +396,7 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 ## ortools/math_opt/python/objectives_test.py
 - LinearObjectiveTest
   - ⚪ LinearObjectiveTest.test_same_model - outside current TS contract: Python objective object API is not exposed directly
-  - 🔴 ⚠️ LinearObjectiveTest.test_name - current parity case mismatch: current test checks model name/solve result; upstream checks objective object name for primary/auxiliary objective
+  - ✅ 🔎 LinearObjectiveTest.test_name
   - ⚪ LinearObjectiveTest.test_maximize - outside current TS contract: Python objective object API is not exposed directly
   - ⚪ LinearObjectiveTest.test_offset - outside current TS contract: Python objective object API is not exposed directly
   - ⚪ LinearObjectiveTest.test_priority - outside current TS contract: Python objective object API is not exposed directly
@@ -444,16 +444,16 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 
 ## ortools/math_opt/python/model_element_test.py
 - ModelElementTest
-  - 🔴 ModelElementTest.test_no_elements - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_add_element - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_get_invalid_element - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_delete_element - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_delete_invalid_element_error - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_delete_element_twice_error - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_delete_element_wrong_model_error - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_get_deleted_element_error - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_ensure_next_id_with_effect - relevant MathOpt model element API parity gap
-  - 🔴 ModelElementTest.test_ensure_next_id_no_effect - relevant MathOpt model element API parity gap
+  - ✅ 🔎 ModelElementTest.test_no_elements
+  - ✅ 🔎 ModelElementTest.test_add_element
+  - ✅ 🔎 ModelElementTest.test_get_invalid_element
+  - ✅ 🔎 ModelElementTest.test_delete_element
+  - ✅ 🔎 ModelElementTest.test_delete_invalid_element_error
+  - ✅ 🔎 ModelElementTest.test_delete_element_twice_error
+  - ✅ 🔎 ModelElementTest.test_delete_element_wrong_model_error
+  - ✅ 🔎 ModelElementTest.test_get_deleted_element_error
+  - ✅ 🔎 ModelElementTest.test_ensure_next_id_with_effect
+  - ✅ 🔎 ModelElementTest.test_ensure_next_id_no_effect
 
 ## ortools/math_opt/python/linear_expression_test.py
 - BoundedLinearExprTest
@@ -647,7 +647,7 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 ## ortools/math_opt/python/solve_test.py
 - SolveTest
   - ✅ 🔎 SolveTest.test_solve_error
-  - 🔴 ⚠️ SolveTest.test_lp_solve - current parity case mismatch: current TS test checks primal objective/values only; upstream also checks termination primal bound, primal solution object, dual objective, dual values, and reduced costs
+  - ✅ 🔎 SolveTest.test_lp_solve
   - ➖ 🔎 SolveTest.test_indicator - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
   - 🟨 🔎 SolveTest.test_filters - placeholder: model/solve filters not exposed in TS MathOpt API
   - ➖ 🔎 SolveTest.test_message_callback - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed

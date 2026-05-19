@@ -62,11 +62,16 @@ export {
   initMathOpt,
   MathOpt,
   MathOptModel,
+  MathOptObjective,
   MathOptSolverType,
 } from './mathopt_api.js';
 export type {
+  MathOptDualSolutionResult,
   MathOptLinearConstraint,
+  MathOptLinearConstraintMatrixEntry,
   MathOptLinearTerm,
+  MathOptPrimalSolutionResult,
+  MathOptSolutionResult,
   MathOptSolveOptions,
   MathOptSolveResult,
   MathOptVariable,

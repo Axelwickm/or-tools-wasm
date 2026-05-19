@@ -15,6 +15,13 @@ export type MathOptLinearTerm = {
   coefficient: number;
 };
 
+export type MathOptLinearConstraintMatrixEntry = {
+  linearConstraint: MathOptLinearConstraint;
+  linear_constraint: MathOptLinearConstraint;
+  variable: MathOptVariable;
+  coefficient: number;
+};
+
 export type MathOptQuadraticTerm = {
   firstVariable: MathOptVariable;
   secondVariable: MathOptVariable;
@@ -33,6 +40,9 @@ export type MathOptQuadraticExpressionInput =
   | MathOptQuadraticExpression;
 
 export type MathOptLinearConstraintOptions = {
+  lb?: number;
+  ub?: number;
+  expr?: MathOptLinearExpressionInput;
   lowerBound?: number;
   upperBound?: number;
   terms?: MathOptLinearTerm[];
@@ -41,6 +51,10 @@ export type MathOptLinearConstraintOptions = {
 };
 
 export type MathOptVariableOptions = {
+  lb?: number;
+  ub?: number;
+  isInteger?: boolean;
+  is_integer?: boolean;
   lowerBound?: number;
   upperBound?: number;
   integer?: boolean;
@@ -55,10 +69,32 @@ export type MathOptSolveOptions = {
 
 export type MathOptSolveResult = {
   terminationReason: string;
+  primalBound: number | null;
+  dualBound: number | null;
   objectiveValue: number | null;
   variableValues: Record<string, number>;
   variableValuesById: Record<number, number>;
+  solutions: MathOptSolutionResult[];
   rawResponse: Uint8Array;
+};
+
+export type MathOptPrimalSolutionResult = {
+  objectiveValue: number | null;
+  variableValues: Record<string, number>;
+  variableValuesById: Record<number, number>;
+};
+
+export type MathOptDualSolutionResult = {
+  objectiveValue: number | null;
+  dualValues: Record<string, number>;
+  dualValuesById: Record<number, number>;
+  reducedCosts: Record<string, number>;
+  reducedCostsById: Record<number, number>;
+};
+
+export type MathOptSolutionResult = {
+  primalSolution: MathOptPrimalSolutionResult | null;
+  dualSolution: MathOptDualSolutionResult | null;
 };
 
 type MathOptObjectiveData = {
@@ -397,24 +433,26 @@ export class MathOptModel {
   readonly name: string;
   private readonly variableData: VariableData[] = [];
   private readonly constraints: LinearConstraintData[] = [];
-  private objective: MathOptObjectiveData = {
+  private objectiveDataValue: MathOptObjectiveData = {
     maximize: false,
     linearTerms: [],
     quadraticTerms: [],
     offset: 0,
   };
+  readonly objective: MathOptObjective;
 
   constructor(name = '') {
     this.name = name;
+    this.objective = new MathOptObjective(this);
   }
 
   addVariable(options: MathOptVariableOptions = {}): MathOptVariable {
     const id = this.variableData.length;
     const variable: VariableData = {
       id,
-      lowerBound: options.lowerBound ?? Number.NEGATIVE_INFINITY,
-      upperBound: options.upperBound ?? Number.POSITIVE_INFINITY,
-      integer: options.integer ?? false,
+      lowerBound: options.lowerBound ?? options.lb ?? Number.NEGATIVE_INFINITY,
+      upperBound: options.upperBound ?? options.ub ?? Number.POSITIVE_INFINITY,
+      integer: options.integer ?? options.isInteger ?? options.is_integer ?? false,
       name: options.name ?? '',
       deleted: false,
     };
@@ -442,17 +480,20 @@ export class MathOptModel {
     return this.addBinaryVariable(options);
   }
 
-  addLinearConstraint(options: Partial<MathOptLinearConstraintOptions> = {}): MathOptLinearConstraint {
+  addLinearConstraint(
+    options: Partial<MathOptLinearConstraintOptions> | MathOptBoundedExpression<MathOptLinearExpression> | MathOptLowerBoundedExpression<MathOptLinearExpression> | MathOptUpperBoundedExpression<MathOptLinearExpression> = {},
+  ): MathOptLinearConstraint {
     const id = this.constraints.length;
-    const expression = options.expression === undefined
-      ? new MathOptLinearExpression(options.terms ?? [])
-      : asFlatLinearExpression(options.expression).add(new MathOptLinearExpression(options.terms ?? []));
+    const normalizedOptions = this.normalizeLinearConstraintOptions(options);
+    const expression = normalizedOptions.expression === undefined
+      ? new MathOptLinearExpression(normalizedOptions.terms ?? [])
+      : asFlatLinearExpression(normalizedOptions.expression).add(new MathOptLinearExpression(normalizedOptions.terms ?? []));
     const constraint: LinearConstraintData = {
       id,
-      lowerBound: (options.lowerBound ?? Number.NEGATIVE_INFINITY) - expression.offset,
-      upperBound: (options.upperBound ?? Number.POSITIVE_INFINITY) - expression.offset,
+      lowerBound: (normalizedOptions.lowerBound ?? Number.NEGATIVE_INFINITY) - expression.offset,
+      upperBound: (normalizedOptions.upperBound ?? Number.POSITIVE_INFINITY) - expression.offset,
       terms: linearTermEntries(expression),
-      name: options.name ?? '',
+      name: normalizedOptions.name ?? '',
       deleted: false,
     };
     this.constraints.push(constraint);
@@ -461,6 +502,26 @@ export class MathOptModel {
 
   add_linear_constraint(options: Partial<MathOptLinearConstraintOptions> = {}): MathOptLinearConstraint {
     return this.addLinearConstraint(options);
+  }
+
+  private normalizeLinearConstraintOptions(
+    options: Partial<MathOptLinearConstraintOptions> | MathOptBoundedExpression<MathOptLinearExpression> | MathOptLowerBoundedExpression<MathOptLinearExpression> | MathOptUpperBoundedExpression<MathOptLinearExpression>,
+  ): Partial<MathOptLinearConstraintOptions> {
+    if (options instanceof MathOptBoundedExpression) {
+      return { lowerBound: options.lowerBound, upperBound: options.upperBound, expression: options.expression };
+    }
+    if (options instanceof MathOptLowerBoundedExpression) {
+      return { lowerBound: options.lowerBound, upperBound: Number.POSITIVE_INFINITY, expression: options.expression };
+    }
+    if (options instanceof MathOptUpperBoundedExpression) {
+      return { lowerBound: Number.NEGATIVE_INFINITY, upperBound: options.upperBound, expression: options.expression };
+    }
+    return {
+      ...options,
+      lowerBound: options.lowerBound ?? options.lb,
+      upperBound: options.upperBound ?? options.ub,
+      expression: options.expression ?? options.expr,
+    };
   }
 
   deleteVariable(variable: MathOptVariable): void {
@@ -472,8 +533,8 @@ export class MathOptModel {
     for (const constraint of this.constraints) {
       constraint.terms = constraint.terms.filter((term) => term.variable.id !== variable.id);
     }
-    this.objective.linearTerms = this.objective.linearTerms.filter((term) => term.variable.id !== variable.id);
-    this.objective.quadraticTerms = this.objective.quadraticTerms.filter((term) => {
+    this.objectiveDataValue.linearTerms = this.objectiveDataValue.linearTerms.filter((term) => term.variable.id !== variable.id);
+    this.objectiveDataValue.quadraticTerms = this.objectiveDataValue.quadraticTerms.filter((term) => {
       return term.firstVariable.id !== variable.id && term.secondVariable.id !== variable.id;
     });
   }
@@ -546,13 +607,24 @@ export class MathOptModel {
     return this.hasVariable(id);
   }
 
-  getVariable(id: number): MathOptVariable | undefined {
+  getVariable(id: number, validate = true): MathOptVariable | undefined {
     const variable = this.variableData[id];
-    return variable && !variable.deleted ? new MathOptVariable(this, variable) : undefined;
+    if (variable && !variable.deleted) return new MathOptVariable(this, variable);
+    if (!validate) {
+      return new MathOptVariable(this, variable ?? {
+        id,
+        lowerBound: Number.NEGATIVE_INFINITY,
+        upperBound: Number.POSITIVE_INFINITY,
+        integer: false,
+        name: '',
+        deleted: true,
+      });
+    }
+    return undefined;
   }
 
-  get_variable(id: number): MathOptVariable {
-    const variable = this.getVariable(id);
+  get_variable(id: number, options?: { validate?: boolean }): MathOptVariable {
+    const variable = this.getVariable(id, options?.validate ?? true);
     if (!variable) throw new Error(`Variable ${id} does not exist.`);
     return variable;
   }
@@ -609,39 +681,146 @@ export class MathOptModel {
     return this.hasLinearConstraint(id);
   }
 
-  getLinearConstraint(id: number): MathOptLinearConstraint | undefined {
+  getLinearConstraint(id: number, validate = true): MathOptLinearConstraint | undefined {
     const constraint = this.constraints[id];
-    return constraint && !constraint.deleted ? new MathOptLinearConstraint(this, constraint) : undefined;
+    if (constraint && !constraint.deleted) return new MathOptLinearConstraint(this, constraint);
+    if (!validate) {
+      return new MathOptLinearConstraint(this, constraint ?? {
+        id,
+        lowerBound: Number.NEGATIVE_INFINITY,
+        upperBound: Number.POSITIVE_INFINITY,
+        terms: [],
+        name: '',
+        deleted: true,
+      });
+    }
+    return undefined;
   }
 
-  get_linear_constraint(id: number): MathOptLinearConstraint {
-    const constraint = this.getLinearConstraint(id);
+  get_linear_constraint(id: number, options?: { validate?: boolean }): MathOptLinearConstraint {
+    const constraint = this.getLinearConstraint(id, options?.validate ?? true);
     if (!constraint) throw new Error(`Linear constraint ${id} does not exist.`);
     return constraint;
   }
 
   maximize(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], offset = 0): void {
-    this.objective = objectiveData(true, terms, offset);
+    this.objectiveDataValue = objectiveData(true, terms, offset);
   }
 
   minimize(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], offset = 0): void {
-    this.objective = objectiveData(false, terms, offset);
+    this.objectiveDataValue = objectiveData(false, terms, offset);
+  }
+
+  maximizeLinearObjective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
+    this.setLinearObjective(terms, true, offset);
+  }
+
+  maximize_linear_objective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
+    this.maximizeLinearObjective(terms, offset);
+  }
+
+  minimizeLinearObjective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
+    this.setLinearObjective(terms, false, offset);
+  }
+
+  minimize_linear_objective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
+    this.minimizeLinearObjective(terms, offset);
+  }
+
+  setObjective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], isMaximize: boolean, offset = 0): void {
+    this.objectiveDataValue = objectiveData(isMaximize, terms, offset);
+  }
+
+  set_objective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], is_maximize: boolean, offset = 0): void {
+    this.setObjective(terms, is_maximize, offset);
+  }
+
+  setLinearObjective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], isMaximize: boolean, offset = 0): void {
+    this.objectiveDataValue = linearObjectiveData(isMaximize, terms, offset);
+  }
+
+  set_linear_objective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], is_maximize: boolean, offset = 0): void {
+    this.setLinearObjective(terms, is_maximize, offset);
+  }
+
+  setQuadraticObjective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], isMaximize: boolean, offset = 0): void {
+    this.setObjective(terms, isMaximize, offset);
+  }
+
+  set_quadratic_objective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], is_maximize: boolean, offset = 0): void {
+    this.setQuadraticObjective(terms, is_maximize, offset);
+  }
+
+  columnNonzeros(variable: MathOptVariable): MathOptLinearConstraint[] {
+    this.assertOwnsVariable(variable);
+    variable.assertLive();
+    return this.constraints
+      .filter((constraint) => !constraint.deleted && constraint.terms.some((term) => term.variable.id === variable.id && term.coefficient !== 0))
+      .map((constraint) => new MathOptLinearConstraint(this, constraint));
+  }
+
+  column_nonzeros(variable: MathOptVariable): MathOptLinearConstraint[] {
+    return this.columnNonzeros(variable);
+  }
+
+  rowNonzeros(constraint: MathOptLinearConstraint): MathOptVariable[] {
+    this.assertOwnsConstraint(constraint);
+    constraint.assertLive();
+    return constraint.terms().map((term) => term.variable);
+  }
+
+  row_nonzeros(constraint: MathOptLinearConstraint): MathOptVariable[] {
+    return this.rowNonzeros(constraint);
+  }
+
+  linearConstraintMatrixEntries(): MathOptLinearConstraintMatrixEntry[] {
+    return this.constraints
+      .filter((constraint) => !constraint.deleted)
+      .flatMap((constraint) => {
+        const linearConstraint = new MathOptLinearConstraint(this, constraint);
+        return constraint.terms
+          .filter((term) => term.coefficient !== 0)
+          .map((term) => ({
+            linearConstraint,
+            linear_constraint: linearConstraint,
+            variable: term.variable,
+            coefficient: term.coefficient,
+          }));
+      });
+  }
+
+  linear_constraint_matrix_entries(): MathOptLinearConstraintMatrixEntry[] {
+    return this.linearConstraintMatrixEntries();
+  }
+
+  get objectiveData(): MathOptObjectiveData {
+    return this.objectiveDataValue;
+  }
+
+  set objectiveData(value: MathOptObjectiveData) {
+    this.objectiveDataValue = value;
   }
 
   variableName(id: number): string {
     return this.variableData[id]?.name ?? String(id);
   }
 
+  linearConstraintName(id: number): string {
+    return this.constraints[id]?.name ?? String(id);
+  }
+
   assertOwnsVariable(variable: MathOptVariable): void {
     if (variable.model !== this) {
       throw new Error('Variable belongs to a different MathOpt model.');
     }
+    variable.assertLive();
   }
 
   assertOwnsConstraint(constraint: MathOptLinearConstraint): void {
     if (constraint.model !== this) {
       throw new Error('Linear constraint belongs to a different MathOpt model.');
     }
+    constraint.assertLive();
   }
 
   encodeModelProto(): Uint8Array {
@@ -667,10 +846,10 @@ export class MathOptModel {
 
   private encodeObjective(): Uint8Array {
     return message([
-      fieldBool(1, this.objective.maximize),
-      fieldDouble(2, this.objective.offset),
-      fieldMessage(3, encodeSparseDoubleVector(this.objective.linearTerms)),
-      fieldMessage(4, encodeSparseDoubleMatrix(this.objective.quadraticTerms.map((term) => {
+      fieldBool(1, this.objectiveDataValue.maximize),
+      fieldDouble(2, this.objectiveDataValue.offset),
+      fieldMessage(3, encodeSparseDoubleVector(this.objectiveDataValue.linearTerms)),
+      fieldMessage(4, encodeSparseDoubleMatrix(this.objectiveDataValue.quadraticTerms.map((term) => {
         const rowId = Math.min(term.firstVariable.id, term.secondVariable.id);
         const columnId = Math.max(term.firstVariable.id, term.secondVariable.id);
         return { rowId, columnId, coefficient: term.coefficient };
@@ -782,7 +961,7 @@ export class MathOptVariable {
     return this.name || `variable_${this.id}`;
   }
 
-  private assertLive(): void {
+  assertLive(): void {
     if (this.data.deleted) {
       throw new Error(`Variable ${this.id} has been deleted.`);
     }
@@ -872,6 +1051,19 @@ export class MathOptLinearConstraint {
     return [...this.data.terms].filter((term) => term.coefficient !== 0);
   }
 
+  asBoundedLinearExpression(): MathOptBoundedExpression<MathOptLinearExpression> {
+    this.assertLive();
+    return new MathOptBoundedExpression(
+      this.lowerBound,
+      new MathOptLinearExpression(this.terms()),
+      this.upperBound,
+    );
+  }
+
+  as_bounded_linear_expression(): MathOptBoundedExpression<MathOptLinearExpression> {
+    return this.asBoundedLinearExpression();
+  }
+
   equals(other: MathOptLinearConstraint): boolean {
     return this.model === other.model && this.id === other.id;
   }
@@ -881,10 +1073,110 @@ export class MathOptLinearConstraint {
     return this.name || `linear_constraint_${this.id}`;
   }
 
-  private assertLive(): void {
+  assertLive(): void {
     if (this.data.deleted) {
       throw new Error(`Linear constraint ${this.id} has been deleted.`);
     }
+  }
+}
+
+export class MathOptObjective {
+  constructor(private readonly model: MathOptModel) {}
+
+  get isMaximize(): boolean {
+    return this.model.objectiveData.maximize;
+  }
+
+  set isMaximize(value: boolean) {
+    this.model.objectiveData = { ...this.model.objectiveData, maximize: value };
+  }
+
+  get is_maximize(): boolean {
+    return this.isMaximize;
+  }
+
+  set is_maximize(value: boolean) {
+    this.isMaximize = value;
+  }
+
+  get offset(): number {
+    return this.model.objectiveData.offset;
+  }
+
+  set offset(value: number) {
+    this.model.objectiveData = { ...this.model.objectiveData, offset: value };
+  }
+
+  get name(): string {
+    return '';
+  }
+
+  clear(): void {
+    this.model.objectiveData = { maximize: false, linearTerms: [], quadraticTerms: [], offset: 0 };
+  }
+
+  setLinearCoefficient(variable: MathOptVariable, coefficient: number): void {
+    this.model.assertOwnsVariable(variable);
+    const terms = this.model.objectiveData.linearTerms.filter((term) => term.variable.id !== variable.id);
+    if (coefficient !== 0) terms.push({ variable, coefficient });
+    this.model.objectiveData = { ...this.model.objectiveData, linearTerms: terms };
+  }
+
+  set_linear_coefficient(variable: MathOptVariable, coefficient: number): void {
+    this.setLinearCoefficient(variable, coefficient);
+  }
+
+  getLinearCoefficient(variable: MathOptVariable): number {
+    this.model.assertOwnsVariable(variable);
+    return this.model.objectiveData.linearTerms.find((term) => term.variable.id === variable.id)?.coefficient ?? 0;
+  }
+
+  get_linear_coefficient(variable: MathOptVariable): number {
+    return this.getLinearCoefficient(variable);
+  }
+
+  linearTerms(): MathOptLinearTerm[] {
+    return [...this.model.objectiveData.linearTerms].filter((term) => term.coefficient !== 0);
+  }
+
+  linear_terms(): MathOptLinearTerm[] {
+    return this.linearTerms();
+  }
+
+  setQuadraticCoefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable, coefficient: number): void {
+    this.model.assertOwnsVariable(firstVariable);
+    this.model.assertOwnsVariable(secondVariable);
+    const key = new MathOptQuadraticTermKey(firstVariable, secondVariable);
+    const terms = this.model.objectiveData.quadraticTerms.filter((term) => {
+      return !new MathOptQuadraticTermKey(term.firstVariable, term.secondVariable).equals(key);
+    });
+    if (coefficient !== 0) terms.push({ firstVariable: key.firstVariable, secondVariable: key.secondVariable, coefficient });
+    this.model.objectiveData = { ...this.model.objectiveData, quadraticTerms: terms };
+  }
+
+  set_quadratic_coefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable, coefficient: number): void {
+    this.setQuadraticCoefficient(firstVariable, secondVariable, coefficient);
+  }
+
+  getQuadraticCoefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable): number {
+    this.model.assertOwnsVariable(firstVariable);
+    this.model.assertOwnsVariable(secondVariable);
+    const key = new MathOptQuadraticTermKey(firstVariable, secondVariable);
+    return this.model.objectiveData.quadraticTerms.find((term) => {
+      return new MathOptQuadraticTermKey(term.firstVariable, term.secondVariable).equals(key);
+    })?.coefficient ?? 0;
+  }
+
+  get_quadratic_coefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable): number {
+    return this.getQuadraticCoefficient(firstVariable, secondVariable);
+  }
+
+  quadraticTerms(): MathOptQuadraticTerm[] {
+    return [...this.model.objectiveData.quadraticTerms].filter((term) => term.coefficient !== 0);
+  }
+
+  quadratic_terms(): MathOptQuadraticTerm[] {
+    return this.quadraticTerms();
   }
 }
 
@@ -1539,6 +1831,22 @@ function objectiveData(
   };
 }
 
+function linearObjectiveData(
+  maximize: boolean,
+  terms: MathOptLinearExpressionInput | MathOptLinearTerm[],
+  offset: number,
+): MathOptObjectiveData {
+  const expression = Array.isArray(terms)
+    ? new MathOptLinearExpression(terms, offset)
+    : asFlatLinearExpression(terms).add(offset);
+  return {
+    maximize,
+    linearTerms: linearTermEntries(expression),
+    quadraticTerms: [],
+    offset: expression.offset,
+  };
+}
+
 function encodeSparseDoubleVector(terms: MathOptLinearTerm[]): Uint8Array {
   const sortedTerms = [...terms].sort((a, b) => a.variable.id - b.variable.id);
   return message([
@@ -1574,33 +1882,89 @@ function decodeSolveResponse(bytes: Uint8Array, model: MathOptModel): MathOptSol
 
   const result = readMessage(resultBytes);
   const termination = result.messages.get(2)?.[0];
-  const terminationReasonNumber = termination ? Number(readMessage(termination).varints.get(1)?.[0] ?? 0n) : 0;
-  const firstSolution = result.messages.get(3)?.[0];
-  const primal = firstSolution ? readMessage(firstSolution).messages.get(1)?.[0] : undefined;
-  const primalMessage = primal ? readMessage(primal) : undefined;
-  const objectiveValue = primalMessage?.doubles.get(2)?.[0] ?? null;
-  const sparseValues = primalMessage?.messages.get(1)?.[0];
-  const variableValuesById: Record<number, number> = {};
-  const variableValues: Record<string, number> = {};
-  if (sparseValues) {
-    const sparse = readMessage(sparseValues);
-    const ids = sparse.packedVarints.get(1) ?? [];
-    const values = sparse.packedDoubles.get(2) ?? [];
-    ids.forEach((id, index) => {
-      const numericId = Number(id);
-      const value = values[index] ?? 0;
-      variableValuesById[numericId] = value;
-      variableValues[model.variableName(numericId)] = value;
-    });
-  }
+  const terminationMessage = termination ? readMessage(termination) : undefined;
+  const terminationReasonNumber = terminationMessage ? Number(terminationMessage.varints.get(1)?.[0] ?? 0n) : 0;
+  const objectiveBounds = terminationMessage?.messages.get(5)?.[0];
+  const objectiveBoundsMessage = objectiveBounds ? readMessage(objectiveBounds) : undefined;
+  const primalBound = objectiveBoundsMessage?.doubles.get(2)?.[0] ?? null;
+  const dualBound = objectiveBoundsMessage?.doubles.get(3)?.[0] ?? null;
+  const solutions = (result.messages.get(3) ?? []).map((solutionBytes) => decodeSolution(solutionBytes, model));
+  const firstPrimalSolution = solutions.find((solution) => solution.primalSolution !== null)?.primalSolution ?? null;
+  const objectiveValue = firstPrimalSolution?.objectiveValue ?? null;
+  const variableValues = firstPrimalSolution?.variableValues ?? {};
+  const variableValuesById = firstPrimalSolution?.variableValuesById ?? {};
 
   return {
     terminationReason: terminationReasonNames[terminationReasonNumber] ?? `TERMINATION_REASON_${terminationReasonNumber}`,
+    primalBound,
+    dualBound,
     objectiveValue,
     variableValues,
     variableValuesById,
+    solutions,
     rawResponse: bytes,
   };
+}
+
+function decodeSolution(bytes: Uint8Array, model: MathOptModel): MathOptSolutionResult {
+  const solution = readMessage(bytes);
+  const primalBytes = solution.messages.get(1)?.[0];
+  const dualBytes = solution.messages.get(2)?.[0];
+  return {
+    primalSolution: primalBytes ? decodePrimalSolution(primalBytes, model) : null,
+    dualSolution: dualBytes ? decodeDualSolution(dualBytes, model) : null,
+  };
+}
+
+function decodePrimalSolution(bytes: Uint8Array, model: MathOptModel): MathOptPrimalSolutionResult {
+  const primal = readMessage(bytes);
+  const variableValues = decodeSparseDoubleVector(
+    primal.messages.get(1)?.[0],
+    (id) => model.variableName(id),
+  );
+  return {
+    objectiveValue: primal.doubles.get(2)?.[0] ?? null,
+    variableValues: variableValues.byName,
+    variableValuesById: variableValues.byId,
+  };
+}
+
+function decodeDualSolution(bytes: Uint8Array, model: MathOptModel): MathOptDualSolutionResult {
+  const dual = readMessage(bytes);
+  const dualValues = decodeSparseDoubleVector(
+    dual.messages.get(1)?.[0],
+    (id) => model.linearConstraintName(id),
+  );
+  const reducedCosts = decodeSparseDoubleVector(
+    dual.messages.get(2)?.[0],
+    (id) => model.variableName(id),
+  );
+  return {
+    objectiveValue: dual.doubles.get(3)?.[0] ?? null,
+    dualValues: dualValues.byName,
+    dualValuesById: dualValues.byId,
+    reducedCosts: reducedCosts.byName,
+    reducedCostsById: reducedCosts.byId,
+  };
+}
+
+function decodeSparseDoubleVector(
+  bytes: Uint8Array | undefined,
+  nameForId: (id: number) => string,
+): { byId: Record<number, number>; byName: Record<string, number> } {
+  const byId: Record<number, number> = {};
+  const byName: Record<string, number> = {};
+  if (!bytes) return { byId, byName };
+  const sparse = readMessage(bytes);
+  const ids = sparse.packedVarints.get(1) ?? [];
+  const values = sparse.packedDoubles.get(2) ?? [];
+  ids.forEach((id, index) => {
+    const numericId = Number(id);
+    const value = values[index] ?? 0;
+    byId[numericId] = value;
+    byName[nameForId(numericId)] = value;
+  });
+  return { byId, byName };
 }
 
 type DecodedMessage = {

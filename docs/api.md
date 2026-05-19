@@ -965,7 +965,7 @@ Parameter enums:
 Import:
 
 ```ts
-import { initMathOpt, MathOpt } from 'or-tools-wasm';
+import { initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm';
 ```
 
 Initialize, build a model, and solve:
@@ -1000,10 +1000,29 @@ Static constructors and aliases:
 - `MathOpt.LinearExpression`
 - `MathOpt.QuadraticExpression`
 - `MathOpt.QuadraticTermKey`
+- `MathOpt.VarEqVar`
 - `MathOpt.BoundedExpression`
 - `MathOpt.LowerBoundedExpression`
 - `MathOpt.UpperBoundedExpression`
 - `MathOpt.setWorkerBridgeEnabled(enabled): void`
+
+Top-level value exports:
+
+- `MathOptModel`
+- `MathOptObjective`
+
+Top-level type exports:
+
+- `MathOptDualSolutionResult`
+- `MathOptLinearConstraint`
+- `MathOptLinearConstraintMatrixEntry`
+- `MathOptLinearTerm`
+- `MathOptPrimalSolutionResult`
+- `MathOptSolutionResult`
+- `MathOptSolveOptions`
+- `MathOptSolveResult`
+- `MathOptVariable`
+- `MathOptVariableOptions`
 
 Solving:
 
@@ -1018,10 +1037,32 @@ Solving:
 `MathOptSolveResult`:
 
 - `terminationReason: string`
+- `primalBound: number | null`
+- `dualBound: number | null`
 - `objectiveValue: number | null`
 - `variableValues: Record<string, number>`
 - `variableValuesById: Record<number, number>`
+- `solutions: MathOptSolutionResult[]`
 - `rawResponse: Uint8Array`
+
+`MathOptSolutionResult`:
+
+- `primalSolution: MathOptPrimalSolutionResult | null`
+- `dualSolution: MathOptDualSolutionResult | null`
+
+`MathOptPrimalSolutionResult`:
+
+- `objectiveValue: number | null`
+- `variableValues: Record<string, number>`
+- `variableValuesById: Record<number, number>`
+
+`MathOptDualSolutionResult`:
+
+- `objectiveValue: number | null`
+- `dualValues: Record<string, number>`
+- `dualValuesById: Record<number, number>`
+- `reducedCosts: Record<string, number>`
+- `reducedCostsById: Record<number, number>`
 
 Solver type enum:
 
@@ -1087,8 +1128,8 @@ Variables:
 - `ensureNextVariableIdAtLeast(id): void`
 - `ensure_next_variable_id_at_least(id): void`
 - `hasVariable(id)` / `has_variable(id): boolean`
-- `getVariable(id): MathOptVariable | undefined`
-- `get_variable(id): MathOptVariable`
+- `getVariable(id, validate?): MathOptVariable | undefined`
+- `get_variable(id, { validate }?): MathOptVariable`
 
 Linear constraints:
 
@@ -1102,18 +1143,43 @@ Linear constraints:
 - `ensureNextLinearConstraintIdAtLeast(id): void`
 - `ensure_next_linear_constraint_id_at_least(id): void`
 - `hasLinearConstraint(id)` / `has_linear_constraint(id): boolean`
-- `getLinearConstraint(id): MathOptLinearConstraint | undefined`
-- `get_linear_constraint(id): MathOptLinearConstraint`
+- `getLinearConstraint(id, validate?): MathOptLinearConstraint | undefined`
+- `get_linear_constraint(id, { validate }?): MathOptLinearConstraint`
+- `columnNonzeros(variable)` / `column_nonzeros(variable): MathOptLinearConstraint[]`
+- `rowNonzeros(constraint)` / `row_nonzeros(constraint): MathOptVariable[]`
+- `linearConstraintMatrixEntries()` / `linear_constraint_matrix_entries(): MathOptLinearConstraintMatrixEntry[]`
+
+`MathOptLinearConstraintMatrixEntry` contains:
+
+- `linearConstraint` / `linear_constraint: MathOptLinearConstraint`
+- `variable: MathOptVariable`
+- `coefficient: number`
 
 Objective and encoding:
 
+- `objective: MathOptObjective`
 - `maximize(terms, offset?): void`
 - `minimize(terms, offset?): void`
+- `maximizeLinearObjective(terms, offset?): void`
+- `maximize_linear_objective(terms, offset?): void`
+- `minimizeLinearObjective(terms, offset?): void`
+- `minimize_linear_objective(terms, offset?): void`
+- `setObjective(terms, isMaximize, offset?): void`
+- `set_objective(terms, is_maximize, offset?): void`
+- `setLinearObjective(terms, isMaximize, offset?): void`
+- `set_linear_objective(terms, is_maximize, offset?): void`
+- `setQuadraticObjective(terms, isMaximize, offset?): void`
+- `set_quadratic_objective(terms, is_maximize, offset?): void`
 - `variableName(id): string`
+- `linearConstraintName(id): string`
 - `encodeModelProto(): Uint8Array`
 
 `MathOptVariableOptions`:
 
+- `lb?: number`
+- `ub?: number`
+- `isInteger?: boolean`
+- `is_integer?: boolean`
 - `lowerBound?: number`
 - `upperBound?: number`
 - `integer?: boolean`
@@ -1121,11 +1187,17 @@ Objective and encoding:
 
 `addLinearConstraint()` accepts:
 
+- `lb?: number`
+- `ub?: number`
+- `expr?: number | MathOptVariable | MathOptLinearTerm | linear expression`
 - `lowerBound?: number`
 - `upperBound?: number`
 - `terms?: MathOptLinearTerm[]`
 - `expression?: number | MathOptVariable | MathOptLinearTerm | linear expression`
 - `name?: string`
+
+It also accepts `MathOpt.boundedExpression()`, `MathOpt.lowerBoundedExpression()`,
+and `MathOpt.upperBoundedExpression()` results.
 
 ### `MathOptVariable`
 
@@ -1141,6 +1213,7 @@ Methods:
 
 - `equals(other): boolean`
 - `toString(): string`
+- `assertLive(): void`
 
 ### `MathOptLinearConstraint`
 
@@ -1158,8 +1231,36 @@ Methods:
 - `getCoefficient(variable): number`
 - `get_coefficient(variable): number`
 - `terms(): MathOptLinearTerm[]`
+- `asBoundedLinearExpression(): MathOptBoundedExpression<MathOptLinearExpression>`
+- `as_bounded_linear_expression(): MathOptBoundedExpression<MathOptLinearExpression>`
 - `equals(other): boolean`
 - `toString(): string`
+- `assertLive(): void`
+
+### `MathOptObjective`
+
+Properties:
+
+- `isMaximize` / `is_maximize`
+- `offset`
+- `name`
+
+`isMaximize` / `is_maximize` and `offset` are writable. `name` is read-only and
+is currently the empty string for the primary objective.
+
+Methods:
+
+- `clear(): void`
+- `setLinearCoefficient(variable, coefficient): void`
+- `set_linear_coefficient(variable, coefficient): void`
+- `getLinearCoefficient(variable): number`
+- `get_linear_coefficient(variable): number`
+- `linearTerms()` / `linear_terms(): MathOptLinearTerm[]`
+- `setQuadraticCoefficient(firstVariable, secondVariable, coefficient): void`
+- `set_quadratic_coefficient(firstVariable, secondVariable, coefficient): void`
+- `getQuadraticCoefficient(firstVariable, secondVariable): number`
+- `get_quadratic_coefficient(firstVariable, secondVariable): number`
+- `quadraticTerms()` / `quadratic_terms(): MathOptQuadraticTerm[]`
 
 ### MathOpt Expression Classes
 
@@ -1178,6 +1279,20 @@ Methods:
 - Methods: `add(input)`, `subtract(input)`, `multiply(coefficient)`,
   `evaluate(variableValues)`, `toString()`.
 
+`MathOptQuadraticTermKey`
+
+- Construct from two variables in the same model.
+- Properties: `firstVariable`, `secondVariable`.
+- Methods: `equals(other)`, `toString()`.
+
+`MathOptVarEqVar`
+
+- Returned by `MathOpt.variableEq(lhs, rhs)` when two different live variables
+  belong to the same model.
+- Properties: `firstVariable` / `first_variable`, `secondVariable` /
+  `second_variable`.
+- Method: `assertNotBoolean(): never`.
+
 Bounded expression classes represent constraints produced by `eq`, `le`, and
 `ge`:
 
@@ -1186,7 +1301,11 @@ Bounded expression classes represent constraints produced by `eq`, `le`, and
 - `MathOptUpperBoundedExpression`
 
 They expose `lowerBound`/`lower_bound`, `upperBound`/`upper_bound`, and
-`toString()`.
+`toString()`. `MathOptBoundedExpression` also exposes `expression` and
+`assertNotBoolean()`. `MathOptLowerBoundedExpression` exposes `expression`,
+`toBoundedExpression(upperBound)`, and `assertNotBoolean()`.
+`MathOptUpperBoundedExpression` exposes `expression`,
+`toBoundedExpression(lowerBound)`, and `assertNotBoolean()`.
 
 ## PDLP
 

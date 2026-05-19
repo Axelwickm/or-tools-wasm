@@ -3,6 +3,11 @@ type MathOptVariableLike = {
   readonly name: string;
 };
 
+type MathOptLinearConstraintLike = {
+  readonly id: number;
+  readonly name: string;
+};
+
 type MathOptModelLike = {
   addVariable(options?: {
     lowerBound?: number;
@@ -15,16 +20,32 @@ type MathOptModelLike = {
     upperBound?: number;
     terms: Array<{ variable: MathOptVariableLike; coefficient: number }>;
     name?: string;
-  }): void;
+  }): MathOptLinearConstraintLike;
   maximize(terms: Array<{ variable: MathOptVariableLike; coefficient: number }>, offset?: number): void;
   minimize(terms: Array<{ variable: MathOptVariableLike; coefficient: number }>, offset?: number): void;
 };
 
 type MathOptSolveResult = {
   terminationReason: string;
+  primalBound: number | null;
+  dualBound: number | null;
   objectiveValue: number | null;
   variableValues: Record<string, number>;
   variableValuesById: Record<number, number>;
+  solutions: Array<{
+    primalSolution: {
+      objectiveValue: number | null;
+      variableValues: Record<string, number>;
+      variableValuesById: Record<number, number>;
+    } | null;
+    dualSolution: {
+      objectiveValue: number | null;
+      dualValues: Record<string, number>;
+      dualValuesById: Record<number, number>;
+      reducedCosts: Record<string, number>;
+      reducedCostsById: Record<number, number>;
+    } | null;
+  }>;
   rawResponse: Uint8Array;
 };
 
@@ -35,7 +56,7 @@ type MathOptSolveOptions = {
 
 type MathOptSolverTypeLike = {
   GLOP: number;
-  GSCIP: number;
+  GSCIP?: number;
   CP_SAT: number;
 };
 
@@ -64,6 +85,11 @@ function assert(condition: unknown, message: string): asserts condition {
 function near(actual: number | null | undefined, expected: number, tolerance = 1e-7) {
   assert(typeof actual === 'number', `expected numeric value, got ${String(actual)}`);
   assert(Math.abs(actual - expected) <= tolerance, `expected ${expected}, got ${actual}`);
+}
+
+function listIsNear(actual: number[], expected: number[], tolerance = 1e-5) {
+  return actual.length === expected.length
+    && actual.every((value, index) => Math.abs(value - expected[index]) <= tolerance);
 }
 
 function assertOptional(result: { rawResponse: Uint8Array }, message = 'expected rawResponse to be present') {
@@ -110,7 +136,7 @@ async function testLinearSolve(api: MathOptApi): Promise<string> {
   const model = api.MathOpt.Model('test_lp_solve');
   const x1 = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x1' });
   const x2 = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x2' });
-  model.addLinearConstraint({
+  const c = model.addLinearConstraint({
     upperBound: 1,
     name: 'c',
     terms: [
@@ -128,11 +154,35 @@ async function testLinearSolve(api: MathOptApi): Promise<string> {
     result.terminationReason === 'TERMINATION_REASON_OPTIMAL',
     `${name}: expected termination OPTIMAL, got ${result.terminationReason}`,
   );
+  near(result.primalBound, 2);
+  assert(result.solutions.length >= 1, `${name}: expected at least one solution`);
+  const solution = result.solutions[0];
+  assert(solution.primalSolution !== null, `${name}: expected primal solution`);
+  assert(solution.dualSolution !== null, `${name}: expected dual solution`);
   near(result.objectiveValue, 2);
+  near(solution.primalSolution.objectiveValue, 2);
   near(result.variableValues.x1, 0);
   near(result.variableValues.x2, 1);
   near(result.variableValuesById[x1.id], 0);
   near(result.variableValuesById[x2.id], 1);
+  near(solution.primalSolution.variableValues.x1, 0);
+  near(solution.primalSolution.variableValues.x2, 1);
+  const dual = solution.dualSolution;
+  near(dual.objectiveValue, 2);
+  assert(Object.keys(dual.dualValues).join(',') === 'c', `${name}: expected dual value only for c`);
+  assert(Object.keys(dual.reducedCosts).sort().join(',') === 'x1,x2', `${name}: expected reduced costs for x1,x2`);
+  const dualVec = [
+    dual.dualValues.c,
+    dual.reducedCosts.x1,
+    dual.reducedCosts.x2,
+  ];
+  assert(
+    listIsNear(dualVec, [1, 0, 1]) || listIsNear(dualVec, [2, -1, 0]),
+    `${name}: dual_vec is ${dualVec.join(',')}; expected 1,0,1 or 2,-1,0`,
+  );
+  assert(typeof dual.dualValuesById[c.id] === 'number', `${name}: expected dualValuesById for c`);
+  assert(typeof dual.reducedCostsById[x1.id] === 'number', `${name}: expected reducedCostsById for x1`);
+  assert(typeof dual.reducedCostsById[x2.id] === 'number', `${name}: expected reducedCostsById for x2`);
   assertOptional(result, `${name}: solve should include non-empty rawResponse`);
   return `${name} PASS`;
 }

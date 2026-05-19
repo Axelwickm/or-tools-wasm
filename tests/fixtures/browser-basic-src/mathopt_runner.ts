@@ -1,5 +1,6 @@
 import { mathOptExpressionContractCases } from './mathopt_expression_contract.ts';
 import { runMathOptModelContractCases } from './mathopt_model_contract.ts';
+import { mathoptSolveResultContractCases } from './mathopt_solve_result_contract.ts';
 
 export type MathOptCaseResult = {
   name: string;
@@ -21,6 +22,11 @@ type MathOptVariableLike = {
   lowerBound?: number;
   upperBound?: number;
   integer?: boolean;
+  lower_bound?: number;
+  upper_bound?: number;
+  is_integer?: boolean;
+  equals?(other: MathOptVariableLike): boolean;
+  toString(): string;
 };
 
 type MathOptLinearConstraintLike = {
@@ -28,9 +34,16 @@ type MathOptLinearConstraintLike = {
   readonly name: string;
   lowerBound?: number;
   upperBound?: number;
+  lower_bound?: number;
+  upper_bound?: number;
   setCoefficient?(variable: MathOptVariableLike, coefficient: number): void;
+  set_coefficient?(variable: MathOptVariableLike, coefficient: number): void;
   getCoefficient?(variable: MathOptVariableLike): number;
+  get_coefficient?(variable: MathOptVariableLike): number;
   terms?(): Array<{ variable: MathOptVariableLike; coefficient: number }>;
+  as_bounded_linear_expression?(): MathOptBoundedExpressionLike<MathOptLinearExpressionLike>;
+  equals?(other: MathOptLinearConstraintLike): boolean;
+  toString(): string;
 };
 
 type MathOptLinearTermLike = {
@@ -119,7 +132,12 @@ type MathOptUpperBoundedExpressionLike<T> = {
 
 type MathOptModelLike = {
   readonly name: string;
+  readonly objective?: MathOptObjectiveLike;
   addVariable(options?: {
+    lb?: number;
+    ub?: number;
+    isInteger?: boolean;
+    is_integer?: boolean;
     lowerBound?: number;
     upperBound?: number;
     integer?: boolean;
@@ -148,20 +166,28 @@ type MathOptModelLike = {
     name?: string;
   }): MathOptVariableLike;
   addLinearConstraint(options?: {
+    lb?: number;
+    ub?: number;
+    expr?: unknown;
     lowerBound?: number;
     upperBound?: number;
     terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
+    expression?: unknown;
     name?: string;
-  }): MathOptLinearConstraintLike;
+  } | MathOptBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptLowerBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptUpperBoundedExpressionLike<MathOptLinearExpressionLike>): MathOptLinearConstraintLike;
   add_linear_constraint?(options?: {
+    lb?: number;
+    ub?: number;
+    expr?: unknown;
     lowerBound?: number;
     upperBound?: number;
     terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
+    expression?: unknown;
     name?: string;
-  }): MathOptLinearConstraintLike;
+  } | MathOptBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptLowerBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptUpperBoundedExpressionLike<MathOptLinearExpressionLike>): MathOptLinearConstraintLike;
   variables?(): MathOptVariableLike[];
   getVariable?(id: number): MathOptVariableLike | undefined;
-  get_variable?(id: number): MathOptVariableLike;
+  get_variable?(id: number, options?: { validate?: boolean }): MathOptVariableLike;
   hasVariable?(id: number): boolean;
   has_variable?(id: number): boolean;
   getNumVariables?(): number;
@@ -173,7 +199,7 @@ type MathOptModelLike = {
   linearConstraints?(): MathOptLinearConstraintLike[];
   linear_constraints?(): MathOptLinearConstraintLike[];
   getLinearConstraint?(id: number): MathOptLinearConstraintLike | undefined;
-  get_linear_constraint?(id: number): MathOptLinearConstraintLike;
+  get_linear_constraint?(id: number, options?: { validate?: boolean }): MathOptLinearConstraintLike;
   hasLinearConstraint?(id: number): boolean;
   has_linear_constraint?(id: number): boolean;
   getNumLinearConstraints?(): number;
@@ -186,8 +212,35 @@ type MathOptModelLike = {
   delete_variable?(variable: MathOptVariableLike): void;
   deleteLinearConstraint?(constraint: MathOptLinearConstraintLike): void;
   delete_linear_constraint?(constraint: MathOptLinearConstraintLike): void;
+  column_nonzeros?(variable: MathOptVariableLike): MathOptLinearConstraintLike[];
+  row_nonzeros?(constraint: MathOptLinearConstraintLike): MathOptVariableLike[];
+  linear_constraint_matrix_entries?(): Array<{
+    linearConstraint?: MathOptLinearConstraintLike;
+    linear_constraint?: MathOptLinearConstraintLike;
+    variable: MathOptVariableLike;
+    coefficient: number;
+  }>;
+  maximize_linear_objective?(terms: unknown, offset?: number): void;
+  minimize_linear_objective?(terms: unknown, offset?: number): void;
+  set_linear_objective?(terms: unknown, isMaximize: boolean, offset?: number): void;
+  set_objective?(terms: unknown, isMaximize: boolean, offset?: number): void;
+  set_quadratic_objective?(terms: unknown, isMaximize: boolean, offset?: number): void;
   maximize(terms: unknown, offset?: number): void;
   minimize(terms: unknown, offset?: number): void;
+};
+
+type MathOptObjectiveLike = {
+  isMaximize?: boolean;
+  is_maximize?: boolean;
+  offset: number;
+  name: string;
+  clear(): void;
+  set_linear_coefficient(variable: MathOptVariableLike, coefficient: number): void;
+  get_linear_coefficient(variable: MathOptVariableLike): number;
+  linear_terms(): MathOptLinearTermLike[];
+  set_quadratic_coefficient(firstVariable: MathOptVariableLike, secondVariable: MathOptVariableLike, coefficient: number): void;
+  get_quadratic_coefficient(firstVariable: MathOptVariableLike, secondVariable: MathOptVariableLike): number;
+  quadratic_terms(): MathOptQuadraticTermLike[];
 };
 
 export type MathOptApi = {
@@ -229,10 +282,26 @@ export type MathOptApi = {
       iterationLimit?: number;
     }): Promise<{
       terminationReason: string;
+      primalBound: number | null;
+      dualBound: number | null;
       objectiveValue: number | null;
       variableValues: Record<string, number>;
-      variableValuesById?: Record<number, number>;
-      rawResponse?: Uint8Array;
+      variableValuesById: Record<number, number>;
+      solutions: Array<{
+        primalSolution: {
+          objectiveValue: number | null;
+          variableValues: Record<string, number>;
+          variableValuesById: Record<number, number>;
+        } | null;
+        dualSolution: {
+          objectiveValue: number | null;
+          dualValues: Record<string, number>;
+          dualValuesById: Record<number, number>;
+          reducedCosts: Record<string, number>;
+          reducedCostsById: Record<number, number>;
+        } | null;
+      }>;
+      rawResponse: Uint8Array;
     }>;
     setWorkerBridgeEnabled?: (enabled: boolean) => void;
   };
@@ -251,6 +320,14 @@ function near(actual: number | null, expected: number, tolerance = 1e-7) {
 function assertOptimal(name: string, result: { terminationReason: string }) {
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: expected OPTIMAL, got ${result.terminationReason}`);
 }
+
+const activeSolveResultContractNames = new Set([
+  'SolveTest/test_solve_error',
+  'SolveTest/test_lp_solve',
+  'SolveTest/test_cp_sat_mip_like',
+  'MathOpt API/solve_options_support_check',
+  'MathOpt API/duplicate_objective_access',
+]);
 
 async function runGlopLp(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {
   const model = api.MathOpt.Model('mathopt_lp');
@@ -357,6 +434,20 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
       }
       options.onProgress?.('MathOpt.modelContract', mode, threads);
       results.push(...await runMathOptModelContractCases(api, mode, threads));
+      for (const testCase of mathoptSolveResultContractCases) {
+        if (!activeSolveResultContractNames.has(testCase.name)) continue;
+        options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
+        const output = await testCase.run(api);
+        results.push({
+          name: `MathOpt.${testCase.name}`,
+          mode,
+          threads,
+          ok: !output.startsWith('TODO:'),
+          terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
+          objectiveValue: null,
+          values: {},
+        });
+      }
     }
   }
   api.MathOpt.setWorkerBridgeEnabled?.(false);
