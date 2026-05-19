@@ -599,6 +599,27 @@ function mpProtoRequest(api: MPSolverApi, numWorkers: number) {
   };
 }
 
+function lpApiTestProtoRequest(api: MPSolverApi) {
+  return {
+    solverType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
+    model: {
+      maximize: true,
+      variable: [
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 2 },
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 1 },
+      ],
+      constraint: [
+        {
+          lowerBound: -10000,
+          upperBound: 4,
+          varIndex: [0, 1],
+          coefficient: [1, 2],
+        },
+      ],
+    },
+  };
+}
+
 function lpTestSolveFromProtoRequest(api: MPSolverApi) {
   return {
     solverType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
@@ -655,6 +676,19 @@ async function runProtoSolveCase(
   assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
   assert(near(variableValues[0], 3), `${name}: x mismatch ${variableValues[0]}`);
   assert(near(variableValues[1], 2), `${name}: y mismatch ${variableValues[1]}`);
+  return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
+}
+
+async function runLpApiTestProtoCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  const name = 'MPSolver: lp_api_test.py test_proto';
+  const result = await api.MPSolver.solveModelRequest(lpApiTestProtoRequest(api));
+  const response = result.response;
+  assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+  assert(near(Number(response.objectiveValue), 5), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+  const variableValues = response.variableValue as number[];
+  assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+  assert(near(variableValues[0], 2), `${name}: x mismatch ${variableValues[0]}`);
+  assert(near(variableValues[1], 1), `${name}: y mismatch ${variableValues[1]}`);
   return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
 }
 
@@ -733,7 +767,7 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
       'MPSolver: lp_api_test.py test_sum_no_brackets',
       'Not applicable: this tests Python generator/list summation helper behavior, not OR-Tools solver API.',
     ),
-    await runProtoSolveCase(api, 'direct', 1, 'MPSolver: lp_api_test.py test_proto'),
+    await runLpApiTestProtoCase(api),
     skipped(
       'MPSolver: lp_test.py RunLinearExampleNaturalLanguageAPI',
       'Blocked: Python operator-overloaded natural expression API is not exposed in TypeScript.',

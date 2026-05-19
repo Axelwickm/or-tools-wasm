@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 390 ✅ implemented; 15 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 1 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 4.
+Totals: 613 upstream tests; 391 ✅ implemented; 15 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 3.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -234,7 +234,7 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 
 ## ortools/linear_solver/python/lp_api_test.py
 - 🟨 🔎 test_sum_no_brackets - placeholder: Python generator/list summation helper behavior only
-- 🔴 ⚠️ test_proto - current parity case mismatch: current TS case uses a SAT integer request; upstream lp_api_test.py uses a specific GLOP proto load/fill-solution flow
+- ✅ 🔎 test_proto
 
 ## ortools/linear_solver/python/model_builder_test.py
 - ModelBuilderTest
