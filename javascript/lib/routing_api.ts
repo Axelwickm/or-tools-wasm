@@ -151,6 +151,50 @@ type RoutingCumulVar = {
   index: number;
 };
 
+type RoutingVehicleVar = {
+  kind: 'routingVehicleVar';
+  index: number;
+};
+
+type RoutingVehicleEqualityConstraint = {
+  type: 'routingVehicleEquality';
+  left: RoutingVehicleVar;
+  right: RoutingVehicleVar;
+};
+
+type RoutingCumulLessOrEqualConstraint = {
+  type: 'routingCumulLessOrEqual';
+  left: RoutingCumulVar;
+  right: RoutingCumulVar;
+};
+
+function isRoutingVehicleVar(value: unknown): value is RoutingVehicleVar {
+  return typeof value === 'object' && value !== null
+    && (value as { kind?: unknown }).kind === 'routingVehicleVar'
+    && typeof (value as { index?: unknown }).index === 'number';
+}
+
+function isRoutingCumulVar(value: unknown): value is RoutingCumulVar {
+  return typeof value === 'object' && value !== null
+    && (value as { kind?: unknown }).kind === 'routingCumulVar'
+    && typeof (value as { dimensionName?: unknown }).dimensionName === 'string'
+    && typeof (value as { index?: unknown }).index === 'number';
+}
+
+function isRoutingVehicleEqualityConstraint(value: unknown): value is RoutingVehicleEqualityConstraint {
+  return typeof value === 'object' && value !== null
+    && (value as { type?: unknown }).type === 'routingVehicleEquality'
+    && isRoutingVehicleVar((value as { left?: unknown }).left)
+    && isRoutingVehicleVar((value as { right?: unknown }).right);
+}
+
+function isRoutingCumulLessOrEqualConstraint(value: unknown): value is RoutingCumulLessOrEqualConstraint {
+  return typeof value === 'object' && value !== null
+    && (value as { type?: unknown }).type === 'routingCumulLessOrEqual'
+    && isRoutingCumulVar((value as { left?: unknown }).left)
+    && isRoutingCumulVar((value as { right?: unknown }).right);
+}
+
 export class RoutingIndexManager {
   readonly ready: Promise<void> = Promise.resolve();
   private module: RoutingModule;
@@ -848,12 +892,51 @@ export class RoutingModel {
     return {
       Parameters: () => ({ trace_propagation: this.parameters?.solver_parameters.trace_propagation ?? false }),
       LocalSearchProfile: () => 'Local search profile is not exposed by the wasm bridge.',
-      Add: () => {},
+      Add: (...constraints) => {
+        for (const constraint of constraints) {
+          this.addSolverConstraint(constraint);
+        }
+      },
     };
   }
 
   NextVar(index: number): number {
     return index;
+  }
+
+  VehicleVar(index: number): RoutingVehicleVar {
+    return { kind: 'routingVehicleVar', index };
+  }
+
+  private addSolverConstraint(constraint: unknown): void {
+    if (isRoutingVehicleEqualityConstraint(constraint)) {
+      const ok = this.module._routing_add_vehicle_equality_constraint(
+        this.handle,
+        toInt64(constraint.left.index),
+        toInt64(constraint.right.index),
+      );
+      if (ok !== 1) {
+        throw new Error('RoutingModel.solver().Add: failed to add vehicle equality constraint.');
+      }
+      return;
+    }
+
+    if (isRoutingCumulLessOrEqualConstraint(constraint)) {
+      if (constraint.left.dimensionName !== constraint.right.dimensionName) {
+        throw new Error('RoutingModel.solver().Add: cumul precedence constraints require the same dimension.');
+      }
+      const ok = this.withCString(constraint.left.dimensionName, (namePtr) => {
+        return this.module._routing_add_dimension_cumul_less_or_equal_constraint(
+          this.handle,
+          namePtr,
+          toInt64(constraint.left.index),
+          toInt64(constraint.right.index),
+        );
+      });
+      if (ok !== 1) {
+        throw new Error('RoutingModel.solver().Add: failed to add cumul precedence constraint.');
+      }
+    }
   }
 
   GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number {

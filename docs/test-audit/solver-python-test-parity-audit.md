@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 325 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 67 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 353; mismatches found: 30.
+Totals: 613 upstream tests; 344 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 48 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 353; mismatches found: 15.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -178,29 +178,29 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 
 ## ortools/constraint_solver/python/pywraprouting_test.py
 - TestPyWrapRoutingIndexManager
-  - 🔴 ⚠️ TestPyWrapRoutingIndexManager.testCtor - current parity case mismatch: current test uses numLocations/numVehicles and routing.Start; upstream checks GetNumberOfNodes/GetNumberOfVehicles/GetStartIndex/GetEndIndex directly
-  - 🔴 🔎 TestPyWrapRoutingIndexManager.testCtorMultiDepotSame - confirmed missing: current fixtures do not cover same-start/same-end multi-depot manager constructor
-  - 🔴 🔎 TestPyWrapRoutingIndexManager.testCtorMultiDepotAllDiff - confirmed missing: current fixtures do not cover all-different multi-depot manager constructor
+  - ✅ 🔎 TestPyWrapRoutingIndexManager.testCtor
+  - ✅ 🔎 TestPyWrapRoutingIndexManager.testCtorMultiDepotSame
+  - ✅ 🔎 TestPyWrapRoutingIndexManager.testCtorMultiDepotAllDiff
 - TestPyWrapRoutingModel
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testCtor - current parity case mismatch: current test checks Start only; upstream also checks End for each vehicle
-  - 🔴 🔎 TestPyWrapRoutingModel.testSolve - confirmed missing: current fixtures do not cover bare Solve() status/objective behavior
-  - 🔴 🔎 TestPyWrapRoutingModel.testSolveMultiDepot - confirmed missing: current fixtures do not cover bare Solve() with multi-depot manager
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testTransitCallback - current parity case mismatch: current test omits upstream initial/final routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testTransitLambda - current parity case mismatch: current test omits upstream initial/final routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testTransitMatrix - current parity case mismatch: current test omits upstream initial/final routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testUnaryTransitCallback - current parity case mismatch: current test omits callback index and routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testUnaryTransitLambda - current parity case mismatch: current test omits callback index and routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testUnaryTransitVector - current parity case mismatch: current test omits callback index and routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testTSP - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - ✅ 🔎 TestPyWrapRoutingModel.testCtor
+  - ✅ 🔎 TestPyWrapRoutingModel.testSolve
+  - ✅ 🔎 TestPyWrapRoutingModel.testSolveMultiDepot
+  - ✅ 🔎 TestPyWrapRoutingModel.testTransitCallback
+  - ✅ 🔎 TestPyWrapRoutingModel.testTransitLambda
+  - ✅ 🔎 TestPyWrapRoutingModel.testTransitMatrix
+  - ✅ 🔎 TestPyWrapRoutingModel.testUnaryTransitCallback
+  - ✅ 🔎 TestPyWrapRoutingModel.testUnaryTransitLambda
+  - ✅ 🔎 TestPyWrapRoutingModel.testUnaryTransitVector
+  - ✅ 🔎 TestPyWrapRoutingModel.testTSP
   - ✅ 🔎 TestPyWrapRoutingModel.testVRP
   - ✅ 🔎 TestPyWrapRoutingModel.testDimensionTSP
   - ✅ 🔎 TestPyWrapRoutingModel.testDimensionWithVehicleCapacitiesTSP
   - ✅ 🔎 TestPyWrapRoutingModel.testDimensionWithVehicleTransitsTSP
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testDimensionWithVehicleTransitsVRP - current parity case mismatch: current TS callbacks all return 1; upstream uses per-vehicle One/Two/Three transits and checks cumul by vehicle + 1
+  - ✅ 🔎 TestPyWrapRoutingModel.testDimensionWithVehicleTransitsVRP
   - ✅ 🔎 TestPyWrapRoutingModel.testConstantDimensionTSP
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testVectorDimensionTSP - current parity case mismatch: current test omits upstream initial/final routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testMatrixDimensionTSP - current parity case mismatch: current test omits upstream initial/final routing status checks
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testMatrixDimensionVRP - current parity case mismatch: current test omits upstream initial/final routing status checks
+  - ✅ 🔎 TestPyWrapRoutingModel.testVectorDimensionTSP
+  - ✅ 🔎 TestPyWrapRoutingModel.testMatrixDimensionTSP
+  - ✅ 🔎 TestPyWrapRoutingModel.testMatrixDimensionVRP
   - ✅ 🔎 TestPyWrapRoutingModel.testDisjunctionTSP
   - ✅ 🔎 TestPyWrapRoutingModel.testDisjunctionPenaltyTSP
   - ✅ 🔎 TestPyWrapRoutingModel.testRoutingModelParameters
@@ -208,9 +208,9 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ✅ 🔎 TestPyWrapRoutingModel.testRoutingSearchParameters
   - ✅ 🔎 TestPyWrapRoutingModel.testFindErrorInRoutingSearchParameters
   - ✅ 🔎 TestPyWrapRoutingModel.testCallback
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testReadAssignment - current parity case mismatch: current test checks objective only; upstream also verifies every route node against input routes
+  - ✅ 🔎 TestPyWrapRoutingModel.testReadAssignment
   - ✅ 🔎 TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_simple
-  - 🔴 ⚠️ TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd - current parity case mismatch: current test does not add the same vehicle/cumul constraints; it calls solver.Add(null), so pickup-delivery setup is not equivalent
+  - ✅ 🔎 TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd
 - TestBoundCost
   - ✅ 🔎 TestBoundCost.testCtor
 - TestRoutingDimension

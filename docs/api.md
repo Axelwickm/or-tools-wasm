@@ -482,9 +482,14 @@ Import:
 
 ```ts
 import {
+  Assignment,
+  BoundCost,
+  DefaultRoutingModelParameters,
   initRouting,
+  LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
+  RoutingSearchStatus,
   DefaultRoutingSearchParameters,
   FirstSolutionStrategy,
 } from 'or-tools-wasm';
@@ -507,6 +512,10 @@ params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 const assignment = await routing.SolveWithParameters(params);
 ```
 
+The Routing API is a high-level wrapper around the compiled OR-Tools Routing
+runtime. It keeps Python-style method names for parity with upstream examples
+and tests.
+
 ### Initialization
 
 `initRouting(): Promise<void>`
@@ -525,6 +534,10 @@ new RoutingIndexManager(numLocations, numVehicles, starts, ends)
 
 Methods:
 
+- `indexToNode(index): Promise<number>`
+- `nodeToIndex(node): Promise<number>`
+- `indexToNodeSync(index): number`
+- `nodeToIndexSync(node): number`
 - `IndexToNode(index): number`
 - `NodeToIndex(node): number`
 - `GetNumberOfNodes(): number`
@@ -534,7 +547,14 @@ Methods:
 - `GetEndIndex(vehicle): number`
 - `delete(): void`
 
-Async aliases `indexToNode()` and `nodeToIndex()` are also available.
+Properties:
+
+- `ready: Promise<void>`
+- `numLocations: number`
+- `numVehicles: number`
+- `starts: number[]`
+- `ends: number[]`
+- `depot: number`
 
 ### `RoutingModel`
 
@@ -579,6 +599,7 @@ Route structure and model helpers:
 - `End(vehicle): number`
 - `IsEnd(index): boolean`
 - `NextVar(index): number`
+- `VehicleVar(index): RoutingVehicleVar`
 - `vehicles(): number`
 - `AddDisjunction(indices, penalty?): number`
 - `AddPickupAndDelivery(pickup, delivery): void`
@@ -590,6 +611,50 @@ Route structure and model helpers:
 - `solver(): { Parameters(): { trace_propagation: boolean }; LocalSearchProfile(): string; Add(...): void }`
 - `delete(): void`
 
+`NextVar(index)` returns an opaque next-variable handle represented by the
+index. Pass that value to `assignment.Value(...)`. `VehicleVar(index)` returns
+an opaque vehicle-variable handle for solver constraints.
+
+Advanced assignment helpers are also exposed for parity with the current
+wrapper implementation:
+
+- `assignmentObjectiveValue(): number`
+- `nextValue(index): number`
+- `dimensionCumulValue(dimensionName, index): number`
+
+These helpers read values from the current assignment state and are usually
+used through `Assignment`.
+
+### Routing Solver Constraints
+
+`routing.solver().Add(...)` accepts the routing constraint objects currently
+needed for pickup-and-delivery parity. JavaScript does not support Python-style
+operator overloading, so constraints are explicit objects:
+
+```ts
+routing.AddPickupAndDelivery(pickupIndex, deliveryIndex);
+
+routing.solver().Add({
+  type: 'routingVehicleEquality',
+  left: routing.VehicleVar(pickupIndex),
+  right: routing.VehicleVar(deliveryIndex),
+});
+
+const distance = routing.GetDimensionOrDie('distance');
+routing.solver().Add({
+  type: 'routingCumulLessOrEqual',
+  left: distance.CumulVar(pickupIndex),
+  right: distance.CumulVar(deliveryIndex),
+});
+```
+
+Supported solver constraint object shapes:
+
+- `{ type: 'routingVehicleEquality', left: routing.VehicleVar(...), right: routing.VehicleVar(...) }`
+- `{ type: 'routingCumulLessOrEqual', left: dimension.CumulVar(...), right: dimension.CumulVar(...) }`
+
+Unknown constraint objects are ignored by the compatibility shim.
+
 ### `RoutingDimension`
 
 - `CumulVar(index): RoutingCumulVar`
@@ -600,7 +665,19 @@ Route structure and model helpers:
 - `SetQuadraticCostSoftSpanUpperBoundForVehicle(boundCost, vehicle): void`
 - `GetQuadraticCostSoftSpanUpperBoundForVehicle(vehicle): BoundCost`
 
-`BoundCost` is a small class with `bound` and `cost` fields.
+`CumulVar(index)` returns an opaque cumul-variable handle for assignment reads
+and solver constraints.
+
+### `BoundCost`
+
+```ts
+new BoundCost(bound = 0, cost = 0)
+```
+
+Fields:
+
+- `bound: number`
+- `cost: number`
 
 ### `Assignment`
 
@@ -616,14 +693,59 @@ the next index. For dimensions, pass `dimension.CumulVar(index)`.
 - `DefaultRoutingSearchParameters(): RoutingSearchParameters`
 - `DefaultRoutingModelParameters(): RoutingModelParameters`
 - `FindErrorInRoutingSearchParameters(params): string`
-- `FirstSolutionStrategy`
-- `LocalSearchMetaheuristic`
-- `RoutingSearchStatus`
 - `BOOL_FALSE`, `BOOL_TRUE`, `BOOL_UNSPECIFIED`
 
-The routing parameter object currently exposes the subset used by the bridge:
-`firstSolutionStrategy`, `solution_limit`, `local_search_operators`, and
-`local_search_metaheuristic`.
+`RoutingSearchParameters` currently exposes the subset used by the bridge:
+
+- `firstSolutionStrategy?: FirstSolutionStrategy`
+- `solution_limit?: number`
+- `local_search_operators?: Record<string, unknown>`
+- `local_search_metaheuristic?: LocalSearchMetaheuristic`
+
+`RoutingModelParameters` exposes:
+
+- `solver_parameters.CopyFrom(value): void`
+- `solver_parameters.trace_propagation: boolean`
+- `solver_parameters.profile_local_search: boolean`
+
+`FindErrorInRoutingSearchParameters(params)` returns an empty string when the
+supported parameter subset is valid.
+
+`FirstSolutionStrategy` contains:
+
+- `UNSET`
+- `AUTOMATIC`
+- `PATH_CHEAPEST_ARC`
+- `PATH_MOST_CONSTRAINED_ARC`
+- `EVALUATOR_STRATEGY`
+- `SAVINGS`
+- `SWEEP`
+- `CHRISTOFIDES`
+- `ALL_UNPERFORMED`
+- `BEST_INSERTION`
+- `PARALLEL_CHEAPEST_INSERTION`
+- `SEQUENTIAL_CHEAPEST_INSERTION`
+- `LOCAL_CHEAPEST_INSERTION`
+- `LOCAL_CHEAPEST_COST_INSERTION`
+- `GLOBAL_CHEAPEST_ARC`
+- `LOCAL_CHEAPEST_ARC`
+- `FIRST_UNBOUND_MIN_VALUE`
+
+`LocalSearchMetaheuristic` contains:
+
+- `UNSET`
+- `GUIDED_LOCAL_SEARCH`
+
+`RoutingSearchStatus` contains:
+
+- `ROUTING_NOT_SOLVED`
+- `ROUTING_SUCCESS`
+- `ROUTING_PARTIAL_SUCCESS_LOCAL_OPTIMUM_NOT_REACHED`
+- `ROUTING_FAIL`
+- `ROUTING_FAIL_TIMEOUT`
+- `ROUTING_INVALID`
+- `ROUTING_INFEASIBLE`
+- `ROUTING_OPTIMAL`
 
 ## MPSolver
 

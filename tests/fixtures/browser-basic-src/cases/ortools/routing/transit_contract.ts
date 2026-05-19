@@ -21,15 +21,17 @@ type RoutingAssignmentLike = {
 
 type RoutingModelLike = {
   RegisterTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
-  RegisterTransitMatrix?: (matrix: number[][]) => number;
-  RegisterUnaryTransitCallback?: (callback: (fromIndex: number) => number) => number;
-  RegisterUnaryTransitVector?: (values: number[]) => number;
+  RegisterTransitMatrix(matrix: number[][]): number;
+  RegisterUnaryTransitCallback(callback: (fromIndex: number) => number): number;
+  RegisterUnaryTransitVector(values: number[]): number;
   SetArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
+  Solve(): Promise<RoutingAssignmentLike | null>;
   SolveWithParameters(parameters?: { firstSolutionStrategy?: number }): Promise<RoutingAssignmentLike | null>;
   Start(vehicle: number): number;
   IsEnd(index: number): boolean;
   NextVar(index: number): number;
   GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  status(): number;
   delete(): void;
 };
 
@@ -76,11 +78,15 @@ function firstUnboundStrategy(api: RoutingApi): number {
   return api.FirstSolutionStrategy?.FIRST_UNBOUND_MIN_VALUE ?? 12;
 }
 
+const ROUTING_NOT_SOLVED = 0;
+const ROUTING_SUCCESS = 1;
+
 export const transitContractCases: RoutingCase[] = [
   {
     name: 'TestPyWrapRoutingModel.testTransitMatrix',
     source: 'ortools/constraint_solver/python/pywraprouting_test.py',
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testTransitMatrix matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testTransitMatrix';
       await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(5, 1, 0);
@@ -89,19 +95,13 @@ export const transitContractCases: RoutingCase[] = [
       try {
         const matrix = [[1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]];
 
-        const registerTransitMatrix = (routing as { RegisterTransitMatrix?: (m: number[][]) => number }).RegisterTransitMatrix;
-        // TODO: RegisterTransitMatrix API is not available in this TS wrapper yet.
-        if (typeof registerTransitMatrix !== 'function') {
-          return `TODO: ${caseName} requires RegisterTransitMatrix support in TS bindings`;
-        }
-
-        const transitIdx = registerTransitMatrix.call(routing, matrix);
+        const transitIdx = routing.RegisterTransitMatrix(matrix);
         assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
-
         routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-
-        const assignment = await routing.SolveWithParameters();
+        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+        const assignment = await routing.Solve();
         assert(assignment, `${caseName} did not return a solution`);
+        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
         assertNumber(assignment?.ObjectiveValue(), 15, `${caseName} objectiveValue`);
         return `${caseName} PASS`;
       } finally {
@@ -114,6 +114,7 @@ export const transitContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testUnaryTransitCallback',
     source: 'ortools/constraint_solver/python/pywraprouting_test.py',
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testUnaryTransitCallback matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testUnaryTransitCallback';
       await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(5, 1, 0);
@@ -122,17 +123,13 @@ export const transitContractCases: RoutingCase[] = [
       try {
         const unaryDistance = (fromIndex: number) => manager.IndexToNode(fromIndex);
 
-        const registerUnaryTransitCallback = (routing as { RegisterUnaryTransitCallback?: (cb: (fromIndex: number) => number) => number })
-        .RegisterUnaryTransitCallback;
-        // TODO: RegisterUnaryTransitCallback API is not available in this TS wrapper yet; using RegisterTransitCallback with an adapter.
-        const transitIdx = typeof registerUnaryTransitCallback === 'function'
-          ? registerUnaryTransitCallback.call(routing, unaryDistance)
-          : routing.RegisterTransitCallback((fromIndex) => unaryDistance(fromIndex));
-
+        const transitIdx = routing.RegisterUnaryTransitCallback(unaryDistance);
+        assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
         routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-
-        const assignment = await routing.SolveWithParameters();
+        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+        const assignment = await routing.Solve();
         assert(assignment, `${caseName} did not return a solution`);
+        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
         assertNumber(assignment?.ObjectiveValue(), 10, `${caseName} objectiveValue`);
         return `${caseName} PASS`;
       } finally {
@@ -145,6 +142,7 @@ export const transitContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testUnaryTransitLambda',
     source: 'ortools/constraint_solver/python/pywraprouting_test.py',
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testUnaryTransitLambda matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testUnaryTransitLambda';
       await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(5, 1, 0);
@@ -153,17 +151,13 @@ export const transitContractCases: RoutingCase[] = [
       try {
         const unaryLambda = (_fromIndex: number) => 1;
 
-        const registerUnaryTransitCallback = (routing as { RegisterUnaryTransitCallback?: (cb: (fromIndex: number) => number) => number })
-        .RegisterUnaryTransitCallback;
-        // TODO: RegisterUnaryTransitCallback API is not available in this TS wrapper yet; using RegisterTransitCallback with an adapter.
-        const transitIdx = typeof registerUnaryTransitCallback === 'function'
-          ? registerUnaryTransitCallback.call(routing, unaryLambda)
-          : routing.RegisterTransitCallback((fromIndex) => unaryLambda(fromIndex));
-
+        const transitIdx = routing.RegisterUnaryTransitCallback(unaryLambda);
+        assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
         routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-
-        const assignment = await routing.SolveWithParameters();
+        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+        const assignment = await routing.Solve();
         assert(assignment, `${caseName} did not return a solution`);
+        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
         assertNumber(assignment?.ObjectiveValue(), 5, `${caseName} objectiveValue`);
         return `${caseName} PASS`;
       } finally {
@@ -176,6 +170,7 @@ export const transitContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testUnaryTransitVector',
     source: 'ortools/constraint_solver/python/pywraprouting_test.py',
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testUnaryTransitVector matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testUnaryTransitVector';
       await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(10, 1, 0);
@@ -183,23 +178,14 @@ export const transitContractCases: RoutingCase[] = [
 
       try {
         const vector = Array.from({ length: 10 }, (_, index) => index);
-        const unaryVector = (fromIndex: number) => vector[manager.IndexToNode(fromIndex)];
 
-        const registerUnaryTransitVector = (routing as { RegisterUnaryTransitVector?: (values: number[]) => number })
-          .RegisterUnaryTransitVector;
-        const registerUnaryTransitCallback = (routing as { RegisterUnaryTransitCallback?: (cb: (fromIndex: number) => number) => number })
-          .RegisterUnaryTransitCallback;
-        // TODO: RegisterUnaryTransitVector API is not available in this TS wrapper yet; using RegisterTransitCallback with an adapter.
-        const transitIdx = typeof registerUnaryTransitVector === 'function'
-          ? registerUnaryTransitVector.call(routing, vector)
-          : typeof registerUnaryTransitCallback === 'function'
-          ? registerUnaryTransitCallback.call(routing, unaryVector)
-          : routing.RegisterTransitCallback((fromIndex) => unaryVector(fromIndex));
-
+        const transitIdx = routing.RegisterUnaryTransitVector(vector);
+        assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
         routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-
-        const assignment = await routing.SolveWithParameters();
+        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+        const assignment = await routing.Solve();
         assert(assignment, `${caseName} did not return a solution`);
+        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
         assertNumber(assignment?.ObjectiveValue(), 45, `${caseName} objectiveValue`);
         return `${caseName} PASS`;
       } finally {

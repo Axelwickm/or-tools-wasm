@@ -1,7 +1,4 @@
-import { runBasicRoutingApiContractCases } from './cases/ortools/routing/basic_contract.ts';
-import { dimensionDisjunctionContractCases } from './cases/ortools/routing/dimension_disjunction_contract.ts';
-import { searchDimensionMiscContractCases } from './cases/ortools/routing/search_dimension_misc_contract.ts';
-import { transitContractCases } from './cases/ortools/routing/transit_contract.ts';
+import { routingContractCases } from './cases/ortools/routing/index.ts';
 
 export type RoutingCaseResult = {
   name: string;
@@ -119,23 +116,7 @@ export async function runRoutingCases(routingApi: RoutingApi): Promise<RoutingCa
 
   const results: RoutingCaseResult[] = [];
 
-  const basicResults = await runBasicRoutingApiContractCases(routingApi as never);
-  for (const result of basicResults) {
-    assert(result.ok, `${result.name} failed`);
-    results.push({
-      name: result.name,
-      ok: result.ok,
-      objective: result.objective,
-      route: result.route ?? [],
-      routeDistance: result.routeDistance ?? 0,
-    });
-  }
-
-  for (const routingCase of [
-    ...transitContractCases,
-    ...dimensionDisjunctionContractCases,
-    ...searchDimensionMiscContractCases,
-  ]) {
+  for (const routingCase of routingContractCases) {
     const message = await routingCase.run(routingApi as never);
     assert(!message.startsWith('TODO:'), message);
     assert(message.endsWith('PASS'), `${routingCase.name} failed: ${message}`);

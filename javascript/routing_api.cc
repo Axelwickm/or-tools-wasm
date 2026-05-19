@@ -435,6 +435,30 @@ EMSCRIPTEN_KEEPALIVE void routing_add_pickup_and_delivery(
   handle->model->AddPickupAndDelivery(pickup, delivery);
 }
 
+EMSCRIPTEN_KEEPALIVE int routing_add_vehicle_equality_constraint(
+    int model_handle, int64_t left_index, int64_t right_index) {
+  RoutingModelHandle* handle = GetModel(model_handle);
+  if (handle == nullptr) return 0;
+  operations_research::Solver* solver = handle->model->solver();
+  solver->AddConstraint(solver->MakeEquality(
+      handle->model->VehicleVar(left_index),
+      handle->model->VehicleVar(right_index)));
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_add_dimension_cumul_less_or_equal_constraint(
+    int model_handle, const char* dimension_name, int64_t left_index,
+    int64_t right_index) {
+  RoutingModelHandle* handle = GetModel(model_handle);
+  RoutingDimension* dimension = GetDimension(handle, dimension_name);
+  if (handle == nullptr || dimension == nullptr) return 0;
+  operations_research::Solver* solver = handle->model->solver();
+  solver->AddConstraint(solver->MakeLessOrEqual(
+      dimension->CumulVar(left_index),
+      dimension->CumulVar(right_index)));
+  return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int routing_solve(int model_handle) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return 0;

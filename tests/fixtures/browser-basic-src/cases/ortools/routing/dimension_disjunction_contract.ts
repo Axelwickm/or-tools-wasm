@@ -2,6 +2,7 @@ type RoutingIndexManagerLike = {
   numVehicles: number;
   IndexToNode(index: number): number;
   NodeToIndex(node: number): number;
+  GetNumberOfVehicles(): number;
   GetNumberOfIndices(): number;
   delete(): void;
 };
@@ -19,13 +20,14 @@ type RoutingAssignmentLike = {
 
 type RoutingModelLike = {
   RegisterTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
-  RegisterTransitMatrix?: (matrix: number[][]) => number;
+  RegisterTransitMatrix(matrix: number[][]): number;
   SetArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
   SolveWithParameters(parameters: { firstSolutionStrategy?: number }): Promise<RoutingAssignmentLike | null>;
   Start(vehicle: number): number;
   IsEnd(index: number): boolean;
   NextVar(index: number): number;
   GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  status(): number;
   AddDimension?: (transitCallbackIndex: number, slack: number, capacity: number, fixStartCumulToZero: boolean, name: string) => [number, boolean] | number;
   AddDimensionWithVehicleCapacity?: (
     transitCallbackIndex: number,
@@ -66,6 +68,8 @@ type RoutingCase = {
 };
 
 const PYTHON_SOURCE = 'ortools/constraint_solver/python/pywraprouting_test.py';
+const ROUTING_NOT_SOLVED = 0;
+const ROUTING_SUCCESS = 1;
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -281,6 +285,7 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testDimensionWithVehicleTransitsVRP',
     source: PYTHON_SOURCE,
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testDimensionWithVehicleTransitsVRP matches upstream per-vehicle transit callbacks and cumul assertions.
       const caseName = 'TestPyWrapRoutingModel.testDimensionWithVehicleTransitsVRP';
       await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(10, 3, 0);
@@ -290,8 +295,8 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
         routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
 
         const one = () => 1;
-        const two = () => 1;
-        const three = () => 1;
+        const two = () => 2;
+        const three = () => 3;
         const distanceCallbacks = [
           routing.RegisterTransitCallback(one),
           routing.RegisterTransitCallback(two),
@@ -401,6 +406,7 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testVectorDimensionTSP',
     source: PYTHON_SOURCE,
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testVectorDimensionTSP matches upstream id, status, objective, and cumul assertions.
       const caseName = 'TestPyWrapRoutingModel.testVectorDimensionTSP';
       await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(10, 1, 0);
@@ -428,8 +434,10 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
 
         const searchParameters = routingApi.DefaultRoutingSearchParameters();
         searchParameters.firstSolutionStrategy = firstUnboundStrategy(routingApi);
+        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
         const assignment = await routing.SolveWithParameters(searchParameters);
         assert(assignment, `${caseName} did not return a solution`);
+        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
 
         let node = routing.Start(0);
         let cumul = 0;
@@ -454,6 +462,7 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testMatrixDimensionTSP',
     source: PYTHON_SOURCE,
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testMatrixDimensionTSP matches upstream id, status, objective, and cumul assertions.
       const caseName = 'TestPyWrapRoutingModel.testMatrixDimensionTSP';
       await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(5, 1, 0);
@@ -481,8 +490,10 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
 
         const searchParameters = routingApi.DefaultRoutingSearchParameters();
         searchParameters.firstSolutionStrategy = firstUnboundStrategy(routingApi);
+        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
         const assignment = await routing.SolveWithParameters(searchParameters);
         assert(assignment, `${caseName} did not return a solution`);
+        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
 
         let index = routing.Start(0);
         let cumul = 0;
@@ -507,18 +518,14 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testMatrixDimensionVRP',
     source: PYTHON_SOURCE,
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testMatrixDimensionVRP matches upstream matrix registration, id, status, objective, and per-vehicle cumul assertions.
       const caseName = 'TestPyWrapRoutingModel.testMatrixDimensionVRP';
       await routingApi.initRouting();
-      const manager = new routingApi.RoutingIndexManager(5, 2, 0);
-      const routing = new routingApi.RoutingModel(manager);
-      try {
+        const manager = new routingApi.RoutingIndexManager(5, 2, 0);
+        const routing = new routingApi.RoutingModel(manager);
+        try {
         const matrix = Array.from({ length: 5 }, (_, row) => Array.from({ length: 5 }, (_, col) => row + col));
-        const registerTransitMatrix = (routing as { RegisterTransitMatrix?: RoutingModelLike['RegisterTransitMatrix'] }).RegisterTransitMatrix;
-        // TODO: `RegisterTransitMatrix` is not available in the current TS routing API.
-        if (typeof registerTransitMatrix !== 'function') {
-          return `TODO: ${caseName} requires RegisterTransitMatrix support in TS bindings`;
-        }
-        const transitIdx = registerTransitMatrix.call(routing, matrix);
+        const transitIdx = routing.RegisterTransitMatrix(matrix);
         routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
 
         const addMatrixDimension = (routing as { AddMatrixDimension?: RoutingModelLike['AddMatrixDimension'] }).AddMatrixDimension;
@@ -539,9 +546,11 @@ export const dimensionDisjunctionContractCases: RoutingCase[] = [
 
         const searchParameters = routingApi.DefaultRoutingSearchParameters();
         searchParameters.firstSolutionStrategy = firstUnboundStrategy(routingApi);
+        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
         const assignment = await routing.SolveWithParameters(searchParameters);
         assert(assignment, `${caseName} did not return a solution`);
-        for (let vehicle = 0; vehicle < manager.numVehicles; vehicle++) {
+        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
+        for (let vehicle = 0; vehicle < manager.GetNumberOfVehicles(); vehicle++) {
           let index = routing.Start(vehicle);
           let cumul = 0;
           while (!routing.IsEnd(index)) {

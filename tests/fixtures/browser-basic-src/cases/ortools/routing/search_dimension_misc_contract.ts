@@ -126,6 +126,7 @@ type RoutingModelLike = {
   ): [number, boolean] | boolean;
   GetDimensionOrDie?(name: string): RoutingDimensionLike;
   Start(vehicle: number): number;
+  vehicles(): number;
   IsEnd(index: number): boolean;
   NextVar(index: number): number;
   GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
@@ -206,8 +207,8 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
         const routing = new routingApi.RoutingModel(manager as RoutingIndexManagerLike, parameters as unknown);
         try {
           assert(
-            manager.numVehicles === 1,
-            `TestPyWrapRoutingModel.testRoutingModelParameters expected 1 vehicle, got ${manager.numVehicles}`,
+            routing.vehicles() === 1,
+            `TestPyWrapRoutingModel.testRoutingModelParameters expected 1 vehicle, got ${routing.vehicles()}`,
           );
 
           const getSolver = routing.solver?.();
@@ -436,6 +437,7 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testReadAssignment',
     source: PYTHON_SOURCE,
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testReadAssignment matches upstream assignment solve, objective, and per-vehicle route assertions.
       await routingApi.initRouting();
 
       const manager = new routingApi.RoutingIndexManager(10, 2, 0);
@@ -473,6 +475,21 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
           assert(solution, 'TestPyWrapRoutingModel.testReadAssignment did not return a solution');
 
           assertNumber(solution?.ObjectiveValue() ?? NaN, 90, 'TestPyWrapRoutingModel.testReadAssignment objectiveValue');
+          for (let vehicle = 0; vehicle < routing.vehicles(); vehicle++) {
+            let node = routing.Start(vehicle);
+            let count = 0;
+            while (!routing.IsEnd(node)) {
+              node = solution.Value(routing.NextVar(node));
+              if (!routing.IsEnd(node)) {
+                assertNumber(
+                  manager.IndexToNode(node),
+                  routes[vehicle][count],
+                  `TestPyWrapRoutingModel.testReadAssignment vehicle ${vehicle} route node ${count}`,
+                );
+                count += 1;
+              }
+            }
+          }
           return `TestPyWrapRoutingModel.testReadAssignment PASS`;
         } finally {
           routing.delete();
@@ -525,6 +542,7 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
     name: 'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd',
     source: PYTHON_SOURCE,
     async run(routingApi) {
+      // TEMP: parity - TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd matches upstream pickup/delivery setup and automatic strategy assertion.
       await routingApi.initRouting();
 
       const manager = new routingApi.RoutingIndexManager(31, 7, 0);
@@ -543,6 +561,7 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
           if (
             typeof addDimension !== 'function' ||
             typeof addPickupAndDelivery !== 'function' ||
+            typeof routing.VehicleVar !== 'function' ||
             !solver ||
             !getDimensionOrDie
           ) {
@@ -553,15 +572,23 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
 
           const dimensionCreated = addDimension.call(routing, transitIdx, 0, 1000, true, 'distance');
           assert(dimensionCreated, 'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd expected AddDimension to succeed');
+          const dimension = getDimensionOrDie('distance');
+          assert(typeof dimension.CumulVar === 'function', 'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd expected CumulVar support');
 
           for (let i = 1; i < 15; i++) {
             const pickupIndex = manager.NodeToIndex(2 * i);
             const deliveryIndex = manager.NodeToIndex(2 * i + 1);
             addPickupAndDelivery.call(routing, pickupIndex, deliveryIndex);
-            solver.Add?.(null);
-            const dimension = getDimensionOrDie('distance');
-            dimension.CumulVar?.(pickupIndex);
-            dimension.CumulVar?.(deliveryIndex);
+            solver.Add?.({
+              type: 'routingVehicleEquality',
+              left: routing.VehicleVar(pickupIndex),
+              right: routing.VehicleVar(deliveryIndex),
+            });
+            solver.Add?.({
+              type: 'routingCumulLessOrEqual',
+              left: dimension.CumulVar(pickupIndex),
+              right: dimension.CumulVar(deliveryIndex),
+            });
           }
 
           const assignment = await routing.SolveWithParameters(routingApi.DefaultRoutingSearchParameters());
