@@ -280,7 +280,6 @@ async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCa
 
 async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
   const name = 'MPSolver: lp_test.py testSetHint';
-  // TEMP: parity - PyWrapLpTest.testSetHint matches upstream GLOP solver, BoolVar setup, objective/constraint coefficients, SetHint call, and variable/constraint count assertions.
   const solver = new api.MPSolver('RunBooleanExampleCppStyle', api.MPSolver.GLOP_LINEAR_PROGRAMMING);
   try {
     const x1 = solver.BoolVar('x1');
@@ -306,7 +305,6 @@ async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
 
 async function runExternalApiCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
   const name = 'MPSolver: pywraplp_test.py test_external_api';
-  // TEMP: parity - PyWrapLp.test_external_api matches upstream GLOP creation, infinity aliases, variable bounds, objective offset, constraint bound edits, solve status, reduced cost, and dual value assertions through the exposed API.
   const solver = createSolver(api, 'GLOP', name);
   try {
     const infinity = solver.infinity();
@@ -521,7 +519,6 @@ async function runBooleanCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseRes
 
 async function runExportToMpsCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
   const name = 'MPSolver: lp_test.py testExportToMps';
-  // TEMP: parity - PyWrapLpTest.testExportToMps matches upstream GLOP model construction and ExportModelAsMpsFormat model-name assertion through C++-style calls.
   const solver = new api.MPSolver('ExportMps', api.MPSolver.GLOP_LINEAR_PROGRAMMING);
   try {
     const infinity = solver.infinity();
@@ -665,7 +662,6 @@ async function runLpTestLoadSolutionFromProtoCase(api: MPSolverApi): Promise<MpS
   const name = 'MPSolver: lp_test.py testLoadSolutionFromProto';
   const solver = new api.MPSolver('', api.MPSolver.GLOP_LINEAR_PROGRAMMING);
   try {
-    // TEMP: parity - PyWrapLpTest.testLoadSolutionFromProto only verifies that loading an empty MPSolutionResponse into a fresh GLOP solver does not throw.
     assert(typeof solver.LoadSolutionFromProto === 'function', `${name}: LoadSolutionFromProto is not exposed`);
     await solver.LoadSolutionFromProto({});
     return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: 0, values: {} };
@@ -677,7 +673,6 @@ async function runLpTestLoadSolutionFromProtoCase(api: MPSolverApi): Promise<MpS
 async function runLpTestSolveFromProtoCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
   const name = 'MPSolver: lp_test.py testSolveFromProto';
   const request = lpTestSolveFromProtoRequest(api);
-  // TEMP: parity - PyWrapLpTest.testSolveFromProto matches upstream request shape, 3-variable assertion, SolveWithProto call, and optimal-status assertion.
   assert((request.model.variable as unknown[]).length === 3, `${name}: expected 3 variables`);
   const result = await api.MPSolver.solveModelRequest(request);
   assert(result.response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(result.response.status)}`);
