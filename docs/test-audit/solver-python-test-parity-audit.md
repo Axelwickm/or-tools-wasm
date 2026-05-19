@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 344 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 48 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 353; mismatches found: 15.
+Totals: 613 upstream tests; 346 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 46 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 353; mismatches found: 13.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -228,8 +228,8 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ➖ 🔎 PyWrapLpTest.testApi - SCIP-only upstream loop; SCIP is not linked/exposed
   - ✅ 🔎 PyWrapLpTest.testSetHint
   - ➖ 🔎 PyWrapLpTest.testBopInfeasible - BOP backend is not linked/exposed
-  - 🔴 ⚠️ PyWrapLpTest.testLoadSolutionFromProto - current parity case mismatch: current TS case solves and loads a SAT solution; upstream only calls LoadSolutionFromProto(empty response) on a GLOP solver
-  - 🔴 ⚠️ PyWrapLpTest.testSolveFromProto - current parity case mismatch: current TS case solves a different SAT integer request; upstream solves a specific 3-variable GLOP MPModelRequest and checks status
+  - ✅ 🔎 PyWrapLpTest.testLoadSolutionFromProto
+  - ✅ 🔎 PyWrapLpTest.testSolveFromProto
   - ✅ 🔎 PyWrapLpTest.testExportToMps
 
 ## ortools/linear_solver/python/lp_api_test.py

@@ -809,6 +809,7 @@ Static helpers:
 - `ParseAndCheckSupportForProblemType(solverId): OptimizationProblemType | null`
 - `getLinearSolverSchemas(): Promise<LinearSolverSchemas>`
 - `createModelRequest(request): Promise<Uint8Array>`
+- `createSolutionResponse(response): Promise<Uint8Array>`
 - `decodeSolutionResponse(bytes): Promise<MPSolverSolutionResponse>`
 - `solveModelRequest(request): Promise<MPSolverProtoSolveResult>`
 
@@ -855,6 +856,7 @@ Solving and solution loading:
 
 - `Solve(parameters?): Promise<MPSolverResultStatus>`
 - `SolveWithProto(options?): Promise<MPSolverProtoSolveResult & { loaded: boolean }>`
+- `LoadSolutionFromProto(response?, tolerance?): Promise<boolean>`
 - `exportModelProto(): Promise<Uint8Array>`
 - `exportModelRequestProto(options?): Promise<Uint8Array>`
 - `VerifySolution(tolerance, logErrors): boolean`

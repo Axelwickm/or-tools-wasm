@@ -409,6 +409,15 @@ async function decodeMPSolutionResponse(bytes: Uint8Array): Promise<MPSolverSolu
   }) as MPSolverSolutionResponse;
 }
 
+async function encodeMPSolutionResponse(response: MPSolverSolutionResponse): Promise<Uint8Array> {
+  const type = await resolveMPSolutionResponseType();
+  const error = type.verify(response);
+  if (error) {
+    throw new Error(`MPSolver.createSolutionResponse: ${error}`);
+  }
+  return type.encode(type.create(response)).finish();
+}
+
 async function solveModelRequestDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
   const module = await loadMpSolverModule();
   const exports = getMpSolverExports();
@@ -927,6 +936,10 @@ export class MPSolver {
     return decodeMPSolutionResponse(bytes);
   }
 
+  static createSolutionResponse(response: MPSolverSolutionResponse): Promise<Uint8Array> {
+    return encodeMPSolutionResponse(response);
+  }
+
   static async solveModelRequest(request: Uint8Array | MPSolverModelRequest): Promise<MPSolverProtoSolveResult> {
     const requestBytes = request instanceof Uint8Array ? request : await encodeMPModelRequest(request);
     const bytes = await solveModelRequestBytes(requestBytes);
@@ -1098,19 +1111,27 @@ export class MPSolver {
     const result = await MPSolver.solveModelRequest(requestBytes);
     let loaded = false;
     if (options.loadSolution ?? true) {
-      const responsePtr = copyBytesToHeap(this.module, result.bytes);
-      try {
-        loaded = this.exports.solverLoadSolutionProto(
-          this.handle,
-          responsePtr,
-          result.bytes.length,
-          options.tolerance ?? 1e-7,
-        ) === 1;
-      } finally {
-        if (responsePtr) this.module._free(responsePtr);
-      }
+      loaded = await this.LoadSolutionFromProto(result.bytes, options.tolerance);
     }
     return { ...result, loaded };
+  }
+
+  async LoadSolutionFromProto(
+    response: Uint8Array | MPSolverSolutionResponse = {},
+    tolerance = 1e-7,
+  ): Promise<boolean> {
+    const responseBytes = response instanceof Uint8Array ? response : await encodeMPSolutionResponse(response);
+    const responsePtr = copyBytesToHeap(this.module, responseBytes);
+    try {
+      return this.exports.solverLoadSolutionProto(
+        this.handle,
+        responsePtr,
+        responseBytes.length,
+        tolerance,
+      ) === 1;
+    } finally {
+      if (responsePtr) this.module._free(responsePtr);
+    }
   }
 
   VerifySolution(tolerance: number, logErrors: boolean): boolean {
