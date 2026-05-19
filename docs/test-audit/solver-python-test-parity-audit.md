@@ -1,6 +1,6 @@
-# Temporary Solver Python Test Roster
+# Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 198 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 127 🔴 relevant missing or checked mismatch; 263 ⚪ not applicable. Double-checked so far: 227; mismatches found: 59.
+Totals: 613 upstream tests; 325 ✅ implemented; 14 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 67 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 353; mismatches found: 30.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -20,161 +20,161 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ✅ 🔎 CpModelHelperTest.test_simple_solve_with_proto_api
   - ✅ 🔎 CpModelHelperTest.test_solution_callback
   - ✅ 🔎 CpModelHelperTest.test_best_bound_callback
-  - 🔴 CpModelHelperTest.test_model_stats - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelHelperTest.test_int_lin_expr - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelHelperTest.test_float_lin_expr - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ✅ 🔎 CpModelHelperTest.test_model_stats
+  - ⚪ 🔎 CpModelHelperTest.test_int_lin_expr - outside current TS contract: exercises Python internal `cmh.IntVar`/`cmh.LinearExpr` class identity, unary/infix operator overloads, and exact helper string formatting; public high-level expression behavior is covered by `CpModelTest.test_str`, `test_repr`, `test_sum_parsing`, and simplification cases
+  - ⚪ 🔎 CpModelHelperTest.test_float_lin_expr - outside current TS contract: exercises Python internal `cmh.IntVar`/`cmh.LinearExpr` class identity, float unary/infix operator overloads, and exact helper string formatting; public high-level float expression behavior is covered by `CpModelTest.test_str`, `test_repr`, `test_sum_parsing`, and `test_weighted_sum_parsing`
 - CpModelBuilderTest
-  - ⚪ CpModelBuilderTest.test_basic - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ 🔎 CpModelBuilderTest.test_basic - outside current solver parity contract: exercises Python generated proto builder mutation semantics, not CP-SAT solve/model behavior
 - SatParametersBuilderTest
-  - ⚪ SatParametersBuilderTest.test_basic_api - outside current TS contract unless we add a Python-style CP-SAT builder API
+  - ⚪ 🔎 SatParametersBuilderTest.test_basic_api - outside current solver parity contract: exercises Python generated SatParameters builder mutation semantics, not CP-SAT solve/model behavior
 
 ## ortools/sat/python/cp_model_test.py
 - CpModelTest
-  - ⚪ CpModelTest.test_is_boolean - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_create_integer_variable - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_hash_int_var - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_literal - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_negation - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_issue4654 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_equality_overload - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_linear - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_none_argument - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - 🔴 CpModelTest.test_empty_linear_constraint - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - ⚪ CpModelTest.test_linear_non_equal - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_eq - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - 🔴 CpModelTest.test_large_constants - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - ⚪ CpModelTest.testGe - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_gt - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_le - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_lt - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_eq_var - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_ge_var - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_gt_var - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_le_var - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_lt_var - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_linear_non_equal_with_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_linear_with_enforcement - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_names - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_natural_api_minimize - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_natural_api_maximize_float - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_natural_api_maximize_complex - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_natural_api_maximize - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_minimize_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_maximize_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_add_true - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_add_false - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_sum - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_sum_parsing - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_weighted_sum_parsing - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_sum_with_api - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_weighted_sum - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - 🔴 ⚠️ CpModelTest.test_all_different - current parity case mismatch: current TS case solves a smaller all-different model; upstream checks Python builder proto shape
-  - ⚪ CpModelTest.test_all_different_gen - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_all_different_list - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - 🔴 ⚠️ CpModelTest.test_element - current parity case mismatch: current TS case solves a simplified element model; upstream checks mixed var/constant exprs and empty-list error
-  - 🔴 CpModelTest.test_fixed_element - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_affine_element - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.testCircuit - current parity case mismatch: current TS case solves a 3-arc circuit; upstream checks 5-arc proto shape and empty-arc error
-  - 🔴 ⚠️ CpModelTest.test_multiple_circuit - current parity case mismatch: current TS case solves a 3-arc route constraint; upstream checks 5-arc proto shape and empty-arc error
-  - 🔴 ⚠️ CpModelTest.test_allowed_assignments - current parity case mismatch: current TS case solves a smaller table; upstream checks 5-column table proto shape and arity errors
-  - 🔴 ⚠️ CpModelTest.test_forbidden_assignments - current parity case mismatch: current TS case solves a smaller negated table; upstream checks 5-column proto shape and arity errors
-  - 🔴 ⚠️ CpModelTest.test_automaton - current parity case mismatch: current TS case solves a shorter fixed automaton; upstream checks proto sizes and invalid-input errors
-  - 🔴 ⚠️ CpModelTest.test_inverse - current parity case mismatch: current TS case solves a fixed inverse; upstream checks builder proto shape for 5 direct/inverse vars
-  - 🔴 ⚠️ CpModelTest.test_max_equality - current parity case mismatch: current TS case solves fixed values; upstream checks add_max_equality proto target/expr structure
-  - 🔴 CpModelTest.test_max_equality_list - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_max_equality_tuple - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_max_equality_generator - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_max_equality_args - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_max_equality_with_constant - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.test_min_equality - current parity case mismatch: current TS case solves fixed values; upstream checks add_min_equality proto target/expr structure
-  - 🔴 CpModelTest.test_min_equality_list - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_min_equality_tuple - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_min_equality_generator - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_min_equality_args - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_min_equality_with_constant - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.test_abs - current parity case mismatch: current TS case solves abs value only; upstream also checks proto expr signs and abs() error message
-  - ⚪ CpModelTest.test_issue4568 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - 🔴 ⚠️ CpModelTest.test_division - current parity case mismatch: current TS case solves division only; upstream also checks proto exprs and division operator error message
-  - 🔴 CpModelTest.testModulo - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.test_multiplication_equality - current parity case mismatch: current TS case uses two factors and solves; upstream checks 5-factor proto structure
-  - ⚪ CpModelTest.test_multiplication_equality_generator - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - 🔴 ⚠️ CpModelTest.test_implication - current parity case mismatch: current TS case solves implication; upstream checks enforcement/bool_and proto structure
-  - 🔴 ⚠️ CpModelTest.test_bool_or - current parity case mismatch: current TS case solves one bool_or; upstream checks proto length, constants, and TypeErrors
-  - ⚪ CpModelTest.test_bool_or_list_or_get - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_at_least_one - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - 🔴 ⚠️ CpModelTest.test_at_most_one - current parity case mismatch: current TS case solves one at_most_one; upstream checks proto length, constants, and TypeErrors
-  - 🔴 ⚠️ CpModelTest.test_exactly_one - current parity case mismatch: current TS case solves one exactly_one; upstream checks proto length, constants, and TypeErrors
-  - 🔴 ⚠️ CpModelTest.test_bool_and - current parity case mismatch: current TS case solves one bool_and; upstream checks proto literals including negated and true literal
-  - 🔴 ⚠️ CpModelTest.test_bool_x_or - current parity case mismatch: current TS case solves fixed xor; upstream checks 5-literal proto shape
-  - 🔴 CpModelTest.test_map_domain - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.test_interval - current parity case mismatch: current TS case solves one interval; upstream checks interval object indexes and start/size/end expressions
-  - ⚪ CpModelTest.test_rebuild_from_linear_expression_proto - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_absent_interval - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - 🔴 ⚠️ CpModelTest.test_optional_interval - current parity case mismatch: current TS case solves one absent optional interval; upstream checks four optional interval forms and TypeErrors
-  - 🔴 ⚠️ CpModelTest.test_no_overlap - current parity case mismatch: current TS case solves compatible intervals; upstream checks no_overlap interval indexes in proto
-  - ⚪ CpModelTest.test_no_overlap2d - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - 🔴 ⚠️ CpModelTest.test_cumulative - current parity case mismatch: current TS case solves a 2-interval cumulative; upstream checks 10-interval proto shape and TypeError
-  - ⚪ CpModelTest.test_get_or_make_index_from_constant - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_str - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_repr - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_integer_expression_errors - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_model_errors - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_solver_errors - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - 🔴 ⚠️ CpModelTest.test_has_objective_minimize - current parity case mismatch: current TS case solves objective value; upstream only checks has_objective() before/after minimize
-  - 🔴 ⚠️ CpModelTest.test_has_objective_maximize - current parity case mismatch: current TS case solves objective value; upstream only checks has_objective() before/after maximize
-  - 🔴 CpModelTest.test_search_for_all_solutions - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.test_solve_with_solution_callback - current parity case mismatch: current TS case counts enumerated solutions; upstream callback sums one solution values to 6
-  - 🔴 CpModelTest.test_solve_with_float_value_in_callback - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ⚪ 🔎 CpModelTest.test_is_boolean - outside current TS contract: Python NumPy boolean scalar recognition has no native JS value equivalent
+  - ✅ 🔎 CpModelTest.test_create_integer_variable
+  - ✅ 🔎 CpModelTest.test_hash_int_var
+  - ✅ 🔎 CpModelTest.test_literal
+  - ✅ 🔎 CpModelTest.test_negation
+  - ✅ 🔎 CpModelTest.test_issue4654
+  - ✅ 🔎 CpModelTest.test_equality_overload
+  - ✅ 🔎 CpModelTest.test_linear
+  - ✅ 🔎 CpModelTest.test_none_argument
+  - ✅ 🔎 CpModelTest.test_empty_linear_constraint
+  - ✅ 🔎 CpModelTest.test_linear_non_equal
+  - ✅ 🔎 CpModelTest.test_eq
+  - ✅ 🔎 CpModelTest.test_large_constants
+  - ✅ 🔎 CpModelTest.testGe
+  - ✅ 🔎 CpModelTest.test_gt
+  - ✅ 🔎 CpModelTest.test_le
+  - ✅ 🔎 CpModelTest.test_lt
+  - ✅ 🔎 CpModelTest.test_eq_var
+  - ✅ 🔎 CpModelTest.test_ge_var
+  - ✅ 🔎 CpModelTest.test_gt_var
+  - ✅ 🔎 CpModelTest.test_le_var
+  - ✅ 🔎 CpModelTest.test_lt_var
+  - ✅ 🔎 CpModelTest.test_linear_non_equal_with_constant
+  - ✅ 🔎 CpModelTest.test_linear_with_enforcement
+  - ✅ 🔎 CpModelTest.test_names
+  - ✅ 🔎 CpModelTest.test_natural_api_minimize
+  - ✅ 🔎 CpModelTest.test_natural_api_maximize_float
+  - ✅ 🔎 CpModelTest.test_natural_api_maximize_complex
+  - ✅ 🔎 CpModelTest.test_natural_api_maximize
+  - ✅ 🔎 CpModelTest.test_minimize_constant
+  - ✅ 🔎 CpModelTest.test_maximize_constant
+  - ✅ 🔎 CpModelTest.test_add_true
+  - ✅ 🔎 CpModelTest.test_add_false
+  - ✅ 🔎 CpModelTest.test_sum
+  - ⚪ 🔎 CpModelTest.test_sum_parsing - current partial parity case covers public high-level sum flattening, integer/float offset behavior, affine/constant/SumArray expression repr, strings, and invalid operands; remaining upstream assertions check Python NumPy scalar handling and internal IntAffine/FloatAffine class identity/fields
+  - ⚪ 🔎 CpModelTest.test_weighted_sum_parsing - current partial parity case covers public high-level `weighted_sum` flattening and constant expression repr; remaining upstream assertions distinguish integer-valued float coefficients and Python NumPy scalar handling, which JS numbers cannot represent
+  - ✅ 🔎 CpModelTest.test_sum_with_api
+  - ✅ 🔎 CpModelTest.test_weighted_sum
+  - ✅ 🔎 CpModelTest.test_all_different
+  - ✅ 🔎 CpModelTest.test_all_different_gen
+  - ✅ 🔎 CpModelTest.test_all_different_list
+  - ✅ 🔎 CpModelTest.test_element
+  - ✅ 🔎 CpModelTest.test_fixed_element
+  - ✅ 🔎 CpModelTest.test_affine_element
+  - ✅ 🔎 CpModelTest.testCircuit
+  - ✅ 🔎 CpModelTest.test_multiple_circuit
+  - ✅ 🔎 CpModelTest.test_allowed_assignments
+  - ✅ 🔎 CpModelTest.test_forbidden_assignments
+  - ✅ 🔎 CpModelTest.test_automaton
+  - ✅ 🔎 CpModelTest.test_inverse
+  - ✅ 🔎 CpModelTest.test_max_equality
+  - ✅ 🔎 CpModelTest.test_max_equality_list
+  - ✅ 🔎 CpModelTest.test_max_equality_tuple
+  - ✅ 🔎 CpModelTest.test_max_equality_generator
+  - ✅ 🔎 CpModelTest.test_max_equality_args
+  - ✅ 🔎 CpModelTest.test_max_equality_with_constant
+  - ✅ 🔎 CpModelTest.test_min_equality
+  - ✅ 🔎 CpModelTest.test_min_equality_list
+  - ✅ 🔎 CpModelTest.test_min_equality_tuple
+  - ✅ 🔎 CpModelTest.test_min_equality_generator
+  - ✅ 🔎 CpModelTest.test_min_equality_args
+  - ✅ 🔎 CpModelTest.test_min_equality_with_constant
+  - ✅ 🔎 CpModelTest.test_abs
+  - ✅ 🔎 CpModelTest.test_issue4568
+  - ✅ 🔎 CpModelTest.test_division
+  - ✅ 🔎 CpModelTest.testModulo
+  - ✅ 🔎 CpModelTest.test_multiplication_equality
+  - ✅ 🔎 CpModelTest.test_multiplication_equality_generator
+  - ✅ 🔎 CpModelTest.test_implication
+  - ✅ 🔎 CpModelTest.test_bool_or
+  - ✅ 🔎 CpModelTest.test_bool_or_list_or_get
+  - ✅ 🔎 CpModelTest.test_at_least_one
+  - ✅ 🔎 CpModelTest.test_at_most_one
+  - ✅ 🔎 CpModelTest.test_exactly_one
+  - ✅ 🔎 CpModelTest.test_bool_and
+  - ✅ 🔎 CpModelTest.test_bool_x_or
+  - ✅ 🔎 CpModelTest.test_map_domain
+  - ✅ 🔎 CpModelTest.test_interval
+  - ✅ 🔎 CpModelTest.test_rebuild_from_linear_expression_proto
+  - ✅ 🔎 CpModelTest.test_absent_interval
+  - ✅ 🔎 CpModelTest.test_optional_interval
+  - ✅ 🔎 CpModelTest.test_no_overlap
+  - ✅ 🔎 CpModelTest.test_no_overlap2d
+  - ✅ 🔎 CpModelTest.test_cumulative
+  - ✅ 🔎 CpModelTest.test_get_or_make_index_from_constant
+  - ✅ 🔎 CpModelTest.test_str
+  - ✅ 🔎 CpModelTest.test_repr
+  - ✅ 🔎 CpModelTest.test_integer_expression_errors
+  - ✅ 🔎 CpModelTest.test_model_errors
+  - ✅ 🔎 CpModelTest.test_solver_errors
+  - ✅ 🔎 CpModelTest.test_has_objective_minimize
+  - ✅ 🔎 CpModelTest.test_has_objective_maximize
+  - ✅ 🔎 CpModelTest.test_search_for_all_solutions
+  - ✅ 🔎 CpModelTest.test_solve_with_solution_callback
+  - ✅ 🔎 CpModelTest.test_solve_with_float_value_in_callback
   - ✅ 🔎 CpModelTest.test_best_bound_callback
-  - 🔴 ⚠️ CpModelTest.test_value - current parity case mismatch: current TS case solves x=2,y=3; upstream solves x=9,y=10 and checks solver.value(2)
-  - 🔴 CpModelTest.test_float_value - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.test_boolean_value - current parity case mismatch: current TS case checks x/y only; upstream also checks negated literals and bool/int constants
-  - ⚪ CpModelTest.test_unsupported_operators - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_is_literal_true_false - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - 🔴 CpModelTest.test_solve_minimize_with_solution_callback - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_solution_value - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ✅ 🔎 CpModelTest.test_value
+  - ✅ 🔎 CpModelTest.test_float_value
+  - ✅ 🔎 CpModelTest.test_boolean_value
+  - ✅ 🔎 CpModelTest.test_unsupported_operators
+  - ⚪ 🔎 CpModelTest.test_is_literal_true_false - current partial parity case covers JS/Python boolean literal constants and bitwise-not integer literal behavior; remaining upstream assertions check Python NumPy boolean scalars, which have no native JS equivalent
+  - ✅ 🔎 CpModelTest.test_solve_minimize_with_solution_callback
+  - ✅ 🔎 CpModelTest.test_solution_value
   - ✅ 🔎 CpModelTest.test_solution_hinting
-  - 🔴 CpModelTest.test_solution_hinting_with_booleans - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 ⚠️ CpModelTest.test_assumptions - current parity case mismatch: current TS case solves with assumptions; upstream checks add/clear assumptions proto behavior
-  - 🔴 ⚠️ CpModelTest.test_stats - current parity case mismatch: current TS case solves an empty model; upstream solves a constrained objective model and checks wall_time > 0
-  - 🔴 ⚠️ CpModelTest.test_search_strategy - current parity case mismatch: current TS case solves a search-strategy model; upstream checks exact decision strategy proto fields
-  - 🔴 CpModelTest.test_model_and_response_stats - relevant CP-SAT proto/solve/callback/statistics parity gap
-  - 🔴 CpModelTest.test_validate_model - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ✅ 🔎 CpModelTest.test_solution_hinting_with_booleans
+  - ✅ 🔎 CpModelTest.test_assumptions
+  - ✅ 🔎 CpModelTest.test_stats
+  - ✅ 🔎 CpModelTest.test_search_strategy
+  - ✅ 🔎 CpModelTest.test_model_and_response_stats
+  - ✅ 🔎 CpModelTest.test_validate_model
   - ✅ 🔎 CpModelTest.test_validate_model_with_overflow
-  - ⚪ CpModelTest.test_copy_model - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - 🔴 CpModelTest.test_custom_log - relevant CP-SAT proto/solve/callback/statistics parity gap
+  - ⚪ 🔎 CpModelTest.test_copy_model - current partial parity case covers high-level clone, proto-index accessors, wrapper `is_boolean`, and cloned `model_proto` identity; remaining upstream assertions check Python copy.copy/deepcopy object graph behavior
+  - ✅ 🔎 CpModelTest.test_custom_log
   - ✅ 🔎 CpModelTest.test_log_to_response
-  - ⚪ CpModelTest.test_issue2762 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - 🔴 ⚠️ CpModelTest.test_model_error - current parity case mismatch: current TS case checks invalid status only; upstream also checks exact solution_info for invalid domains
-  - ⚪ CpModelTest.test_int_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_bool_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_fixed_size_interval_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_interval_var_series - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_compare_with_none - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_small_series - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_issue4376_sat_model - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_issue4376_minimize_model - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_issue4434 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_raise_python_exception_in_callback - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_in_place_sum_modifications - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_large_sum - outside current TS contract unless we add a Python-style CP-SAT builder API
-  - ⚪ CpModelTest.test_large_iadd - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_complex_iadd - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_large_isub - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_complex_isub - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_radd - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification1 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification2 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification3 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification4 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification5 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification6 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification7 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification8 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification9 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_simplification10 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_issue4759 - outside current TS contract: Python cp_model builder/operator convenience behavior
-  - ⚪ CpModelTest.test_pre_pep8 - outside current TS contract: Python cp_model builder/operator convenience behavior
+  - ✅ 🔎 CpModelTest.test_issue2762
+  - ✅ 🔎 CpModelTest.test_model_error
+  - ⚪ 🔎 CpModelTest.test_int_var_series - outside current TS contract: Python pandas `Series` variable factories and pandas vectorized solver values
+  - ⚪ 🔎 CpModelTest.test_bool_var_series - outside current TS contract: Python pandas `Series` variable factories and pandas vectorized solver boolean values
+  - ⚪ 🔎 CpModelTest.test_fixed_size_interval_var_series - outside current TS contract: Python pandas `Series` interval factories; scalar optional fixed-size interval construction is covered by `CpModelTest.test_interval`
+  - ⚪ 🔎 CpModelTest.test_interval_var_series - outside current TS contract: Python pandas `Series` interval factories
+  - ✅ 🔎 CpModelTest.test_compare_with_none
+  - ⚪ 🔎 CpModelTest.test_small_series - outside current TS contract: pandas `Series.sum`/`Series.dot` preserving Python expression identity and exact string formatting
+  - ⚪ 🔎 CpModelTest.test_issue4376_sat_model - outside current TS contract for parity audit: long-running Python performance regression model with timing assertion, not a deterministic API assertion
+  - ⚪ 🔎 CpModelTest.test_issue4376_minimize_model - outside current TS contract for parity audit: long-running Python performance regression model with best-bound timing/quality assertion, not a deterministic API assertion
+  - ✅ 🔎 CpModelTest.test_issue4434
+  - ✅ 🔎 CpModelTest.test_raise_python_exception_in_callback
+  - ⚪ 🔎 CpModelTest.test_in_place_sum_modifications - current partial parity case covers public expression immutability and flattened expression behavior; remaining upstream assertions inspect Python internal `cmh.SumArray` class identity plus `int_offset`, `double_offset`, and `num_exprs`
+  - ✅ 🔎 CpModelTest.test_large_sum
+  - ⚪ 🔎 CpModelTest.test_large_iadd - upstream specifically stress-tests Python `+=` in-place accumulation over 300000 Boolean vars, which has no direct JS operator equivalent
+  - ✅ 🔎 CpModelTest.test_complex_iadd
+  - ⚪ 🔎 CpModelTest.test_large_isub - upstream specifically stress-tests Python `-=` in-place accumulation over 300000 Boolean vars, which has no direct JS operator equivalent
+  - ✅ 🔎 CpModelTest.test_complex_isub
+  - ✅ 🔎 CpModelTest.test_radd
+  - ✅ 🔎 CpModelTest.test_simplification1
+  - ✅ 🔎 CpModelTest.test_simplification2
+  - ✅ 🔎 CpModelTest.test_simplification3
+  - ✅ 🔎 CpModelTest.test_simplification4
+  - ✅ 🔎 CpModelTest.test_simplification5
+  - ✅ 🔎 CpModelTest.test_simplification6
+  - ✅ 🔎 CpModelTest.test_simplification7
+  - ✅ 🔎 CpModelTest.test_simplification8
+  - ✅ 🔎 CpModelTest.test_simplification9
+  - ✅ 🔎 CpModelTest.test_simplification10
+  - ✅ 🔎 CpModelTest.test_issue4759
+  - ✅ 🔎 CpModelTest.test_pre_pep8
 
 ## ortools/constraint_solver/python/pywraprouting_test.py
 - TestPyWrapRoutingIndexManager
@@ -731,4 +731,3 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ✅ 🔎 PrimalDualHybridGradientTest.test_solution
   - ✅ 🔎 PrimalDualHybridGradientTest.test_solution_2
   - ✅ 🔎 PrimalDualHybridGradientTest.test_starting_point
-

@@ -44,6 +44,7 @@ export type CpSatApi = {
   solve(model: Uint8Array, params?: SolverParams, callbacks?: CpSatSolveCallbacks): Promise<CpSatSolveResult>;
   solveRaw(model: Uint8Array, params?: Uint8Array | null): Promise<Uint8Array>;
   validate(model: Uint8Array): Promise<{ ok: boolean; message: string }>;
+  modelStats(model: Uint8Array): Promise<string>;
   getSchemas(): Promise<SchemaPair>;
   createModel(model: CpModelProto): Promise<Uint8Array>;
   loadModule(): Promise<unknown>;
@@ -274,6 +275,24 @@ async function createModel(model: CpModelProto): Promise<Uint8Array> {
   }
   const message = type.create(protobufModel);
   return type.encode(message).finish();
+}
+
+async function modelStats(model: Uint8Array): Promise<string> {
+  const type = await resolveCpModelType();
+  const decoded = type.decode(model);
+  const object = type.toObject(decoded, {
+    enums: String,
+    longs: Number,
+    defaults: true,
+    arrays: true,
+    objects: true,
+  }) as CpModelProto;
+  return JSON.stringify({
+    name: object.name ?? '',
+    variables: object.variables?.length ?? 0,
+    constraints: object.constraints?.length ?? 0,
+    hasObjective: object.objective !== undefined || object.floatingPointObjective !== undefined,
+  });
 }
 
 const readUint32LE = (buffer: ArrayBufferLike, ptr: number) =>
@@ -513,6 +532,7 @@ export const CpSat: CpSatApi = {
   solve: (model, params = null, callbacks) => solve(model, params, callbacks),
   solveRaw: (model, params = null) => solveRaw(model, params),
   validate: (model) => (shouldUseWorkerBridge() ? validateViaWorker(model) : validateDirect(model)),
+  modelStats,
   getSchemas,
   createModel,
   loadModule,

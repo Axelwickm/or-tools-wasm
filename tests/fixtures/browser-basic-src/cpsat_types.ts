@@ -7,6 +7,7 @@ export type SolverResponse = {
   objectiveValue?: unknown;
   bestObjectiveBound?: unknown;
   solution?: unknown[];
+  solutionInfo?: unknown;
   solveLog?: string;
   wallTime?: unknown;
   numBooleans?: unknown;
@@ -26,6 +27,7 @@ export type CpSatLike = {
     bytes: Uint8Array;
   }>;
   validate(model: Uint8Array): Promise<{ ok: boolean; message: string }>;
+  modelStats(model: Uint8Array): Promise<string>;
   createModel(model: CpModelProto): Promise<Uint8Array>;
   setWorkerBridgeEnabled(enabled: boolean): void;
   isWorkerBridgeEnabled(): boolean;

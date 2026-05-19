@@ -19,66 +19,73 @@ import {
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
+import * as OrTools from 'or-tools-wasm';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
+import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
-const results = await runCpSatCases(CpSat);
+test('runs the shared high-level CP-SAT Python parity cases in Node', async () => {
+  await runCpSatHighLevelParityCasesForPackage(OrTools);
+});
 
-for (const result of results) {
-  if (result.cases.length !== cpSatCases.length) {
-    throw new Error(`node ${result.workerProfile} ran ${result.cases.length} cases, expected ${cpSatCases.length}`);
-  }
+test('runs the shared proto CP-SAT cases in Node', async () => {
+  const results = await runCpSatCases(CpSat);
 
-  for (const testCase of result.cases) {
-    if (!testCase.ok) {
-      throw new Error(`node ${result.workerProfile} case failed: ${testCase.name}`);
+  for (const result of results) {
+    assert.equal(result.cases.length, cpSatCases.length, `node ${result.workerProfile} case count`);
+    for (const testCase of result.cases) {
+      assert.equal(testCase.ok, true, `node ${result.workerProfile} case ${testCase.name}`);
     }
   }
-}
-
-const routingResults = await runRoutingCases({
-  BOOL_FALSE,
-  BOOL_UNSPECIFIED,
-  BoundCost,
-  DefaultRoutingModelParameters,
-  DefaultRoutingSearchParameters,
-  FindErrorInRoutingSearchParameters,
-  FirstSolutionStrategy,
-  initRouting,
-  LocalSearchMetaheuristic,
-  RoutingIndexManager: RoutingIndexManager as never,
-  RoutingModel: RoutingModel as never,
 });
-if (!routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.testRoutingSearchParameters' && result.ok)) {
-  throw new Error(`node routing case failed: ${JSON.stringify(routingResults)}`);
-}
 
-const mpSolverResults = await runMPSolverCases({
-  initMPSolver,
-  MPSolver,
-  MPSolverParameters,
-  setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
-  isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+test('runs the shared Routing cases in Node', async () => {
+  const routingResults = await runRoutingCases({
+    BOOL_FALSE,
+    BOOL_UNSPECIFIED,
+    BoundCost,
+    DefaultRoutingModelParameters,
+    DefaultRoutingSearchParameters,
+    FindErrorInRoutingSearchParameters,
+    FirstSolutionStrategy,
+    initRouting,
+    LocalSearchMetaheuristic,
+    RoutingIndexManager: RoutingIndexManager as never,
+    RoutingModel: RoutingModel as never,
+  });
+  assert.equal(
+    routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.testRoutingSearchParameters' && result.ok),
+    true,
+    `node routing case failed: ${JSON.stringify(routingResults)}`,
+  );
 });
-if (!mpSolverResults.every((result) => result.ok)) {
-  throw new Error(`node MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
-}
 
-const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
-if (!mathOptResults.every((result) => result.ok)) {
-  throw new Error(`node MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
-}
-
-const pdlpResults = await runPdlpCases({
-  initPdlp,
-  Pdlp,
-  setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+test('runs the shared MPSolver cases in Node', async () => {
+  const mpSolverResults = await runMPSolverCases({
+    initMPSolver,
+    MPSolver,
+    MPSolverParameters,
+    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+  });
+  assert.equal(mpSolverResults.every((result) => result.ok), true, `node MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
 });
-if (!pdlpResults.every((result) => result.ok)) {
-  throw new Error(`node PDLP case failed: ${JSON.stringify(pdlpResults)}`);
-}
 
-console.log(`node ran ${cpSatCases.length} CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`);
+test('runs the shared MathOpt cases in Node', async () => {
+  const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+  assert.equal(mathOptResults.every((result) => result.ok), true, `node MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
+});
+
+test('runs the shared PDLP cases in Node', async () => {
+  const pdlpResults = await runPdlpCases({
+    initPdlp,
+    Pdlp,
+    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+  });
+  assert.equal(pdlpResults.every((result) => result.ok), true, `node PDLP case failed: ${JSON.stringify(pdlpResults)}`);
+});

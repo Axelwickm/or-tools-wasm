@@ -39,9 +39,29 @@ function assertNumber(value: unknown, expected: number, message: string) {
   assert(value === expected, `${message}: expected ${expected}, got ${value}`);
 }
 
-function solutionValue(response: SolverResponse, index: number) {
-  const value = response?.solution?.[index];
-  assert(typeof value === 'number', `missing numeric solution value at index ${index}`);
+type CpSatLinearExpr = {
+  vars?: number[];
+  coeffs?: number[];
+  offset?: number;
+};
+
+function cpSolverValue(response: SolverResponse, expression: number | CpSatLinearExpr, caseName: string) {
+  if (typeof expression === 'number') {
+    return expression;
+  }
+
+  const vars = expression.vars ?? [];
+  const coeffs = expression.coeffs ?? [];
+  assert(vars.length === coeffs.length, `${caseName} expected expression vars and coeffs to match`);
+
+  let value = expression.offset ?? 0;
+  for (let i = 0; i < vars.length; i += 1) {
+    const varIndex = vars[i];
+    const coeff = coeffs[i];
+    const variableValue = response.solution?.[varIndex];
+    assert(typeof variableValue === 'number', `${caseName} expected variable ${varIndex} to have a numeric solution value`);
+    value += coeff * variableValue;
+  }
   return value;
 }
 
@@ -95,6 +115,7 @@ function helperSimpleSolveModel() {
 
 export const pythonApiContractCases: CpSatCase[] = [
   {
+    // TEMP: parity - CpModelHelperTest.test_simple_solve matches upstream proto solve assertions using the shared CP-SAT contract API.
     name: 'CpModelHelperTest/test_simple_solve',
     source: 'ortools/sat/python/cp_model_helper_test.py',
     model: helperSimpleSolveModel(),
@@ -106,6 +127,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     },
   },
   {
+    // TEMP: parity - CpModelHelperTest.test_simple_solve_with_core matches upstream proto solve assertions using the shared CP-SAT contract API.
     name: 'CpModelHelperTest/test_simple_solve_with_core',
     source: 'ortools/sat/python/cp_model_helper_test.py',
     model: helperSimpleSolveModel(),
@@ -119,6 +141,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     },
   },
   {
+    // TEMP: parity - CpModelHelperTest.test_simple_solve_with_proto_api matches upstream proto builder assertions using the shared CP-SAT contract API.
     name: 'CpModelHelperTest/test_simple_solve_with_proto_api',
     source: 'ortools/sat/python/cp_model_helper_test.py',
     model: {
@@ -151,6 +174,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     },
   },
   {
+    // TEMP: parity - CpModelHelperTest.test_solution_callback matches upstream callback count and status assertions using the shared CP-SAT contract API.
     name: 'CpModelHelperTest/test_solution_callback',
     source: 'ortools/sat/python/cp_model_helper_test.py',
     model: {
@@ -192,6 +216,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     },
   },
   {
+    // TEMP: parity - CpModelHelperTest.test_best_bound_callback matches upstream best-bound callback and status assertions using the shared CP-SAT contract API.
     name: 'CpModelHelperTest/test_best_bound_callback',
     source: 'ortools/sat/python/cp_model_helper_test.py',
     model: {
@@ -228,6 +253,42 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(result.response, 'OPTIMAL', this.name);
       assertNumber(bestBound, 2.6, `${this.name} callback bestBound`);
       return result.response.status;
+    },
+  },
+  {
+    // TEMP: parity - CpModelHelperTest.test_model_stats matches upstream non-empty model-stats assertion using the shared CP-SAT contract API.
+    name: 'CpModelHelperTest/test_model_stats',
+    source: 'ortools/sat/python/cp_model_helper_test.py',
+    model: {
+      variables: [{ domain: [-10, 10] }, { domain: [-10, 10] }, { domain: [-1000, 1000] }],
+      constraints: [
+        {
+          linear: {
+            vars: [0, 1],
+            coeffs: [1, 1],
+            domain: [-1000, 1000],
+          },
+        },
+        {
+          linear: {
+            vars: [0, 1, 2],
+            coeffs: [1, 2, -1],
+            domain: [0, 1000],
+          },
+        },
+      ],
+      objective: {
+        vars: [2],
+        coeffs: [-1],
+        scalingFactor: -1,
+      },
+      name: 'testModelStats',
+    },
+    async run(CpSat) {
+      const modelBytes = await CpSat.createModel(this.model);
+      const stats = await CpSat.modelStats(modelBytes);
+      assert(Boolean(stats), `${this.name} expected model stats to be truthy`);
+      return stats;
     },
   },
   {
@@ -290,7 +351,8 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      const values = [solutionValue(response, 0), solutionValue(response, 1), solutionValue(response, 2)];
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const values = response.solution;
       assert(new Set(values).size === 3, `${this.name} expected all values to be different`);
       return response.status;
     },
@@ -316,7 +378,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 1) === 7, `${this.name} expected target = 7`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [, targetValue] = response.solution;
+      assert(targetValue === 7, `${this.name} expected target = 7`);
       return response.status;
     },
   },
@@ -344,7 +408,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 1) === 1, `${this.name} expected y = 1`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [, yValue] = response.solution;
+      assert(yValue === 1, `${this.name} expected y = 1`);
       return response.status;
     },
   },
@@ -373,7 +439,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 1) === 1, `${this.name} expected y = 1`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [, yValue] = response.solution;
+      assert(yValue === 1, `${this.name} expected y = 1`);
       return response.status;
     },
   },
@@ -433,9 +501,11 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 3) === 1, `${this.name} expected g0 = 1`);
-      assert(solutionValue(response, 4) === 2, `${this.name} expected g1 = 2`);
-      assert(solutionValue(response, 5) === 0, `${this.name} expected g2 = 0`);
+      assert(response.solution?.length === 6, `${this.name} expected 6 solution values`);
+      const [, , , g0Value, g1Value, g2Value] = response.solution;
+      assert(g0Value === 1, `${this.name} expected g0 = 1`);
+      assert(g1Value === 2, `${this.name} expected g1 = 2`);
+      assert(g2Value === 0, `${this.name} expected g2 = 0`);
       return response.status;
     },
   },
@@ -509,7 +579,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 1) === 1, `${this.name} expected y = 1`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [, yValue] = response.solution;
+      assert(yValue === 1, `${this.name} expected y = 1`);
       return response.status;
     },
   },
@@ -527,7 +599,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 2) === 1, `${this.name} expected x2 = 1`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [, , x2Value] = response.solution;
+      assert(x2Value === 1, `${this.name} expected x2 = 1`);
       return response.status;
     },
   },
@@ -545,8 +619,10 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 1) === 0, `${this.name} expected x1 = 0`);
-      assert(solutionValue(response, 2) === 0, `${this.name} expected x2 = 0`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [, x1Value, x2Value] = response.solution;
+      assert(x1Value === 0, `${this.name} expected x1 = 0`);
+      assert(x2Value === 0, `${this.name} expected x2 = 0`);
       return response.status;
     },
   },
@@ -564,7 +640,12 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      const total = solutionValue(response, 0) + solutionValue(response, 1) + solutionValue(response, 2);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [x0Value, x1Value, x2Value] = response.solution;
+      assert(typeof x0Value === 'number', `${this.name} expected x0 to be numeric`);
+      assert(typeof x1Value === 'number', `${this.name} expected x1 to be numeric`);
+      assert(typeof x2Value === 'number', `${this.name} expected x2 to be numeric`);
+      const total = x0Value + x1Value + x2Value;
       assert(total === 1, `${this.name} expected exactly one true literal`);
       return response.status;
     },
@@ -582,8 +663,10 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 1, `${this.name} expected x0 = 1`);
-      assert(solutionValue(response, 1) === 1, `${this.name} expected x1 = 1`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [x0Value, x1Value] = response.solution;
+      assert(x0Value === 1, `${this.name} expected x0 = 1`);
+      assert(x1Value === 1, `${this.name} expected x1 = 1`);
       return response.status;
     },
   },
@@ -601,7 +684,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 2) === 0, `${this.name} expected x2 = 0`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [, , x2Value] = response.solution;
+      assert(x2Value === 0, `${this.name} expected x2 = 0`);
       return response.status;
     },
   },
@@ -626,7 +711,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 5, `${this.name} expected x = 5`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [xValue] = response.solution;
+      assert(xValue === 5, `${this.name} expected x = 5`);
       return response.status;
     },
   },
@@ -651,7 +738,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 2, `${this.name} expected x = 2`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [xValue] = response.solution;
+      assert(xValue === 2, `${this.name} expected x = 2`);
       return response.status;
     },
   },
@@ -675,7 +764,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 3, `${this.name} expected x = 3`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [xValue] = response.solution;
+      assert(xValue === 3, `${this.name} expected x = 3`);
       return response.status;
     },
   },
@@ -699,7 +790,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 2, `${this.name} expected x = 2`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [xValue] = response.solution;
+      assert(xValue === 2, `${this.name} expected x = 2`);
       return response.status;
     },
   },
@@ -724,7 +817,9 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 12, `${this.name} expected x = 12`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [xValue] = response.solution;
+      assert(xValue === 12, `${this.name} expected x = 12`);
       return response.status;
     },
   },
@@ -832,9 +927,11 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 1, `${this.name} expected x = true`);
-      assert(solutionValue(response, 1) === 0, `${this.name} expected y = false`);
-      assert(solutionValue(response, 2) === 1, `${this.name} expected z = true`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [xValue, yValue, zValue] = response.solution;
+      assert(xValue === 1, `${this.name} expected x = true`);
+      assert(yValue === 0, `${this.name} expected y = false`);
+      assert(zValue === 1, `${this.name} expected z = true`);
       return response.status;
     },
   },
@@ -892,8 +989,10 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 1, `${this.name} expected x = true`);
-      assert(solutionValue(response, 1) === 0, `${this.name} expected y = false`);
+      assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
+      const [xValue, yValue] = response.solution;
+      assert(xValue === 1, `${this.name} expected x = true`);
+      assert(yValue === 0, `${this.name} expected y = false`);
       return response.status;
     },
   },
@@ -916,8 +1015,10 @@ export const pythonApiContractCases: CpSatCase[] = [
         cpModelPresolve: false,
       });
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 2, `${this.name} expected x = 2`);
-      assert(solutionValue(response, 1) === 4, `${this.name} expected y = 4`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [xValue, yValue] = response.solution;
+      assert(xValue === 2, `${this.name} expected x = 2`);
+      assert(yValue === 4, `${this.name} expected y = 4`);
       return response.status;
     },
   },
@@ -993,8 +1094,10 @@ export const pythonApiContractCases: CpSatCase[] = [
       assert(result.response, `${this.name} returned no solver response`);
       const response = result.response;
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 10, `${this.name} expected x = 10`);
-      assert(solutionValue(response, 1) === -5, `${this.name} expected y = -5`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const [xValue, yValue] = response.solution;
+      assert(xValue === 10, `${this.name} expected x = 10`);
+      assert(yValue === -5, `${this.name} expected y = -5`);
       assert(typeof response.solveLog === 'string', `${this.name} expected solveLog`);
       assert(response.solveLog.includes('Starting CP-SAT solver'), `${this.name} expected solveLog to contain startup line`);
       assert(logLines.some((line) => line.includes('Starting CP-SAT solver')), `${this.name} expected log callback`);
@@ -1013,6 +1116,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     },
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
+      const caseName = this.name;
       const seen: number[] = [];
       const result = await CpSat.solve(
         modelBytes,
@@ -1022,7 +1126,10 @@ export const pythonApiContractCases: CpSatCase[] = [
         },
         {
           onSolution(response) {
-            seen.push(solutionValue(response, 0));
+            assert(response.solution?.length === 2, `${caseName} expected 2 solution values`);
+            const [xValue] = response.solution;
+            assert(typeof xValue === 'number', `${caseName} expected x to be numeric`);
+            seen.push(xValue);
           },
         },
       );
@@ -1075,9 +1182,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     name: 'CpModelTest/test_model_error',
     source: 'ortools/sat/python/cp_model_test.py',
     model: {
-      variables: [
-        { name: 'x0', domain: [0, -2] },
-      ],
+      variables: [{ name: 'x0' }],
     },
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
@@ -1087,6 +1192,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       });
       assert(result.response, `${this.name} returned no solver response`);
       assertStatus(result.response, 'MODEL_INVALID', this.name);
+      assert(result.response.solutionInfo === 'var #0 has no domain(): name: "x0"', `${this.name} expected exact solutionInfo, got ${String(result.response.solutionInfo)}`);
       return result.response.status;
     },
   },
@@ -1124,15 +1230,15 @@ export const pythonApiContractCases: CpSatCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     model: {
       variables: [
-        { name: 'x', domain: [2, 2] },
-        { name: 'y', domain: [3, 3] },
+        { name: 'x', domain: [0, 10] },
+        { name: 'y', domain: [0, 10] },
       ],
       constraints: [
         {
           linear: {
             vars: [0, 1],
-            coeffs: [1, 1],
-            domain: [5, 5],
+            coeffs: [1, 2],
+            domain: [29, 29],
           },
         },
       ],
@@ -1140,8 +1246,12 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
-      assert(solutionValue(response, 0) === 2, `${this.name} expected x = 2`);
-      assert(solutionValue(response, 1) === 3, `${this.name} expected y = 3`);
+      assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
+      const x = { vars: [0], coeffs: [1] };
+      const y = { vars: [1], coeffs: [1] };
+      assertNumber(cpSolverValue(response, x, this.name), 9, `${this.name} solver.value(x)`);
+      assertNumber(cpSolverValue(response, y, this.name), 10, `${this.name} solver.value(y)`);
+      assertNumber(cpSolverValue(response, 2, this.name), 2, `${this.name} solver.value(2)`);
       return response.status;
     },
   },

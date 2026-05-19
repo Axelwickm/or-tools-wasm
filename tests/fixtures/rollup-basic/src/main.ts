@@ -1,3 +1,4 @@
+import { runCpSatHighLevelParityCasesForPackage } from '../../browser-basic-src/cpsat_high_level_runner.ts';
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
 import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
@@ -78,6 +79,7 @@ async function main() {
   setStatus({ ok: false, phase: 'running' });
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
+  const ortools = await import('or-tools-wasm');
   const {
     CpSat,
     BOOL_FALSE,
@@ -98,7 +100,7 @@ async function main() {
     Pdlp,
     RoutingIndexManager,
     RoutingModel,
-  } = await import('or-tools-wasm');
+  } = ortools;
   const typedCpSat: typeof CpSatValue = CpSat;
   const routingApi = {
     BOOL_FALSE: BOOL_FALSE as typeof BoolFalseValue,
@@ -113,7 +115,8 @@ async function main() {
     RoutingIndexManager: RoutingIndexManager as typeof RoutingIndexManagerValue,
     RoutingModel: RoutingModel as typeof RoutingModelValue,
   };
-  const results = await runCpSatCases(typedCpSat, {
+  const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(ortools as never);
+  const results = await runCpSatCases(typedCpSat as never, {
     getWorkerStats: workerSpy.snapshot,
   });
   const routingWorkerStatsBefore = workerSpy.snapshot();
@@ -142,6 +145,7 @@ async function main() {
   setStatus({
     ok: true,
     results,
+    highLevelCpSatResults,
     routingResults,
     mpSolverResults,
     mathOptResults,

@@ -1,5 +1,6 @@
 import type { CpSatCase } from '../../../cpsat_types.ts';
 import { pythonApiContractCases } from './python_api_contract.ts';
+export { cpSatHighLevelParityCases, runCpSatHighLevelParityCases } from './python_high_level_parity.ts';
 
 export const cpSatCases: CpSatCase[] = pythonApiContractCases.map((testCase) => ({
   ...testCase,

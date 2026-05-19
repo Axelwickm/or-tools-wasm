@@ -19,6 +19,8 @@ import {
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm';
+import * as OrTools from 'or-tools-wasm';
+import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
@@ -29,7 +31,9 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   if (CpSat.isWorkerBridgeEnabled()) {
     throw new Error('Deno should use the direct runtime by default');
   }
-  const results = await runCpSatCases(CpSat);
+  await runCpSatHighLevelParityCasesForPackage(OrTools as never);
+
+  const results = await runCpSatCases(CpSat as never);
   for (const result of results) {
     if (result.cases.length !== cpSatCases.length) {
       throw new Error(`${result.mode} ran ${result.cases.length} cases, expected ${cpSatCases.length}`);
