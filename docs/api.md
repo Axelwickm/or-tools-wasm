@@ -16,11 +16,383 @@ cross-origin isolation headers; see [Browser requirements](../README.md#browser-
 Import:
 
 ```ts
-import { CpSat, type CpModelProto, type SatParameters } from 'or-tools-wasm';
+import {
+  CpModel,
+  CpSolver,
+  CpSolverSolutionCallback,
+  CpSat,
+  Domain,
+  LinearExpr,
+  sum,
+  weightedSum,
+  type CpModelProto,
+  type SatParameters,
+} from 'or-tools-wasm';
 ```
 
-CP-SAT is the proto-first API. Build or serialize a `CpModelProto`, validate it,
-then solve it.
+CP-SAT exposes two public API layers:
+
+- A high-level Python-like model builder around `CpModel` and `CpSolver`.
+- The proto-first `CpSat` API for callers that build or serialize
+  `CpModelProto` objects directly.
+
+Prefer the high-level API for application code, and use `CpSat` when you need
+direct generated protobuf access.
+
+### High-Level CP-SAT
+
+```ts
+const model = new CpModel();
+const x = model.newIntVar(0, 10, 'x');
+const y = model.newIntVar(0, 10, 'y');
+
+model.add(x.plus(y.times(2)).eq(14));
+model.maximize(x.plus(y));
+
+const solver = new CpSolver();
+solver.parameters.numSearchWorkers = 4;
+const status = await solver.solve(model);
+
+console.log(solver.statusName(status));
+console.log(solver.value(x), solver.value(y), solver.objectiveValue());
+```
+
+The high-level CP-SAT API uses explicit expression methods because JavaScript
+does not support Python-style operator overloading. For example:
+
+- `x.plus(y.times(2)).eq(29)` instead of `x + 2 * y == 29`
+- `x.le(10)`, `x.lt(10)`, `x.ge(0)`, `x.gt(0)`, `x.ne(y)`
+- `x.not()` or `x.negated()` for Boolean negation
+
+Most high-level methods are exported in idiomatic camelCase, with snake_case
+aliases for Python parity where useful. Some PascalCase aliases are also present
+for compatibility with existing OR-Tools examples.
+
+### `CpModel`
+
+`new CpModel(model?: CpModelProto)`
+
+Creates a high-level model. Passing an existing proto clones it into a wrapper.
+
+Common variable methods:
+
+- `newIntVar(lb, ub, name?)`
+- `new_int_var(lb, ub, name?)`
+- `NewIntVar(lb, ub, name?)`
+- `newIntVarFromDomain(domain, name?)`
+- `new_int_var_from_domain(domain, name?)`
+- `NewIntVarFromDomain(domain, name?)`
+- `newBoolVar(name?)`
+- `new_bool_var(name?)`
+- `NewBoolVar(name?)`
+- `newConstant(value, name?)`
+- `new_constant(value, name?)`
+- `NewConstant(value, name?)`
+- `getIntVarFromProtoIndex(index)`
+- `get_int_var_from_proto_index(index)`
+- `getBoolVarFromProtoIndex(index)`
+- `get_bool_var_from_proto_index(index)`
+- `getIntervalVarFromProtoIndex(index)`
+- `get_interval_var_from_proto_index(index)`
+
+Model/proto helpers:
+
+- `name`: model name getter/setter.
+- `proto()` / `Proto()`: returns the mutable `CpModelProto`.
+- `clone()`: returns a new `CpModel` wrapper around a cloned proto.
+- `removeAllNames()`
+- `remove_all_names()`
+- `validate(): Promise<string>`: returns `''` for a valid model, otherwise the
+  native validation message.
+- `modelStats(): string`
+- `hasObjective(): boolean`
+- `getOrMakeIndexFromConstant(value)`
+- `get_or_make_index_from_constant(value)`
+- `getOrMakeVariableIndex(variable)`
+- `get_or_make_variable_index(variable)`
+- `isBooleanValue(value)` / `is_boolean_value(value)`
+- `isBooleanIndex(index)`
+- `literalReferences(literals)`
+
+Linear constraints and objectives:
+
+- `add(bound: BoundedLinearExpr | boolean)`
+- `Add(bound)`
+- `addLinearConstraint(expression, lb, ub)`
+- `add_linear_constraint(expression, lb, ub)`
+- `AddLinearConstraint(expression, lb, ub)`
+- `addEquality(left, right)`
+- `minimize(expression)`
+- `Minimize(expression)`
+- `maximize(expression)`
+- `Maximize(expression)`
+
+Logical constraints:
+
+- `addBoolOr(literals)`
+- `add_bool_or(literals)`
+- `AddBoolOr(literals)`
+- `addBoolAnd(literals)`
+- `add_bool_and(literals)`
+- `AddBoolAnd(literals)`
+- `addBoolXor(literals)`
+- `add_bool_xor(literals)`
+- `AddBoolXOr(literals)`
+- `addAtLeastOne(literals)`
+- `add_at_least_one(literals)`
+- `addAtMostOne(literals)`
+- `add_at_most_one(literals)`
+- `addExactlyOne(literals)`
+- `add_exactly_one(literals)`
+- `addImplication(left, right)`
+- `add_implication(left, right)`
+- `addMapDomain(variable, booleanVariables, offset?)`
+- `add_map_domain(variable, booleanVariables, offset?)`
+
+Integer and table constraints:
+
+- `addAllDifferent(expressions)`
+- `AddAllDifferent(expressions)`
+- `addElement(index, expressions, target)`
+- `addAllowedAssignments(expressions, tuples)`
+- `addForbiddenAssignments(expressions, tuples)`
+- `addAutomaton(expressions, startingState, finalStates, transitions)`
+- `addCircuit(arcs)`
+- `addMultipleCircuit(arcs)`
+- `addInverse(direct, inverse)`
+- `addMaxEquality(target, expressions)`
+- `add_max_equality(target, expressions)`
+- `addMinEquality(target, expressions)`
+- `add_min_equality(target, expressions)`
+- `addAbsEquality(target, expression)`
+- `add_abs_equality(target, expression)`
+- `addDivisionEquality(target, numerator, denominator)`
+- `add_division_equality(target, numerator, denominator)`
+- `addModuloEquality(target, expression, modulo)`
+- `add_modulo_equality(target, expression, modulo)`
+- `addMultiplicationEquality(target, expressions)`
+- `add_multiplication_equality(target, expressions)`
+
+Scheduling constraints:
+
+- `newIntervalVar(start, size, end, name?)`
+- `new_interval_var(start, size, end, name?)`
+- `newFixedSizeIntervalVar(start, size, name?)`
+- `new_fixed_size_interval_var(start, size, name?)`
+- `newOptionalFixedSizeIntervalVar(start, size, isPresent, name?)`
+- `new_optional_fixed_size_interval_var(start, size, isPresent, name?)`
+- `newOptionalIntervalVar(start, size, end, isPresent, name?)`
+- `new_optional_interval_var(start, size, end, isPresent, name?)`
+- `addNoOverlap(intervals)`
+- `add_no_overlap(intervals)`
+- `AddNoOverlap(intervals)`
+- `addNoOverlap2D(xIntervals, yIntervals)`
+- `add_no_overlap_2d(xIntervals, yIntervals)`
+- `AddNoOverlap2D(xIntervals, yIntervals)`
+- `addCumulative(intervals, demands, capacity)`
+- `add_cumulative(intervals, demands, capacity)`
+- `addReservoirConstraint(times, levelChanges, minLevel, maxLevel, activeLiterals?)`
+
+Search and hints:
+
+- `addDecisionStrategy(expressions, variableSelectionStrategy, domainReductionStrategy)`
+- `addHint(variable, value)`
+- `addAssumption(literal)`
+- `addAssumptions(literals)`
+- `clearAssumptions()`
+
+### Expressions And Variables
+
+The high-level package exports:
+
+- `IntVar`, `BoolVar`, `NotBoolVar`
+- `LinearExpr`, `BoundedLinearExpr`, `BoundedLinearExpression`
+- `FlatIntExpr`, `FlatFloatExpr`
+- `IntervalVar`, `Constraint`
+- `Domain`
+- `ValueError`, `RuntimeError`, `ArithmeticError`, `NotImplementedError`
+- `sum(values)`, `weightedSum(values, coeffs)`, `term(variable, coeff)`
+- `object_is_a_true_literal(literal)`, `object_is_a_false_literal(literal)`
+- `rebuild_from_linear_expression_proto(proto, modelProto)`
+- camelCase aliases: `objectIsATrueLiteral`, `objectIsAFalseLiteral`,
+  `rebuildFromLinearExpressionProto`
+- types: `LinearExprLike`, `LiteralLike`
+
+Expression helpers:
+
+- `LinearExpr.constant(value)`
+- `LinearExpr.from(value)`
+- `LinearExpr.affine(expression, coeff, offset)`
+- `LinearExpr.sum(values)` / `LinearExpr.Sum(values)`
+- `LinearExpr.weightedSum(values, coeffs)`
+- `LinearExpr.weighted_sum(values, coeffs)`
+- `LinearExpr.WeightedSum(values, coeffs)`
+- `LinearExpr.term(variable, coeff)` / `LinearExpr.Term(variable, coeff)`
+- `plus(value, coeff?)`, `minus(value)`, `times(coeff)`, `neg()`
+- `eq(value)`, `ne(value)`, `le(value)`, `lt(value)`, `ge(value)`, `gt(value)`
+- `toProto()`
+- `isInteger()` / `is_integer()`
+- `hasFloatingPointTerms()`
+- `toString()` and `repr()` for display/debug parity with Python-style tests
+- `toFloatObjective(maximize?)`
+
+Unsupported Python-style operation methods such as `abs()`, `div()`,
+`truediv()`, `mod()`, and the `__pow__`/bitwise helpers throw
+`NotImplementedError` with guidance to use the matching `CpModel` constraint
+method instead.
+
+`IntVar` supports:
+
+- `name`, `model_proto`, `expr()`
+- `plus(value, coeff?)`, `minus(value)`, `times(coeff)`, `neg()`
+- `eq(value)`, `ne(value)`, `le(value)`, `lt(value)`, `ge(value)`, `gt(value)`
+- `isInteger()` / `is_integer()`
+- `isBoolean()` / `is_boolean`
+- `negated()` for Boolean variables
+- `debugString()`, `repr()`, `toString()`
+- Python-style helper aliases used by parity tests: `__add__`, `__mul__`,
+  `__lt__`, `__gt__`, `__abs__`, `__div__`, `__truediv__`, `__mod__`, and
+  unsupported bitwise/power helpers.
+
+`BoolVar` extends `IntVar` with:
+
+- `literalIndex`
+- `not()`
+
+`NotBoolVar` supports:
+
+- `variable`, `model`, `index`, `name`, `model_proto`
+- `not()` / `negated()`
+- `expr()`
+- `plus(value, coeff?)`, `minus(value)`, `times(coeff)`, `neg()`
+- `isInteger()` / `is_integer()`
+- `repr()`, `toString()`
+
+`FlatIntExpr` and `FlatFloatExpr` support:
+
+- `vars`
+- `coeffs`
+- `offset`
+- `expr()`
+- `plus(value)`, `minus(value)`, `times(coeff)`
+- `repr()`, `toString()`
+
+`BoundedLinearExpr` supports:
+
+- `expression`
+- `lowerBound`
+- `upperBound`
+- `domain`
+- `toString()`
+
+`BoundedLinearExpression` builds a `BoundedLinearExpr` from an expression and a
+`Domain`.
+
+`Domain` supports:
+
+- `new Domain(lower, upper)`
+- `new Domain(value)`
+- `Domain.fromFlatIntervals(intervals)`
+- `Domain.from_flat_intervals(intervals)`
+- `Domain.fromIntervals(intervals)`
+- `Domain.from_intervals(intervals)`
+- `Domain.fromValues(values)`
+- `Domain.from_values(values)`
+- `flatIntervals`
+
+`Constraint` supports:
+
+- `model`
+- `index`
+- `name`
+- `withName(name)`
+- `with_name(name)`
+- `onlyEnforceIf(literals)`
+
+`IntervalVar` supports:
+
+- `model`
+- `index`
+- `name`
+- `model_proto`
+- `startExpr()`
+- `sizeExpr()`
+- `endExpr()`
+- `presenceLiterals()`
+- `repr()`, `toString()`
+
+### `CpSolver`
+
+`new CpSolver()`
+
+High-level solver wrapper. It delegates to the proto-first `CpSat` runtime while
+keeping the latest decoded response for Python-like result helpers.
+
+`solver.parameters`
+
+Mutable `SatParameters` object merged into every `solve()` call unless raw
+parameters are passed.
+
+`solver.solve(model, paramsOrCallback?, callbacks?): Promise<CpSolverStatus | undefined>`
+
+Solves a `CpModel`. The second argument can be:
+
+- a `SatParameters` object
+- raw `Uint8Array` parameter bytes
+- a `CpSolverSolutionCallback`
+- `null`
+
+Result helpers:
+
+- `response()`
+- `responseStats()`
+- `solutionInfo()`
+- `statusName(status?)`
+- `value(expression)`
+- `floatValue(expression)`
+- `booleanValue(literal)`
+- `objectiveValue()`
+- `bestObjectiveBound()`
+
+Response properties:
+
+- `response_proto`
+- `solve_log`
+- `objective_value`
+- `best_objective_bound`
+- `wall_time` / `wallTime`
+- `user_time`
+- `deterministic_time`
+- `num_booleans` / `numBooleans`
+- `num_conflicts` / `numConflicts`
+- `num_branches` / `numBranches`
+- `num_integers`
+- `num_binary_propagations`
+- `num_integer_propagations`
+
+Callbacks:
+
+- `solver.bestBoundCallback = (bound) => {}`
+- `solver.logCallback = (message) => {}`
+- Python-style aliases: `best_bound_callback`, `log_callback`
+
+`CpSolverSolutionCallback` can be subclassed or assigned an
+`onSolutionCallback()` method. During a callback, use `value()`, `floatValue()`,
+`booleanValue()`, `objectiveValue`, `bestObjectiveBound`, and `wallTime`.
+
+```ts
+class Printer extends CpSolverSolutionCallback {
+  onSolutionCallback() {
+    console.log(this.value(x));
+  }
+}
+
+await solver.solve(model, new Printer());
+```
+
+### Proto-First CP-SAT
+
+Build or serialize a `CpModelProto`, validate it, then solve it:
 
 ```ts
 const modelBytes = await CpSat.createModel(model);

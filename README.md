@@ -116,9 +116,10 @@ yet. Commercial and large third-party native backends such as Gurobi, CPLEX,
 XPRESS, HiGHS, OSQP, ECOS, and SCS are not planned.
 
 The TypeScript API mirrors the public OR-Tools API shape where it maps cleanly
-to WebAssembly. CP-SAT is proto-first, routing exposes the familiar
-`RoutingIndexManager` and `RoutingModel` APIs, MPSolver exposes the
-`pywraplp`-style solver API, and MathOpt exposes a TypeScript model builder.
+to WebAssembly. CP-SAT exposes both a Python-like high-level builder and the
+proto-first `CpSat` API, routing exposes the familiar `RoutingIndexManager` and
+`RoutingModel` APIs, MPSolver exposes the `pywraplp`-style solver API, and
+MathOpt exposes a TypeScript model builder.
 
 The worker script and WebAssembly files are emitted automatically from package
 imports, with no manual copying into `public/` or `static/` required.
