@@ -44,6 +44,7 @@ export default defineConfig({
         schema_viewer: path.resolve(siteRoot, 'schema_viewer.html'),
         sports_scheduling: path.resolve(siteRoot, 'sports_scheduling.html'),
         steel_mill_slab: path.resolve(siteRoot, 'steel_mill_slab.html'),
+        sudoku_generator: path.resolve(siteRoot, 'sudoku_generator.html'),
       },
     },
   },

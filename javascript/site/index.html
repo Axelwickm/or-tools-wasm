@@ -36,42 +36,6 @@
     <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>, and the package is on
     <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>.
   </p>
-  <h2>Solver coverage</h2>
-  <table class="solver-coverage">
-    <thead>
-      <tr>
-        <th>OR-Tools solver</th>
-        <th>Here</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>CP-SAT</td><td class="supported">✅</td><td>Constraint and integer optimization for Boolean, integer, scheduling, and logical models.</td></tr>
-      <tr><td>Routing</td><td class="supported">✅</td><td>Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search.</td></tr>
-      <tr><td>MPSolver API</td><td class="supported">✅</td><td>Linear and mixed-integer programming wrapper with GLOP LP and SAT MIP backends.</td></tr>
-      <tr><td>MathOpt API</td><td class="supported">✅</td><td>Unified modeling and solve API with GLOP, CP-SAT, and PDLP backends.</td></tr>
-      <tr><td>GLOP</td><td class="supported">✅</td><td>Google's simplex linear programming solver.</td></tr>
-      <tr><td>PDLP</td><td class="supported">✅</td><td>First-order LP and convex diagonal quadratic solver for very large models.</td></tr>
-      <tr><td>SAT integer programming</td><td class="supported">✅</td><td>CP-SAT-backed integer programming backend for pure integer linear models.</td></tr>
-      <tr><td>CLP</td><td></td><td>COIN-OR linear programming backend.</td></tr>
-      <tr><td>GLPK</td><td></td><td>GNU linear and mixed-integer programming backend.</td></tr>
-      <tr><td>SCIP / GSCIP</td><td></td><td>SCIP-based LP, MIP, and nonconvex integer quadratic backend.</td></tr>
-      <tr><td>CBC</td><td></td><td>COIN-OR branch-and-cut mixed-integer programming backend.</td></tr>
-      <tr><td>HiGHS</td><td></td><td>Linear and mixed-integer programming backend.</td></tr>
-      <tr><td>BOP</td><td></td><td>Boolean optimization backend for mostly Boolean integer models.</td></tr>
-      <tr><td>Knapsack</td><td></td><td>Dedicated knapsack mixed-integer programming backend.</td></tr>
-      <tr><td>Gurobi</td><td></td><td>Commercial LP, MIP, and nonconvex integer quadratic backend.</td></tr>
-      <tr><td>CPLEX</td><td></td><td>Commercial linear and mixed-integer programming backend.</td></tr>
-      <tr><td>XPRESS</td><td></td><td>Commercial LP, MIP, and nonconvex integer quadratic backend.</td></tr>
-      <tr><td>COPT</td><td></td><td>Commercial linear and mixed-integer programming backend exposed by MPSolver.</td></tr>
-      <tr><td>OSQP</td><td></td><td>Continuous convex quadratic programming backend exposed by MathOpt.</td></tr>
-      <tr><td>ECOS</td><td></td><td>Conic optimization backend exposed by MathOpt.</td></tr>
-      <tr><td>SCS</td><td></td><td>First-order conic optimization backend exposed by MathOpt.</td></tr>
-      <tr><td>Santorini</td><td></td><td>MathOpt reference MIP solver, intended for testing rather than production.</td></tr>
-      <tr><td>Network flow algorithms</td><td></td><td>Max-flow and min-cost-flow graph optimization algorithms.</td></tr>
-      <tr><td>Assignment algorithms</td><td></td><td>Linear-sum assignment and related assignment optimization algorithms.</td></tr>
-    </tbody>
-  </table>
   <h2>CP-SAT</h2>
   <p class="solver-description">
     Use <a href="https://developers.google.com/optimization/cp/cp_solver" rel="noopener">CP-SAT</a> for discrete optimization problems with integer, Boolean, scheduling, and logical constraints.
@@ -82,6 +46,7 @@
     <li><a href="./schema_viewer.html">Schema Viewer - print embedded proto schemas</a></li>
     <li><a href="./sports_scheduling.html">Sports Scheduling - double round-robin minimization</a></li>
     <li><a href="./steel_mill_slab.html">Steel Mill Slab - compare three solver variants</a></li>
+    <li><a href="./sudoku_generator.html">Sudoku Generator - remove clues while CP-SAT proves uniqueness</a></li>
   </ul>
   <h2>Routing</h2>
   <p class="solver-description">

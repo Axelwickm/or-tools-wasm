@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>CP-SAT - Sudoku Generator</title>
+		<link rel="stylesheet" href="./example.css">
+		<style>
+			.sudoku-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
+				gap: 1rem;
+				align-items: start;
+			}
+			#sudoku-board {
+				display: grid;
+				grid-template-columns: repeat(9, minmax(0, 1fr));
+				width: min(100%, 25rem);
+				aspect-ratio: 1;
+				border: 2px solid #24292f;
+				background: #24292f;
+			}
+			.sudoku-cell {
+				width: 100%;
+				min-width: 0;
+				border: 1px solid #d0d7de;
+				background: #fff;
+				text-align: center;
+				font-size: clamp(1rem, 4vw, 1.5rem);
+				font-variant-numeric: tabular-nums;
+				box-sizing: border-box;
+			}
+			.sudoku-cell:nth-child(3n) {
+				border-right-color: #24292f;
+			}
+			.sudoku-cell:nth-child(n+19):nth-child(-n+27),
+			.sudoku-cell:nth-child(n+46):nth-child(-n+54) {
+				border-bottom-color: #24292f;
+			}
+			.sudoku-cell.given {
+				background: #eef6ff;
+				font-weight: 700;
+			}
+			.sudoku-cell.testing {
+				background: #fff8c5;
+			}
+			.sudoku-cell.removed {
+				background: #f6f8fa;
+				color: #8c959f;
+			}
+			.sudoku-cell.solved {
+				color: #1a7f37;
+			}
+			#status {
+				min-height: 18rem;
+			}
+			@media (max-width: 820px) {
+				.sudoku-layout {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<nav>
+			<a href="./index.html">← All examples</a>
+			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+		</nav>
+		<h1>CP-SAT - Sudoku Generator</h1>
+		<div class="code-toggle">
+			<details>
+				<summary>Show code</summary>
+				<pre class="code-block"><code><span class="kw">import</span> { CpSat } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+
+<span class="kw">const</span> model = <span class="kw">await</span> CpSat.<span class="fn">createModel</span>(<span class="comment">/* 729 Boolean variables: row, col, digit */</span>);
+<span class="kw">const</span> first = <span class="kw">await</span> CpSat.<span class="fn">solve</span>(model, { stopAfterFirstSolution: <span class="kw">true</span> });
+<span class="comment">// To prove uniqueness, add one no-good constraint that blocks the first grid.</span>
+<span class="kw">const</span> second = <span class="kw">await</span> CpSat.<span class="fn">solve</span>(blockedModel, { stopAfterFirstSolution: <span class="kw">true</span> });
+console.<span class="fn">log</span>(second.response?.status === <span class="str">'INFEASIBLE'</span>);</code></pre>
+			</details>
+		</div>
+		<p>
+			Generate a Sudoku puzzle by solving a full CP-SAT model, removing clues one by one, and proving after each removal that the puzzle still has a unique solution.
+		</p>
+		<div class="controls">
+			<label>Target clues <input id="target-clues" class="short-number" type="number" value="0" min="0" max="81"></label>
+			<label>Seed <input id="seed" class="medium-number" type="number" value="1" min="1"></label>
+			<label>Workers <input id="workers" class="short-number" type="number" value="1" min="1"></label>
+			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<button id="generate">Generate</button>
+			<button id="solve">Solve board</button>
+			<button id="clear">Clear</button>
+			<button id="stop" disabled>Stop</button>
+		</div>
+		<div class="sudoku-layout">
+			<div id="sudoku-board" aria-label="Sudoku board"></div>
+			<div>
+				<p>Status / Search:</p>
+				<pre id="status">Generate a puzzle to watch CP-SAT remove clues.</pre>
+			</div>
+		</div>
+		<script type="module" src="./sudoku_generator.ts"></script>
+	</body>
+</html>
