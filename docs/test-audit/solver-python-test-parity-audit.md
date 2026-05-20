@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 391 ✅ implemented; 24 🟨 placeholders/API gaps; 2 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 3.
+Totals: 613 upstream tests; 392 ✅ implemented; 23 🟨 placeholders/API gaps; 2 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 3.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -223,14 +223,14 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 - MPSolver backend coverage
   - 🧪 CLP backend LP coverage - CLP now runs through the same shared TS/WASM MPSolver public API cases as GLOP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("CLP")`, `SupportsProblemType(CLP_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. This is backend parity coverage, not a separate upstream Python `test_clp` because upstream has no explicit Python CLP test body.
   - 🧪 GLPK backend LP/MIP coverage - GLPK runs through the same shared TS/WASM MPSolver public API LP cases as GLOP/CLP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("GLPK_LP")`, `SupportsProblemType(GLPK_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. GLPK also runs direct MIP solve cases for `CreateSolver("GLPK")`, `SupportsProblemType(GLPK_MIXED_INTEGER_PROGRAMMING)`, and the `simple_mip_program.py` model. This is backend parity coverage, not a separate upstream Python `test_glpk` because upstream has no explicit Python GLPK solve test body.
-  - 🧪 SCIP backend MIP coverage - SCIP now runs shared TS/WASM MPSolver public API MIP cases for `CreateSolver("SCIP")`, `SupportsProblemType(SCIP_MIXED_INTEGER_PROGRAMMING)`, parse/check support, solve status, objective/value checks, `VerifySolution()`, and the `simple_mip_program.py` model. This is backend coverage; upstream `lp_test.py/testApi` still mixes SCIP with Python-only natural expression helpers and is not full parity yet.
+  - ✅ 🔎 SCIP backend MIP coverage - SCIP now runs shared TS/WASM MPSolver public API MIP cases for `CreateSolver("SCIP")`, `SupportsProblemType(SCIP_MIXED_INTEGER_PROGRAMMING)`, parse/check support, solve status, objective/value checks, `VerifySolution()`, and the `simple_mip_program.py` model. This matches the SCIP branch of upstream `lp_test.py/testApi`; upstream only defines `SCIP_MIXED_INTEGER_PROGRAMMING`, so the Python-only natural expression LP helper branch is not reached for SCIP.
 - PyWrapLp
   - ➖ 🔎 PyWrapLp.test_proto - CBC backend is not linked/exposed
   - ✅ 🔎 PyWrapLp.test_external_api
 
 ## ortools/linear_solver/python/lp_test.py
 - PyWrapLpTest
-  - 🟨 🔎 PyWrapLpTest.testApi - SCIP backend is linked and smoke-tested, but full parity is blocked by Python-only natural expression helper assertions
+  - ✅ 🔎 PyWrapLpTest.testApi
   - ✅ 🔎 PyWrapLpTest.testSetHint
   - ➖ 🔎 PyWrapLpTest.testBopInfeasible - BOP backend is not linked/exposed
   - ✅ 🔎 PyWrapLpTest.testLoadSolutionFromProto

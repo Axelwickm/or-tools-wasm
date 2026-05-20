@@ -325,6 +325,8 @@ async function runGlpkMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseRe
 }
 
 async function runScipMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  // TEMP: parity - matches ortools/linear_solver/python/lp_test.py testApi for
+  // SCIP_MIXED_INTEGER_PROGRAMMING, which reaches RunMixedIntegerExampleCppStyleAPI.
   assert(api.MPSolver.SupportsProblemType(api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING), 'MPSolver: SCIP MIP not supported');
   assert(api.MPSolver.ParseSolverType('SCIP') === api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING, 'MPSolver: SCIP ParseSolverType mismatch');
   assert(
