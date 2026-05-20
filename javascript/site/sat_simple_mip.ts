@@ -8,6 +8,7 @@ const workerInput = document.getElementById('workers') as HTMLInputElement | nul
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
+const solverId = document.body.dataset.solverId === 'GLPK' ? 'GLPK' : 'SAT';
 
 if (workerInput) {
   workerInput.max = String(maxWorkerCount);
@@ -16,6 +17,11 @@ if (workerInput) {
 }
 
 configureWorkerBridge(workerBridgeToggle);
+
+if (solverId === 'GLPK') {
+  if (workerInput) workerInput.disabled = true;
+  if (workerBridgeToggle) workerBridgeToggle.disabled = true;
+}
 
 function getSelectedWorkerCount() {
   const requested = Number.parseInt(workerInput?.value ?? '1', 10) || 1;
@@ -30,8 +36,8 @@ async function runSimpleMip() {
   try {
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
     await initMPSolver();
-    const solver = MPSolver.CreateSolver('SAT');
-    if (!solver) throw new Error('SAT backend is unavailable in this build.');
+    const solver = MPSolver.CreateSolver(solverId);
+    if (!solver) throw new Error(`${solverId} backend is unavailable in this build.`);
     try {
       const infinity = solver.infinity();
       const x = solver.IntVar(0, infinity, 'x');
@@ -48,18 +54,25 @@ async function runSimpleMip() {
       objective.SetCoefficient(y, 10);
       objective.SetMaximization();
 
-      const workerCount = getSelectedWorkerCount();
-      appendStatus(statusEl, `Solving with SAT integer backend, workers=${workerCount}...`);
-      const protoResult = await solver.SolveWithProto({
-        solverSpecificParameters: `num_workers: ${workerCount}`,
-      });
-      if (!protoResult.loaded) throw new Error('Solver returned a solution response that could not be loaded.');
+      const workerCount = solverId === 'SAT' ? getSelectedWorkerCount() : undefined;
+      appendStatus(statusEl, workerCount
+        ? `Solving with SAT integer backend, workers=${workerCount}...`
+        : `Solving with ${solverId} integer backend...`);
+      if (solverId === 'SAT') {
+        const protoResult = await solver.SolveWithProto({
+          solverSpecificParameters: `num_workers: ${workerCount}`,
+        });
+        if (!protoResult.loaded) throw new Error('Solver returned a solution response that could not be loaded.');
+      } else {
+        const status = await solver.Solve();
+        if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
+      }
       if (Math.abs(objective.Value() - 23) > 1e-6) {
         throw new Error(`Expected objective 23, got ${formatNumber(objective.Value())}.`);
       }
 
       renderSimpleMpResult(solutionOutput, {
-        status: protoResult.response.status ?? MPSolver.OPTIMAL,
+        status: MPSolver.OPTIMAL,
         objective: objective.Value(),
         x: x.solution_value(),
         y: y.solution_value(),

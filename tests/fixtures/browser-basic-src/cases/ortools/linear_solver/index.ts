@@ -135,6 +135,8 @@ export type MPSolverApi = {
     new(name: string, problemType: number): MPSolverLike;
     GLOP_LINEAR_PROGRAMMING: number;
     CLP_LINEAR_PROGRAMMING: number;
+    GLPK_LINEAR_PROGRAMMING: number;
+    GLPK_MIXED_INTEGER_PROGRAMMING: number;
     SAT_INTEGER_PROGRAMMING: number;
     OPTIMAL: number;
     INFEASIBLE: number;
@@ -174,7 +176,7 @@ export type MPSolverApi = {
 };
 
 type LpBackend = {
-  solverId: 'GLOP' | 'CLP';
+  solverId: 'GLOP' | 'CLP' | 'GLPK_LP';
   problemType: number;
   supportsExactConditionNumber: boolean;
   x3ReducedCost: number;
@@ -195,13 +197,19 @@ function lpBackends(api: MPSolverApi): LpBackend[] {
     {
       solverId: 'GLOP',
       problemType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
-      supportsExactConditionNumber: true,
+      supportsExactConditionNumber: false,
       x3ReducedCost: -2.666666666666667,
     },
     {
       solverId: 'CLP',
       problemType: api.MPSolver.CLP_LINEAR_PROGRAMMING,
       supportsExactConditionNumber: false,
+      x3ReducedCost: -2.666666666666667,
+    },
+    {
+      solverId: 'GLPK_LP',
+      problemType: api.MPSolver.GLPK_LINEAR_PROGRAMMING,
+      supportsExactConditionNumber: true,
       x3ReducedCost: -2.666666666666667,
     },
   ];
@@ -268,8 +276,15 @@ async function runSimpleProgram(
 }
 
 async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
-  const name = 'MPSolver: lp_test.py RunMixedIntegerExampleCppStyleAPI';
-  const solver = createSolver(api, 'SAT', name);
+  return runMixedIntegerCppStyleBackendCase(api, 'SAT', 'MPSolver: lp_test.py RunMixedIntegerExampleCppStyleAPI');
+}
+
+async function runMixedIntegerCppStyleBackendCase(
+  api: MPSolverApi,
+  solverId: 'SAT' | 'GLPK',
+  name: string,
+): Promise<MpSolverCaseResult> {
+  const solver = createSolver(api, solverId, name);
   try {
     const infinity = solver.infinity();
     const x1 = solver.IntVar(0.0, infinity, 'x1');
@@ -301,6 +316,11 @@ async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCa
   } finally {
     solver.delete();
   }
+}
+
+async function runGlpkMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.GLPK_MIXED_INTEGER_PROGRAMMING), 'MPSolver: GLPK MIP not supported');
+  return runMixedIntegerCppStyleBackendCase(api, 'GLPK', 'MPSolver: GLPK_MIXED_INTEGER_PROGRAMMING');
 }
 
 async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
@@ -814,6 +834,7 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     ),
     ...linearCppStyleResults,
     await runMixedIntegerCppStyleCase(api),
+    await runGlpkMixedIntegerCase(api),
     await runBooleanCppStyleCase(api),
     skipped(
       'MPSolver: lp_test.py testApi',
@@ -838,8 +859,32 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     ),
     await runSimpleProgram(
       api,
+      'MPSolver: CLP simple_lp_program.py',
+      'CLP',
+      (solver, infinity) => solver.NumVar(0, infinity, 'x'),
+      (solver, infinity) => solver.NumVar(0, infinity, 'y'),
+      { objective: 25, x: 0, y: 2.5 },
+    ),
+    await runSimpleProgram(
+      api,
+      'MPSolver: GLPK_LP simple_lp_program.py',
+      'GLPK_LP',
+      (solver, infinity) => solver.NumVar(0, infinity, 'x'),
+      (solver, infinity) => solver.NumVar(0, infinity, 'y'),
+      { objective: 25, x: 0, y: 2.5 },
+    ),
+    await runSimpleProgram(
+      api,
       'MPSolver: simple_mip_program.py',
       'SAT',
+      (solver, infinity) => solver.IntVar(0, infinity, 'x'),
+      (solver, infinity) => solver.IntVar(0, infinity, 'y'),
+      { objective: 23, x: 3, y: 2 },
+    ),
+    await runSimpleProgram(
+      api,
+      'MPSolver: GLPK simple_mip_program.py',
+      'GLPK',
       (solver, infinity) => solver.IntVar(0, infinity, 'x'),
       (solver, infinity) => solver.IntVar(0, infinity, 'y'),
       { objective: 23, x: 3, y: 2 },

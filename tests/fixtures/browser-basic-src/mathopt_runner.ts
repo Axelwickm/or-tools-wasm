@@ -249,7 +249,12 @@ export type MathOptApi = {
     SolverType: {
       GLOP: number;
       CP_SAT: number;
+      GLPK: number;
     };
+    GlpkParameters?: new (options?: {
+      computeUnboundRaysIfPossible?: boolean;
+      compute_unbound_rays_if_possible?: boolean;
+    }) => unknown;
     LinearExpression: abstract new (...args: never[]) => MathOptLinearExpressionLike;
     QuadraticExpression: abstract new (...args: never[]) => MathOptQuadraticExpressionLike;
     QuadraticTermKey: abstract new (...args: never[]) => MathOptQuadraticTermKeyLike;
@@ -280,6 +285,7 @@ export type MathOptApi = {
       solverType?: number | string;
       threads?: number;
       iterationLimit?: number;
+      glpk?: unknown;
     }): Promise<{
       terminationReason: string;
       primalBound: number | null;
@@ -408,6 +414,59 @@ async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
   };
 }
 
+async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<MathOptCaseResult> {
+  const model = api.MathOpt.Model('mathopt_glpk_lp');
+  const x = model.addVariable({ lowerBound: 0, name: 'x' });
+  const y = model.addVariable({ lowerBound: 0, name: 'y' });
+  model.addLinearConstraint({
+    upperBound: 14,
+    terms: [
+      { variable: x, coefficient: 1 },
+      { variable: y, coefficient: 1 },
+    ],
+    name: 'demand',
+  });
+  model.addLinearConstraint({
+    upperBound: 20,
+    terms: [
+      { variable: x, coefficient: 2 },
+      { variable: y, coefficient: 1 },
+    ],
+    name: 'capacity',
+  });
+  model.maximize([
+    { variable: x, coefficient: 3 },
+    { variable: y, coefficient: 4 },
+  ]);
+
+  const glpk = api.MathOpt.GlpkParameters
+    ? new api.MathOpt.GlpkParameters({ computeUnboundRaysIfPossible: false })
+    : undefined;
+  const result = await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLPK, threads: 1, glpk });
+  assertOptimal('MathOpt GLPK LP', result);
+  assert(near(result.objectiveValue, 56), `MathOpt GLPK LP: expected objective 56, got ${result.objectiveValue}`);
+  assert(near(result.variableValues.x, 0), `MathOpt GLPK LP: expected x=0, got ${result.variableValues.x}`);
+  assert(near(result.variableValues.y, 14), `MathOpt GLPK LP: expected y=14, got ${result.variableValues.y}`);
+
+  let rejectedThreads = false;
+  try {
+    await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLPK, threads: 4 });
+  } catch (error) {
+    rejectedThreads = error instanceof Error && error.message.includes('GLPK');
+  }
+  assert(rejectedThreads, 'MathOpt GLPK LP: expected threads > 1 to be rejected');
+
+  return {
+    name: 'MathOpt.testGlpkLinearProgram',
+    mode,
+    threads: 1,
+    ok: true,
+    terminationReason: result.terminationReason,
+    objectiveValue: result.objectiveValue,
+    values: result.variableValues,
+  };
+}
+
 export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
   await api.initMathOpt();
   const results: MathOptCaseResult[] = [];
@@ -419,6 +478,10 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
       results.push(await runGlopLp(api, mode, threads));
       options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
       results.push(await runCpSatMip(api, mode, threads));
+      if (threads === 1) {
+        options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
+        results.push(await runGlpkLp(api, mode));
+      }
       for (const testCase of mathOptExpressionContractCases) {
         options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
         const output = await testCase.run(api);

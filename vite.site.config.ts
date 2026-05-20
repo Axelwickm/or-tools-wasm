@@ -33,6 +33,8 @@ export default defineConfig({
         clp_transportation: path.resolve(siteRoot, 'clp_transportation.html'),
         glop_simple_lp: path.resolve(siteRoot, 'glop_simple_lp.html'),
         glop_stigler_diet: path.resolve(siteRoot, 'glop_stigler_diet.html'),
+        glpk_simple_lp: path.resolve(siteRoot, 'glpk_simple_lp.html'),
+        glpk_simple_mip: path.resolve(siteRoot, 'glpk_simple_mip.html'),
         index: path.resolve(siteRoot, 'index.html'),
         magic_square: path.resolve(siteRoot, 'magic_square.html'),
         mathopt_basic: path.resolve(siteRoot, 'mathopt_basic.html'),

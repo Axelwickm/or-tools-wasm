@@ -3,7 +3,7 @@ import { CpSat, initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm';
 type VariableKind = 'continuous' | 'integer';
 
 export type SimpleMpConfig = {
-  solverId: 'GLOP' | 'CLP' | 'SAT';
+  solverId: 'GLOP' | 'CLP' | 'GLPK_LP' | 'GLPK' | 'SAT';
   variableKind: VariableKind;
   expectedObjective: number;
   workerCount?: number;

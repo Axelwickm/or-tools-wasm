@@ -222,6 +222,7 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 ## ortools/linear_solver/python/pywraplp_test.py
 - MPSolver backend coverage
   - 🧪 CLP backend LP coverage - CLP now runs through the same shared TS/WASM MPSolver public API cases as GLOP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("CLP")`, `SupportsProblemType(CLP_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. This is backend parity coverage, not a separate upstream Python `test_clp` because upstream has no explicit Python CLP test body.
+  - 🧪 GLPK backend LP/MIP coverage - GLPK runs through the same shared TS/WASM MPSolver public API LP cases as GLOP/CLP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("GLPK_LP")`, `SupportsProblemType(GLPK_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. GLPK also runs direct MIP solve cases for `CreateSolver("GLPK")`, `SupportsProblemType(GLPK_MIXED_INTEGER_PROGRAMMING)`, and the `simple_mip_program.py` model. This is backend parity coverage, not a separate upstream Python `test_glpk` because upstream has no explicit Python GLPK solve test body.
 - PyWrapLp
   - ➖ 🔎 PyWrapLp.test_proto - CBC backend is not linked/exposed
   - ✅ 🔎 PyWrapLp.test_external_api
@@ -238,6 +239,15 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 ## ortools/linear_solver/python/lp_api_test.py
 - 🟨 🔎 test_sum_no_brackets - placeholder: Python generator/list summation helper behavior only
 - ✅ 🔎 test_proto
+
+## ortools/math_opt/python/parameters_test.py
+- GlpkParameters
+  - ✅ 🔎 GlpkParameters.test_to_proto - `compute_unbound_rays_if_possible` true, false, and unset are represented by `MathOpt.GlpkParameters` / `GlpkParameters` and passed into `SolveParametersProto.glpk`
+- ProtoRoundTrip
+  - ✅ 🔎 ProtoRoundTrip.test_solver_type_round_trip - `MathOpt.SolverType.GLPK` is exposed and encoded as `SOLVER_TYPE_GLPK`
+- SolveParametersTest
+  - ✅ 🔎 SolveParametersTest.test_to_proto_with_specifics/glpk - `MathOpt.solve(..., { glpk: new GlpkParameters(...) })` encodes the GLPK-specific solve parameters
+  - ✅ 🔎 GLPK threading guard - MathOpt GLPK rejects `threads > 1`; upstream native GLPK tests only allow `threads=1` and reject cross-thread GLPK use
 
 ## ortools/linear_solver/python/model_builder_test.py
 - ModelBuilderTest

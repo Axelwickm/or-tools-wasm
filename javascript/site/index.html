@@ -67,7 +67,7 @@
     Use <a href="https://developers.google.com/optimization/math_opt" rel="noopener">MathOpt</a> to route one model through selectable solver backends.
   </p>
   <ul>
-    <li><a href="./mathopt_basic.html">Basic Model - switch between GLOP and CP-SAT</a></li>
+    <li><a href="./mathopt_basic.html">Basic Model - switch between GLOP, GLPK, and CP-SAT</a></li>
   </ul>
   <h2>MPSolver (frontend)</h2>
   <p class="solver-description">
@@ -75,7 +75,7 @@
     to route one linear model through selectable LP and integer backends.
   </p>
   <ul>
-    <li><a href="./mp_simple_lp.html">Basic Model - switch between GLOP, CLP, and SAT</a></li>
+    <li><a href="./mp_simple_lp.html">Basic Model - switch between GLOP, CLP, GLPK, and SAT</a></li>
   </ul>
   <h2>CP-SAT</h2>
   <p class="solver-description">
@@ -113,6 +113,14 @@
   <ul>
     <li><a href="./clp_simple_lp.html">Simple LP - simple_lp_program.py model with CLP</a></li>
     <li><a href="./clp_transportation.html">Transportation LP - minimum-cost shipment planning</a></li>
+  </ul>
+  <h2>GLPK</h2>
+  <p class="solver-description">
+    Use GLPK for continuous and mixed-integer linear programs through MPSolver, or as a MathOpt backend.
+  </p>
+  <ul>
+    <li><a href="./glpk_simple_lp.html">Simple LP - simple_lp_program.py model with GLPK</a></li>
+    <li><a href="./glpk_simple_mip.html">Simple MIP - simple_mip_program.py model with GLPK</a></li>
   </ul>
   <h2>SAT</h2>
   <p class="solver-description">

@@ -1,11 +1,12 @@
 import { initMathOpt, MathOpt } from 'or-tools-wasm';
-import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, setRunning } from './mathopt_sample_helpers.js';
+import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, setRunning, workerCountInput } from './mathopt_sample_helpers.js';
 
 const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;
 
 function selectedSolverType(): keyof typeof MathOpt.SolverType {
   const value = solverSelect?.value;
   if (value === 'CP_SAT') return value;
+  if (value === 'GLPK') return value;
   return 'GLOP';
 }
 
@@ -20,12 +21,21 @@ function addBackendCompatibleBinaryVariable(
   return model.addVariable({ lowerBound: 0, upperBound: 1, name });
 }
 
+function updateThreadControl() {
+  if (!workerCountInput) return;
+  workerCountInput.disabled = selectedSolverType() === 'GLPK';
+  if (workerCountInput.disabled) workerCountInput.value = '1';
+}
+
+solverSelect?.addEventListener('change', updateThreadControl);
+updateThreadControl();
+
 async function runMathOptExample() {
   setRunning(true);
   clearStatus();
   try {
-    const threads = configureMathOptRun();
     const solverType = selectedSolverType();
+    const threads = solverType === 'GLPK' ? 1 : configureMathOptRun();
     appendStatus('Initializing MathOpt runtime...');
     await initMathOpt();
 

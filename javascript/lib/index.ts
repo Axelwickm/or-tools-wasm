@@ -59,6 +59,7 @@ export type {
   MPSolverSolutionResponse,
 } from './mp_solver_api.js';
 export {
+  GlpkParameters,
   initMathOpt,
   MathOpt,
   MathOptModel,

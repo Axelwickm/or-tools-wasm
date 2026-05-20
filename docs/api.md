@@ -760,7 +760,7 @@ Initialize before constructing solvers:
 ```ts
 await initMPSolver();
 
-const solver = MPSolver.CreateSolver('GLOP'); // or 'CLP' for the Coin-OR LP backend
+const solver = MPSolver.CreateSolver('GLOP'); // or 'CLP' / 'GLPK_LP' for LP backends
 if (!solver) throw new Error('LP backend unavailable');
 
 const x = solver.NumVar(0, solver.infinity(), 'x');
@@ -791,8 +791,9 @@ Loads the MPSolver WebAssembly runtime.
 the WebAssembly runtime will be supported at runtime; use
 `MPSolver.SupportsProblemType()`.
 
-The default package runtime currently includes `GLOP` and `CLP` for continuous
-linear programming and `SAT` for integer linear programming through MPSolver.
+The default package runtime currently includes `GLOP`, `CLP`, and `GLPK_LP` for
+continuous linear programming, plus `SAT` and `GLPK` for integer linear
+programming through MPSolver.
 
 `MPSolverResultStatus` contains `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
 `UNBOUNDED`, `ABNORMAL`, `MODEL_INVALID`, and `NOT_SOLVED`.
@@ -968,7 +969,7 @@ Parameter enums:
 Import:
 
 ```ts
-import { initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm';
+import { GlpkParameters, initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm';
 ```
 
 Initialize, build a model, and solve:
@@ -1007,12 +1008,14 @@ Static constructors and aliases:
 - `MathOpt.BoundedExpression`
 - `MathOpt.LowerBoundedExpression`
 - `MathOpt.UpperBoundedExpression`
+- `MathOpt.GlpkParameters`
 - `MathOpt.setWorkerBridgeEnabled(enabled): void`
 
 Top-level value exports:
 
 - `MathOptModel`
 - `MathOptObjective`
+- `GlpkParameters`
 
 Top-level type exports:
 
@@ -1036,6 +1039,15 @@ Solving:
 - `solverType?: MathOptSolverType | keyof typeof MathOptSolverType`
 - `threads?: number`
 - `iterationLimit?: number`
+- `glpk?: GlpkParameters`
+
+`GlpkParameters` mirrors the upstream MathOpt GLPK-specific solve parameters:
+
+- `computeUnboundRaysIfPossible?: boolean`
+- `compute_unbound_rays_if_possible?: boolean`
+
+GLPK is single-threaded in this package. MathOpt GLPK solves reject
+`threads > 1`; omit `threads` or pass `threads: 1`.
 
 `MathOptSolveResult`:
 

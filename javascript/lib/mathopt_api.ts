@@ -65,6 +65,7 @@ export type MathOptSolveOptions = {
   solverType?: MathOptSolverType | keyof typeof MathOptSolverType;
   threads?: number;
   iterationLimit?: number;
+  glpk?: GlpkParameters;
 };
 
 export type MathOptSolveResult = {
@@ -160,6 +161,28 @@ export enum MathOptSolverType {
   HIGHS = 10,
   SANTORINI = 11,
   XPRESS = 13,
+}
+
+export class GlpkParameters {
+  readonly computeUnboundRaysIfPossible?: boolean;
+  readonly compute_unbound_rays_if_possible?: boolean;
+
+  constructor(options: {
+    computeUnboundRaysIfPossible?: boolean;
+    compute_unbound_rays_if_possible?: boolean;
+  } = {}) {
+    this.computeUnboundRaysIfPossible = options.computeUnboundRaysIfPossible
+      ?? options.compute_unbound_rays_if_possible;
+    this.compute_unbound_rays_if_possible = this.computeUnboundRaysIfPossible;
+  }
+
+  toProtoBytes(): Uint8Array {
+    return message([
+      this.computeUnboundRaysIfPossible === undefined
+        ? empty()
+        : fieldBool(1, this.computeUnboundRaysIfPossible),
+    ]);
+  }
 }
 
 export class MathOptQuadraticTermKey {
@@ -1609,6 +1632,7 @@ export async function initMathOpt(): Promise<void> {
 
 export class MathOpt {
   static readonly SolverType = MathOptSolverType;
+  static readonly GlpkParameters = GlpkParameters;
   static readonly LinearExpression = MathOptLinearExpression;
   static readonly QuadraticExpression = MathOptQuadraticExpression;
   static readonly QuadraticTermKey = MathOptQuadraticTermKey;
@@ -1795,6 +1819,9 @@ function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): 
   const solverType = typeof options.solverType === 'string'
     ? MathOptSolverType[options.solverType]
     : options.solverType ?? MathOptSolverType.GLOP;
+  if (solverType === MathOptSolverType.GLPK && options.threads !== undefined && options.threads !== 1) {
+    throw new Error('GLPK does not support multi-threaded MathOpt solves; use threads: 1 or omit threads.');
+  }
   return message([
     fieldVarint(1, solverType),
     fieldMessage(2, model.encodeModelProto()),
@@ -1802,7 +1829,10 @@ function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): 
       ? fieldMessage(4, message([
         options.iterationLimit ? fieldVarint(2, options.iterationLimit) : empty(),
         options.threads ? fieldVarint(4, options.threads) : empty(),
+        options.glpk ? fieldMessage(26, options.glpk.toProtoBytes()) : empty(),
       ]))
+      : options.glpk
+        ? fieldMessage(4, message([fieldMessage(26, options.glpk.toProtoBytes())]))
       : empty(),
   ]);
 }

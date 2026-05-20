@@ -4,7 +4,11 @@ import { appendStatus, formatNumber, renderSimpleMpResult, setRunning } from './
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const solverId = document.body.dataset.solverId === 'CLP' ? 'CLP' : 'GLOP';
+const solverId = document.body.dataset.solverId === 'CLP'
+  ? 'CLP'
+  : document.body.dataset.solverId === 'GLPK_LP'
+    ? 'GLPK_LP'
+    : 'GLOP';
 
 async function runSimpleGlop() {
   setRunning(runButton, true);

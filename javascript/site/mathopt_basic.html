@@ -47,12 +47,14 @@ console.log(result.objectiveValue, result.variableValues);</code></pre>
     <p>
       Adapted from <code>ortools/math_opt/samples/python/basic_example.py</code>.
       The browser demo solves the same two-variable linear model with a selectable MathOpt backend.
+      GLPK runs with a single thread.
     </p>
     <div class="controls">
       <label>
         Backend
         <select id="solver">
           <option value="GLOP">GLOP</option>
+          <option value="GLPK">GLPK</option>
           <option value="CP_SAT">CP-SAT</option>
         </select>
       </label>

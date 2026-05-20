@@ -54,6 +54,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(USE_PDLP ON CACHE BOOL "Use the PDLP solver" FORCE)
   set(USE_XPRESS OFF CACHE BOOL "Use the Xpress solver" FORCE)
   option(ORTOOLS_WASM_USE_CLP "Build CLP support into the WASM MPSolver runtime" ON)
+  option(ORTOOLS_WASM_USE_GLPK "Build GLPK support into the WASM MPSolver and MathOpt runtimes" ON)
 endif()
 
 if(MSVC)
@@ -234,6 +235,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/clp_interface.cc")
   endif()
+  if(ORTOOLS_WASM_USE_GLPK)
+    list(APPEND MP_SOLVER_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/glpk_interface.cc")
+  endif()
 
   set(MATHOPT_BROWSER_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/mathopt_api.cc"
@@ -243,6 +248,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_proto_solver.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc")
+  if(ORTOOLS_WASM_USE_GLPK)
+    list(APPEND MATHOPT_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/glpk_solver.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/glpk/gap.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/glpk/glpk_sparse_vector.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/glpk/rays.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/third_party_solvers/glpk/glpk_env_deleter.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/third_party_solvers/glpk/glpk_formatters.cc")
+  endif()
 
   set(PDLP_BROWSER_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/pdlp_api.cc")
@@ -361,6 +375,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
         Coin::Clp
         Coin::ClpSolver
         Coin::OsiClp)
+    endforeach()
+  endif()
+
+  if(ORTOOLS_WASM_USE_GLPK)
+    foreach(GLPK_TARGET
+        mp_solver_runtime
+        mp_solver_runtime_asyncify
+        mp_solver_runtime_node
+        mp_solver_runtime_node_asyncify
+        mathopt_runtime
+        mathopt_runtime_asyncify
+        mathopt_runtime_node
+        mathopt_runtime_node_asyncify)
+      target_compile_definitions(${GLPK_TARGET} PRIVATE USE_GLPK)
+      target_link_libraries(${GLPK_TARGET} PRIVATE GLPK::GLPK)
     endforeach()
   endif()
 
@@ -486,6 +515,10 @@ message(STATUS "GLOP support: ${USE_GLOP}")
 # Disable by default since it is GPLv3, user could enable it and release under GPLv3
 # see: https://www.apache.org/licenses/GPL-compatibility.html
 CMAKE_DEPENDENT_OPTION(USE_GLPK "Use the GLPK solver" OFF "BUILD_CXX" OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND ORTOOLS_WASM_USE_GLPK)
+  set(USE_GLPK ON CACHE BOOL "Use the GLPK solver" FORCE)
+  set(BUILD_GLPK ON CACHE BOOL "Build the GLPK dependency Library" FORCE)
+endif()
 message(STATUS "GLPK support: ${USE_GLPK}")
 if(USE_GLPK)
   CMAKE_DEPENDENT_OPTION(BUILD_GLPK "Build the GLPK dependency Library" OFF

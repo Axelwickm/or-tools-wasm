@@ -87,7 +87,6 @@ if(USE_GLOP)
 endif()
 if(USE_GLPK)
   list(APPEND OR_TOOLS_COMPILE_DEFINITIONS "USE_GLPK")
-  set(GLPK_DIR glpk)
 endif()
 if(USE_GUROBI)
   set(GUROBI_DIR gurobi)
@@ -526,7 +525,6 @@ set(ORTOOLS_CPP_SUBPROJECTS
  init
  glop
  graph
- ${GLPK_DIR}
  ${GSCIP_DIR}
  ${GUROBI_DIR}
  ${PDLP_DIR}
@@ -553,6 +551,12 @@ foreach(SUBPROJECT IN LISTS ORTOOLS_CPP_SUBPROJECTS)
   target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}_${SUBPROJECT}>)
   add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_${SUBPROJECT})
 endforeach()
+
+if(USE_GLPK)
+  add_subdirectory(ortools/third_party_solvers/glpk)
+  target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}_glpk>)
+  add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_glpk)
+endif()
 
 if(BUILD_MATH_OPT)
   add_subdirectory(ortools/${MATH_OPT_DIR})
