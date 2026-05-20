@@ -1,4 +1,4 @@
-import { CpSat, initMPSolver, MPSolver } from 'or-tools-wasm';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver } from 'or-tools-wasm';
 import { appendStatus, configureWorkerBridge, formatNumber, renderSimpleMpResult, setRunning } from './mp_solver_helpers.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
@@ -20,7 +20,6 @@ configureWorkerBridge(workerBridgeToggle);
 
 if (solverId === 'GLPK') {
   if (workerInput) workerInput.disabled = true;
-  if (workerBridgeToggle) workerBridgeToggle.disabled = true;
 }
 
 function getSelectedWorkerCount() {
@@ -81,7 +80,7 @@ async function runSimpleMip() {
         wallTime: solver.WallTime(),
         iterations: solver.Iterations(),
         nodes: solver.nodes(),
-        usedWorkerBridge: typeof CpSat.isWorkerBridgeEnabled === 'function' ? CpSat.isWorkerBridgeEnabled() : true,
+        usedWorkerBridge: isWorkerBridgeEnabled(),
         workerCount,
       });
       appendStatus(statusEl, `Objective: ${formatNumber(objective.Value())}`);

@@ -9,7 +9,7 @@ type PdlpApi = {
     qp_to_mpmodel_proto(qp: QuadraticProgramLike): Promise<Uint8Array>;
     primal_dual_hybrid_gradient(qp: QuadraticProgramLike, params?: PdlpParams, initialSolution?: PrimalAndDualSolutionLike): Promise<PdlpResultLike>;
   };
-  setWorkerBridgeEnabled?: (enabled: boolean) => void;
+  setWorkerBridgeEnabled: (enabled: boolean) => void;
 };
 
 type QuadraticProgramLike = {
@@ -613,13 +613,13 @@ export async function runPdlpCases(api: PdlpApi): Promise<PdlpCaseResult[]> {
   await api.initPdlp();
   const results: PdlpCaseResult[] = [];
   for (const mode of ['direct', 'worker'] as const) {
-    api.setWorkerBridgeEnabled?.(mode === 'worker');
+    api.setWorkerBridgeEnabled(mode === 'worker');
     for (const testCase of pdlpCases) {
       await testCase.run(api);
       results.push({ name: testCase.name, mode, ok: true });
     }
   }
-  api.setWorkerBridgeEnabled?.(false);
+  api.setWorkerBridgeEnabled(false);
   return results;
 }
 

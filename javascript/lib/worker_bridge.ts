@@ -38,6 +38,14 @@ export function shouldUseWorkerBridge() {
   return workerBridgePreferred && workerBridgeAvailable;
 }
 
+export function isWorkerBridgeEnabled() {
+  return shouldUseWorkerBridge();
+}
+
+export function isWorkerBridgeAvailable() {
+  return workerBridgeAvailable;
+}
+
 export function setWorkerBridgeEnabled(enabled: boolean) {
   workerBridgePreferred = Boolean(enabled);
   if (workerBridgePreferred && !workerBridgeAvailable) {

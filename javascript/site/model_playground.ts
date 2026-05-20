@@ -1,4 +1,4 @@
-import { CpSat, type SatParameters } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type SatParameters } from 'or-tools-wasm';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 const sampleModel = {
@@ -149,9 +149,9 @@ async function solveModel() {
 
 if (workerBridgeToggle) {
   workerBridgeToggle.checked = true;
-  CpSat.setWorkerBridgeEnabled(workerBridgeToggle.checked);
+  setWorkerBridgeEnabled(workerBridgeToggle.checked);
   workerBridgeToggle.addEventListener('change', () => {
-    CpSat.setWorkerBridgeEnabled(workerBridgeToggle.checked);
+    setWorkerBridgeEnabled(workerBridgeToggle.checked);
   });
 }
 

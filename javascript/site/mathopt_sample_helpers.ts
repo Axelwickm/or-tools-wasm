@@ -1,4 +1,4 @@
-import { MathOpt } from 'or-tools-wasm';
+import { setWorkerBridgeEnabled } from 'or-tools-wasm';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 export const statusEl = document.getElementById('status');
@@ -23,7 +23,7 @@ export function clearStatus() {
 }
 
 export function configureMathOptRun() {
-  MathOpt.setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
+  setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
   const requested = Number(workerCountInput?.value ?? getMaxWorkerCount());
   return Math.max(1, Math.min(getMaxWorkerCount(), Number.isFinite(requested) ? Math.floor(requested) : 1));
 }

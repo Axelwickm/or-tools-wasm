@@ -19,8 +19,9 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver } from 'or-tools-wasm';
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setWorkerBridgeEnabled } from 'or-tools-wasm';
 
+setWorkerBridgeEnabled(true);
 await initMPSolver();
 const solver = MPSolver.CreateSolver('GLPK');
 if (!solver) throw new Error('GLPK backend is unavailable');
@@ -46,7 +47,7 @@ await solver.Solve();</code></pre>
     </p>
     <div class="controls">
       <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
-      <label><input id="use-worker-bridge" type="checkbox" disabled> Use worker bridge</label>
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve MIP">Solve MIP</button>
     </div>
     <div id="solution-output">Run the solver to view the solution.</div>

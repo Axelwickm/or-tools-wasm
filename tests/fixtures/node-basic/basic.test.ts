@@ -18,6 +18,8 @@ import {
   Pdlp,
   RoutingIndexManager,
   RoutingModel,
+  isWorkerBridgeEnabled,
+  setWorkerBridgeEnabled,
 } from 'or-tools-wasm';
 import * as OrTools from 'or-tools-wasm';
 import assert from 'node:assert/strict';
@@ -70,8 +72,8 @@ test('runs the shared MPSolver cases in Node', async () => {
     initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+    setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled,
   });
   assert.equal(mpSolverResults.every((result) => result.ok), true, `node MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
 });
@@ -85,7 +87,7 @@ test('runs the shared PDLP cases in Node', async () => {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled,
   });
   assert.equal(pdlpResults.every((result) => result.ok), true, `node PDLP case failed: ${JSON.stringify(pdlpResults)}`);
 });

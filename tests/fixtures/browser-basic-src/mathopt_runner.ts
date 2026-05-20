@@ -309,7 +309,7 @@ export type MathOptApi = {
       }>;
       rawResponse: Uint8Array;
     }>;
-    setWorkerBridgeEnabled?: (enabled: boolean) => void;
+    setWorkerBridgeEnabled: (enabled: boolean) => void;
   };
 };
 
@@ -470,9 +470,9 @@ async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<Ma
 export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
   await api.initMathOpt();
   const results: MathOptCaseResult[] = [];
-  const modes: Array<'direct' | 'worker'> = api.MathOpt.setWorkerBridgeEnabled ? ['direct', 'worker'] : ['direct'];
+  const modes: Array<'direct' | 'worker'> = ['direct', 'worker'];
   for (const mode of modes) {
-    api.MathOpt.setWorkerBridgeEnabled?.(mode === 'worker');
+    api.MathOpt.setWorkerBridgeEnabled(mode === 'worker');
     for (const threads of [1, 4]) {
       options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
       results.push(await runGlopLp(api, mode, threads));
@@ -513,6 +513,6 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
       }
     }
   }
-  api.MathOpt.setWorkerBridgeEnabled?.(false);
+  api.MathOpt.setWorkerBridgeEnabled(false);
   return results;
 }

@@ -2,8 +2,10 @@ import type { OrToolsWasmModule } from './wasm_module_types.js';
 import { loadPdlpRuntime } from './runtime_loader.js';
 import type { WorkerResponse } from './worker_protocol.js';
 import {
+  isWorkerBridgeEnabled,
   nextWorkerBridgeRequestId,
   postWorkerRequest,
+  setWorkerBridgeEnabled,
   shouldUseWorkerBridge,
 } from './worker_bridge.js';
 
@@ -687,6 +689,14 @@ export class PrimalAndDualSolution {
 export const Pdlp = {
   QuadraticProgram,
   PrimalAndDualSolution,
+
+  setWorkerBridgeEnabled(enabled: boolean): void {
+    setWorkerBridgeEnabled(enabled);
+  },
+
+  isWorkerBridgeEnabled(): boolean {
+    return isWorkerBridgeEnabled();
+  },
 
   async validateQuadraticProgramDimensions(qp: QuadraticProgramInput | QuadraticProgram): Promise<void> {
     const message = new TextDecoder().decode(await pdlpBytes('validate', encodeQuadraticProgram(qp)));

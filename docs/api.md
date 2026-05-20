@@ -455,12 +455,11 @@ normal application code should use `solve()`.
 
 `CpSat.setWorkerBridgeEnabled(enabled: boolean): void`
 
-Enables or disables the browser worker bridge for CP-SAT and shared worker-based
-solvers.
+Alias for the shared package worker bridge control.
 
 `CpSat.isWorkerBridgeEnabled(): boolean`
 
-Returns the current worker bridge preference.
+Alias for the shared package worker bridge state.
 
 ### CP-SAT Types And Enums
 
@@ -1010,9 +1009,19 @@ Static constructors and aliases:
 - `MathOpt.UpperBoundedExpression`
 - `MathOpt.GlpkParameters`
 - `MathOpt.setWorkerBridgeEnabled(enabled): void`
+- `MPSolver.setWorkerBridgeEnabled(enabled): void`
+- `MPSolver.isWorkerBridgeEnabled(): boolean`
+- `Pdlp.setWorkerBridgeEnabled(enabled): void`
+- `Pdlp.isWorkerBridgeEnabled(): boolean`
+- `RoutingModel.setWorkerBridgeEnabled(enabled): void`
+- `RoutingModel.isWorkerBridgeEnabled(): boolean`
 
 Top-level value exports:
 
+- `setWorkerBridgeEnabled`
+- `isWorkerBridgeEnabled`
+- `isWorkerBridgeAvailable`
+- `terminateWorkerBridge`
 - `MathOptModel`
 - `MathOptObjective`
 - `GlpkParameters`
@@ -1441,17 +1450,25 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 ## Browser Worker Bridge
 
 The CP-SAT, MathOpt, Routing, MPSolver proto-solve, and PDLP paths can use the
-browser worker bridge. CP-SAT exposes the public controls:
+browser worker bridge. Worker bridge availability is independent of solver
+threading support; for example GLPK is single-threaded but can still run through
+the worker bridge in browser UI code. Prefer the shared package controls:
+
+```ts
+import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';
+
+setWorkerBridgeEnabled(true);
+isWorkerBridgeEnabled();
+```
+
+Solver-specific aliases are also exposed for existing call sites:
 
 ```ts
 CpSat.setWorkerBridgeEnabled(true);
-CpSat.isWorkerBridgeEnabled();
-```
-
-MathOpt also exposes:
-
-```ts
 MathOpt.setWorkerBridgeEnabled(true);
+MPSolver.setWorkerBridgeEnabled(true);
+Pdlp.setWorkerBridgeEnabled(true);
+RoutingModel.setWorkerBridgeEnabled(true);
 ```
 
 The worker bridge is intended for browser UI responsiveness. In non-browser

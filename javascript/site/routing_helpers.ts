@@ -1,4 +1,4 @@
-import { CpSat, type Assignment, type RoutingIndexManager, type RoutingModel } from 'or-tools-wasm';
+import { setWorkerBridgeEnabled, type Assignment, type RoutingIndexManager, type RoutingModel } from 'or-tools-wasm';
 
 export type RouteSummary = {
   vehicle: number;
@@ -10,9 +10,9 @@ export type RouteSummary = {
 export function configureWorkerBridge(toggle: HTMLInputElement | null) {
   if (!toggle) return;
   toggle.checked = true;
-  CpSat.setWorkerBridgeEnabled(true);
+  setWorkerBridgeEnabled(true);
   toggle.addEventListener('change', () => {
-    CpSat.setWorkerBridgeEnabled(toggle.checked);
+    setWorkerBridgeEnabled(toggle.checked);
   });
 }
 

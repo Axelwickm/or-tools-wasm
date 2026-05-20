@@ -18,6 +18,8 @@ import {
   Pdlp,
   RoutingIndexManager,
   RoutingModel,
+  isWorkerBridgeEnabled,
+  setWorkerBridgeEnabled,
 } from 'or-tools-wasm';
 import * as OrTools from 'or-tools-wasm';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
@@ -64,8 +66,8 @@ const mpSolverResults = await runMPSolverCases({
   initMPSolver,
   MPSolver,
   MPSolverParameters,
-  setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
-  isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+  setWorkerBridgeEnabled,
+  isWorkerBridgeEnabled,
 });
 if (!mpSolverResults.every((result) => result.ok)) {
   throw new Error(`bun MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
@@ -79,7 +81,7 @@ if (!mathOptResults.every((result) => result.ok)) {
 const pdlpResults = await runPdlpCases({
   initPdlp,
   Pdlp,
-  setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+  setWorkerBridgeEnabled,
 });
 if (!pdlpResults.every((result) => result.ok)) {
   throw new Error(`bun PDLP case failed: ${JSON.stringify(pdlpResults)}`);

@@ -171,8 +171,8 @@ export type MPSolverApi = {
     SCALING_OFF: number;
     SCALING_ON: number;
   };
-  setWorkerBridgeEnabled?: (enabled: boolean) => void;
-  isWorkerBridgeEnabled?: () => boolean;
+  setWorkerBridgeEnabled: (enabled: boolean) => void;
+  isWorkerBridgeEnabled: () => boolean;
 };
 
 type LpBackend = {
@@ -793,15 +793,15 @@ async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string)
 
 async function runProtoSolveMatrix(api: MPSolverApi): Promise<MpSolverCaseResult[]> {
   const results: MpSolverCaseResult[] = [];
-  const modes: Array<'direct' | 'worker'> = api.setWorkerBridgeEnabled ? ['direct', 'worker'] : ['direct'];
+  const modes: Array<'direct' | 'worker'> = ['direct', 'worker'];
   for (const mode of modes) {
-    api.setWorkerBridgeEnabled?.(mode === 'worker');
-    assert(api.isWorkerBridgeEnabled?.() !== false || mode === 'direct', `MPSolver: worker bridge state mismatch for ${mode}`);
+    api.setWorkerBridgeEnabled(mode === 'worker');
+    assert(api.isWorkerBridgeEnabled() !== false || mode === 'direct', `MPSolver: worker bridge state mismatch for ${mode}`);
     for (const numWorkers of [1, 4]) {
       results.push(await runProtoSolveCase(api, mode, numWorkers));
     }
   }
-  api.setWorkerBridgeEnabled?.(false);
+  api.setWorkerBridgeEnabled(false);
   return results;
 }
 

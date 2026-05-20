@@ -6,6 +6,12 @@ export { CpSat } from './cp_sat_api.js';
 export { default } from './cp_sat_api.js';
 export type { CpSatApi, CpSatModelInstance, CpSatSolveCallbacks, CpSatSolveResult } from './cp_sat_api.js';
 export {
+  isWorkerBridgeAvailable,
+  isWorkerBridgeEnabled,
+  setWorkerBridgeEnabled,
+  terminateWorkerBridge,
+} from './worker_bridge.js';
+export {
   ArithmeticError,
   BoolVar,
   BoundedLinearExpr,
@@ -103,12 +109,14 @@ export {
   DefaultRoutingSearchParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
+  isRoutingWorkerBridgeEnabled,
   initRouting,
   LocalSearchMetaheuristic,
   RoutingDimension,
   RoutingIndexManager,
   RoutingModel,
   RoutingSearchStatus,
+  setRoutingWorkerBridgeEnabled,
 } from './routing_api.js';
 export type { RoutingModelParameters, RoutingSearchParameters } from './routing_api.js';
 export {

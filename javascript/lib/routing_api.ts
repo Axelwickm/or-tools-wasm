@@ -1,6 +1,12 @@
 import type { OrToolsWasmModule } from './wasm_module_types.js';
 import { loadRoutingRuntime } from './runtime_loader.js';
-import { nextWorkerBridgeRequestId, postWorkerRequest, shouldUseWorkerBridge } from './worker_bridge.js';
+import {
+  isWorkerBridgeEnabled,
+  nextWorkerBridgeRequestId,
+  postWorkerRequest,
+  setWorkerBridgeEnabled,
+  shouldUseWorkerBridge,
+} from './worker_bridge.js';
 import type { RoutingModelOperation, RoutingSolveResult, WorkerResponse } from './worker_protocol.js';
 
 type RoutingTransitCallback = (fromIndex: number, toIndex: number) => number;
@@ -60,6 +66,14 @@ function getRoutingModule(): RoutingModule {
 
 export async function initRouting(): Promise<void> {
   await loadRoutingModule();
+}
+
+export function setRoutingWorkerBridgeEnabled(enabled: boolean): void {
+  setWorkerBridgeEnabled(enabled);
+}
+
+export function isRoutingWorkerBridgeEnabled(): boolean {
+  return isWorkerBridgeEnabled();
 }
 
 export enum FirstSolutionStrategy {
@@ -418,6 +432,14 @@ export class Assignment {
 }
 
 export class RoutingModel {
+  static setWorkerBridgeEnabled(enabled: boolean): void {
+    setWorkerBridgeEnabled(enabled);
+  }
+
+  static isWorkerBridgeEnabled(): boolean {
+    return isWorkerBridgeEnabled();
+  }
+
   readonly ready: Promise<void> = Promise.resolve();
   private module: RoutingModule;
   private handle = 0;

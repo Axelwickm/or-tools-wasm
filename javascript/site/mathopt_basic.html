@@ -20,9 +20,9 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { MathOpt, initMathOpt } from 'or-tools-wasm';
+        <pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt, setWorkerBridgeEnabled } from 'or-tools-wasm';
 
-MathOpt.setWorkerBridgeEnabled(true);
+setWorkerBridgeEnabled(true);
 await initMathOpt();
 
 const model = MathOpt.Model('basic');

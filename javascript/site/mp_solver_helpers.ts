@@ -1,4 +1,4 @@
-import { CpSat, initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, type MPVariable } from 'or-tools-wasm';
 
 type VariableKind = 'continuous' | 'integer';
 
@@ -37,9 +37,9 @@ export function appendStatus(element: HTMLElement | null, message: string): void
 export function configureWorkerBridge(toggle: HTMLInputElement | null): void {
   if (!toggle) return;
   toggle.checked = true;
-  CpSat.setWorkerBridgeEnabled(true);
+  setWorkerBridgeEnabled(true);
   toggle.addEventListener('change', () => {
-    CpSat.setWorkerBridgeEnabled(toggle.checked);
+    setWorkerBridgeEnabled(toggle.checked);
   });
 }
 
@@ -90,9 +90,7 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       wallTime: solver.WallTime(),
       iterations: solver.Iterations(),
       nodes: solver.nodes(),
-      usedWorkerBridge: typeof CpSat.isWorkerBridgeEnabled === 'function'
-        ? CpSat.isWorkerBridgeEnabled()
-        : true,
+      usedWorkerBridge: isWorkerBridgeEnabled(),
       workerCount,
     };
     assertExpectedObjective(result, config.expectedObjective);

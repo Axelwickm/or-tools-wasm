@@ -115,6 +115,8 @@ async function main() {
     Pdlp,
     RoutingIndexManager,
     RoutingModel,
+    isWorkerBridgeEnabled,
+    setWorkerBridgeEnabled,
   } = ortools;
   const typedCpSat: CpSatApi = CpSat;
   const routingApi: RoutingApi = {
@@ -146,8 +148,8 @@ async function main() {
     initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+    setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled,
   });
   const mpSolverWorkerStatsAfter = workerSpy.snapshot();
   setStatus({ ok: false, phase: 'mathopt' });
@@ -166,7 +168,7 @@ async function main() {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled,
   });
   setStatus({
     ok: true,

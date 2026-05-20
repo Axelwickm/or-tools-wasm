@@ -96,13 +96,13 @@ console.log(result.response);
 | --- | --- | --- |
 | CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
 | Routing | ✅ | Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search. |
-| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, and SAT MIP backends. |
-| MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, CP-SAT, and PDLP backends. |
+| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, and SAT MIP backends. |
+| MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, GLPK, CP-SAT, and PDLP backends. |
 | GLOP | ✅ | Google's simplex linear programming solver. |
 | PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
 | SAT integer programming | ✅ | CP-SAT-backed integer programming backend for pure integer linear models. |
 | CLP | ✅ | COIN-OR linear programming backend. |
-| GLPK |  | GNU linear and mixed-integer programming backend. |
+| GLPK | ✅ | GNU linear and mixed-integer programming backend. |
 | SCIP / GSCIP |  | SCIP-based LP, MIP, and nonconvex integer quadratic backend. |
 | CBC |  | COIN-OR branch-and-cut mixed-integer programming backend. |
 | Knapsack |  | Dedicated knapsack mixed-integer programming backend. |
@@ -143,10 +143,21 @@ Cross-Origin-Embedder-Policy: require-corp
 Without these headers, browsers may block `SharedArrayBuffer`, and solving can
 fail during WebAssembly runtime or worker startup.
 
-Browser solves run through a hidden worker bridge by default, so the main
-thread stays available for rendering, input, progress UI, and cancellation. The
-package loads solver runtimes on demand; application code does not need to
-choose between JSPI and Asyncify manually.
+Browser solves can run through a hidden worker bridge, so the main thread stays
+available for rendering, input, progress UI, and cancellation. The shared worker
+bridge controls apply across CP-SAT, routing, MPSolver, MathOpt, and PDLP:
+
+```ts
+import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';
+
+setWorkerBridgeEnabled(true);
+console.log(isWorkerBridgeEnabled());
+```
+
+Worker bridge support is separate from solver threading. For example, GLPK is
+single-threaded in this package but can still run through the browser worker
+bridge. The package loads solver runtimes on demand; application code does not
+need to choose between JSPI and Asyncify manually.
 
 For Vite dev and preview servers, set the headers in `vite.config.ts`:
 

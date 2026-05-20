@@ -1,14 +1,17 @@
-import { initMPSolver, MPSolver } from 'or-tools-wasm';
-import { appendStatus, formatNumber, renderSimpleMpResult, setRunning } from './mp_solver_helpers.js';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver } from 'or-tools-wasm';
+import { appendStatus, configureWorkerBridge, formatNumber, renderSimpleMpResult, setRunning } from './mp_solver_helpers.js';
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const solverId = document.body.dataset.solverId === 'CLP'
   ? 'CLP'
   : document.body.dataset.solverId === 'GLPK_LP'
     ? 'GLPK_LP'
     : 'GLOP';
+
+configureWorkerBridge(workerBridgeToggle);
 
 async function runSimpleGlop() {
   setRunning(runButton, true);
@@ -48,7 +51,7 @@ async function runSimpleGlop() {
         wallTime: solver.WallTime(),
         iterations: solver.Iterations(),
         nodes: solver.nodes(),
-        usedWorkerBridge: false,
+        usedWorkerBridge: isWorkerBridgeEnabled(),
       });
       appendStatus(statusEl, `Objective: ${formatNumber(objective.Value())}`);
       appendStatus(statusEl, `x = ${formatNumber(x.solution_value())}`);

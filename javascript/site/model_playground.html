@@ -24,7 +24,7 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm';
+        <pre class="code-block"><code data-highlight="ts">import { CpSat, setWorkerBridgeEnabled, type SatParameters } from 'or-tools-wasm';
 
 const modelJson = JSON.parse(textarea.value);
 const workers = 4;
@@ -33,7 +33,7 @@ const params: SatParameters = {
   numWorkers: workers,
 };
 
-CpSat.setWorkerBridgeEnabled(true);
+setWorkerBridgeEnabled(true);
 const model = await CpSat.createModel(modelJson);
 const validation = await CpSat.validate(model);
 if (!validation.ok) throw new Error(validation.message);

@@ -5,6 +5,7 @@ import {
   nextWorkerBridgeRequestId,
   postWorkerRequest,
   setWorkerBridgeEnabled,
+  isWorkerBridgeEnabled,
   shouldUseWorkerBridge,
   terminateWorkerBridge,
 } from './worker_bridge.js';
@@ -538,7 +539,7 @@ export const CpSat: CpSatApi = {
   loadModule,
   cancelSolve,
   setWorkerBridgeEnabled: (enabled: boolean) => setWorkerBridgeEnabled(enabled),
-  isWorkerBridgeEnabled: () => shouldUseWorkerBridge(),
+  isWorkerBridgeEnabled: () => isWorkerBridgeEnabled(),
 };
 
 if (isBrowserMainThread) {

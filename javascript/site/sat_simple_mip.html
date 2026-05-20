@@ -19,9 +19,9 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { CpSat, initMPSolver, MPSolver } from 'or-tools-wasm';
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setWorkerBridgeEnabled } from 'or-tools-wasm';
 
-CpSat.setWorkerBridgeEnabled(true);
+setWorkerBridgeEnabled(true);
 await initMPSolver();
 
 const solver = MPSolver.CreateSolver('SAT');

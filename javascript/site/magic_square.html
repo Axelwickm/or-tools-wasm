@@ -37,7 +37,7 @@
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm';
+				<pre class="code-block"><code data-highlight="ts">import { CpSat, setWorkerBridgeEnabled, type SatParameters } from 'or-tools-wasm';
 
 type MagicSquareExpr = {
   vars: number[];
@@ -96,7 +96,7 @@ function buildMagicSquareModel(size: number): MagicSquareModel {
   return { name: `magic_square_${size}`, variables, constraints };
 }
 
-CpSat.setWorkerBridgeEnabled(true);
+setWorkerBridgeEnabled(true);
 const size = 5;
 const model = await CpSat.createModel(buildMagicSquareModel(size));
 const validation = await CpSat.validate(model);

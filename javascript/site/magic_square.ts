@@ -1,4 +1,4 @@
-import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type MagicSquareExpr = {
@@ -29,9 +29,7 @@ const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
 
 function applyWorkerBridgePreference(enabled: boolean) {
-  if (typeof CpSat?.setWorkerBridgeEnabled === 'function') {
-    CpSat.setWorkerBridgeEnabled(enabled);
-  }
+  setWorkerBridgeEnabled(enabled);
 }
 
 if (workerInput) {

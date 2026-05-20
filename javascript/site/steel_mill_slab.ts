@@ -1,4 +1,4 @@
-import { CpSat, type CpSatModelInstance } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance } from 'or-tools-wasm';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type SolverMethod = 'sat' | 'sat_table' | 'sat_column';
@@ -314,9 +314,7 @@ const applyWorkerBridgePreference = (enabled: boolean) => {
   if (workerBridgeToggle) {
     workerBridgeToggle.checked = enabled;
   }
-  if (typeof CpSat?.setWorkerBridgeEnabled === 'function') {
-    CpSat.setWorkerBridgeEnabled(enabled);
-  }
+  setWorkerBridgeEnabled(enabled);
 };
 
 if (workerBridgeToggle) {

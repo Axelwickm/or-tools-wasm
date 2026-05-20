@@ -1,4 +1,4 @@
-import { CpSat, type CpModelProto, type CpSolverResponse, type SatParameters } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type CpModelProto, type CpSolverResponse, type SatParameters } from 'or-tools-wasm';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Grid = number[];
@@ -92,7 +92,7 @@ function configureCpSat() {
     workerInput.max = String(maxWorkerCount);
     workerInput.value = String(workers);
   }
-  CpSat.setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
+  setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
   return workers;
 }
 
@@ -399,7 +399,7 @@ if (workerInput) workerInput.value = String(Math.min(maxWorkerCount, 4));
 if (workerBridgeToggle) {
   workerBridgeToggle.checked = true;
   workerBridgeToggle.addEventListener('change', () => {
-    CpSat.setWorkerBridgeEnabled(workerBridgeToggle.checked);
+    setWorkerBridgeEnabled(workerBridgeToggle.checked);
   });
 }
 

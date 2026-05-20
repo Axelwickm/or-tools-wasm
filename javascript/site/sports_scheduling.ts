@@ -1,4 +1,4 @@
-import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Domain = [number, number] | number[];
@@ -54,9 +54,7 @@ function applyWorkerBridgePreference(enabled: boolean) {
   if (workerBridgeToggle) {
     workerBridgeToggle.checked = enabled;
   }
-  if (typeof CpSat?.setWorkerBridgeEnabled === 'function') {
-    CpSat.setWorkerBridgeEnabled(enabled);
-  }
+  setWorkerBridgeEnabled(enabled);
 }
 
 function append(text: string) {

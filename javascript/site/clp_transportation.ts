@@ -1,5 +1,5 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm';
-import { appendStatus, formatNumber, setRunning } from './mp_solver_helpers.js';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver, type MPVariable } from 'or-tools-wasm';
+import { appendStatus, configureWorkerBridge, formatNumber, setRunning } from './mp_solver_helpers.js';
 
 type Plant = { name: string; supply: number };
 type Warehouse = { name: string; demand: number };
@@ -26,6 +26,9 @@ const costs = [
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+
+configureWorkerBridge(workerBridgeToggle);
 
 function renderTransportationResult(
   shipments: MPVariable[][],
@@ -38,6 +41,8 @@ function renderTransportationResult(
     <table>
       <tbody>
         <tr><th>Total cost</th><td>${formatNumber(objective)}</td></tr>
+        <tr><th>Worker bridge</th><td>${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}</td></tr>
+        <tr><th>Solver workers</th><td>1</td></tr>
         <tr><th>Wall time</th><td>${wallTime} ms</td></tr>
         <tr><th>Iterations</th><td>${iterations}</td></tr>
       </tbody>

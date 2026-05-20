@@ -18,6 +18,8 @@ import {
   Pdlp,
   RoutingIndexManager,
   RoutingModel,
+  isWorkerBridgeEnabled,
+  setWorkerBridgeEnabled,
 } from 'or-tools-wasm';
 import * as OrTools from 'or-tools-wasm';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
@@ -28,7 +30,7 @@ import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
 Deno.test('runs the shared CP-SAT cases in Deno', async () => {
-  if (CpSat.isWorkerBridgeEnabled()) {
+  if (isWorkerBridgeEnabled()) {
     throw new Error('Deno should use the direct runtime by default');
   }
   await runCpSatHighLevelParityCasesForPackage(OrTools as never);
@@ -61,8 +63,8 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
     initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: CpSat.isWorkerBridgeEnabled,
+    setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled,
   });
   if (!mpSolverResults.every((result) => result.ok)) {
     throw new Error(`deno MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
@@ -76,7 +78,7 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled: CpSat.setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled,
   });
   if (!pdlpResults.every((result) => result.ok)) {
     throw new Error(`deno PDLP case failed: ${JSON.stringify(pdlpResults)}`);

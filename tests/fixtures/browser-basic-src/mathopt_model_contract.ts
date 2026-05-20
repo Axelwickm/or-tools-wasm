@@ -1104,9 +1104,7 @@ export async function runMathOptModelContractCases(
   mode: 'direct' | 'worker' = 'direct',
   threads = 1,
 ): Promise<MathOptModelCaseResult[]> {
-  if (api.MathOpt.setWorkerBridgeEnabled) {
-    api.MathOpt.setWorkerBridgeEnabled(mode === 'worker');
-  }
+  api.MathOpt.setWorkerBridgeEnabled(mode === 'worker');
   await api.initMathOpt();
   const results: MathOptModelCaseResult[] = [];
   for (const testCase of mathOptModelContractCases) {

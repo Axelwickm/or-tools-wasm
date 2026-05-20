@@ -1,5 +1,5 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm';
-import { appendStatus, formatNumber, setRunning } from './mp_solver_helpers.js';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver, type MPVariable } from 'or-tools-wasm';
+import { appendStatus, configureWorkerBridge, formatNumber, setRunning } from './mp_solver_helpers.js';
 
 type Nutrient = { name: string; minimum: number };
 type Food = { name: string; unit: string; nutrients: number[] };
@@ -99,7 +99,10 @@ const data: Food[] = [
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const solverId = document.body.dataset.solverId === 'CLP' ? 'CLP' : 'GLOP';
+
+configureWorkerBridge(workerBridgeToggle);
 
 function renderDietResult(
   annualCost: number,
@@ -113,6 +116,8 @@ function renderDietResult(
     <table>
       <tbody>
         <tr><th>Annual cost</th><td>$${formatNumber(annualCost)}</td></tr>
+        <tr><th>Worker bridge</th><td>${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}</td></tr>
+        <tr><th>Solver workers</th><td>1</td></tr>
         <tr><th>Selected foods</th><td>${selectedFoods.length}</td></tr>
         <tr><th>Wall time</th><td>${wallTime} ms</td></tr>
         <tr><th>Iterations</th><td>${iterations}</td></tr>

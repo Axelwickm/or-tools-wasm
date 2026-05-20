@@ -30,7 +30,7 @@
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm';
+				<pre class="code-block"><code data-highlight="ts">import { CpSat, setWorkerBridgeEnabled, type SatParameters } from 'or-tools-wasm';
 
 type Order = { width: number; color: number };
 type Column = { orders: number[]; load: number; loss: number };
@@ -100,7 +100,7 @@ function buildSteelMillModel(): CpModelInput {
   };
 }
 
-CpSat.setWorkerBridgeEnabled(true);
+setWorkerBridgeEnabled(true);
 const model = await CpSat.createModel(buildSteelMillModel());
 const validation = await CpSat.validate(model);
 if (!validation.ok) throw new Error(validation.message);

@@ -66,7 +66,7 @@ type MathOptApi = {
     SolverType: MathOptSolverTypeLike;
     Model(name?: string): MathOptModelLike;
     solve(model: MathOptModelLike, options?: MathOptSolveOptions): Promise<MathOptSolveResult>;
-    setWorkerBridgeEnabled?: (enabled: boolean) => void;
+    setWorkerBridgeEnabled: (enabled: boolean) => void;
   };
 };
 

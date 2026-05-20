@@ -26,9 +26,10 @@
   initRouting,
   RoutingIndexManager,
   RoutingModel,
+  setWorkerBridgeEnabled,
 } from 'or-tools-wasm';
 
-CpSat.setWorkerBridgeEnabled(true);
+setWorkerBridgeEnabled(true);
 await initRouting();
 
 const manager = new RoutingIndexManager(distanceMatrix.length, 4, 0);

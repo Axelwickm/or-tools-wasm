@@ -85,9 +85,10 @@
   initRouting,
   RoutingIndexManager,
   RoutingModel,
+  setWorkerBridgeEnabled,
 } from 'or-tools-wasm';
 
-CpSat.setWorkerBridgeEnabled(true);
+setWorkerBridgeEnabled(true);
 await initRouting();
 
 const vehicleCapacities = [20, 20, 24];
