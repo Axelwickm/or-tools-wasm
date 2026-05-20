@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>MathOpt - Solver Backends</title>
+    <title>GSCIP - MathOpt Integer Programming</title>
     <link rel="stylesheet" href="./example.css">
     <style>
       #solution-output { margin: 0.75rem 0; }
@@ -13,10 +13,9 @@
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
-      <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>
     </nav>
-    <h1>MathOpt - solver backend sample</h1>
-    <p><em>Problem: solve a tiny linear model and compare how the MathOpt frontend sends it to different solver backends.</em></p>
+    <h1>GSCIP - MathOpt integer programming backend</h1>
+    <p><em>Problem: solve a small integer linear model through MathOpt using the GSCIP backend.</em></p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
@@ -25,40 +24,34 @@
 setWorkerBridgeEnabled(true);
 await initMathOpt();
 
-const model = MathOpt.Model('basic');
-const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
+const model = MathOpt.Model('gscip_simple_mip');
+const x = model.addIntegerVariable({ lowerBound: 0, upperBound: 10, name: 'x' });
+const y = model.addIntegerVariable({ lowerBound: 0, upperBound: 10, name: 'y' });
 
-model.addLinearConstraint({ upperBound: 1, terms: [
+model.addLinearConstraint({ upperBound: 4, terms: [
   { variable: x, coefficient: 1 },
   { variable: y, coefficient: 1 },
 ]});
+model.addLinearConstraint({
+  upperBound: 2,
+  terms: [{ variable: x, coefficient: 1 }],
+});
 model.maximize([
-  { variable: x, coefficient: 2 },
-  { variable: y, coefficient: 1 },
+  { variable: x, coefficient: 1 },
+  { variable: y, coefficient: 2 },
 ]);
 
 const result = await MathOpt.solve(model, {
-  solverType: MathOpt.SolverType.GLOP,
+  solverType: MathOpt.SolverType.GSCIP,
+  threads: 4,
 });
 console.log(result.objectiveValue, result.variableValues);</code></pre>
       </details>
     </div>
     <p>
-      Adapted from <code>ortools/math_opt/samples/python/basic_example.py</code>.
-      The browser demo solves the same two-variable linear model with a selectable MathOpt backend.
-      GLPK runs with a single thread.
+      GSCIP is SCIP exposed through the MathOpt frontend.
     </p>
     <div class="controls">
-      <label>
-        Backend
-        <select id="solver">
-          <option value="GLOP">GLOP</option>
-          <option value="GLPK">GLPK</option>
-          <option value="GSCIP">GSCIP</option>
-          <option value="CP_SAT">CP-SAT</option>
-        </select>
-      </label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>
       <button id="run" data-idle-label="Solve model">Solve model</button>
@@ -67,6 +60,6 @@ console.log(result.objectiveValue, result.variableValues);</code></pre>
     <p>Status / Response:</p>
     <pre id="status"></pre>
     <script type="module" src="./code_highlight.ts"></script>
-    <script type="module" src="./mathopt_basic.ts"></script>
+    <script type="module" src="./gscip_simple_mip.ts"></script>
   </body>
 </html>

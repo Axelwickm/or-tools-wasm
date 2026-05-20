@@ -14,6 +14,9 @@
 #include "ortools/math_opt/solvers/cp_sat_solver.h"
 #include "ortools/math_opt/solvers/glop_solver.h"
 #include "ortools/math_opt/solvers/pdlp_solver.h"
+#ifdef USE_SCIP
+#include "ortools/math_opt/solvers/gscip_solver.h"
+#endif
 
 namespace {
 
@@ -21,6 +24,9 @@ using operations_research::math_opt::CallbackRegistrationProto;
 using operations_research::math_opt::CallbackResultProto;
 using operations_research::math_opt::AllSolversRegistry;
 using operations_research::math_opt::CpSatSolver;
+#ifdef USE_SCIP
+using operations_research::math_opt::GScipSolver;
+#endif
 using operations_research::math_opt::GlopSolver;
 using operations_research::math_opt::PdlpSolver;
 using operations_research::math_opt::SolveRequest;
@@ -28,6 +34,9 @@ using operations_research::math_opt::SolveResponse;
 using operations_research::math_opt::SolveResultProto;
 using operations_research::math_opt::Solver;
 using operations_research::math_opt::SOLVER_TYPE_CP_SAT;
+#ifdef USE_SCIP
+using operations_research::math_opt::SOLVER_TYPE_GSCIP;
+#endif
 using operations_research::math_opt::SOLVER_TYPE_GLOP;
 using operations_research::math_opt::SOLVER_TYPE_PDLP;
 
@@ -66,6 +75,11 @@ void EnsureMathOptSolversRegistered() {
   if (!registry->IsRegistered(SOLVER_TYPE_PDLP)) {
     registry->Register(SOLVER_TYPE_PDLP, PdlpSolver::New);
   }
+#ifdef USE_SCIP
+  if (!registry->IsRegistered(SOLVER_TYPE_GSCIP)) {
+    registry->Register(SOLVER_TYPE_GSCIP, GScipSolver::New);
+  }
+#endif
 }
 
 }  // namespace

@@ -55,6 +55,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(USE_XPRESS OFF CACHE BOOL "Use the Xpress solver" FORCE)
   option(ORTOOLS_WASM_USE_CLP "Build CLP support into the WASM MPSolver runtime" ON)
   option(ORTOOLS_WASM_USE_GLPK "Build GLPK support into the WASM MPSolver and MathOpt runtimes" ON)
+  option(ORTOOLS_WASM_USE_SCIP "Build SCIP/GSCIP support into the WASM MPSolver and MathOpt runtimes" ON)
 endif()
 
 if(MSVC)
@@ -239,6 +240,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/glpk_interface.cc")
   endif()
+  if(ORTOOLS_WASM_USE_SCIP)
+    list(APPEND MP_SOLVER_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/scip_params.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/scip_proto_solver.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/scip_callback.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/scip_interface.cc")
+  endif()
 
   set(MATHOPT_BROWSER_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/mathopt_api.cc"
@@ -256,6 +264,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/glpk/rays.cc"
       "${PROJECT_SOURCE_DIR}/ortools/third_party_solvers/glpk/glpk_env_deleter.cc"
       "${PROJECT_SOURCE_DIR}/ortools/third_party_solvers/glpk/glpk_formatters.cc")
+  endif()
+  if(ORTOOLS_WASM_USE_SCIP)
+    file(GLOB_RECURSE ORTOOLS_WASM_GSCIP_SOURCES CONFIGURE_DEPENDS
+      "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/gscip/*.cc")
+    list(FILTER ORTOOLS_WASM_GSCIP_SOURCES EXCLUDE REGEX "/bugs/")
+    list(FILTER ORTOOLS_WASM_GSCIP_SOURCES EXCLUDE REGEX "_test\\.cc$")
+    list(FILTER ORTOOLS_WASM_GSCIP_SOURCES EXCLUDE REGEX "/gscip_testing\\.cc$")
+    list(APPEND MATHOPT_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/gscip_solver.cc"
+      "${PROJECT_SOURCE_DIR}/ortools/math_opt/solvers/message_callback_data.cc"
+      ${ORTOOLS_WASM_GSCIP_SOURCES})
   endif()
 
   set(PDLP_BROWSER_SOURCES
@@ -390,6 +409,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
         mathopt_runtime_node_asyncify)
       target_compile_definitions(${GLPK_TARGET} PRIVATE USE_GLPK)
       target_link_libraries(${GLPK_TARGET} PRIVATE GLPK::GLPK)
+    endforeach()
+  endif()
+
+  if(ORTOOLS_WASM_USE_SCIP)
+    foreach(SCIP_TARGET
+        mp_solver_runtime
+        mp_solver_runtime_asyncify
+        mp_solver_runtime_node
+        mp_solver_runtime_node_asyncify
+        mathopt_runtime
+        mathopt_runtime_asyncify
+        mathopt_runtime_node
+        mathopt_runtime_node_asyncify)
+      target_compile_definitions(${SCIP_TARGET} PRIVATE USE_SCIP)
+      target_link_libraries(${SCIP_TARGET} PRIVATE SCIP::libscip)
     endforeach()
   endif()
 
@@ -559,6 +593,12 @@ message(STATUS "Build PDLP: ${BUILD_PDLP}")
 ## SCIP
 # see: https://github.com/scipopt/scip
 CMAKE_DEPENDENT_OPTION(USE_SCIP "Use the Scip solver" OFF "BUILD_CXX" OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND ORTOOLS_WASM_USE_SCIP)
+  set(USE_SCIP ON CACHE BOOL "Use the SCIP solver" FORCE)
+  set(BUILD_Boost ON CACHE BOOL "Build the Boost dependency Library" FORCE)
+  set(BUILD_soplex ON CACHE BOOL "Build the Soplex dependency Library" FORCE)
+  set(BUILD_SCIP ON CACHE BOOL "Build the SCIP dependency Library" FORCE)
+endif()
 message(STATUS "SCIP support: ${USE_SCIP}")
 if(USE_SCIP)
   CMAKE_DEPENDENT_OPTION(BUILD_Boost "Build the Boost dependency Library" OFF

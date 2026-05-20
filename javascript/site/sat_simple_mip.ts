@@ -8,7 +8,11 @@ const workerInput = document.getElementById('workers') as HTMLInputElement | nul
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
-const solverId = document.body.dataset.solverId === 'GLPK' ? 'GLPK' : 'SAT';
+const solverId = document.body.dataset.solverId === 'GLPK'
+  ? 'GLPK'
+  : document.body.dataset.solverId === 'SCIP'
+    ? 'SCIP'
+    : 'SAT';
 
 if (workerInput) {
   workerInput.max = String(maxWorkerCount);
@@ -18,7 +22,7 @@ if (workerInput) {
 
 configureWorkerBridge(workerBridgeToggle);
 
-if (solverId === 'GLPK') {
+if (solverId !== 'SAT') {
   if (workerInput) workerInput.disabled = true;
 }
 

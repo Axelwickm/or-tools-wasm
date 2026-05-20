@@ -1,13 +1,13 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 391 ✅ implemented; 15 🟨 placeholders/API gaps; 11 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 3.
+Totals: 613 upstream tests; 391 ✅ implemented; 24 🟨 placeholders/API gaps; 2 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 3.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
 - 🔎 Double-checked: appended after a status once the upstream Python test body has been compared with our TS/WASM parity implementation.
 - ⚠️ Checked mismatch: appended when a current TS/WASM case exists in the same area, but it does not match the upstream Python test behavior closely enough to count as parity.
 - 🟨 Placeholder/API gap: our fixtures already acknowledge this test, but it is skipped/TODO because an exposed solver surface is missing a supporting API, such as MathOpt filters or IncrementalSolver.
-- ➖ Backend-blocked: the upstream test depends on a solver backend we do not currently link or expose, such as CBC, BOP, SCIP/GSCIP, or Gurobi.
+- ➖ Backend-blocked: the upstream test depends on a solver backend we do not currently link or expose, such as CBC, BOP, or Gurobi.
 - 🔴 Relevant missing: the test appears relevant to a solver/API surface we do expose or claim, but no matching parity fixture was found. These are the likely follow-up candidates.
 - ⚪ Not applicable: the test is in a solver-family Python file, but it targets Python-only conveniences, internal wrappers, export/update-tracker helpers, or APIs outside the current TypeScript/WASM contract.
 - 🧪 Backend coverage note: a runtime/backend check exists, but it is not counted as full upstream Python test parity until the corresponding upstream Python tests have been compared assertion-by-assertion.
@@ -223,13 +223,14 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 - MPSolver backend coverage
   - 🧪 CLP backend LP coverage - CLP now runs through the same shared TS/WASM MPSolver public API cases as GLOP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("CLP")`, `SupportsProblemType(CLP_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. This is backend parity coverage, not a separate upstream Python `test_clp` because upstream has no explicit Python CLP test body.
   - 🧪 GLPK backend LP/MIP coverage - GLPK runs through the same shared TS/WASM MPSolver public API LP cases as GLOP/CLP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("GLPK_LP")`, `SupportsProblemType(GLPK_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. GLPK also runs direct MIP solve cases for `CreateSolver("GLPK")`, `SupportsProblemType(GLPK_MIXED_INTEGER_PROGRAMMING)`, and the `simple_mip_program.py` model. This is backend parity coverage, not a separate upstream Python `test_glpk` because upstream has no explicit Python GLPK solve test body.
+  - 🧪 SCIP backend MIP coverage - SCIP now runs shared TS/WASM MPSolver public API MIP cases for `CreateSolver("SCIP")`, `SupportsProblemType(SCIP_MIXED_INTEGER_PROGRAMMING)`, parse/check support, solve status, objective/value checks, `VerifySolution()`, and the `simple_mip_program.py` model. This is backend coverage; upstream `lp_test.py/testApi` still mixes SCIP with Python-only natural expression helpers and is not full parity yet.
 - PyWrapLp
   - ➖ 🔎 PyWrapLp.test_proto - CBC backend is not linked/exposed
   - ✅ 🔎 PyWrapLp.test_external_api
 
 ## ortools/linear_solver/python/lp_test.py
 - PyWrapLpTest
-  - ➖ 🔎 PyWrapLpTest.testApi - SCIP-only upstream loop; SCIP is not linked/exposed
+  - 🟨 🔎 PyWrapLpTest.testApi - SCIP backend is linked and smoke-tested, but full parity is blocked by Python-only natural expression helper assertions
   - ✅ 🔎 PyWrapLpTest.testSetHint
   - ➖ 🔎 PyWrapLpTest.testBopInfeasible - BOP backend is not linked/exposed
   - ✅ 🔎 PyWrapLpTest.testLoadSolutionFromProto
@@ -661,20 +662,21 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 - SolveTest
   - ✅ 🔎 SolveTest.test_solve_error
   - ✅ 🔎 SolveTest.test_lp_solve
-  - ➖ 🔎 SolveTest.test_indicator - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
+  - 🧪 GSCIP backend MIP coverage - GSCIP now runs shared TS/WASM MathOpt solve cases in direct and worker modes with `threads: 1` and `threads: 4`, checking optimal termination, objective value, and variable values. This is backend coverage, not full parity for the GSCIP-specific upstream tests below.
+  - 🟨 🔎 SolveTest.test_indicator - GSCIP is linked, but MathOpt indicator constraint helpers are not exposed in TS
   - 🟨 🔎 SolveTest.test_filters - placeholder: model/solve filters not exposed in TS MathOpt API
-  - ➖ 🔎 SolveTest.test_message_callback - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
-  - ➖ 🔎 SolveTest.test_solve_interrupter - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
-  - ➖ 🔎 SolveTest.test_solve_duplicated_names - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
-  - ➖ 🔎 SolveTest.test_solve_remove_names - uses MathOpt GSCIP; GSCIP/SCIP is not linked/exposed
+  - 🟨 🔎 SolveTest.test_message_callback - GSCIP is linked, but MathOpt message callback solve options are not exposed in TS
+  - 🟨 🔎 SolveTest.test_solve_interrupter - GSCIP is linked, but MathOpt solve interrupter support is not exposed in TS
+  - 🟨 🔎 SolveTest.test_solve_duplicated_names - GSCIP is linked, but this exact name-removal/duplicate-name solve contract is not ported yet
+  - 🟨 🔎 SolveTest.test_solve_remove_names - GSCIP is linked, but this exact name-removal solve contract is not ported yet
   - 🟨 🔎 SolveTest.test_incremental_solve_remove_names - placeholder: IncrementalSolver API not available in TS MathOpt
   - 🟨 🔎 SolveTest.test_incremental_solve_init_error - placeholder: IncrementalSolver API not available in TS MathOpt
   - 🟨 🔎 SolveTest.test_incremental_solve_error - placeholder: IncrementalSolver API not available in TS MathOpt
   - 🟨 🔎 SolveTest.test_incremental_solve_error_on_reject - placeholder: IncrementalSolver API not available in TS MathOpt
   - 🟨 🔎 SolveTest.test_incremental_lp - placeholder: IncrementalSolver API not available in TS MathOpt
-  - ➖ 🔎 SolveTest.test_incremental_mip - uses incremental GSCIP; GSCIP/SCIP is not linked/exposed
-  - ➖ 🔎 SolveTest.test_incremental_mip_with_message_cb - uses incremental GSCIP; GSCIP/SCIP is not linked/exposed
-  - ➖ 🔎 SolveTest.test_incremental_solve_interrupter - uses incremental GSCIP; GSCIP/SCIP is not linked/exposed
+  - 🟨 🔎 SolveTest.test_incremental_mip - placeholder: IncrementalSolver API not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_mip_with_message_cb - placeholder: IncrementalSolver API and message callbacks not available in TS MathOpt
+  - 🟨 🔎 SolveTest.test_incremental_solve_interrupter - placeholder: IncrementalSolver API and solve interrupter support not available in TS MathOpt
   - 🟨 🔎 SolveTest.test_incremental_solve_rejected - placeholder: IncrementalSolver API not available in TS MathOpt
   - 🟨 🔎 SolveTest.test_multiple_incremental_lps - placeholder: IncrementalSolver API not available in TS MathOpt
   - 🟨 🔎 SolveTest.test_incremental_solver_delete - placeholder: IncrementalSolver API not available in TS MathOpt

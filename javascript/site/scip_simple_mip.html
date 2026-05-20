@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SCIP - Integer Programming</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 8rem; }
+    </style>
+  </head>
+  <body data-solver-id="SCIP">
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>SCIP - integer programming backend</h1>
+    <p><em>Problem: choose integer values for two variables that maximize the objective while satisfying linear limits.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setWorkerBridgeEnabled } from 'or-tools-wasm';
+
+setWorkerBridgeEnabled(true);
+await initMPSolver();
+const solver = MPSolver.CreateSolver('SCIP');
+if (!solver) throw new Error('SCIP backend is unavailable');
+
+const x = solver.IntVar(0, solver.infinity(), 'x');
+const y = solver.IntVar(0, solver.infinity(), 'y');
+const c0 = solver.Constraint(-solver.infinity(), 17.5);
+c0.SetCoefficient(x, 1);
+c0.SetCoefficient(y, 7);
+const c1 = solver.Constraint(-solver.infinity(), 3.5);
+c1.SetCoefficient(x, 1);
+
+const objective = solver.Objective();
+objective.SetCoefficient(x, 1);
+objective.SetCoefficient(y, 10);
+objective.SetMaximization();
+
+const status = await solver.Solve();
+console.log(status, objective.Value(), x.solution_value(), y.solution_value());</code></pre>
+      </details>
+    </div>
+    <p>
+      Direct port of <code>simple_mip_program.py</code> through the MPSolver SCIP integer backend.
+    </p>
+    <div class="controls">
+      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <button id="run" data-idle-label="Solve MIP">Solve MIP</button>
+    </div>
+    <div id="solution-output">Run the solver to view the solution.</div>
+    <p>Status / Response:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./sat_simple_mip.ts"></script>
+  </body>
+</html>

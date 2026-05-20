@@ -251,7 +251,9 @@ SCIP_RETCODE GScip::InterruptEventHandler::Init(GScip* const gscip) {
   // of these.
   CatchEvent(SCIP_EVENTTYPE_PRESOLVEROUND);
   CatchEvent(SCIP_EVENTTYPE_NODEEVENT);
-  CatchEvent(SCIP_EVENTTYPE_ROWEVENT);
+  // WASM/SCIP 10: SCIPcatchEvent() rejects row/variable event masks and logs
+  // SCIP_INVALIDCALL; keep the upstream line visible for future merges.
+  // CatchEvent(SCIP_EVENTTYPE_ROWEVENT);
 
   return TryCallInterruptIfNeeded(gscip);
 }

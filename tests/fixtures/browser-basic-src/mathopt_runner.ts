@@ -248,6 +248,7 @@ export type MathOptApi = {
   MathOpt: {
     SolverType: {
       GLOP: number;
+      GSCIP: number;
       CP_SAT: number;
       GLPK: number;
     };
@@ -414,6 +415,44 @@ async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
   };
 }
 
+async function runGScipMip(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {
+  const model = api.MathOpt.Model('mathopt_gscip_mip');
+  const x = model.addVariable({ lowerBound: 0, upperBound: 10, integer: true, name: 'x' });
+  const y = model.addVariable({ lowerBound: 0, upperBound: 10, integer: true, name: 'y' });
+  model.addLinearConstraint({
+    upperBound: 4,
+    terms: [
+      { variable: x, coefficient: 1 },
+      { variable: y, coefficient: 1 },
+    ],
+    name: 'budget',
+  });
+  model.addLinearConstraint({
+    upperBound: 2,
+    terms: [{ variable: x, coefficient: 1 }],
+    name: 'x_cap',
+  });
+  model.maximize([
+    { variable: x, coefficient: 1 },
+    { variable: y, coefficient: 2 },
+  ]);
+
+  const result = await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GSCIP, threads });
+  assertOptimal('MathOpt GSCIP MIP', result);
+  assert(near(result.objectiveValue, 8), `MathOpt GSCIP MIP: expected objective 8, got ${result.objectiveValue}`);
+  assert(near(result.variableValues.x, 0), `MathOpt GSCIP MIP: expected x=0, got ${result.variableValues.x}`);
+  assert(near(result.variableValues.y, 4), `MathOpt GSCIP MIP: expected y=4, got ${result.variableValues.y}`);
+  return {
+    name: 'MathOpt.testGScipIntegerProgram',
+    mode,
+    threads,
+    ok: true,
+    terminationReason: result.terminationReason,
+    objectiveValue: result.objectiveValue,
+    values: result.variableValues,
+  };
+}
+
 async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<MathOptCaseResult> {
   const model = api.MathOpt.Model('mathopt_glpk_lp');
   const x = model.addVariable({ lowerBound: 0, name: 'x' });
@@ -478,6 +517,8 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
       results.push(await runGlopLp(api, mode, threads));
       options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
       results.push(await runCpSatMip(api, mode, threads));
+      options.onProgress?.('MathOpt.testGScipIntegerProgram', mode, threads);
+      results.push(await runGScipMip(api, mode, threads));
       if (threads === 1) {
         options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
         results.push(await runGlpkLp(api, mode));

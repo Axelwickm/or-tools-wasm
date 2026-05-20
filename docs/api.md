@@ -791,7 +791,7 @@ the WebAssembly runtime will be supported at runtime; use
 `MPSolver.SupportsProblemType()`.
 
 The default package runtime currently includes `GLOP`, `CLP`, and `GLPK_LP` for
-continuous linear programming, plus `SAT` and `GLPK` for integer linear
+continuous linear programming, plus `SAT`, `GLPK`, and `SCIP` for integer linear
 programming through MPSolver.
 
 `MPSolverResultStatus` contains `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
@@ -1103,8 +1103,10 @@ Solver type enum:
 - `SANTORINI`
 - `XPRESS`
 
-Only solver types compiled into the WebAssembly runtime are available at
-runtime.
+The default package runtime currently includes `GLOP`, `GLPK`, `GSCIP`,
+`CP_SAT`, and `PDLP`. Other enum values are exported for API/proto parity but
+return an unavailable-solver error unless a custom build links the corresponding
+native backend.
 
 Expression helpers:
 
@@ -1452,7 +1454,9 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 The CP-SAT, MathOpt, Routing, MPSolver proto-solve, and PDLP paths can use the
 browser worker bridge. Worker bridge availability is independent of solver
 threading support; for example GLPK is single-threaded but can still run through
-the worker bridge in browser UI code. Prefer the shared package controls:
+the worker bridge in browser UI code, while CP-SAT, SAT, SCIP/GSCIP, and other
+threaded-capable paths can also accept solver thread settings. Prefer the shared
+package controls:
 
 ```ts
 import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';

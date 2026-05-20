@@ -67,7 +67,7 @@
     Use <a href="https://developers.google.com/optimization/math_opt" rel="noopener">MathOpt</a> to route one model through selectable solver backends.
   </p>
   <ul>
-    <li><a href="./mathopt_basic.html">Basic Model - switch between GLOP, GLPK, and CP-SAT</a></li>
+    <li><a href="./mathopt_basic.html">Basic Model - switch between GLOP, GLPK, GSCIP, and CP-SAT</a></li>
   </ul>
   <h2>MPSolver (frontend)</h2>
   <p class="solver-description">
@@ -75,7 +75,7 @@
     to route one linear model through selectable LP and integer backends.
   </p>
   <ul>
-    <li><a href="./mp_simple_lp.html">Basic Model - switch between GLOP, CLP, GLPK, and SAT</a></li>
+    <li><a href="./mp_simple_lp.html">Basic Model - switch between GLOP, CLP, GLPK, SCIP, and SAT</a></li>
   </ul>
   <h2>CP-SAT</h2>
   <p class="solver-description">
@@ -121,6 +121,21 @@
   <ul>
     <li><a href="./glpk_simple_lp.html">Simple LP - simple_lp_program.py model with GLPK</a></li>
     <li><a href="./glpk_simple_mip.html">Simple MIP - simple_mip_program.py model with GLPK</a></li>
+  </ul>
+  <h2>SCIP</h2>
+  <p class="solver-description">
+    Use SCIP for mixed-integer linear programs through MPSolver.
+  </p>
+  <ul>
+    <li><a href="./scip_simple_mip.html">Simple MIP - simple_mip_program.py model with SCIP</a></li>
+    <li><a href="./scip_assignment.html">Assignment With Task Sizes - binary MIP from the OR-Tools samples</a></li>
+  </ul>
+  <h2>GSCIP</h2>
+  <p class="solver-description">
+    Use GSCIP for SCIP-backed mixed-integer optimization through MathOpt.
+  </p>
+  <ul>
+    <li><a href="./gscip_simple_mip.html">Simple MIP - MathOpt model with GSCIP</a></li>
   </ul>
   <h2>SAT</h2>
   <p class="solver-description">

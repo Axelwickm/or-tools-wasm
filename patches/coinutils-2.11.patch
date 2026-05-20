@@ -10,3 +10,73 @@ index 3fc9cff..b2423fe 100644
    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version")
  endif()
  
+diff --git a/CoinUtils/src/CoinTime.hpp b/CoinUtils/src/CoinTime.hpp
+index bc54e35..68653f6 100644
+--- a/CoinUtils/src/CoinTime.hpp
++++ b/CoinUtils/src/CoinTime.hpp
+@@ -125,6 +125,13 @@ static inline double CoinCpuTime()
+   cpu_temp = (double)((double)ticksnow / CLOCKS_PER_SEC);
+ #endif
+ 
++#else
++#if defined(__EMSCRIPTEN__)
++  // WASM: Emscripten logs unsupported syscall warnings for getrusage();
++  // keep the upstream rusage path visible and use clock() instead.
++  // struct rusage usage;
++  // getrusage(RUSAGE_SELF, &usage);
++  cpu_temp = static_cast< double >(clock()) / CLOCKS_PER_SEC;
+ #else
+   struct rusage usage;
+ #ifdef ZEROFAULT
+@@ -134,6 +141,7 @@ static inline double CoinCpuTime()
+   getrusage(RUSAGE_SELF, &usage);
+   cpu_temp = static_cast< double >(usage.ru_utime.tv_sec);
+   cpu_temp += 1.0e-6 * (static_cast< double >(usage.ru_utime.tv_usec));
++#endif
+ #endif
+   return cpu_temp;
+ }
+@@ -145,6 +153,13 @@ static inline double CoinSysTime()
+   double sys_temp;
+ #if defined(_MSC_VER) || defined(__MSVCRT__)
+   sys_temp = 0.0;
++#else
++#if defined(__EMSCRIPTEN__)
++  // WASM: Emscripten logs unsupported syscall warnings for getrusage();
++  // keep the upstream rusage path visible and return no system CPU time.
++  // struct rusage usage;
++  // getrusage(RUSAGE_SELF, &usage);
++  sys_temp = 0.0;
+ #else
+   struct rusage usage;
+ #ifdef ZEROFAULT
+@@ -154,6 +169,7 @@ static inline double CoinSysTime()
+   getrusage(RUSAGE_SELF, &usage);
+   sys_temp = static_cast< double >(usage.ru_stime.tv_sec);
+   sys_temp += 1.0e-6 * (static_cast< double >(usage.ru_stime.tv_usec));
++#endif
+ #endif
+   return sys_temp;
+ }
+@@ -165,6 +181,13 @@ static inline double CoinCpuTimeJustChildren()
+   double cpu_temp;
+ #if defined(_MSC_VER) || defined(__MSVCRT__)
+   cpu_temp = 0.0;
++#else
++#if defined(__EMSCRIPTEN__)
++  // WASM: Emscripten logs unsupported syscall warnings for getrusage();
++  // keep the upstream rusage path visible and return no child CPU time.
++  // struct rusage usage;
++  // getrusage(RUSAGE_CHILDREN, &usage);
++  cpu_temp = 0.0;
+ #else
+   struct rusage usage;
+ #ifdef ZEROFAULT
+@@ -174,6 +197,7 @@ static inline double CoinCpuTimeJustChildren()
+   getrusage(RUSAGE_CHILDREN, &usage);
+   cpu_temp = static_cast< double >(usage.ru_utime.tv_sec);
+   cpu_temp += 1.0e-6 * (static_cast< double >(usage.ru_utime.tv_usec));
++#endif
+ #endif
+   return cpu_temp;
+ }

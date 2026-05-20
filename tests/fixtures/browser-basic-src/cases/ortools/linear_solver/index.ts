@@ -137,6 +137,7 @@ export type MPSolverApi = {
     CLP_LINEAR_PROGRAMMING: number;
     GLPK_LINEAR_PROGRAMMING: number;
     GLPK_MIXED_INTEGER_PROGRAMMING: number;
+    SCIP_MIXED_INTEGER_PROGRAMMING: number;
     SAT_INTEGER_PROGRAMMING: number;
     OPTIMAL: number;
     INFEASIBLE: number;
@@ -281,7 +282,7 @@ async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCa
 
 async function runMixedIntegerCppStyleBackendCase(
   api: MPSolverApi,
-  solverId: 'SAT' | 'GLPK',
+  solverId: 'SAT' | 'GLPK' | 'SCIP',
   name: string,
 ): Promise<MpSolverCaseResult> {
   const solver = createSolver(api, solverId, name);
@@ -321,6 +322,16 @@ async function runMixedIntegerCppStyleBackendCase(
 async function runGlpkMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
   assert(api.MPSolver.SupportsProblemType(api.MPSolver.GLPK_MIXED_INTEGER_PROGRAMMING), 'MPSolver: GLPK MIP not supported');
   return runMixedIntegerCppStyleBackendCase(api, 'GLPK', 'MPSolver: GLPK_MIXED_INTEGER_PROGRAMMING');
+}
+
+async function runScipMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING), 'MPSolver: SCIP MIP not supported');
+  assert(api.MPSolver.ParseSolverType('SCIP') === api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING, 'MPSolver: SCIP ParseSolverType mismatch');
+  assert(
+    api.MPSolver.ParseAndCheckSupportForProblemType('SCIP') === api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING,
+    'MPSolver: SCIP ParseAndCheckSupportForProblemType mismatch',
+  );
+  return runMixedIntegerCppStyleBackendCase(api, 'SCIP', 'MPSolver: SCIP_MIXED_INTEGER_PROGRAMMING');
 }
 
 async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
@@ -835,10 +846,11 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     ...linearCppStyleResults,
     await runMixedIntegerCppStyleCase(api),
     await runGlpkMixedIntegerCase(api),
+    await runScipMixedIntegerCase(api),
     await runBooleanCppStyleCase(api),
     skipped(
       'MPSolver: lp_test.py testApi',
-      'Partially mirrored by backend-specific C++ style cases; upstream test currently gates to SCIP, which is not linked in this package.',
+      'Partially mirrored by backend-specific C++ style cases; upstream also exercises Python-only natural expression helpers.',
     ),
     await runSetHintCase(api),
     skipped(
@@ -885,6 +897,14 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
       api,
       'MPSolver: GLPK simple_mip_program.py',
       'GLPK',
+      (solver, infinity) => solver.IntVar(0, infinity, 'x'),
+      (solver, infinity) => solver.IntVar(0, infinity, 'y'),
+      { objective: 23, x: 3, y: 2 },
+    ),
+    await runSimpleProgram(
+      api,
+      'MPSolver: SCIP simple_mip_program.py',
+      'SCIP',
       (solver, infinity) => solver.IntVar(0, infinity, 'x'),
       (solver, infinity) => solver.IntVar(0, infinity, 'y'),
       { objective: 23, x: 3, y: 2 },

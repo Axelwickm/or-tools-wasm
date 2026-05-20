@@ -7,6 +7,7 @@ function selectedSolverType(): keyof typeof MathOpt.SolverType {
   const value = solverSelect?.value;
   if (value === 'CP_SAT') return value;
   if (value === 'GLPK') return value;
+  if (value === 'GSCIP') return value;
   return 'GLOP';
 }
 
@@ -15,7 +16,7 @@ function addBackendCompatibleBinaryVariable(
   solverType: keyof typeof MathOpt.SolverType,
   name: string,
 ) {
-  if (solverType === 'CP_SAT') {
+  if (solverType === 'CP_SAT' || solverType === 'GSCIP') {
     return model.addBinaryVariable({ name });
   }
   return model.addVariable({ lowerBound: 0, upperBound: 1, name });
@@ -61,7 +62,7 @@ async function runMathOptExample() {
     });
     renderRows([
       ['Backend', solverType],
-      ['Variable domain', solverType === 'CP_SAT' ? 'binary' : 'continuous [0, 1]'],
+      ['Variable domain', solverType === 'CP_SAT' || solverType === 'GSCIP' ? 'binary' : 'continuous [0, 1]'],
       ['Objective', result.objectiveValue],
       ['x', result.variableValues.x],
       ['y', result.variableValues.y],

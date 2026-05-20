@@ -96,14 +96,14 @@ console.log(result.response);
 | --- | --- | --- |
 | CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
 | Routing | ✅ | Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search. |
-| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, and SAT MIP backends. |
-| MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, GLPK, CP-SAT, and PDLP backends. |
+| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, SCIP MIP, and SAT MIP backends. |
+| MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, GLPK, GSCIP, CP-SAT, and PDLP backends. |
 | GLOP | ✅ | Google's simplex linear programming solver. |
 | PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
 | SAT integer programming | ✅ | CP-SAT-backed integer programming backend for pure integer linear models. |
 | CLP | ✅ | COIN-OR linear programming backend. |
 | GLPK | ✅ | GNU linear and mixed-integer programming backend. |
-| SCIP / GSCIP |  | SCIP-based LP, MIP, and nonconvex integer quadratic backend. |
+| SCIP / GSCIP | ✅ | SCIP-based mixed-integer backend through MPSolver and MathOpt. |
 | CBC |  | COIN-OR branch-and-cut mixed-integer programming backend. |
 | Knapsack |  | Dedicated knapsack mixed-integer programming backend. |
 | Network flow algorithms |  | Max-flow and min-cost-flow graph optimization algorithms. |
@@ -156,8 +156,9 @@ console.log(isWorkerBridgeEnabled());
 
 Worker bridge support is separate from solver threading. For example, GLPK is
 single-threaded in this package but can still run through the browser worker
-bridge. The package loads solver runtimes on demand; application code does not
-need to choose between JSPI and Asyncify manually.
+bridge, while CP-SAT, SAT, SCIP/GSCIP, and other threaded-capable paths may also
+accept solver thread settings. The package loads solver runtimes on demand;
+application code does not need to choose between JSPI and Asyncify manually.
 
 For Vite dev and preview servers, set the headers in `vite.config.ts`:
 
