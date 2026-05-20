@@ -263,6 +263,7 @@ async function solveRoutingWithModule(
     }
 
     return {
+      status: module._routing_status(modelHandle),
       objectiveValue: toNumber(module._routing_assignment_objective_value(modelHandle)),
       nextValues,
       starts,

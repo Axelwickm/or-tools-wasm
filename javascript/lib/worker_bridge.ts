@@ -90,7 +90,14 @@ async function ensureWorker(): Promise<BridgeWorker> {
       }
       const pending = pendingWorkerRequests.get(message.id);
       if (message.type === 'solveCallback') {
-        pending?.onEvent?.(message);
+        if (pending?.onEvent) {
+          try {
+            pending.onEvent(message);
+          } catch (error) {
+            pendingWorkerRequests.delete(message.id);
+            pending.reject(error);
+          }
+        }
         return;
       }
       if (message.type === 'error') {

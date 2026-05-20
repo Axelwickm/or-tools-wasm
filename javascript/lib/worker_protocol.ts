@@ -95,6 +95,7 @@ export type CancelSolve = {
 };
 
 export type RoutingSolveResult = {
+  status: number;
   objectiveValue: number;
   nextValues: number[];
   starts: number[];

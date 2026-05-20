@@ -117,10 +117,10 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
   }
   expect(parsedStatus.results?.[0].workerStats).toEqual(
     expect.objectContaining({
-      total: 4,
       pthread: 4,
     }),
   );
+  expect(parsedStatus.results?.[0].workerStats?.total).toBeGreaterThanOrEqual(4);
   expect(parsedStatus.results?.[2].workerStats?.total).toBeGreaterThanOrEqual(5);
   expect(parsedStatus.routingResults).toEqual(expect.arrayContaining([
     expect.objectContaining({

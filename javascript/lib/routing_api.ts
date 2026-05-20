@@ -430,6 +430,7 @@ export class RoutingModel {
   private readonly dimensionNames = new Set<string>();
   private readonly atSolutionCallbacks: Array<() => void> = [];
   private lastObjectiveValue = 0;
+  private lastWorkerStatus: RoutingSearchStatus | null = null;
   private readonly parameters?: RoutingModelParameters;
 
   constructor(private readonly manager: RoutingIndexManager, parameters?: RoutingModelParameters) {
@@ -481,6 +482,7 @@ export class RoutingModel {
         dimensionNames: [...this.dimensionNames],
       });
       this.lastWorkerResult = response.result;
+      this.lastWorkerStatus = response.result?.status ?? null;
       if (!response.result) return null;
       const assignment = new Assignment(this, response.result);
       this.lastObjectiveValue = assignment.ObjectiveValue();
@@ -489,6 +491,8 @@ export class RoutingModel {
     }
 
     this.installMatrixEvaluator();
+    this.lastWorkerResult = null;
+    this.lastWorkerStatus = null;
     const result = this.module._routing_solve_with_parameters_ext(
       this.handle,
       parameters.firstSolutionStrategy ?? 0,
@@ -510,6 +514,8 @@ export class RoutingModel {
 
   solveWithParametersSync(parameters: RoutingSearchParameters = DefaultRoutingSearchParameters()): Assignment | null {
     this.installMatrixEvaluator();
+    this.lastWorkerResult = null;
+    this.lastWorkerStatus = null;
     const ok = this.module._routing_solve_with_parameters_ext(
       this.handle,
       parameters.firstSolutionStrategy ?? 0,
@@ -523,6 +529,9 @@ export class RoutingModel {
   }
 
   status(): RoutingSearchStatus {
+    if (this.lastWorkerStatus !== null) {
+      return this.lastWorkerStatus;
+    }
     return this.module._routing_status(this.handle);
   }
 
