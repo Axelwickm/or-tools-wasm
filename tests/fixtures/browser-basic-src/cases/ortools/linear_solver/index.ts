@@ -134,6 +134,7 @@ export type MPSolverApi = {
   MPSolver: {
     new(name: string, problemType: number): MPSolverLike;
     GLOP_LINEAR_PROGRAMMING: number;
+    CLP_LINEAR_PROGRAMMING: number;
     SAT_INTEGER_PROGRAMMING: number;
     OPTIMAL: number;
     INFEASIBLE: number;
@@ -172,6 +173,13 @@ export type MPSolverApi = {
   isWorkerBridgeEnabled?: () => boolean;
 };
 
+type LpBackend = {
+  solverId: 'GLOP' | 'CLP';
+  problemType: number;
+  supportsExactConditionNumber: boolean;
+  x3ReducedCost: number;
+};
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
@@ -180,6 +188,23 @@ function assert(condition: unknown, message: string): asserts condition {
 
 function near(actual: number, expected: number, tolerance = 1e-7) {
   return Math.abs(actual - expected) <= tolerance;
+}
+
+function lpBackends(api: MPSolverApi): LpBackend[] {
+  return [
+    {
+      solverId: 'GLOP',
+      problemType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
+      supportsExactConditionNumber: true,
+      x3ReducedCost: -2.666666666666667,
+    },
+    {
+      solverId: 'CLP',
+      problemType: api.MPSolver.CLP_LINEAR_PROGRAMMING,
+      supportsExactConditionNumber: false,
+      x3ReducedCost: -2.666666666666667,
+    },
+  ];
 }
 
 function createSolver(api: MPSolverApi, solverId: string, name: string): MPSolverLike {
@@ -303,16 +328,16 @@ async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
   }
 }
 
-async function runExternalApiCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
-  const name = 'MPSolver: pywraplp_test.py test_external_api';
-  const solver = createSolver(api, 'GLOP', name);
+async function runExternalApiCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: pywraplp_test.py test_external_api (${backend.solverId})`;
+  const solver = createSolver(api, backend.solverId, name);
   try {
     const infinity = solver.infinity();
-    assert(api.MPSolver.SupportsProblemType(api.MPSolver.GLOP_LINEAR_PROGRAMMING), `${name}: GLOP not supported`);
+    assert(api.MPSolver.SupportsProblemType(backend.problemType), `${name}: ${backend.solverId} not supported`);
     assert(!api.MPSolver.SupportsProblemType(10_000), `${name}: bogus solver type reported supported`);
-    assert(api.MPSolver.ParseSolverType('GLOP') === api.MPSolver.GLOP_LINEAR_PROGRAMMING, `${name}: ParseSolverType mismatch`);
-    assert(api.MPSolver.ParseAndCheckSupportForProblemType('GLOP') === api.MPSolver.GLOP_LINEAR_PROGRAMMING, `${name}: ParseAndCheckSupportForProblemType mismatch`);
-    assert(!solver.IsMIP(), `${name}: GLOP should not be MIP`);
+    assert(api.MPSolver.ParseSolverType(backend.solverId) === backend.problemType, `${name}: ParseSolverType mismatch`);
+    assert(api.MPSolver.ParseAndCheckSupportForProblemType(backend.solverId) === backend.problemType, `${name}: ParseAndCheckSupportForProblemType mismatch`);
+    assert(!solver.IsMIP(), `${name}: ${backend.solverId} should not be MIP`);
 
     const x1 = solver.Var(0.0, infinity, false, 'x1');
     const x2 = solver.NumVar(0.0, infinity, 'x2');
@@ -401,8 +426,10 @@ async function runExternalApiCase(api: MPSolverApi): Promise<MpSolverCaseResult>
     assert(near(x1.ReducedCost(), 0.0), `${name}: reduced cost mismatch`);
     assert(near(c0.DualValue(), 2 / 3), `${name}: dual value mismatch ${c0.DualValue()}`);
     assert(solver.ComputeConstraintActivities().length === solver.NumConstraints(), `${name}: activity count mismatch`);
-    assert(Number.isFinite(solver.ComputeExactConditionNumber()), `${name}: condition number should be finite`);
-    assert(!solver.NextSolution(), `${name}: GLOP should not produce a next solution`);
+    if (backend.supportsExactConditionNumber) {
+      assert(Number.isFinite(solver.ComputeExactConditionNumber()), `${name}: condition number should be finite`);
+    }
+    assert(!solver.NextSolution(), `${name}: ${backend.solverId} should not produce a next solution`);
     assert(solver.SolverVersion().length > 0, `${name}: missing solver version`);
 
     return {
@@ -421,9 +448,9 @@ async function runExternalApiCase(api: MPSolverApi): Promise<MpSolverCaseResult>
   }
 }
 
-async function runLinearCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
-  const name = 'MPSolver: lp_test.py RunLinearExampleCppStyleAPI';
-  const solver = createSolver(api, 'GLOP', name);
+async function runLinearCppStyleCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: lp_test.py RunLinearExampleCppStyleAPI (${backend.solverId})`;
+  const solver = createSolver(api, backend.solverId, name);
   try {
     const infinity = solver.infinity();
     const x1 = solver.NumVar(0.0, infinity, 'x1');
@@ -458,6 +485,8 @@ async function runLinearCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseResu
     assert(near(x1.solution_value(), 33.3333333333333, 1e-5), `${name}: x1 mismatch`);
     assert(near(x2.solution_value(), 66.6666666666667, 1e-5), `${name}: x2 mismatch`);
     assert(near(x3.solution_value(), 0, 1e-7), `${name}: x3 mismatch`);
+    assert(near(x1.ReducedCost(), 0, 1e-7), `${name}: x1 reduced cost mismatch`);
+    assert(near(x3.ReducedCost(), backend.x3ReducedCost, 1e-5), `${name}: x3 reduced cost mismatch ${x3.ReducedCost()}`);
     const activities = solver.ComputeConstraintActivities();
     assert(near(activities[c0.index()], 100, 1e-5), `${name}: c0 activity mismatch`);
     assert(near(activities[c1.index()], 600, 1e-5), `${name}: c1 activity mismatch`);
@@ -599,9 +628,9 @@ function mpProtoRequest(api: MPSolverApi, numWorkers: number) {
   };
 }
 
-function lpApiTestProtoRequest(api: MPSolverApi) {
+function lpApiTestProtoRequest(solverType: number) {
   return {
-    solverType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
+    solverType,
     model: {
       maximize: true,
       variable: [
@@ -620,9 +649,9 @@ function lpApiTestProtoRequest(api: MPSolverApi) {
   };
 }
 
-function lpTestSolveFromProtoRequest(api: MPSolverApi) {
+function lpTestSolveFromProtoRequest(solverType: number) {
   return {
-    solverType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
+    solverType,
     solverTimeLimitSeconds: 1.0,
     solverSpecificParameters: '',
     model: {
@@ -679,9 +708,9 @@ async function runProtoSolveCase(
   return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
 }
 
-async function runLpApiTestProtoCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
-  const name = 'MPSolver: lp_api_test.py test_proto';
-  const result = await api.MPSolver.solveModelRequest(lpApiTestProtoRequest(api));
+async function runLpApiTestProtoCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: lp_api_test.py test_proto (${backend.solverId})`;
+  const result = await api.MPSolver.solveModelRequest(lpApiTestProtoRequest(backend.problemType));
   const response = result.response;
   assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
   assert(near(Number(response.objectiveValue), 5), `${name}: objective mismatch ${String(response.objectiveValue)}`);
@@ -704,9 +733,9 @@ async function runLpTestLoadSolutionFromProtoCase(api: MPSolverApi): Promise<MpS
   }
 }
 
-async function runLpTestSolveFromProtoCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
-  const name = 'MPSolver: lp_test.py testSolveFromProto';
-  const request = lpTestSolveFromProtoRequest(api);
+async function runLpTestSolveFromProtoCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: lp_test.py testSolveFromProto (${backend.solverId})`;
+  const request = lpTestSolveFromProtoRequest(backend.problemType);
   assert((request.model.variable as unknown[]).length === 3, `${name}: expected 3 variables`);
   const result = await api.MPSolver.solveModelRequest(request);
   assert(result.response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(result.response.status)}`);
@@ -759,20 +788,31 @@ async function runProtoSolveMatrix(api: MPSolverApi): Promise<MpSolverCaseResult
 export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolverCaseResult[]> {
   await api.initMPSolver();
   const protoResults = await runProtoSolveMatrix(api);
+  const linearBackends = lpBackends(api);
+  const externalApiResults = [];
+  const lpApiProtoResults = [];
+  const linearCppStyleResults = [];
+  const solveFromProtoResults = [];
+  for (const backend of linearBackends) {
+    externalApiResults.push(await runExternalApiCase(api, backend));
+    lpApiProtoResults.push(await runLpApiTestProtoCase(api, backend));
+    linearCppStyleResults.push(await runLinearCppStyleCase(api, backend));
+    solveFromProtoResults.push(await runLpTestSolveFromProtoCase(api, backend));
+  }
   return [
     await runStatefulProtoSolveCase(api),
     ...protoResults,
-    await runExternalApiCase(api),
+    ...externalApiResults,
     skipped(
       'MPSolver: lp_api_test.py test_sum_no_brackets',
       'Not applicable: this tests Python generator/list summation helper behavior, not OR-Tools solver API.',
     ),
-    await runLpApiTestProtoCase(api),
+    ...lpApiProtoResults,
     skipped(
       'MPSolver: lp_test.py RunLinearExampleNaturalLanguageAPI',
       'Blocked: Python operator-overloaded natural expression API is not exposed in TypeScript.',
     ),
-    await runLinearCppStyleCase(api),
+    ...linearCppStyleResults,
     await runMixedIntegerCppStyleCase(api),
     await runBooleanCppStyleCase(api),
     skipped(
@@ -785,7 +825,7 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
       'Blocked: BOP backend is not linked in this package, and the source test uses Python natural expressions.',
     ),
     await runLpTestLoadSolutionFromProtoCase(api),
-    await runLpTestSolveFromProtoCase(api),
+    ...solveFromProtoResults,
     await runExportToMpsCase(api),
     await runClearSupportCase(api),
     await runSimpleProgram(

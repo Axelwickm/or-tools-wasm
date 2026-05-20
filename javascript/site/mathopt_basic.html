@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>MathOpt - Basic Model</title>
+    <title>MathOpt - Solver Backends</title>
     <link rel="stylesheet" href="./example.css">
     <style>
       #solution-output { margin: 0.75rem 0; }
@@ -15,40 +15,47 @@
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
       <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>
     </nav>
-    <h1>MathOpt - basic model sample</h1>
+    <h1>MathOpt - solver backend sample</h1>
+    <p><em>Problem: solve a tiny linear model and compare how the MathOpt frontend sends it to different solver backends.</em></p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code><span class="kw">import</span> { MathOpt, initMathOpt } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+        <pre class="code-block"><code data-highlight="ts">import { MathOpt, initMathOpt } from 'or-tools-wasm';
 
-MathOpt.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
-<span class="kw">await</span> <span class="fn">initMathOpt</span>();
+MathOpt.setWorkerBridgeEnabled(true);
+await initMathOpt();
 
-<span class="kw">const</span> model = MathOpt.<span class="fn">Model</span>(<span class="str">'Basic MathOpt example'</span>);
-<span class="kw">const</span> x = model.<span class="fn">addVariable</span>({ lowerBound: <span class="num">0</span>, upperBound: <span class="num">1</span>, name: <span class="str">'x'</span> });
-<span class="kw">const</span> y = model.<span class="fn">addVariable</span>({ lowerBound: <span class="num">0</span>, upperBound: <span class="num">2.5</span>, name: <span class="str">'y'</span> });
+const model = MathOpt.Model('basic');
+const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
+const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
 
-model.<span class="fn">addLinearConstraint</span>({ upperBound: <span class="num">1.5</span>, terms: [
-  { variable: x, coefficient: <span class="num">1</span> },
-  { variable: y, coefficient: <span class="num">1</span> },
+model.addLinearConstraint({ upperBound: 1, terms: [
+  { variable: x, coefficient: 1 },
+  { variable: y, coefficient: 1 },
 ]});
-model.<span class="fn">maximize</span>([
-  { variable: x, coefficient: <span class="num">2</span> },
-  { variable: y, coefficient: <span class="num">1</span> },
+model.maximize([
+  { variable: x, coefficient: 2 },
+  { variable: y, coefficient: 1 },
 ]);
 
-<span class="kw">const</span> result = <span class="kw">await</span> MathOpt.<span class="fn">solve</span>(model, {
+const result = await MathOpt.solve(model, {
   solverType: MathOpt.SolverType.GLOP,
-  threads: <span class="num">4</span>,
 });
-console.<span class="fn">log</span>(result.objectiveValue, result.variableValues);</code></pre>
+console.log(result.objectiveValue, result.variableValues);</code></pre>
       </details>
     </div>
     <p>
       Adapted from <code>ortools/math_opt/samples/python/basic_example.py</code>.
-      The browser demo solves the same two-variable linear model with GLOP.
+      The browser demo solves the same two-variable linear model with a selectable MathOpt backend.
     </p>
     <div class="controls">
+      <label>
+        Backend
+        <select id="solver">
+          <option value="GLOP">GLOP</option>
+          <option value="CP_SAT">CP-SAT</option>
+        </select>
+      </label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>
       <button id="run" data-idle-label="Solve model">Solve model</button>
@@ -56,6 +63,7 @@ console.<span class="fn">log</span>(result.objectiveValue, result.variableValues
     <div id="solution-output">Run the solver to view the solution.</div>
     <p>Status / Response:</p>
     <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./mathopt_basic.ts"></script>
   </body>
 </html>

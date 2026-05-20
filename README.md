@@ -96,12 +96,12 @@ console.log(result.response);
 | --- | --- | --- |
 | CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
 | Routing | ✅ | Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search. |
-| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP and SAT MIP backends. |
+| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, and SAT MIP backends. |
 | MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, CP-SAT, and PDLP backends. |
 | GLOP | ✅ | Google's simplex linear programming solver. |
 | PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
 | SAT integer programming | ✅ | CP-SAT-backed integer programming backend for pure integer linear models. |
-| CLP |  | COIN-OR linear programming backend. |
+| CLP | ✅ | COIN-OR linear programming backend. |
 | GLPK |  | GNU linear and mixed-integer programming backend. |
 | SCIP / GSCIP |  | SCIP-based LP, MIP, and nonconvex integer quadratic backend. |
 | CBC |  | COIN-OR branch-and-cut mixed-integer programming backend. |

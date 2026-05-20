@@ -15,31 +15,32 @@
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>Routing - Simple Routing</h1>
+		<p><em>Problem: find the shortest route for one vehicle to visit every location and return to the depot.</em></p>
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code><span class="kw">import</span> {
+				<pre class="code-block"><code data-highlight="ts">import {
   CpSat,
   DefaultRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
   RoutingIndexManager,
   RoutingModel,
-} <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+} from 'or-tools-wasm';
 
-CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
-<span class="kw">await</span> <span class="fn">initRouting</span>();
+CpSat.setWorkerBridgeEnabled(true);
+await initRouting();
 
-<span class="kw">const</span> manager = <span class="kw">new</span> <span class="type">RoutingIndexManager</span>(<span class="num">5</span>, <span class="num">1</span>, <span class="num">0</span>);
-<span class="kw">const</span> routing = <span class="kw">new</span> <span class="type">RoutingModel</span>(manager);
-<span class="kw">const</span> transit = routing.<span class="fn">RegisterTransitCallback</span>((from, to) =&gt;
-  Math.<span class="fn">abs</span>(manager.<span class="fn">IndexToNode</span>(to) - manager.<span class="fn">IndexToNode</span>(from)),
+const manager = new RoutingIndexManager(5, 1, 0);
+const routing = new RoutingModel(manager);
+const transit = routing.RegisterTransitCallback((from, to) =&gt;
+  Math.abs(manager.IndexToNode(to) - manager.IndexToNode(from)),
 );
-routing.<span class="fn">SetArcCostEvaluatorOfAllVehicles</span>(transit);
+routing.SetArcCostEvaluatorOfAllVehicles(transit);
 
-<span class="kw">const</span> params = <span class="fn">DefaultRoutingSearchParameters</span>();
+const params = DefaultRoutingSearchParameters();
 params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-<span class="kw">const</span> assignment = <span class="kw">await</span> routing.<span class="fn">SolveWithParameters</span>(params);</code></pre>
+const assignment = await routing.SolveWithParameters(params);</code></pre>
 			</details>
 		</div>
 		<p>This adapts <code>simple_routing_program.py</code>: one vehicle visits five locations and minimizes arc distance.</p>
@@ -51,6 +52,7 @@ params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 		<p>Status / Response:</p>
 		<pre id="status"></pre>
 
+		<script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./routing_simple.ts"></script>
 	</body>
 </html>

@@ -42,4 +42,3 @@ export function renderRows(rows: Array<[string, string | number | null | undefin
     </table>
   `;
 }
-

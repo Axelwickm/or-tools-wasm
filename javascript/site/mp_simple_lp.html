@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>MPSolver - Linear Programming</title>
+    <title>MPSolver - Frontend</title>
     <link rel="stylesheet" href="./example.css">
     <style>
       #solution-output { margin: 0.75rem 0; }
@@ -14,45 +14,54 @@
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
-    <h1>MPSolver - Linear Programming</h1>
+    <h1>MPSolver - frontend sample</h1>
+    <p><em>Problem: solve one small linear model through MPSolver while switching between available LP and integer backends.</em></p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code><span class="kw">import</span> { CpSat, initMPSolver, MPSolver } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver } from 'or-tools-wasm';
 
-CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
-<span class="kw">await</span> <span class="fn">initMPSolver</span>();
+await initMPSolver();
 
-<span class="kw">const</span> solver = MPSolver.<span class="fn">CreateSolver</span>(<span class="str">'GLOP'</span>);
-<span class="kw">if</span> (!solver) <span class="kw">throw</span> <span class="kw">new</span> Error(<span class="str">'GLOP is unavailable'</span>);
+const solver = MPSolver.CreateSolver('GLOP');
+if (!solver) throw new Error('GLOP is unavailable');
 
-<span class="kw">const</span> x = solver.<span class="fn">NumVar</span>(<span class="num">0</span>, solver.<span class="fn">infinity</span>(), <span class="str">'x'</span>);
-<span class="kw">const</span> y = solver.<span class="fn">NumVar</span>(<span class="num">0</span>, solver.<span class="fn">infinity</span>(), <span class="str">'y'</span>);
-<span class="kw">const</span> c0 = solver.<span class="fn">Constraint</span>(-solver.<span class="fn">infinity</span>(), <span class="num">17.5</span>);
-c0.<span class="fn">SetCoefficient</span>(x, <span class="num">1</span>);
-c0.<span class="fn">SetCoefficient</span>(y, <span class="num">7</span>);
-<span class="kw">const</span> c1 = solver.<span class="fn">Constraint</span>(-solver.<span class="fn">infinity</span>(), <span class="num">3.5</span>);
-c1.<span class="fn">SetCoefficient</span>(x, <span class="num">1</span>);
-<span class="kw">const</span> objective = solver.<span class="fn">Objective</span>();
-objective.<span class="fn">SetCoefficient</span>(x, <span class="num">1</span>);
-objective.<span class="fn">SetCoefficient</span>(y, <span class="num">10</span>);
-objective.<span class="fn">SetMaximization</span>();
+const x = solver.NumVar(0, 1, 'x');
+const y = solver.NumVar(0, 1, 'y');
+const c0 = solver.Constraint(-solver.infinity(), 1);
+c0.SetCoefficient(x, 1);
+c0.SetCoefficient(y, 1);
 
-<span class="kw">await</span> solver.<span class="fn">SolveWithProto</span>();
-console.<span class="fn">log</span>(x.<span class="fn">solution_value</span>(), y.<span class="fn">solution_value</span>());</code></pre>
+const objective = solver.Objective();
+objective.SetCoefficient(x, 2);
+objective.SetCoefficient(y, 1);
+objective.SetMaximization();
+
+await solver.SolveWithProto();
+console.log(x.solution_value(), y.solution_value());</code></pre>
       </details>
     </div>
     <p>
-      This adapts <code>simple_lp_program.py</code>: GLOP maximizes
-      <code>x + 10y</code> over continuous variables with two linear constraints.
+      MPSolver routes one tiny linear model through selectable backends. GLOP and CLP
+      solve it as a continuous LP; SAT solves the same model with integral variables.
     </p>
     <div class="controls">
+      <label>
+        Backend
+        <select id="solver">
+          <option value="GLOP">GLOP</option>
+          <option value="CLP">CLP</option>
+          <option value="SAT">SAT</option>
+        </select>
+      </label>
+      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
-      <button id="run" data-idle-label="Solve LP">Solve LP</button>
+      <button id="run" data-idle-label="Solve model">Solve model</button>
     </div>
     <div id="solution-output">Run the solver to view the solution.</div>
     <p>Status / Response:</p>
     <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./mp_simple_lp.ts"></script>
   </body>
 </html>

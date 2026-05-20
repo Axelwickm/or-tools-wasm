@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>CLP - Simple LP</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 8rem; }
+    </style>
+  </head>
+  <body data-solver-id="CLP">
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>CLP - simple linear program</h1>
+    <p><em>Problem: choose values for two continuous variables that maximize profit while staying inside two linear resource limits.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver } from 'or-tools-wasm';
+
+await initMPSolver();
+const solver = MPSolver.CreateSolver('CLP');
+if (!solver) throw new Error('CLP is unavailable');
+
+// Same model as simple_lp_program.py, solved with CLP.
+const x = solver.NumVar(0, solver.infinity(), 'x');
+const y = solver.NumVar(0, solver.infinity(), 'y');
+const c0 = solver.Constraint(-solver.infinity(), 17.5);
+c0.SetCoefficient(x, 1);
+c0.SetCoefficient(y, 7);
+const c1 = solver.Constraint(-solver.infinity(), 3.5);
+c1.SetCoefficient(x, 1);
+const objective = solver.Objective();
+objective.SetCoefficient(x, 1);
+objective.SetCoefficient(y, 10);
+objective.SetMaximization();
+
+await solver.Solve();</code></pre>
+      </details>
+    </div>
+    <p>
+      The <code>simple_lp_program.py</code> model solved with the COIN-OR CLP backend.
+    </p>
+    <div class="controls">
+      <button id="run" data-idle-label="Solve LP">Solve LP</button>
+    </div>
+    <div id="solution-output">Run the solver to view the solution.</div>
+    <p>Status / Response:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./glop_simple_lp.ts"></script>
+  </body>
+</html>

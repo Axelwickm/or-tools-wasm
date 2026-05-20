@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>GLOP - Stigler Diet</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 8rem; }
+    </style>
+  </head>
+  <body data-solver-id="GLOP">
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>GLOP - Stigler diet</h1>
+    <p><em>Problem: choose the cheapest mix of foods that satisfies daily minimum nutrition requirements.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver } from 'or-tools-wasm';
+
+await initMPSolver();
+const solver = MPSolver.CreateSolver('GLOP');
+
+const nutrients = [
+  { name: 'Calories (kcal)', minimum: 3 },
+  { name: 'Protein (g)', minimum: 70 },
+  { name: 'Calcium (g)', minimum: 0.8 },
+];
+const data = [
+  { name: 'Wheat Flour', nutrients: [44.7, 1411, 2] },
+  { name: 'Macaroni', nutrients: [11.6, 418, 0.7] },
+  { name: 'Milk', nutrients: [6.1, 310, 10.5] },
+  { name: 'Eggs', nutrients: [2.9, 238, 1] },
+  { name: 'Spinach', nutrients: [1.1, 106, 0] },
+];
+
+const foods = data.map((food) =&gt; solver.NumVar(0, solver.infinity(), food.name));
+
+nutrients.forEach((nutrient, nutrientIndex) =&gt; {
+  const ct = solver.Constraint(nutrient.minimum, solver.infinity());
+  data.forEach((food, foodIndex) =&gt; {
+    ct.SetCoefficient(foods[foodIndex], food.nutrients[nutrientIndex]);
+  });
+});
+
+const objective = solver.Objective();
+foods.forEach((food) =&gt; objective.SetCoefficient(food, 1));
+objective.SetMinimization();
+await solver.Solve();</code></pre>
+      </details>
+    </div>
+    <p>
+      Direct port of <code>ortools/linear_solver/samples/stigler_diet.py</code>,
+      a continuous diet LP with many foods and nutrient lower bounds.
+    </p>
+    <div class="controls">
+      <button id="run" data-idle-label="Solve diet">Solve diet</button>
+    </div>
+    <div id="solution-output">Run the solver to view the annual diet cost and selected foods.</div>
+    <p>Status / Response:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./glop_stigler_diet.ts"></script>
+  </body>
+</html>

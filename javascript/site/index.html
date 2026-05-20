@@ -6,7 +6,23 @@
   <link rel="stylesheet" href="./example.css">
   <style>
     body { line-height: 1.6; }
-    h1 { margin-bottom: 0.5rem; }
+    h1 { margin-bottom: 0; }
+    .site-title {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .site-badges {
+      display: inline-flex;
+      gap: 0.4rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .site-badges img {
+      display: block;
+    }
     h2 { margin-bottom: 0.25rem; }
     .solver-description {
       color: #57606a;
@@ -29,24 +45,49 @@
   </style>
 </head>
 <body>
-  <h1>or-tools-wasm examples</h1>
+  <div class="site-title">
+    <h1>or-tools-wasm examples</h1>
+    <span class="site-badges">
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">
+        <img alt="GitHub: or-tools-wasm" src="https://img.shields.io/badge/GitHub-or--tools--wasm-181717?logo=github">
+      </a>
+      <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">
+        <img alt="npm package version" src="https://img.shields.io/npm/v/or-tools-wasm?logo=npm&amp;label=npm">
+      </a>
+    </span>
+  </div>
   <p>
     Select an example to launch a browser demo powered by the OR-Tools WebAssembly package.
     Source code is available on
     <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>, and the package is on
     <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>.
   </p>
+  <h2>MathOpt (frontend)</h2>
+  <p class="solver-description">
+    Use <a href="https://developers.google.com/optimization/math_opt" rel="noopener">MathOpt</a> to route one model through selectable solver backends.
+  </p>
+  <ul>
+    <li><a href="./mathopt_basic.html">Basic Model - switch between GLOP and CP-SAT</a></li>
+  </ul>
+  <h2>MPSolver (frontend)</h2>
+  <p class="solver-description">
+    Use <a href="https://developers.google.com/optimization/lp/mpsolver" rel="noopener">MPSolver</a>
+    to route one linear model through selectable LP and integer backends.
+  </p>
+  <ul>
+    <li><a href="./mp_simple_lp.html">Basic Model - switch between GLOP, CLP, and SAT</a></li>
+  </ul>
   <h2>CP-SAT</h2>
   <p class="solver-description">
     Use <a href="https://developers.google.com/optimization/cp/cp_solver" rel="noopener">CP-SAT</a> for discrete optimization problems with integer, Boolean, scheduling, and logical constraints.
   </p>
   <ul>
+    <li><a href="./sudoku_generator.html">Sudoku Generator - remove clues while CP-SAT proves uniqueness</a></li>
     <li><a href="./magic_square.html">Magic Square - fill a grid where every row, column, and diagonal has the same sum</a></li>
     <li><a href="./model_playground.html">Model Playground - paste JSON CpModelProto text and solve it</a></li>
     <li><a href="./schema_viewer.html">Schema Viewer - print embedded proto schemas</a></li>
     <li><a href="./sports_scheduling.html">Sports Scheduling - double round-robin minimization</a></li>
     <li><a href="./steel_mill_slab.html">Steel Mill Slab - compare three solver variants</a></li>
-    <li><a href="./sudoku_generator.html">Sudoku Generator - remove clues while CP-SAT proves uniqueness</a></li>
   </ul>
   <h2>Routing</h2>
   <p class="solver-description">
@@ -57,23 +98,28 @@
     <li><a href="./routing_vrp.html">Vehicle Routing Problem - direct port of the VRP example</a></li>
     <li><a href="./routing_dispatch.html">Dispatch Map - multi-depot pallet delivery with animated routes</a></li>
   </ul>
-  <h2>MPSolver</h2>
+  <h2>GLOP</h2>
   <p class="solver-description">
-    Use MPSolver for <a href="https://developers.google.com/optimization/lp/mpsolver" rel="noopener">linear programming</a> and <a href="https://developers.google.com/optimization/mip" rel="noopener">mixed-integer programming</a> models with linear objectives and constraints.
+    Use GLOP for continuous linear programs through the MPSolver API.
   </p>
   <ul>
-    <li><a href="./mp_simple_lp.html">Linear Programming - direct port of the simple LP example</a></li>
-    <li><a href="./mp_simple_mip.html">Mixed-Integer Programming - direct port of the simple MIP example</a></li>
+    <li><a href="./glop_simple_lp.html">Simple LP - direct port of simple_lp_program.py</a></li>
+    <li><a href="./glop_stigler_diet.html">Stigler Diet - cost-minimizing diet LP with nutrient lower bounds</a></li>
   </ul>
-  <h2>MathOpt</h2>
+  <h2>CLP</h2>
   <p class="solver-description">
-    Use <a href="https://developers.google.com/optimization/math_opt" rel="noopener">MathOpt</a> as a unified modeling and solve API for linear and integer optimization backends.
+    Use CLP for continuous linear programs through the MPSolver API.
   </p>
   <ul>
-    <li><a href="./mathopt_basic.html">Basic Model - two-variable model through MathOpt's unified request path</a></li>
-    <li><a href="./mathopt_simple.html">Linear Programming - direct port of the MathOpt LP sample</a></li>
-    <li><a href="./mathopt_integer.html">Integer Programming - direct port of the MathOpt integer programming sample</a></li>
-    <li><a href="./mathopt_scheduling.html">Time-Indexed Scheduling - binary scheduling model with release times</a></li>
+    <li><a href="./clp_simple_lp.html">Simple LP - simple_lp_program.py model with CLP</a></li>
+    <li><a href="./clp_transportation.html">Transportation LP - minimum-cost shipment planning</a></li>
+  </ul>
+  <h2>SAT</h2>
+  <p class="solver-description">
+    Use the SAT integer backend for MPSolver mixed-integer linear models.
+  </p>
+  <ul>
+    <li><a href="./sat_simple_mip.html">Simple MIP - direct port of simple_mip_program.py</a></li>
   </ul>
 </body>
 </html>

@@ -10,6 +10,7 @@ Legend and classification guide:
 - ➖ Backend-blocked: the upstream test depends on a solver backend we do not currently link or expose, such as CBC, BOP, SCIP/GSCIP, or Gurobi.
 - 🔴 Relevant missing: the test appears relevant to a solver/API surface we do expose or claim, but no matching parity fixture was found. These are the likely follow-up candidates.
 - ⚪ Not applicable: the test is in a solver-family Python file, but it targets Python-only conveniences, internal wrappers, export/update-tracker helpers, or APIs outside the current TypeScript/WASM contract.
+- 🧪 Backend coverage note: a runtime/backend check exists, but it is not counted as full upstream Python test parity until the corresponding upstream Python tests have been compared assertion-by-assertion.
 
 Decision rule: this is a contract relevance pass, not a promise that every Python test should be ported line-for-line. When a test mixes solver behavior with Python-only syntax, it is marked by the part that determines whether a useful TS/WASM parity test should exist.
 
@@ -219,6 +220,8 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ✅ 🔎 TestRoutingDimension.testQuadraticCostSoftSpanUpperBound
 
 ## ortools/linear_solver/python/pywraplp_test.py
+- MPSolver backend coverage
+  - 🧪 CLP backend LP coverage - CLP now runs through the same shared TS/WASM MPSolver public API cases as GLOP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("CLP")`, `SupportsProblemType(CLP_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. This is backend parity coverage, not a separate upstream Python `test_clp` because upstream has no explicit Python CLP test body.
 - PyWrapLp
   - ➖ 🔎 PyWrapLp.test_proto - CBC backend is not linked/exposed
   - ✅ 🔎 PyWrapLp.test_external_api

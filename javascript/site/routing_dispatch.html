@@ -74,40 +74,41 @@
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>Routing - Dispatch Map</h1>
+		<p><em>Problem: assign pallet deliveries to trucks from multiple depots while keeping each route within vehicle capacity.</em></p>
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code><span class="kw">import</span> {
+				<pre class="code-block"><code data-highlight="ts">import {
   CpSat,
   DefaultRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
   RoutingIndexManager,
   RoutingModel,
-} <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+} from 'or-tools-wasm';
 
-CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
-<span class="kw">await</span> <span class="fn">initRouting</span>();
+CpSat.setWorkerBridgeEnabled(true);
+await initRouting();
 
-<span class="kw">const</span> vehicleCapacities = [<span class="num">20</span>, <span class="num">20</span>, <span class="num">24</span>];
-<span class="kw">const</span> starts = [<span class="num">0</span>, <span class="num">1</span>, <span class="num">2</span>];
-<span class="kw">const</span> manager = <span class="kw">new</span> <span class="type">RoutingIndexManager</span>(stops.length, <span class="num">3</span>, starts, starts);
-<span class="kw">const</span> routing = <span class="kw">new</span> <span class="type">RoutingModel</span>(manager);
-<span class="kw">const</span> transit = routing.<span class="fn">RegisterTransitCallback</span>((from, to) =&gt; {
-  <span class="kw">const</span> a = stops[manager.<span class="fn">IndexToNode</span>(from)];
-  <span class="kw">const</span> b = stops[manager.<span class="fn">IndexToNode</span>(to)];
-  <span class="kw">return</span> Math.<span class="fn">round</span>(Math.<span class="fn">hypot</span>(a.x - b.x, a.y - b.y));
+const vehicleCapacities = [20, 20, 24];
+const starts = [0, 1, 2];
+const manager = new RoutingIndexManager(stops.length, 3, starts, starts);
+const routing = new RoutingModel(manager);
+const transit = routing.RegisterTransitCallback((from, to) =&gt; {
+  const a = stops[manager.IndexToNode(from)];
+  const b = stops[manager.IndexToNode(to)];
+  return Math.round(Math.hypot(a.x - b.x, a.y - b.y));
 });
-routing.<span class="fn">SetArcCostEvaluatorOfAllVehicles</span>(transit);
-<span class="kw">const</span> demand = routing.<span class="fn">RegisterUnaryTransitCallback</span>((from) =&gt;
-  stops[manager.<span class="fn">IndexToNode</span>(from)].demand,
+routing.SetArcCostEvaluatorOfAllVehicles(transit);
+const demand = routing.RegisterUnaryTransitCallback((from) =&gt;
+  stops[manager.IndexToNode(from)].demand,
 );
-routing.<span class="fn">AddDimensionWithVehicleCapacity</span>(demand, <span class="num">0</span>, vehicleCapacities, <span class="kw">true</span>, <span class="str">'load'</span>);
-routing.<span class="fn">AddDimension</span>(transit, <span class="num">0</span>, <span class="num">2200</span>, <span class="kw">true</span>, <span class="str">'distance'</span>);
+routing.AddDimensionWithVehicleCapacity(demand, 0, vehicleCapacities, true, 'load');
+routing.AddDimension(transit, 0, 2200, true, 'distance');
 
-<span class="kw">const</span> params = <span class="fn">DefaultRoutingSearchParameters</span>();
+const params = DefaultRoutingSearchParameters();
 params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-<span class="kw">const</span> assignment = <span class="kw">await</span> routing.<span class="fn">SolveWithParameters</span>(params);</code></pre>
+const assignment = await routing.SolveWithParameters(params);</code></pre>
 			</details>
 		</div>
 		<p>A capacitated multi-depot delivery problem: three trucks leave separate depots to deliver pallet orders across a city grid.</p>
@@ -129,6 +130,7 @@ params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 		<p>Status / Response:</p>
 		<pre id="status"></pre>
 
+		<script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./routing_dispatch.ts"></script>
 	</body>
 </html>

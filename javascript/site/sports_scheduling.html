@@ -20,26 +20,116 @@
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>CP-SAT - Sports Scheduling</h1>
+		<p><em>Problem: build a double round-robin schedule where teams play balanced home and away games with as few breaks as possible.</em></p>
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code><span class="kw">import</span> { CpSat, <span class="kw">type</span> SatParameters } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+				<pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm';
 
-<span class="kw">const</span> model = <span class="kw">await</span> CpSat.<span class="fn">createModel</span>({
-  name: <span class="str">'sports_schedule'</span>,
-  variables: [
-    <span class="comment">// Boolean fixture variables: fixture_day_home_away.</span>
-  ],
-  constraints: [
-    <span class="comment">// Each team plays once per day, each pairing appears once per half-season, and breaks are minimized.</span>
-  ],
-  objective: { vars: breakVariables, coeffs: breakVariables.<span class="fn">map</span>(() =&gt; <span class="num">1</span>) },
-});
+type CpModelInput = {
+  name: string;
+  variables: Array&lt;{ name: string; domain: number[] }&gt;;
+  constraints: Array&lt;
+    | { name?: string; linear: { vars: number[]; coeffs: number[]; domain: number[] } }
+    | { name?: string; table: { vars: number[]; values: number[] } }
+  &gt;;
+  objective?: { vars: number[]; coeffs: number[]; offset?: number; scaling_factor?: number };
+};
 
-CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
-<span class="kw">const</span> params: SatParameters = { numWorkers: <span class="num">4</span>, maxTimeInSeconds: <span class="num">10</span> };
-<span class="kw">const</span> result = <span class="kw">await</span> CpSat.<span class="fn">solve</span>(model, params);
-console.<span class="fn">log</span>(result.response?.objectiveValue);</code></pre>
+function buildSportsScheduleModel(numTeams: number): CpModelInput {
+  const numDays = 2 * numTeams - 2;
+  const matchesPerHalf = numTeams - 1;
+  const variables: CpModelInput['variables'] = [];
+  const constraints: CpModelInput['constraints'] = [];
+  const addVar = (name: string) =&gt; {
+    const index = variables.length;
+    variables.push({ name, domain: [0, 1] });
+    return index;
+  };
+  const addSum = (name: string, vars: number[], domain: number[]) =&gt; {
+    constraints.push({
+      name,
+      linear: { vars, coeffs: Array(vars.length).fill(1), domain },
+    });
+  };
+
+  const fixture: number[][][] = [];
+  for (let day = 0; day &lt; numDays; ++day) {
+    fixture[day] = [];
+    for (let home = 0; home &lt; numTeams; ++home) {
+      fixture[day][home] = [];
+      for (let away = 0; away &lt; numTeams; ++away) {
+        fixture[day][home][away] = home === away ? -1 : addVar(`d${day}_h${home}_a${away}`);
+      }
+    }
+  }
+
+  const atHome = Array.from({ length: numDays }, (_, day) =&gt;
+    Array.from({ length: numTeams }, (_, team) =&gt; addVar(`home_d${day}_t${team}`)),
+  );
+
+  for (let day = 0; day &lt; numDays; ++day) {
+    for (let team = 0; team &lt; numTeams; ++team) {
+      const plays: number[] = [];
+      const homes: number[] = [];
+      for (let other = 0; other &lt; numTeams; ++other) {
+        if (team === other) continue;
+        plays.push(fixture[day][team][other], fixture[day][other][team]);
+        homes.push(fixture[day][team][other]);
+      }
+      addSum(`plays_once_d${day}_t${team}`, plays, [1, 1]);
+      constraints.push({
+        name: `link_home_d${day}_t${team}`,
+        linear: { vars: [...homes, atHome[day][team]], coeffs: [...homes.map(() =&gt; 1), -1], domain: [0, 0] },
+      });
+    }
+  }
+
+  for (let team = 0; team &lt; numTeams; ++team) {
+    for (let other = team + 1; other &lt; numTeams; ++other) {
+      const firstHalf: number[] = [];
+      const secondHalf: number[] = [];
+      for (let day = 0; day &lt; matchesPerHalf; ++day) {
+        firstHalf.push(fixture[day][team][other], fixture[day][other][team]);
+        const secondDay = day + matchesPerHalf;
+        secondHalf.push(fixture[secondDay][team][other], fixture[secondDay][other][team]);
+      }
+      addSum(`first_half_${team}_${other}`, firstHalf, [1, 1]);
+      addSum(`second_half_${team}_${other}`, secondHalf, [1, 1]);
+    }
+  }
+
+  const breaks: number[] = [];
+  for (let team = 0; team &lt; numTeams; ++team) {
+    for (let day = 0; day &lt; numDays - 1; ++day) {
+      const breakVar = addVar(`break_t${team}_d${day}`);
+      breaks.push(breakVar);
+      constraints.push({
+        table: {
+          vars: [atHome[day][team], atHome[day + 1][team], breakVar],
+          values: [0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1],
+        },
+      });
+    }
+  }
+
+  return {
+    name: 'sports_schedule',
+    variables,
+    constraints,
+    objective: { vars: breaks, coeffs: Array(breaks.length).fill(1), offset: 0, scaling_factor: 1 },
+  };
+}
+
+CpSat.setWorkerBridgeEnabled(true);
+const numTeams = 4;
+const model = await CpSat.createModel(buildSportsScheduleModel(numTeams));
+const validation = await CpSat.validate(model);
+if (!validation.ok) throw new Error(validation.message);
+
+const params: SatParameters = { numWorkers: 4, logSearchProgress: true };
+const result = await CpSat.solve(model, params);
+console.log(result.response?.objectiveValue, result.response?.solution);</code></pre>
 			</details>
 		</div>
 		<p>This demo adapts the <code>sports_scheduling_sat</code>
@@ -61,6 +151,7 @@ console.<span class="fn">log</span>(result.response?.objectiveValue);</code></pr
 		<p>Status / Response:</p>
 		<pre id="status"></pre>
 
+		<script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./sports_scheduling.ts"></script>
 	</body>
 </html>

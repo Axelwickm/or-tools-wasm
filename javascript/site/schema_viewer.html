@@ -14,14 +14,15 @@
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>CP-SAT - Schema Viewer</h1>
+		<p><em>Problem: inspect the protobuf schemas embedded in the WebAssembly package so raw model structures are easier to understand.</em></p>
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code><span class="kw">import</span> { CpSat } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+				<pre class="code-block"><code data-highlight="ts">import { CpSat } from 'or-tools-wasm';
 
-<span class="kw">const</span> schemas = <span class="kw">await</span> CpSat.<span class="fn">getSchemas</span>();
-console.<span class="fn">log</span>(schemas.cp_model);
-console.<span class="fn">log</span>(schemas.sat_parameters);</code></pre>
+const schemas = await CpSat.getSchemas();
+console.log(schemas.cp_model);
+console.log(schemas.sat_parameters);</code></pre>
 			</details>
 		</div>
 		<p>This demo calls the WASM exports that expose the embedded <code>cp_model.proto</code>
@@ -34,6 +35,7 @@ console.<span class="fn">log</span>(schemas.sat_parameters);</code></pre>
 		<h2>SatParameters</h2>
 		<textarea id="sat-schema" readonly></textarea>
 
+		<script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./schema_viewer.ts"></script>
 	</body>
 </html>

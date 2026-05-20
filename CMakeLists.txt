@@ -53,6 +53,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(USE_GUROBI OFF CACHE BOOL "Use the Gurobi solver" FORCE)
   set(USE_PDLP ON CACHE BOOL "Use the PDLP solver" FORCE)
   set(USE_XPRESS OFF CACHE BOOL "Use the Xpress solver" FORCE)
+  option(ORTOOLS_WASM_USE_CLP "Build CLP support into the WASM MPSolver runtime" ON)
 endif()
 
 if(MSVC)
@@ -229,6 +230,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc"
     "${PROTO_SCHEMA_HEADER}")
+  if(ORTOOLS_WASM_USE_CLP)
+    list(APPEND MP_SOLVER_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/clp_interface.cc")
+  endif()
 
   set(MATHOPT_BROWSER_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/mathopt_api.cc"
@@ -345,6 +350,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       ${RUNTIME_NAME}_node_asyncify)
   endforeach()
 
+  if(ORTOOLS_WASM_USE_CLP)
+    foreach(MP_SOLVER_TARGET
+        mp_solver_runtime
+        mp_solver_runtime_asyncify
+        mp_solver_runtime_node
+        mp_solver_runtime_node_asyncify)
+      target_compile_definitions(${MP_SOLVER_TARGET} PRIVATE USE_CLP)
+      target_link_libraries(${MP_SOLVER_TARGET} PRIVATE
+        Coin::Clp
+        Coin::ClpSolver
+        Coin::OsiClp)
+    endforeach()
+  endif()
+
   target_link_options(cp_sat_runtime PRIVATE
     "--emit-tsd"
     "${JS_OUTPUT_DIR}/cp_sat_runtime.d.ts")
@@ -450,6 +469,12 @@ else()
   set(BUILD_Clp OFF)
   set(BUILD_Cgl OFF)
   set(BUILD_Cbc OFF)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND ORTOOLS_WASM_USE_CLP)
+  set(BUILD_CoinUtils ON CACHE BOOL "Build the CoinUtils dependency Library" FORCE)
+  set(BUILD_Osi ON CACHE BOOL "Build the Osi dependency Library" FORCE)
+  set(BUILD_Clp ON CACHE BOOL "Build the Clp dependency Library" FORCE)
 endif()
 
 ## GLOP

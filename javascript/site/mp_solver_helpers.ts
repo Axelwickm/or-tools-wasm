@@ -3,7 +3,7 @@ import { CpSat, initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm';
 type VariableKind = 'continuous' | 'integer';
 
 export type SimpleMpConfig = {
-  solverId: 'GLOP' | 'SAT';
+  solverId: 'GLOP' | 'CLP' | 'SAT';
   variableKind: VariableKind;
   expectedObjective: number;
   workerCount?: number;
@@ -54,22 +54,19 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
   try {
     const infinity = solver.infinity();
     const makeVariable = config.variableKind === 'integer'
-      ? (name: string): MPVariable => solver.IntVar(0, infinity, name)
-      : (name: string): MPVariable => solver.NumVar(0, infinity, name);
+      ? (name: string): MPVariable => solver.IntVar(0, 1, name)
+      : (name: string): MPVariable => solver.NumVar(0, 1, name);
 
     const x = makeVariable('x');
     const y = makeVariable('y');
 
-    const c0 = solver.Constraint(-infinity, 17.5, 'c0');
+    const c0 = solver.Constraint(-infinity, 1, 'c0');
     c0.SetCoefficient(x, 1);
-    c0.SetCoefficient(y, 7);
-
-    const c1 = solver.Constraint(-infinity, 3.5, 'c1');
-    c1.SetCoefficient(x, 1);
+    c0.SetCoefficient(y, 1);
 
     const objective = solver.Objective();
-    objective.SetCoefficient(x, 1);
-    objective.SetCoefficient(y, 10);
+    objective.SetCoefficient(x, 2);
+    objective.SetCoefficient(y, 1);
     objective.SetMaximization();
 
     const workerCount = config.workerCount && config.workerCount > 1

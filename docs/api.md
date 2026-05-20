@@ -760,8 +760,8 @@ Initialize before constructing solvers:
 ```ts
 await initMPSolver();
 
-const solver = MPSolver.CreateSolver('GLOP');
-if (!solver) throw new Error('GLOP unavailable');
+const solver = MPSolver.CreateSolver('GLOP'); // or 'CLP' for the Coin-OR LP backend
+if (!solver) throw new Error('LP backend unavailable');
 
 const x = solver.NumVar(0, solver.infinity(), 'x');
 const y = solver.NumVar(0, solver.infinity(), 'y');
@@ -784,12 +784,15 @@ Loads the MPSolver WebAssembly runtime.
 ### Solver Types And Status
 
 `OptimizationProblemType` contains OR-Tools MPSolver problem type ids, including
-`GLOP_LINEAR_PROGRAMMING`, `PDLP_LINEAR_PROGRAMMING`, `SAT_INTEGER_PROGRAMMING`,
-`CLP_LINEAR_PROGRAMMING`, `GLPK_LINEAR_PROGRAMMING`,
+`GLOP_LINEAR_PROGRAMMING`, `CLP_LINEAR_PROGRAMMING`, `PDLP_LINEAR_PROGRAMMING`,
+`SAT_INTEGER_PROGRAMMING`, `GLPK_LINEAR_PROGRAMMING`,
 `SCIP_MIXED_INTEGER_PROGRAMMING`, `GLPK_MIXED_INTEGER_PROGRAMMING`,
 `CBC_MIXED_INTEGER_PROGRAMMING`, and others. Only problem types compiled into
 the WebAssembly runtime will be supported at runtime; use
 `MPSolver.SupportsProblemType()`.
+
+The default package runtime currently includes `GLOP` and `CLP` for continuous
+linear programming and `SAT` for integer linear programming through MPSolver.
 
 `MPSolverResultStatus` contains `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
 `UNBOUNDED`, `ABNORMAL`, `MODEL_INVALID`, and `NOT_SOLVED`.

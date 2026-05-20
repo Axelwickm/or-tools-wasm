@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>CLP - Transportation LP</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 8rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>CLP - transportation LP</h1>
+    <p><em>Problem: decide how much each plant should ship to each warehouse so all demand is met at the lowest total shipping cost.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver } from 'or-tools-wasm';
+
+await initMPSolver();
+const solver = MPSolver.CreateSolver('CLP');
+if (!solver) throw new Error('CLP is unavailable');
+
+const plants = [
+  { name: 'Detroit', supply: 350 },
+  { name: 'Denver', supply: 600 },
+  { name: 'Austin', supply: 500 },
+];
+const warehouses = [
+  { name: 'Boston', demand: 325 },
+  { name: 'Atlanta', demand: 300 },
+  { name: 'Chicago', demand: 275 },
+  { name: 'Seattle', demand: 250 },
+];
+const costs = [
+  [2.7, 1.8, 1.4, 2.9],
+  [2.2, 2.5, 1.7, 1.1],
+  [1.9, 1.6, 2.3, 2.4],
+];
+
+const ship = plants.map((plant, plantId) =&gt;
+  warehouses.map((warehouse, warehouseId) =&gt;
+    solver.NumVar(0, solver.infinity(), `ship_${plant.name}_${warehouse.name}`),
+  ),
+);
+
+plants.forEach((plant, plantId) =&gt; {
+  const ct = solver.Constraint(0, plant.supply);
+  warehouses.forEach((_, warehouseId) =&gt; ct.SetCoefficient(ship[plantId][warehouseId], 1));
+});
+warehouses.forEach((warehouse, warehouseId) =&gt; {
+  const ct = solver.Constraint(warehouse.demand, warehouse.demand);
+  plants.forEach((_, plantId) =&gt; ct.SetCoefficient(ship[plantId][warehouseId], 1));
+});
+
+const objective = solver.Objective();
+plants.forEach((_, plantId) =&gt; {
+  warehouses.forEach((_, warehouseId) =&gt; {
+    objective.SetCoefficient(ship[plantId][warehouseId], costs[plantId][warehouseId]);
+  });
+});
+objective.SetMinimization();
+
+await solver.Solve();
+console.log(objective.Value());</code></pre>
+      </details>
+    </div>
+    <p>
+      A continuous transportation LP: choose shipment quantities from plants to warehouses
+      while meeting demand at minimum cost with the COIN-OR CLP backend.
+    </p>
+    <div class="controls">
+      <button id="run" data-idle-label="Solve transportation LP">Solve transportation LP</button>
+    </div>
+    <div id="solution-output">Run the solver to view shipment quantities and total cost.</div>
+    <p>Status / Response:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./clp_transportation.ts"></script>
+  </body>
+</html>

@@ -20,24 +20,26 @@
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>CP-SAT - Model Playground</h1>
+    <p><em>Problem: load a user-provided CP-SAT model, validate it, and solve it with editable search parameters.</em></p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code><span class="kw">import</span> { CpSat, <span class="kw">type</span> SatParameters } <span class="kw">from</span> <span class="str">'or-tools-wasm'</span>;
+        <pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm';
 
-<span class="kw">const</span> modelJson = JSON.<span class="fn">parse</span>(textarea.value);
-<span class="kw">const</span> params: SatParameters = {
-  ...JSON.<span class="fn">parse</span>(paramsTextarea.value),
-  numWorkers: <span class="num">4</span>,
+const modelJson = JSON.parse(textarea.value);
+const workers = 4;
+const params: SatParameters = {
+  ...JSON.parse(paramsTextarea.value),
+  numWorkers: workers,
 };
 
-CpSat.<span class="fn">setWorkerBridgeEnabled</span>(<span class="kw">true</span>);
-<span class="kw">const</span> model = <span class="kw">await</span> CpSat.<span class="fn">createModel</span>(modelJson);
-<span class="kw">const</span> validation = <span class="kw">await</span> CpSat.<span class="fn">validate</span>(model);
-<span class="kw">if</span> (!validation.ok) <span class="kw">throw</span> <span class="kw">new</span> Error(validation.message);
+CpSat.setWorkerBridgeEnabled(true);
+const model = await CpSat.createModel(modelJson);
+const validation = await CpSat.validate(model);
+if (!validation.ok) throw new Error(validation.message);
 
-<span class="kw">const</span> result = <span class="kw">await</span> CpSat.<span class="fn">solve</span>(model, params);
-console.<span class="fn">log</span>(result.response);</code></pre>
+const result = await CpSat.solve(model, params);
+console.log(result.response);</code></pre>
       </details>
     </div>
     <p>Paste a JSON-shaped <code>CpModelProto</code>, optionally edit SAT parameters, then validate or solve it in the browser.</p>
@@ -66,6 +68,7 @@ console.<span class="fn">log</span>(result.response);</code></pre>
     </div>
   </main>
 
-  <script type="module" src="./model_playground.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./model_playground.ts"></script>
 </body>
 </html>
