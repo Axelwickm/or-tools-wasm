@@ -12,7 +12,9 @@ const solverId = document.body.dataset.solverId === 'GLPK'
   ? 'GLPK'
   : document.body.dataset.solverId === 'SCIP'
     ? 'SCIP'
-    : 'SAT';
+    : document.body.dataset.solverId === 'CBC'
+      ? 'CBC'
+      : 'SAT';
 
 if (workerInput) {
   workerInput.max = String(maxWorkerCount);

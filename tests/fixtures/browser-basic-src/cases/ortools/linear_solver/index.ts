@@ -138,6 +138,7 @@ export type MPSolverApi = {
     GLPK_LINEAR_PROGRAMMING: number;
     GLPK_MIXED_INTEGER_PROGRAMMING: number;
     SCIP_MIXED_INTEGER_PROGRAMMING: number;
+    CBC_MIXED_INTEGER_PROGRAMMING: number;
     SAT_INTEGER_PROGRAMMING: number;
     OPTIMAL: number;
     INFEASIBLE: number;
@@ -282,7 +283,7 @@ async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCa
 
 async function runMixedIntegerCppStyleBackendCase(
   api: MPSolverApi,
-  solverId: 'SAT' | 'GLPK' | 'SCIP',
+  solverId: 'SAT' | 'GLPK' | 'SCIP' | 'CBC',
   name: string,
 ): Promise<MpSolverCaseResult> {
   const solver = createSolver(api, solverId, name);
@@ -334,6 +335,36 @@ async function runScipMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseRe
     'MPSolver: SCIP ParseAndCheckSupportForProblemType mismatch',
   );
   return runMixedIntegerCppStyleBackendCase(api, 'SCIP', 'MPSolver: SCIP_MIXED_INTEGER_PROGRAMMING');
+}
+
+async function runCbcMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  // TEMP: parity - covers CBC_MIXED_INTEGER_PROGRAMMING backend availability
+  // and integer solve behavior through the public MPSolver API.
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING), 'MPSolver: CBC MIP not supported');
+  assert(api.MPSolver.ParseSolverType('CBC') === api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING, 'MPSolver: CBC ParseSolverType mismatch');
+  assert(
+    api.MPSolver.ParseAndCheckSupportForProblemType('CBC') === api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING,
+    'MPSolver: CBC ParseAndCheckSupportForProblemType mismatch',
+  );
+  return runMixedIntegerCppStyleBackendCase(api, 'CBC', 'MPSolver: CBC_MIXED_INTEGER_PROGRAMMING');
+}
+
+async function runCbcWorkerBridgeMatrix(api: MPSolverApi): Promise<MpSolverCaseResult[]> {
+  const results: MpSolverCaseResult[] = [];
+  for (const mode of ['direct', 'worker'] as const) {
+    api.setWorkerBridgeEnabled(mode === 'worker');
+    assert(api.isWorkerBridgeEnabled() !== false || mode === 'direct', `MPSolver: CBC worker bridge state mismatch for ${mode}`);
+    results.push(await runSimpleProgram(
+      api,
+      `MPSolver: CBC simple_mip_program.py (${mode})`,
+      'CBC',
+      (solver, infinity) => solver.IntVar(0, infinity, 'x'),
+      (solver, infinity) => solver.IntVar(0, infinity, 'y'),
+      { objective: 23, x: 3, y: 2 },
+    ));
+  }
+  api.setWorkerBridgeEnabled(false);
+  return results;
 }
 
 async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
@@ -682,6 +713,26 @@ function lpApiTestProtoRequest(solverType: number) {
   };
 }
 
+function pywrapLpTestCbcProtoRequest(api: MPSolverApi) {
+  return {
+    solverType: api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING,
+    model: {
+      variable: [
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 2 },
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 1 },
+      ],
+      constraint: [
+        {
+          lowerBound: -10000,
+          upperBound: 4,
+          varIndex: [0, 1],
+          coefficient: [1, 2],
+        },
+      ],
+    },
+  };
+}
+
 function lpTestSolveFromProtoRequest(solverType: number) {
   return {
     solverType,
@@ -751,6 +802,23 @@ async function runLpApiTestProtoCase(api: MPSolverApi, backend: LpBackend): Prom
   assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
   assert(near(variableValues[0], 2), `${name}: x mismatch ${variableValues[0]}`);
   assert(near(variableValues[1], 1), `${name}: y mismatch ${variableValues[1]}`);
+  return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
+}
+
+async function runPywrapLpTestCbcProtoCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  // TEMP: parity - mirrors ortools/linear_solver/python/pywraplp_test.py
+  // PyWrapLp.test_proto with the same CBC MPModelProto, objective, variable
+  // values, and best-objective-bound assertions.
+  const name = 'MPSolver: pywraplp_test.py test_proto (CBC)';
+  const result = await api.MPSolver.solveModelRequest(pywrapLpTestCbcProtoRequest(api));
+  const response = result.response;
+  assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+  assert(near(Number(response.objectiveValue), 3), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+  const variableValues = response.variableValue as number[];
+  assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+  assert(near(variableValues[0], 1), `${name}: x mismatch ${variableValues[0]}`);
+  assert(near(variableValues[1], 1), `${name}: y mismatch ${variableValues[1]}`);
+  assert(near(Number(response.bestObjectiveBound), 3), `${name}: best objective bound mismatch ${String(response.bestObjectiveBound)}`);
   return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
 }
 
@@ -840,6 +908,7 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
       'MPSolver: lp_api_test.py test_sum_no_brackets',
       'Not applicable: this tests Python generator/list summation helper behavior, not OR-Tools solver API.',
     ),
+    await runPywrapLpTestCbcProtoCase(api),
     ...lpApiProtoResults,
     skipped(
       'MPSolver: lp_test.py RunLinearExampleNaturalLanguageAPI',
@@ -849,6 +918,7 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     await runMixedIntegerCppStyleCase(api),
     await runGlpkMixedIntegerCase(api),
     await runScipMixedIntegerCase(api),
+    await runCbcMixedIntegerCase(api),
     await runBooleanCppStyleCase(api),
     skipped(
       'MPSolver: lp_test.py testApi',
@@ -911,5 +981,6 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
       (solver, infinity) => solver.IntVar(0, infinity, 'y'),
       { objective: 23, x: 3, y: 2 },
     ),
+    ...(await runCbcWorkerBridgeMatrix(api)),
   ];
 }

@@ -1,13 +1,13 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 392 ✅ implemented; 23 🟨 placeholders/API gaps; 2 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 398; mismatches found: 3.
+Totals: 613 upstream tests; 393 ✅ implemented; 23 🟨 placeholders/API gaps; 1 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 196 ⚪ not applicable. Double-checked so far: 399; mismatches found: 3.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
 - 🔎 Double-checked: appended after a status once the upstream Python test body has been compared with our TS/WASM parity implementation.
 - ⚠️ Checked mismatch: appended when a current TS/WASM case exists in the same area, but it does not match the upstream Python test behavior closely enough to count as parity.
 - 🟨 Placeholder/API gap: our fixtures already acknowledge this test, but it is skipped/TODO because an exposed solver surface is missing a supporting API, such as MathOpt filters or IncrementalSolver.
-- ➖ Backend-blocked: the upstream test depends on a solver backend we do not currently link or expose, such as CBC, BOP, or Gurobi.
+- ➖ Backend-blocked: the upstream test depends on a solver backend we do not currently link or expose, such as BOP or Gurobi.
 - 🔴 Relevant missing: the test appears relevant to a solver/API surface we do expose or claim, but no matching parity fixture was found. These are the likely follow-up candidates.
 - ⚪ Not applicable: the test is in a solver-family Python file, but it targets Python-only conveniences, internal wrappers, export/update-tracker helpers, or APIs outside the current TypeScript/WASM contract.
 - 🧪 Backend coverage note: a runtime/backend check exists, but it is not counted as full upstream Python test parity until the corresponding upstream Python tests have been compared assertion-by-assertion.
@@ -224,8 +224,9 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - 🧪 CLP backend LP coverage - CLP now runs through the same shared TS/WASM MPSolver public API cases as GLOP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("CLP")`, `SupportsProblemType(CLP_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. This is backend parity coverage, not a separate upstream Python `test_clp` because upstream has no explicit Python CLP test body.
   - 🧪 GLPK backend LP/MIP coverage - GLPK runs through the same shared TS/WASM MPSolver public API LP cases as GLOP/CLP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("GLPK_LP")`, `SupportsProblemType(GLPK_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. GLPK also runs direct MIP solve cases for `CreateSolver("GLPK")`, `SupportsProblemType(GLPK_MIXED_INTEGER_PROGRAMMING)`, and the `simple_mip_program.py` model. This is backend parity coverage, not a separate upstream Python `test_glpk` because upstream has no explicit Python GLPK solve test body.
   - ✅ 🔎 SCIP backend MIP coverage - SCIP now runs shared TS/WASM MPSolver public API MIP cases for `CreateSolver("SCIP")`, `SupportsProblemType(SCIP_MIXED_INTEGER_PROGRAMMING)`, parse/check support, solve status, objective/value checks, `VerifySolution()`, and the `simple_mip_program.py` model. This matches the SCIP branch of upstream `lp_test.py/testApi`; upstream only defines `SCIP_MIXED_INTEGER_PROGRAMMING`, so the Python-only natural expression LP helper branch is not reached for SCIP.
+  - ✅ 🔎 CBC backend MIP coverage - CBC now runs shared TS/WASM MPSolver public API MIP cases for `CreateSolver("CBC")`, `SupportsProblemType(CBC_MIXED_INTEGER_PROGRAMMING)`, parse/check support, direct and worker-bridge solve status, objective/value checks, `VerifySolution()`, and the `simple_mip_program.py` model.
 - PyWrapLp
-  - ➖ 🔎 PyWrapLp.test_proto - CBC backend is not linked/exposed
+  - ✅ 🔎 PyWrapLp.test_proto
   - ✅ 🔎 PyWrapLp.test_external_api
 
 ## ortools/linear_solver/python/lp_test.py

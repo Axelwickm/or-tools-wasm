@@ -54,6 +54,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(USE_PDLP ON CACHE BOOL "Use the PDLP solver" FORCE)
   set(USE_XPRESS OFF CACHE BOOL "Use the Xpress solver" FORCE)
   option(ORTOOLS_WASM_USE_CLP "Build CLP support into the WASM MPSolver runtime" ON)
+  option(ORTOOLS_WASM_USE_CBC "Build CBC support into the WASM MPSolver runtime" ON)
   option(ORTOOLS_WASM_USE_GLPK "Build GLPK support into the WASM MPSolver and MathOpt runtimes" ON)
   option(ORTOOLS_WASM_USE_SCIP "Build SCIP/GSCIP support into the WASM MPSolver and MathOpt runtimes" ON)
 endif()
@@ -236,6 +237,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/clp_interface.cc")
   endif()
+  if(ORTOOLS_WASM_USE_CBC)
+    list(APPEND MP_SOLVER_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/cbc_interface.cc")
+  endif()
   if(ORTOOLS_WASM_USE_GLPK)
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/glpk_interface.cc")
@@ -392,7 +397,23 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       target_compile_definitions(${MP_SOLVER_TARGET} PRIVATE USE_CLP)
       target_link_libraries(${MP_SOLVER_TARGET} PRIVATE
         Coin::Clp
-        Coin::ClpSolver
+        Coin::OsiClp)
+    endforeach()
+  endif()
+
+  if(ORTOOLS_WASM_USE_CBC)
+    foreach(MP_SOLVER_TARGET
+        mp_solver_runtime
+        mp_solver_runtime_asyncify
+        mp_solver_runtime_node
+        mp_solver_runtime_node_asyncify)
+      target_compile_definitions(${MP_SOLVER_TARGET} PRIVATE USE_CBC USE_CLP)
+      target_link_libraries(${MP_SOLVER_TARGET} PRIVATE
+        Coin::Cbc
+        Coin::CbcSolver
+        Coin::OsiCbc
+        Coin::Cgl
+        Coin::Clp
         Coin::OsiClp)
     endforeach()
   endif()
@@ -534,10 +555,15 @@ else()
   set(BUILD_Cbc OFF)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND ORTOOLS_WASM_USE_CLP)
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND (ORTOOLS_WASM_USE_CLP OR ORTOOLS_WASM_USE_CBC))
   set(BUILD_CoinUtils ON CACHE BOOL "Build the CoinUtils dependency Library" FORCE)
   set(BUILD_Osi ON CACHE BOOL "Build the Osi dependency Library" FORCE)
   set(BUILD_Clp ON CACHE BOOL "Build the Clp dependency Library" FORCE)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND ORTOOLS_WASM_USE_CBC)
+  set(BUILD_Cgl ON CACHE BOOL "Build the Cgl dependency Library" FORCE)
+  set(BUILD_Cbc ON CACHE BOOL "Build the Cbc dependency Library" FORCE)
 endif()
 
 ## GLOP

@@ -44,7 +44,7 @@ console.log(x.solution_value(), y.solution_value());</code></pre>
     </div>
     <p>
       MPSolver routes one tiny linear model through selectable backends. GLOP, CLP,
-      and GLPK_LP solve it as a continuous LP; SAT, GLPK, and SCIP solve the same model with integral variables.
+      and GLPK_LP solve it as a continuous LP; SAT, GLPK, SCIP, and CBC solve the same model with integral variables.
     </p>
     <div class="controls">
       <label>
@@ -55,6 +55,7 @@ console.log(x.solution_value(), y.solution_value());</code></pre>
           <option value="GLPK_LP">GLPK LP</option>
           <option value="GLPK">GLPK MIP</option>
           <option value="SCIP">SCIP MIP</option>
+          <option value="CBC">CBC MIP</option>
           <option value="SAT">SAT</option>
         </select>
       </label>
