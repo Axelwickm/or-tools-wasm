@@ -45,10 +45,22 @@ Install from npm:
 npm install or-tools-wasm
 ```
 
-Import the API you need:
+Import the solver API you need from its subpath:
 
 ```ts
-import { CpSat } from 'or-tools-wasm';
+import { CpSat } from 'or-tools-wasm/cp-sat';
+```
+
+Public solver APIs live under solver-scoped subpaths:
+
+```ts
+import { CpModel, CpSolver } from 'or-tools-wasm/cp-sat';
+import { RoutingIndexManager, RoutingModel } from 'or-tools-wasm/routing';
+import { MPSolver } from 'or-tools-wasm/mp-solver';
+import { MathOpt } from 'or-tools-wasm/mathopt';
+import { Pdlp } from 'or-tools-wasm/pdlp';
+import { KnapsackSolver } from 'or-tools-wasm/knapsack';
+import { SimpleMaxFlow } from 'or-tools-wasm/network-flow';
 ```
 
 Create or serialize an OR-Tools proto model, validate it, then solve it:
@@ -149,7 +161,7 @@ bridge controls apply across CP-SAT, routing, MPSolver, Knapsack, Network Flow,
 MathOpt, and PDLP:
 
 ```ts
-import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';
+import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm/cp-sat';
 
 setWorkerBridgeEnabled(true);
 console.log(isWorkerBridgeEnabled());

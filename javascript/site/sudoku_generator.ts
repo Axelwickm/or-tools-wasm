@@ -1,4 +1,4 @@
-import { CpSat, setWorkerBridgeEnabled, type CpModelProto, type CpSolverResponse, type SatParameters } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type CpModelProto, type CpSolverResponse, type SatParameters } from 'or-tools-wasm/cp-sat';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Grid = number[];

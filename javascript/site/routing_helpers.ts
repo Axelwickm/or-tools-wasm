@@ -1,4 +1,4 @@
-import { setWorkerBridgeEnabled, type Assignment, type RoutingIndexManager, type RoutingModel } from 'or-tools-wasm';
+import { setWorkerBridgeEnabled, type Assignment, type RoutingIndexManager, type RoutingModel } from 'or-tools-wasm/routing';
 
 export type RouteSummary = {
   vehicle: number;

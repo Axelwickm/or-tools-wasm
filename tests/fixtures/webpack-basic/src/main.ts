@@ -6,6 +6,13 @@ import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
+import * as CpSatApi from 'or-tools-wasm/cp-sat';
+import * as RoutingApiModule from 'or-tools-wasm/routing';
+import * as MPSolverApi from 'or-tools-wasm/mp-solver';
+import * as KnapsackApi from 'or-tools-wasm/knapsack';
+import * as NetworkFlowApi from 'or-tools-wasm/network-flow';
+import * as MathOptApi from 'or-tools-wasm/mathopt';
+import * as PdlpApi from 'or-tools-wasm/pdlp';
 
 const statusEl = document.getElementById('status');
 
@@ -31,9 +38,9 @@ type WorkerStats = {
   graphSolve: number;
 };
 
-type CpSatApi = typeof import('or-tools-wasm')['CpSat'];
+type CpSat = typeof import('or-tools-wasm/cp-sat')['CpSat'];
 type RoutingApi = Pick<
-  typeof import('or-tools-wasm'),
+  typeof import('or-tools-wasm/routing'),
   | 'BOOL_FALSE'
   | 'BOOL_UNSPECIFIED'
   | 'BoundCost'
@@ -100,91 +107,76 @@ async function main() {
   setStatus({ ok: false, phase: 'running' });
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
-  const ortools = await import('or-tools-wasm');
-  const {
-    CpSat,
-    BOOL_FALSE,
-    BOOL_UNSPECIFIED,
-    BoundCost,
-    DefaultRoutingSearchParameters,
-    DefaultRoutingModelParameters,
-    FindErrorInRoutingSearchParameters,
-    FirstSolutionStrategy,
-    initMathOpt,
-    initKnapsack,
-    initNetworkFlow,
-    initMPSolver,
-    initPdlp,
-    initRouting,
-    LocalSearchMetaheuristic,
-    MathOpt,
-    KnapsackSolver,
-    KnapsackSolverType,
-    SimpleLinearSumAssignment,
-    SimpleMaxFlow,
-    SimpleMinCostFlow,
-    MPSolver,
-    MPSolverParameters,
-    Pdlp,
-    RoutingIndexManager,
-    RoutingModel,
-    isWorkerBridgeEnabled,
-    setWorkerBridgeEnabled,
-  } = ortools;
-  const typedCpSat: CpSatApi = CpSat;
+  const typedCpSat: CpSat = CpSatApi.CpSat;
   const routingApi: RoutingApi = {
-    BOOL_FALSE,
-    BOOL_UNSPECIFIED,
-    BoundCost,
-    DefaultRoutingModelParameters,
-    DefaultRoutingSearchParameters,
-    FindErrorInRoutingSearchParameters,
-    FirstSolutionStrategy,
-    initRouting,
-    LocalSearchMetaheuristic,
-    RoutingIndexManager,
-    RoutingModel,
+    BOOL_FALSE: RoutingApiModule.BOOL_FALSE,
+    BOOL_UNSPECIFIED: RoutingApiModule.BOOL_UNSPECIFIED,
+    BoundCost: RoutingApiModule.BoundCost,
+    DefaultRoutingModelParameters: RoutingApiModule.DefaultRoutingModelParameters,
+    DefaultRoutingSearchParameters: RoutingApiModule.DefaultRoutingSearchParameters,
+    FindErrorInRoutingSearchParameters: RoutingApiModule.FindErrorInRoutingSearchParameters,
+    FirstSolutionStrategy: RoutingApiModule.FirstSolutionStrategy,
+    initRouting: RoutingApiModule.initRouting,
+    LocalSearchMetaheuristic: RoutingApiModule.LocalSearchMetaheuristic,
+    RoutingIndexManager: RoutingApiModule.RoutingIndexManager,
+    RoutingModel: RoutingApiModule.RoutingModel,
   };
-  const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(ortools as never);
+  setStatus({ ok: false, phase: 'cp-sat-high-level' });
+  const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
+  setStatus({ ok: false, phase: 'cp-sat' });
   const results = await runCpSatCases(typedCpSat as never, {
     getWorkerStats: workerSpy.snapshot,
   }) as RunResult[];
+  setStatus({ ok: false, phase: 'routing' });
   const routingWorkerStatsBefore = workerSpy.snapshot();
   const routingResults = await runRoutingCases(routingApi as never);
   const routingWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'mp-solver' });
   const mpSolverWorkerStatsBefore = workerSpy.snapshot();
   const mpSolverResults = await runMPSolverCases({
-    initMPSolver,
-    MPSolver,
-    MPSolverParameters,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
+    initMPSolver: MPSolverApi.initMPSolver,
+    MPSolver: MPSolverApi.MPSolver,
+    MPSolverParameters: MPSolverApi.MPSolverParameters,
+    setWorkerBridgeEnabled: MPSolverApi.setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: MPSolverApi.isWorkerBridgeEnabled,
   });
   const mpSolverWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'knapsack' });
   const knapsackWorkerStatsBefore = workerSpy.snapshot();
   const knapsackResults = await runKnapsackCases({
-    initKnapsack,
-    KnapsackSolver,
-    KnapsackSolverType,
-    setWorkerBridgeEnabled,
+    initKnapsack: KnapsackApi.initKnapsack,
+    KnapsackSolver: KnapsackApi.KnapsackSolver,
+    KnapsackSolverType: KnapsackApi.KnapsackSolverType,
+    setWorkerBridgeEnabled: KnapsackApi.setWorkerBridgeEnabled,
   });
   const knapsackWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'network-flow' });
   const networkFlowWorkerStatsBefore = workerSpy.snapshot();
   const networkFlowResults = await runNetworkFlowCases({
-    initNetworkFlow,
-    SimpleMaxFlow,
-    SimpleMinCostFlow,
-    SimpleLinearSumAssignment,
-    setWorkerBridgeEnabled,
+    initNetworkFlow: NetworkFlowApi.initNetworkFlow,
+    SimpleMaxFlow: NetworkFlowApi.SimpleMaxFlow,
+    SimpleMinCostFlow: NetworkFlowApi.SimpleMinCostFlow,
+    SimpleLinearSumAssignment: NetworkFlowApi.SimpleLinearSumAssignment,
+    setWorkerBridgeEnabled: NetworkFlowApi.setWorkerBridgeEnabled,
   });
   const networkFlowWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'mathopt' });
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
-  const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+  const mathOptResults = await runMathOptCases({ initMathOpt: MathOptApi.initMathOpt, MathOpt: MathOptApi.MathOpt }, {
+    onProgress: (caseName, mode, threads) => setStatus({
+      ok: false,
+      phase: 'mathopt',
+      caseName,
+      mode,
+      threads,
+    }),
+  });
   const mathOptWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'pdlp' });
   const pdlpResults = await runPdlpCases({
-    initPdlp,
-    Pdlp,
-    setWorkerBridgeEnabled,
+    initPdlp: PdlpApi.initPdlp,
+    Pdlp: PdlpApi.Pdlp,
+    setWorkerBridgeEnabled: PdlpApi.setWorkerBridgeEnabled,
   });
   setStatus({
     ok: true,

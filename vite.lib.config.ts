@@ -9,6 +9,16 @@ const rootDir = __dirname;
 const libRoot = path.resolve(__dirname, 'javascript/lib');
 const wasmBuildDir = path.resolve(__dirname, 'build/javascript/wasm');
 const outDir = path.resolve(__dirname, 'build/javascript/lib');
+const libEntries = {
+  index: path.join(libRoot, 'index.ts'),
+  'cp-sat': path.join(libRoot, 'cp-sat.ts'),
+  routing: path.join(libRoot, 'routing.ts'),
+  mathopt: path.join(libRoot, 'mathopt.ts'),
+  'mp-solver': path.join(libRoot, 'mp-solver.ts'),
+  pdlp: path.join(libRoot, 'pdlp.ts'),
+  knapsack: path.join(libRoot, 'knapsack.ts'),
+  'network-flow': path.join(libRoot, 'network-flow.ts'),
+};
 
 const unwrapDataUrlWorkers = (code: string) =>
   code.replace(
@@ -122,9 +132,9 @@ export default defineConfig({
   build: {
     target: 'esnext',
     lib: {
-      entry: path.join(libRoot, 'index.ts'),
+      entry: libEntries,
       formats: ['es'],
-      fileName: 'index',
+      fileName: (_format, entryName) => `${entryName}.js`,
     },
     outDir,
     emptyOutDir: true,

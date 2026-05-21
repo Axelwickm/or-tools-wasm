@@ -4,7 +4,7 @@ import {
   KnapsackSolver,
   KnapsackSolverType,
   setWorkerBridgeEnabled,
-} from 'or-tools-wasm';
+} from 'or-tools-wasm/knapsack';
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');

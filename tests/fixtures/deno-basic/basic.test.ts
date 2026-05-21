@@ -1,5 +1,36 @@
 import {
   CpSat,
+} from 'or-tools-wasm/cp-sat';
+import * as CpSatApi from 'or-tools-wasm/cp-sat';
+import {
+  isWorkerBridgeEnabled,
+  setWorkerBridgeEnabled,
+} from 'or-tools-wasm/mp-solver';
+import {
+  initMPSolver,
+  MPSolver,
+  MPSolverParameters,
+} from 'or-tools-wasm/mp-solver';
+import {
+  initKnapsack,
+  KnapsackSolver,
+  KnapsackSolverType,
+} from 'or-tools-wasm/knapsack';
+import {
+  initNetworkFlow,
+  SimpleLinearSumAssignment,
+  SimpleMaxFlow,
+  SimpleMinCostFlow,
+} from 'or-tools-wasm/network-flow';
+import {
+  initMathOpt,
+  MathOpt,
+} from 'or-tools-wasm/mathopt';
+import {
+  initPdlp,
+  Pdlp,
+} from 'or-tools-wasm/pdlp';
+import {
   BOOL_FALSE,
   BOOL_UNSPECIFIED,
   BoundCost,
@@ -7,28 +38,11 @@ import {
   DefaultRoutingModelParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
-  initKnapsack,
-  initMathOpt,
-  initMPSolver,
-  initNetworkFlow,
-  initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
-  KnapsackSolver,
-  KnapsackSolverType,
-  SimpleLinearSumAssignment,
-  SimpleMaxFlow,
-  SimpleMinCostFlow,
-  MathOpt,
-  MPSolver,
-  MPSolverParameters,
-  Pdlp,
   RoutingIndexManager,
   RoutingModel,
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
-} from 'or-tools-wasm';
-import * as OrTools from 'or-tools-wasm';
+} from 'or-tools-wasm/routing';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
@@ -42,7 +56,7 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   if (isWorkerBridgeEnabled()) {
     throw new Error('Deno should use the direct runtime by default');
   }
-  await runCpSatHighLevelParityCasesForPackage(OrTools as never);
+  await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
 
   const results = await runCpSatCases(CpSat as never);
   for (const result of results) {

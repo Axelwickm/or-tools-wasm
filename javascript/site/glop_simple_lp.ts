@@ -1,4 +1,4 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver } from 'or-tools-wasm';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver } from 'or-tools-wasm/mp-solver';
 import { appendStatus, configureWorkerBridge, formatNumber, renderSimpleMpResult, setRunning } from './mp_solver_helpers.js';
 
 const solutionOutput = document.getElementById('solution-output');

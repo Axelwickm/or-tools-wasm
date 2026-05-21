@@ -24,6 +24,69 @@
       "import": "./build/javascript/browser/index.js",
       "default": "./build/javascript/browser/index.js"
     },
+    "./cp-sat": {
+      "types": "./build/javascript/lib/cp-sat.d.ts",
+      "bun": "./build/javascript/node/cp-sat.js",
+      "deno": "./build/javascript/node/cp-sat.js",
+      "node": "./build/javascript/node/cp-sat.js",
+      "browser": "./build/javascript/browser/cp-sat.js",
+      "import": "./build/javascript/browser/cp-sat.js",
+      "default": "./build/javascript/browser/cp-sat.js"
+    },
+    "./routing": {
+      "types": "./build/javascript/lib/routing.d.ts",
+      "bun": "./build/javascript/node/routing.js",
+      "deno": "./build/javascript/node/routing.js",
+      "node": "./build/javascript/node/routing.js",
+      "browser": "./build/javascript/browser/routing.js",
+      "import": "./build/javascript/browser/routing.js",
+      "default": "./build/javascript/browser/routing.js"
+    },
+    "./mathopt": {
+      "types": "./build/javascript/lib/mathopt.d.ts",
+      "bun": "./build/javascript/node/mathopt.js",
+      "deno": "./build/javascript/node/mathopt.js",
+      "node": "./build/javascript/node/mathopt.js",
+      "browser": "./build/javascript/browser/mathopt.js",
+      "import": "./build/javascript/browser/mathopt.js",
+      "default": "./build/javascript/browser/mathopt.js"
+    },
+    "./mp-solver": {
+      "types": "./build/javascript/lib/mp-solver.d.ts",
+      "bun": "./build/javascript/node/mp-solver.js",
+      "deno": "./build/javascript/node/mp-solver.js",
+      "node": "./build/javascript/node/mp-solver.js",
+      "browser": "./build/javascript/browser/mp-solver.js",
+      "import": "./build/javascript/browser/mp-solver.js",
+      "default": "./build/javascript/browser/mp-solver.js"
+    },
+    "./pdlp": {
+      "types": "./build/javascript/lib/pdlp.d.ts",
+      "bun": "./build/javascript/node/pdlp.js",
+      "deno": "./build/javascript/node/pdlp.js",
+      "node": "./build/javascript/node/pdlp.js",
+      "browser": "./build/javascript/browser/pdlp.js",
+      "import": "./build/javascript/browser/pdlp.js",
+      "default": "./build/javascript/browser/pdlp.js"
+    },
+    "./knapsack": {
+      "types": "./build/javascript/lib/knapsack.d.ts",
+      "bun": "./build/javascript/node/knapsack.js",
+      "deno": "./build/javascript/node/knapsack.js",
+      "node": "./build/javascript/node/knapsack.js",
+      "browser": "./build/javascript/browser/knapsack.js",
+      "import": "./build/javascript/browser/knapsack.js",
+      "default": "./build/javascript/browser/knapsack.js"
+    },
+    "./network-flow": {
+      "types": "./build/javascript/lib/network-flow.d.ts",
+      "bun": "./build/javascript/node/network-flow.js",
+      "deno": "./build/javascript/node/network-flow.js",
+      "node": "./build/javascript/node/network-flow.js",
+      "browser": "./build/javascript/browser/network-flow.js",
+      "import": "./build/javascript/browser/network-flow.js",
+      "default": "./build/javascript/browser/network-flow.js"
+    },
     "./build/javascript/lib/*": "./build/javascript/lib/*"
   },
   "imports": {
@@ -65,7 +128,7 @@
     "test:fixtures": "npm run test:fixture:vite && npm run test:fixture:webpack && npm run test:fixture:rollup && npm run test:fixture:deno && npm run test:fixture:node && npm run test:fixture:bun"
   },
   "files": [
-    "build/javascript/lib/index.d.ts",
+    "build/javascript/lib/*.d.ts",
     "build/javascript/wasm",
     "build/javascript/browser",
     "build/javascript/node",

@@ -1,10 +1,11 @@
 # TypeScript API
 
-This page documents the public exports from `or-tools-wasm`. The package is ESM
-only:
+This page documents the public solver subpath exports from `or-tools-wasm`.
+The package is ESM only:
 
 ```ts
-import { CpSat, initRouting, RoutingIndexManager, RoutingModel } from 'or-tools-wasm';
+import { CpSat } from 'or-tools-wasm/cp-sat';
+import { initRouting, RoutingIndexManager, RoutingModel } from 'or-tools-wasm/routing';
 ```
 
 Most solver runtimes are loaded lazily. Browser solves use the package worker
@@ -27,7 +28,7 @@ import {
   weightedSum,
   type CpModelProto,
   type SatParameters,
-} from 'or-tools-wasm';
+} from 'or-tools-wasm/routing';
 ```
 
 CP-SAT exposes two public API layers:
@@ -491,7 +492,7 @@ import {
   RoutingSearchStatus,
   DefaultRoutingSearchParameters,
   FirstSolutionStrategy,
-} from 'or-tools-wasm';
+} from 'or-tools-wasm/routing';
 ```
 
 Always initialize the routing runtime before constructing routing objects:
@@ -751,7 +752,7 @@ supported parameter subset is valid.
 Import:
 
 ```ts
-import { initMPSolver, MPSolver, MPSolverParameters } from 'or-tools-wasm';
+import { initMPSolver, MPSolver, MPSolverParameters } from 'or-tools-wasm/mp-solver';
 ```
 
 Initialize before constructing solvers:
@@ -975,7 +976,7 @@ import {
   KnapsackSolver,
   KnapsackSolverType,
   setWorkerBridgeEnabled,
-} from 'or-tools-wasm';
+} from 'or-tools-wasm/knapsack';
 
 setWorkerBridgeEnabled(true);
 await initKnapsack();
@@ -1025,7 +1026,7 @@ The dedicated Network Flow API mirrors the Python graph wrappers for
 `SimpleMaxFlow`, `SimpleMinCostFlow`, and `SimpleLinearSumAssignment`.
 
 ```ts
-import { initNetworkFlow, SimpleMaxFlow, setWorkerBridgeEnabled } from 'or-tools-wasm';
+import { initNetworkFlow, SimpleMaxFlow, setWorkerBridgeEnabled } from 'or-tools-wasm/network-flow';
 
 setWorkerBridgeEnabled(true);
 await initNetworkFlow();
@@ -1104,7 +1105,7 @@ thread, but there is no solver thread-count parameter.
 Import:
 
 ```ts
-import { GlpkParameters, initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm';
+import { GlpkParameters, initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm/mathopt';
 ```
 
 Initialize, build a model, and solve:
@@ -1484,7 +1485,7 @@ They expose `lowerBound`/`lower_bound`, `upperBound`/`upper_bound`, and
 Import:
 
 ```ts
-import { initPdlp, Pdlp, QuadraticProgram } from 'or-tools-wasm';
+import { initPdlp, Pdlp, QuadraticProgram } from 'or-tools-wasm/pdlp';
 ```
 
 PDLP exposes the primal-dual hybrid gradient solver for LP and convex diagonal
@@ -1606,7 +1607,7 @@ and other threaded-capable paths can also accept solver thread settings. Prefer
 the shared package controls:
 
 ```ts
-import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';
+import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm/cp-sat';
 
 setWorkerBridgeEnabled(true);
 isWorkerBridgeEnabled();

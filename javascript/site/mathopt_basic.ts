@@ -1,4 +1,4 @@
-import { initMathOpt, MathOpt } from 'or-tools-wasm';
+import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
 import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, setRunning, workerCountInput } from './mathopt_sample_helpers.js';
 
 const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;

@@ -6,36 +6,53 @@ import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
-import type { CpSat as CpSatValue } from 'or-tools-wasm';
-import type {
-  BOOL_FALSE as BoolFalseValue,
-  BOOL_UNSPECIFIED as BoolUnspecifiedValue,
-  BoundCost as BoundCostValue,
-  DefaultRoutingSearchParameters as DefaultRoutingSearchParametersValue,
-  DefaultRoutingModelParameters as DefaultRoutingModelParametersValue,
-  FindErrorInRoutingSearchParameters as FindErrorInRoutingSearchParametersValue,
-  FirstSolutionStrategy as FirstSolutionStrategyValue,
-  initMathOpt as initMathOptValue,
-  initKnapsack as initKnapsackValue,
-  initNetworkFlow as initNetworkFlowValue,
-  initMPSolver as initMPSolverValue,
-  initPdlp as initPdlpValue,
-  initRouting as initRoutingValue,
-  LocalSearchMetaheuristic as LocalSearchMetaheuristicValue,
-  MathOpt as MathOptValue,
-  KnapsackSolver as KnapsackSolverValue,
-  KnapsackSolverType as KnapsackSolverTypeValue,
-  SimpleLinearSumAssignment as SimpleLinearSumAssignmentValue,
-  SimpleMaxFlow as SimpleMaxFlowValue,
-  SimpleMinCostFlow as SimpleMinCostFlowValue,
-  MPSolver as MPSolverValue,
-  MPSolverParameters as MPSolverParametersValue,
-  Pdlp as PdlpValue,
-  RoutingIndexManager as RoutingIndexManagerValue,
-  RoutingModel as RoutingModelValue,
-} from 'or-tools-wasm';
+import * as CpSatApi from 'or-tools-wasm/cp-sat';
+import * as RoutingApiModule from 'or-tools-wasm/routing';
+import * as MPSolverApi from 'or-tools-wasm/mp-solver';
+import * as KnapsackApi from 'or-tools-wasm/knapsack';
+import * as NetworkFlowApi from 'or-tools-wasm/network-flow';
+import * as MathOptApi from 'or-tools-wasm/mathopt';
+import * as PdlpApi from 'or-tools-wasm/pdlp';
 
 const statusEl = document.getElementById('status');
+
+type RunResult = {
+  mode: 'direct' | 'worker';
+  ok: boolean;
+  solverStatus?: unknown;
+  cases: Array<{
+    name: string;
+    ok: boolean;
+    solverStatus: unknown;
+  }>;
+  workerStats: WorkerStats;
+};
+
+type WorkerStats = {
+  total: number;
+  pthread: number;
+  routingSolve: number;
+  mpSolverSolve: number;
+  mathOptSolve: number;
+  knapsackSolve: number;
+  graphSolve: number;
+};
+
+type CpSat = typeof import('or-tools-wasm/cp-sat')['CpSat'];
+type RoutingApi = Pick<
+  typeof import('or-tools-wasm/routing'),
+  | 'BOOL_FALSE'
+  | 'BOOL_UNSPECIFIED'
+  | 'BoundCost'
+  | 'DefaultRoutingModelParameters'
+  | 'DefaultRoutingSearchParameters'
+  | 'FindErrorInRoutingSearchParameters'
+  | 'FirstSolutionStrategy'
+  | 'initRouting'
+  | 'LocalSearchMetaheuristic'
+  | 'RoutingIndexManager'
+  | 'RoutingModel'
+>;
 
 function setStatus(value: unknown) {
   if (statusEl) {
@@ -44,12 +61,12 @@ function setStatus(value: unknown) {
 }
 
 function installWorkerSpy() {
-  const OriginalWorker = window.Worker;
+  const originalWorker = window.Worker;
   const creations: Array<{ url: string; name?: string }> = [];
   const messages: Array<{ type?: string }> = [];
 
   window.Worker = function WorkerSpy(scriptURL: string | URL, options?: WorkerOptions) {
-    const worker = new OriginalWorker(scriptURL, options);
+    const worker = new originalWorker(scriptURL, options);
     creations.push({
       url: String(scriptURL),
       name: options?.name,
@@ -65,7 +82,7 @@ function installWorkerSpy() {
   } as unknown as typeof Worker;
 
   return {
-    snapshot() {
+    snapshot(): WorkerStats {
       return {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
@@ -90,94 +107,76 @@ async function main() {
   setStatus({ ok: false, phase: 'running' });
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
-  const ortools = await import('or-tools-wasm');
-  const {
-    CpSat,
-    BOOL_FALSE,
-    BOOL_UNSPECIFIED,
-    BoundCost,
-    DefaultRoutingSearchParameters,
-    DefaultRoutingModelParameters,
-    FindErrorInRoutingSearchParameters,
-    FirstSolutionStrategy,
-    initMathOpt,
-    initKnapsack,
-    initNetworkFlow,
-    initMPSolver,
-    initPdlp,
-    initRouting,
-    LocalSearchMetaheuristic,
-    MathOpt,
-    KnapsackSolver,
-    KnapsackSolverType,
-    SimpleLinearSumAssignment,
-    SimpleMaxFlow,
-    SimpleMinCostFlow,
-    MPSolver,
-    MPSolverParameters,
-    Pdlp,
-    RoutingIndexManager,
-    RoutingModel,
-    isWorkerBridgeEnabled,
-    setWorkerBridgeEnabled,
-  } = ortools;
-  const typedCpSat: typeof CpSatValue = CpSat;
-  const routingApi = {
-    BOOL_FALSE: BOOL_FALSE as typeof BoolFalseValue,
-    BOOL_UNSPECIFIED: BOOL_UNSPECIFIED as typeof BoolUnspecifiedValue,
-    BoundCost: BoundCost as typeof BoundCostValue,
-    DefaultRoutingModelParameters: DefaultRoutingModelParameters as typeof DefaultRoutingModelParametersValue,
-    DefaultRoutingSearchParameters: DefaultRoutingSearchParameters as typeof DefaultRoutingSearchParametersValue,
-    FindErrorInRoutingSearchParameters: FindErrorInRoutingSearchParameters as typeof FindErrorInRoutingSearchParametersValue,
-    FirstSolutionStrategy: FirstSolutionStrategy as typeof FirstSolutionStrategyValue,
-    initRouting: initRouting as typeof initRoutingValue,
-    LocalSearchMetaheuristic: LocalSearchMetaheuristic as typeof LocalSearchMetaheuristicValue,
-    RoutingIndexManager: RoutingIndexManager as typeof RoutingIndexManagerValue,
-    RoutingModel: RoutingModel as typeof RoutingModelValue,
+  const typedCpSat: CpSat = CpSatApi.CpSat;
+  const routingApi: RoutingApi = {
+    BOOL_FALSE: RoutingApiModule.BOOL_FALSE,
+    BOOL_UNSPECIFIED: RoutingApiModule.BOOL_UNSPECIFIED,
+    BoundCost: RoutingApiModule.BoundCost,
+    DefaultRoutingModelParameters: RoutingApiModule.DefaultRoutingModelParameters,
+    DefaultRoutingSearchParameters: RoutingApiModule.DefaultRoutingSearchParameters,
+    FindErrorInRoutingSearchParameters: RoutingApiModule.FindErrorInRoutingSearchParameters,
+    FirstSolutionStrategy: RoutingApiModule.FirstSolutionStrategy,
+    initRouting: RoutingApiModule.initRouting,
+    LocalSearchMetaheuristic: RoutingApiModule.LocalSearchMetaheuristic,
+    RoutingIndexManager: RoutingApiModule.RoutingIndexManager,
+    RoutingModel: RoutingApiModule.RoutingModel,
   };
-  const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(ortools as never);
+  setStatus({ ok: false, phase: 'cp-sat-high-level' });
+  const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
+  setStatus({ ok: false, phase: 'cp-sat' });
   const results = await runCpSatCases(typedCpSat as never, {
     getWorkerStats: workerSpy.snapshot,
-  });
+  }) as RunResult[];
+  setStatus({ ok: false, phase: 'routing' });
   const routingWorkerStatsBefore = workerSpy.snapshot();
   const routingResults = await runRoutingCases(routingApi as never);
   const routingWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'mp-solver' });
   const mpSolverWorkerStatsBefore = workerSpy.snapshot();
   const mpSolverResults = await runMPSolverCases({
-    initMPSolver: initMPSolver as typeof initMPSolverValue,
-    MPSolver: MPSolver as typeof MPSolverValue,
-    MPSolverParameters: MPSolverParameters as typeof MPSolverParametersValue,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
+    initMPSolver: MPSolverApi.initMPSolver,
+    MPSolver: MPSolverApi.MPSolver,
+    MPSolverParameters: MPSolverApi.MPSolverParameters,
+    setWorkerBridgeEnabled: MPSolverApi.setWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: MPSolverApi.isWorkerBridgeEnabled,
   });
   const mpSolverWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'knapsack' });
   const knapsackWorkerStatsBefore = workerSpy.snapshot();
   const knapsackResults = await runKnapsackCases({
-    initKnapsack: initKnapsack as typeof initKnapsackValue,
-    KnapsackSolver: KnapsackSolver as typeof KnapsackSolverValue,
-    KnapsackSolverType: KnapsackSolverType as typeof KnapsackSolverTypeValue,
-    setWorkerBridgeEnabled,
+    initKnapsack: KnapsackApi.initKnapsack,
+    KnapsackSolver: KnapsackApi.KnapsackSolver,
+    KnapsackSolverType: KnapsackApi.KnapsackSolverType,
+    setWorkerBridgeEnabled: KnapsackApi.setWorkerBridgeEnabled,
   });
   const knapsackWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'network-flow' });
   const networkFlowWorkerStatsBefore = workerSpy.snapshot();
   const networkFlowResults = await runNetworkFlowCases({
-    initNetworkFlow: initNetworkFlow as typeof initNetworkFlowValue,
-    SimpleMaxFlow: SimpleMaxFlow as typeof SimpleMaxFlowValue,
-    SimpleMinCostFlow: SimpleMinCostFlow as typeof SimpleMinCostFlowValue,
-    SimpleLinearSumAssignment: SimpleLinearSumAssignment as typeof SimpleLinearSumAssignmentValue,
-    setWorkerBridgeEnabled,
+    initNetworkFlow: NetworkFlowApi.initNetworkFlow,
+    SimpleMaxFlow: NetworkFlowApi.SimpleMaxFlow,
+    SimpleMinCostFlow: NetworkFlowApi.SimpleMinCostFlow,
+    SimpleLinearSumAssignment: NetworkFlowApi.SimpleLinearSumAssignment,
+    setWorkerBridgeEnabled: NetworkFlowApi.setWorkerBridgeEnabled,
   });
   const networkFlowWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'mathopt' });
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
-  const mathOptResults = await runMathOptCases({
-    initMathOpt: initMathOpt as typeof initMathOptValue,
-    MathOpt: MathOpt as typeof MathOptValue,
+  const mathOptResults = await runMathOptCases({ initMathOpt: MathOptApi.initMathOpt, MathOpt: MathOptApi.MathOpt }, {
+    onProgress: (caseName, mode, threads) => setStatus({
+      ok: false,
+      phase: 'mathopt',
+      caseName,
+      mode,
+      threads,
+    }),
   });
   const mathOptWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'pdlp' });
   const pdlpResults = await runPdlpCases({
-    initPdlp: initPdlp as typeof initPdlpValue,
-    Pdlp: Pdlp as typeof PdlpValue,
-    setWorkerBridgeEnabled,
+    initPdlp: PdlpApi.initPdlp,
+    Pdlp: PdlpApi.Pdlp,
+    setWorkerBridgeEnabled: PdlpApi.setWorkerBridgeEnabled,
   });
   setStatus({
     ok: true,

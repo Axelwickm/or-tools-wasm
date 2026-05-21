@@ -1,4 +1,4 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, type MPVariable } from 'or-tools-wasm';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import { appendStatus, configureWorkerBridge, formatNumber, setRunning } from './mp_solver_helpers.js';
 
 type Nutrient = { name: string; minimum: number };

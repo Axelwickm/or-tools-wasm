@@ -3,7 +3,7 @@ import {
   isWorkerBridgeEnabled,
   setWorkerBridgeEnabled,
   SimpleLinearSumAssignment,
-} from 'or-tools-wasm';
+} from 'or-tools-wasm/network-flow';
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');

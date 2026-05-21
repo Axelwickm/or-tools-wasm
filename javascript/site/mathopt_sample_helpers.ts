@@ -1,4 +1,4 @@
-import { setWorkerBridgeEnabled } from 'or-tools-wasm';
+import { setWorkerBridgeEnabled } from 'or-tools-wasm/mathopt';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 export const statusEl = document.getElementById('status');

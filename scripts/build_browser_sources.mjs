@@ -5,6 +5,16 @@ import { build, transform } from 'esbuild';
 const rootDir = path.resolve(import.meta.dirname, '..');
 const sourceDir = path.join(rootDir, 'javascript/lib');
 const outDir = path.join(rootDir, 'build/javascript/browser');
+const publicEntryNames = [
+  'index',
+  'cp-sat',
+  'routing',
+  'mathopt',
+  'mp-solver',
+  'pdlp',
+  'knapsack',
+  'network-flow',
+];
 
 async function* listTypeScriptFiles(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -44,7 +54,7 @@ async function transpileSource(sourcePath) {
 const externalRuntimeLoaderPlugin = {
   name: 'external-runtime-loader',
   setup(buildContext) {
-    buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader)\.js$/ }, (args) => ({
+    buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader|worker_bridge)\.js$/ }, (args) => ({
       path: args.path,
       external: true,
     }));
@@ -52,20 +62,22 @@ const externalRuntimeLoaderPlugin = {
 };
 
 async function bundleBrowserEntry() {
-  await build({
-    entryPoints: [path.join(sourceDir, 'index.ts')],
-    outfile: path.join(outDir, 'index.js'),
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    target: 'es2020',
-    define: {
-      __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
-    },
-    minifySyntax: true,
-    sourcemap: false,
-    plugins: [externalRuntimeLoaderPlugin],
-  });
+  for (const entryName of publicEntryNames) {
+    await build({
+      entryPoints: [path.join(sourceDir, `${entryName}.ts`)],
+      outfile: path.join(outDir, `${entryName}.js`),
+      bundle: true,
+      format: 'esm',
+      platform: 'browser',
+      target: 'es2020',
+      define: {
+        __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
+      },
+      minifySyntax: true,
+      sourcemap: false,
+      plugins: [externalRuntimeLoaderPlugin],
+    });
+  }
 }
 
 await rm(outDir, { recursive: true, force: true });

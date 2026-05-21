@@ -1,4 +1,4 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, type MPVariable } from 'or-tools-wasm';
+import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, type MPVariable } from 'or-tools-wasm/mp-solver';
 
 type VariableKind = 'continuous' | 'integer';
 

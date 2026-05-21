@@ -5,11 +5,21 @@ import { build } from 'esbuild';
 const rootDir = path.resolve(import.meta.dirname, '..');
 const sourceDir = path.join(rootDir, 'javascript/lib');
 const outDir = path.join(rootDir, 'build/javascript/node');
+const publicEntryNames = [
+  'index',
+  'cp-sat',
+  'routing',
+  'mathopt',
+  'mp-solver',
+  'pdlp',
+  'knapsack',
+  'network-flow',
+];
 
 const externalLoaderPlugin = {
   name: 'external-runtime-node-loader',
   setup(buildContext) {
-    buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader)\.js$/ }, (args) => ({
+    buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader|worker_bridge)\.js$/ }, (args) => ({
       path: args.path,
       external: true,
     }));
@@ -19,16 +29,18 @@ const externalLoaderPlugin = {
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
 
-await build({
-  entryPoints: [path.join(sourceDir, 'index.ts')],
-  outfile: path.join(outDir, 'index.js'),
-  bundle: true,
-  format: 'esm',
-  platform: 'node',
-  target: 'node22',
-  sourcemap: false,
-  plugins: [externalLoaderPlugin],
-});
+for (const entryName of publicEntryNames) {
+  await build({
+    entryPoints: [path.join(sourceDir, `${entryName}.ts`)],
+    outfile: path.join(outDir, `${entryName}.js`),
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    target: 'node22',
+    sourcemap: false,
+    plugins: [externalLoaderPlugin],
+  });
+}
 
 await build({
   entryPoints: [path.join(sourceDir, 'ortools_worker.ts')],
@@ -39,6 +51,16 @@ await build({
   target: 'node22',
   sourcemap: false,
   plugins: [externalLoaderPlugin],
+});
+
+await build({
+  entryPoints: [path.join(sourceDir, 'worker_bridge.ts')],
+  outfile: path.join(outDir, 'worker_bridge.js'),
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node22',
+  sourcemap: false,
 });
 
 await writeFile(

@@ -1,4 +1,4 @@
-import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Domain = [number, number] | number[];

@@ -1,4 +1,4 @@
-import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance } from 'or-tools-wasm';
+import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance } from 'or-tools-wasm/cp-sat';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type SolverMethod = 'sat' | 'sat_table' | 'sat_column';

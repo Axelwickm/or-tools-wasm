@@ -1,4 +1,4 @@
-import { initMathOpt, MathOpt } from 'or-tools-wasm';
+import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
 import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, setRunning } from './mathopt_sample_helpers.js';
 
 async function runGScipExample() {

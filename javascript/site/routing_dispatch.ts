@@ -4,7 +4,7 @@ import {
   initRouting,
   RoutingIndexManager,
   RoutingModel,
-} from 'or-tools-wasm';
+} from 'or-tools-wasm/routing';
 import { appendStatus, configureWorkerBridge, extractRoutes, setRunning, type RouteSummary } from './routing_helpers.js';
 
 type Stop = {
