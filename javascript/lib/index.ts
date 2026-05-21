@@ -11,6 +11,7 @@ export {
   setWorkerBridgeEnabled,
   terminateWorkerBridge,
 } from './worker_bridge.js';
+export { terminateLoadedRuntimeThreads } from './runtime_loader.js';
 export {
   ArithmeticError,
   BoolVar,
@@ -102,6 +103,18 @@ export type {
   SparseMatrixEntry,
   SparseMatrixInput,
 } from './pdlp_api.js';
+export {
+  initNetworkFlow,
+  NetworkFlow,
+  SimpleLinearSumAssignment,
+  SimpleLinearSumAssignmentStatus,
+  SimpleMaxFlow,
+  SimpleMaxFlowStatus,
+  SimpleMinCostFlow,
+  SimpleMinCostFlowStatus,
+  solveGraphPayload,
+} from './graph_api.js';
+export type { GraphSolvePayload } from './graph_api.js';
 export {
   Assignment,
   BOOL_FALSE,

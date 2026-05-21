@@ -2,7 +2,7 @@ import type { OrToolsWasmModule } from './wasm_module_types.js';
 
 type RuntimeModuleFactory = (moduleOverrides?: Record<string, unknown>) => Promise<OrToolsWasmModule>;
 type RuntimeFlavor = 'jspi' | 'asyncify';
-type RuntimeName = 'cp_sat_runtime' | 'routing_runtime' | 'mp_solver_runtime' | 'mathopt_runtime' | 'pdlp_runtime';
+type RuntimeName = 'cp_sat_runtime' | 'routing_runtime' | 'mp_solver_runtime' | 'mathopt_runtime' | 'pdlp_runtime' | 'graph_runtime';
 type RuntimeKey = `${RuntimeName}:${RuntimeFlavor}`;
 
 type RuntimeAsset = {
@@ -61,10 +61,26 @@ const runtimeAssets: Record<RuntimeName, Record<RuntimeFlavor, RuntimeAsset>> = 
       wasmUrl: new URL('#internal-wasm/pdlp_runtime_asyncify.wasm?no-inline', import.meta.url).href,
     },
   },
+  graph_runtime: {
+    jspi: {
+      jsUrl: new URL('#internal-wasm/graph_runtime.js?no-inline', import.meta.url).href,
+      wasmUrl: new URL('#internal-wasm/graph_runtime.wasm?no-inline', import.meta.url).href,
+    },
+    asyncify: {
+      jsUrl: new URL('#internal-wasm/graph_runtime_asyncify.js?no-inline', import.meta.url).href,
+      wasmUrl: new URL('#internal-wasm/graph_runtime_asyncify.wasm?no-inline', import.meta.url).href,
+    },
+  },
 };
 
 const modulePromises: Partial<Record<RuntimeKey, Promise<OrToolsWasmModule>>> = {};
 let selectedFlavor: RuntimeFlavor | null = null;
+
+type RuntimeWithPthreads = OrToolsWasmModule & {
+  PThread?: {
+    terminateAllThreads?: () => void;
+  };
+};
 
 function isDenoRuntimeHost(): boolean {
   return 'Deno' in globalThis;
@@ -137,6 +153,15 @@ function createRuntime(runtimeName: RuntimeName, flavor = selectRuntimeFlavor(ru
   return modulePromises[key];
 }
 
+export async function terminateLoadedRuntimeThreads(): Promise<void> {
+  const modules = await Promise.allSettled(Object.values(modulePromises));
+  for (const moduleResult of modules) {
+    if (moduleResult.status !== 'fulfilled') continue;
+    const module = moduleResult.value as RuntimeWithPthreads;
+    module.PThread?.terminateAllThreads?.();
+  }
+}
+
 export async function loadRuntime(): Promise<OrToolsWasmModule> {
   return createRuntime('cp_sat_runtime');
 }
@@ -175,6 +200,14 @@ export async function loadPdlpRuntime(): Promise<OrToolsWasmModule> {
 
 export async function loadPdlpRuntimeAsyncify(): Promise<OrToolsWasmModule> {
   return createRuntime('pdlp_runtime', 'asyncify');
+}
+
+export async function loadGraphRuntime(): Promise<OrToolsWasmModule> {
+  return createRuntime('graph_runtime');
+}
+
+export async function loadGraphRuntimeAsyncify(): Promise<OrToolsWasmModule> {
+  return createRuntime('graph_runtime', 'asyncify');
 }
 
 export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };

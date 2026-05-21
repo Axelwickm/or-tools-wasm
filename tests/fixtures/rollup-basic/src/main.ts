@@ -3,6 +3,7 @@ import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
 import { runKnapsackCases } from '../../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
+import { runNetworkFlowCases } from '../../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
 import type { CpSat as CpSatValue } from 'or-tools-wasm';
@@ -16,6 +17,7 @@ import type {
   FirstSolutionStrategy as FirstSolutionStrategyValue,
   initMathOpt as initMathOptValue,
   initKnapsack as initKnapsackValue,
+  initNetworkFlow as initNetworkFlowValue,
   initMPSolver as initMPSolverValue,
   initPdlp as initPdlpValue,
   initRouting as initRoutingValue,
@@ -23,6 +25,9 @@ import type {
   MathOpt as MathOptValue,
   KnapsackSolver as KnapsackSolverValue,
   KnapsackSolverType as KnapsackSolverTypeValue,
+  SimpleLinearSumAssignment as SimpleLinearSumAssignmentValue,
+  SimpleMaxFlow as SimpleMaxFlowValue,
+  SimpleMinCostFlow as SimpleMinCostFlowValue,
   MPSolver as MPSolverValue,
   MPSolverParameters as MPSolverParametersValue,
   Pdlp as PdlpValue,
@@ -68,6 +73,7 @@ function installWorkerSpy() {
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
         mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
         knapsackSolve: messages.filter((message) => message.type === 'knapsackSolve').length,
+        graphSolve: messages.filter((message) => message.type === 'graphSolve').length,
       };
     },
   };
@@ -96,6 +102,7 @@ async function main() {
     FirstSolutionStrategy,
     initMathOpt,
     initKnapsack,
+    initNetworkFlow,
     initMPSolver,
     initPdlp,
     initRouting,
@@ -103,6 +110,9 @@ async function main() {
     MathOpt,
     KnapsackSolver,
     KnapsackSolverType,
+    SimpleLinearSumAssignment,
+    SimpleMaxFlow,
+    SimpleMinCostFlow,
     MPSolver,
     MPSolverParameters,
     Pdlp,
@@ -149,6 +159,15 @@ async function main() {
     setWorkerBridgeEnabled,
   });
   const knapsackWorkerStatsAfter = workerSpy.snapshot();
+  const networkFlowWorkerStatsBefore = workerSpy.snapshot();
+  const networkFlowResults = await runNetworkFlowCases({
+    initNetworkFlow: initNetworkFlow as typeof initNetworkFlowValue,
+    SimpleMaxFlow: SimpleMaxFlow as typeof SimpleMaxFlowValue,
+    SimpleMinCostFlow: SimpleMinCostFlow as typeof SimpleMinCostFlowValue,
+    SimpleLinearSumAssignment: SimpleLinearSumAssignment as typeof SimpleLinearSumAssignmentValue,
+    setWorkerBridgeEnabled,
+  });
+  const networkFlowWorkerStatsAfter = workerSpy.snapshot();
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({
     initMathOpt: initMathOpt as typeof initMathOptValue,
@@ -167,6 +186,7 @@ async function main() {
     routingResults,
     mpSolverResults,
     knapsackResults,
+    networkFlowResults,
     mathOptResults,
     pdlpResults,
     routingWorkerStatsBefore,
@@ -175,6 +195,8 @@ async function main() {
     mpSolverWorkerStatsAfter,
     knapsackWorkerStatsBefore,
     knapsackWorkerStatsAfter,
+    networkFlowWorkerStatsBefore,
+    networkFlowWorkerStatsAfter,
     mathOptWorkerStatsBefore,
     mathOptWorkerStatsAfter,
   });

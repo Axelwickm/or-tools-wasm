@@ -10,11 +10,15 @@ import {
   initKnapsack,
   initMathOpt,
   initMPSolver,
+  initNetworkFlow,
   initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
   KnapsackSolver,
   KnapsackSolverType,
+  SimpleLinearSumAssignment,
+  SimpleMaxFlow,
+  SimpleMinCostFlow,
   MathOpt,
   MPSolver,
   MPSolverParameters,
@@ -32,6 +36,7 @@ import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cps
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
+import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
@@ -90,6 +95,17 @@ test('runs the shared Knapsack cases in Node', async () => {
     setWorkerBridgeEnabled,
   });
   assert.equal(knapsackResults.every((result) => result.ok), true, `node Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
+});
+
+test('runs the shared Network Flow cases in Node', async () => {
+  const networkFlowResults = await runNetworkFlowCases({
+    initNetworkFlow,
+    SimpleMaxFlow,
+    SimpleMinCostFlow,
+    SimpleLinearSumAssignment,
+    setWorkerBridgeEnabled,
+  });
+  assert.equal(networkFlowResults.every((result) => result.ok), true, `node Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
 });
 
 test('runs the shared MathOpt cases in Node', async () => {

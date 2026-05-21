@@ -3,6 +3,7 @@ import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
 import { runKnapsackCases } from '../../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
+import { runNetworkFlowCases } from '../../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
 
@@ -27,6 +28,7 @@ type WorkerStats = {
   mpSolverSolve: number;
   mathOptSolve: number;
   knapsackSolve: number;
+  graphSolve: number;
 };
 
 type CpSatApi = typeof import('or-tools-wasm')['CpSat'];
@@ -81,6 +83,7 @@ function installWorkerSpy() {
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
         mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
         knapsackSolve: messages.filter((message) => message.type === 'knapsackSolve').length,
+        graphSolve: messages.filter((message) => message.type === 'graphSolve').length,
       };
     },
   };
@@ -111,12 +114,16 @@ async function main() {
     LocalSearchMetaheuristic,
     initMPSolver,
     initKnapsack,
+    initNetworkFlow,
     initMathOpt,
     initPdlp,
     MPSolver,
     MPSolverParameters,
     KnapsackSolver,
     KnapsackSolverType,
+    SimpleLinearSumAssignment,
+    SimpleMaxFlow,
+    SimpleMinCostFlow,
     MathOpt,
     Pdlp,
     RoutingIndexManager,
@@ -167,6 +174,16 @@ async function main() {
     setWorkerBridgeEnabled,
   });
   const knapsackWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'network-flow' });
+  const networkFlowWorkerStatsBefore = workerSpy.snapshot();
+  const networkFlowResults = await runNetworkFlowCases({
+    initNetworkFlow,
+    SimpleMaxFlow,
+    SimpleMinCostFlow,
+    SimpleLinearSumAssignment,
+    setWorkerBridgeEnabled,
+  });
+  const networkFlowWorkerStatsAfter = workerSpy.snapshot();
   setStatus({ ok: false, phase: 'mathopt' });
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt }, {
@@ -192,6 +209,7 @@ async function main() {
     routingResults,
     mpSolverResults,
     knapsackResults,
+    networkFlowResults,
     mathOptResults,
     pdlpResults,
     routingWorkerStatsBefore,
@@ -200,6 +218,8 @@ async function main() {
     mpSolverWorkerStatsAfter,
     knapsackWorkerStatsBefore,
     knapsackWorkerStatsAfter,
+    networkFlowWorkerStatsBefore,
+    networkFlowWorkerStatsAfter,
     mathOptWorkerStatsBefore,
     mathOptWorkerStatsAfter,
   });

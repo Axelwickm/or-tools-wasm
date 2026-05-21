@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadMathOptRuntime, loadMPSolverRuntime, loadPdlpRuntime, loadRuntime } from './runtime_loader.js';
+import { loadGraphRuntime, loadMathOptRuntime, loadMPSolverRuntime, loadPdlpRuntime, loadRuntime } from './runtime_loader.js';
 import { solveRoutingInWorker } from './worker_routing.js';
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
@@ -121,6 +121,72 @@ async function solveKnapsackInWorker(message: Extract<WorkerRequest, { type: 'kn
     if (weightsPtr) module._free(weightsPtr);
     if (capacitiesPtr) module._free(capacitiesPtr);
     module._free(namePtr);
+  }
+}
+
+async function solveGraphInWorker(message: Extract<WorkerRequest, { type: 'graphSolve' }>) {
+  const module = await loadGraphRuntime();
+  if (message.algorithm === 'maxFlow') {
+    const tailsPtr = copyFloat64ToHeap(module, message.tails);
+    const headsPtr = copyFloat64ToHeap(module, message.heads);
+    const capacitiesPtr = copyFloat64ToHeap(module, message.capacities);
+    try {
+      return module.ccall(
+        'graph_max_flow_solve_serialized',
+        'string',
+        ['number', 'number', 'number', 'number', 'number', 'number'],
+        [tailsPtr, headsPtr, capacitiesPtr, message.tails.length, message.source, message.sink],
+      ) as string;
+    } finally {
+      if (tailsPtr) module._free(tailsPtr);
+      if (headsPtr) module._free(headsPtr);
+      if (capacitiesPtr) module._free(capacitiesPtr);
+    }
+  }
+  if (message.algorithm === 'minCostFlow') {
+    const tailsPtr = copyFloat64ToHeap(module, message.tails);
+    const headsPtr = copyFloat64ToHeap(module, message.heads);
+    const capacitiesPtr = copyFloat64ToHeap(module, message.capacities);
+    const unitCostsPtr = copyFloat64ToHeap(module, message.unitCosts);
+    const suppliesPtr = copyFloat64ToHeap(module, message.supplies);
+    try {
+      return module.ccall(
+        'graph_min_cost_flow_solve_serialized',
+        'string',
+        ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+        [
+          tailsPtr,
+          headsPtr,
+          capacitiesPtr,
+          unitCostsPtr,
+          message.tails.length,
+          suppliesPtr,
+          message.supplies.length,
+          message.solveMaxFlowWithMinCost ? 1 : 0,
+        ],
+      ) as string;
+    } finally {
+      if (tailsPtr) module._free(tailsPtr);
+      if (headsPtr) module._free(headsPtr);
+      if (capacitiesPtr) module._free(capacitiesPtr);
+      if (unitCostsPtr) module._free(unitCostsPtr);
+      if (suppliesPtr) module._free(suppliesPtr);
+    }
+  }
+  const leftNodesPtr = copyFloat64ToHeap(module, message.leftNodes);
+  const rightNodesPtr = copyFloat64ToHeap(module, message.rightNodes);
+  const costsPtr = copyFloat64ToHeap(module, message.costs);
+  try {
+    return module.ccall(
+      'graph_linear_sum_assignment_solve_serialized',
+      'string',
+      ['number', 'number', 'number', 'number'],
+      [leftNodesPtr, rightNodesPtr, costsPtr, message.leftNodes.length],
+    ) as string;
+  } finally {
+    if (leftNodesPtr) module._free(leftNodesPtr);
+    if (rightNodesPtr) module._free(rightNodesPtr);
+    if (costsPtr) module._free(costsPtr);
   }
 }
 
@@ -276,6 +342,14 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       const result = await solveKnapsackInWorker(message);
       workerScope.postMessage({
         type: 'knapsackSolveResult',
+        id: message.id,
+        result,
+      } satisfies WorkerResponse);
+      return;
+    } else if (message.type === 'graphSolve') {
+      const result = await solveGraphInWorker(message);
+      workerScope.postMessage({
+        type: 'graphSolveResult',
         id: message.id,
         result,
       } satisfies WorkerResponse);

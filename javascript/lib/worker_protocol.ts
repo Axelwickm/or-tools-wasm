@@ -121,6 +121,37 @@ export type KnapsackSolveRequest = {
   capacities: number[];
 };
 
+export type GraphSolveRequest =
+  | {
+      type: 'graphSolve';
+      id: number;
+      algorithm: 'maxFlow';
+      tails: number[];
+      heads: number[];
+      capacities: number[];
+      source: number;
+      sink: number;
+    }
+  | {
+      type: 'graphSolve';
+      id: number;
+      algorithm: 'minCostFlow';
+      tails: number[];
+      heads: number[];
+      capacities: number[];
+      unitCosts: number[];
+      supplies: number[];
+      solveMaxFlowWithMinCost: boolean;
+    }
+  | {
+      type: 'graphSolve';
+      id: number;
+      algorithm: 'linearSumAssignment';
+      leftNodes: number[];
+      rightNodes: number[];
+      costs: number[];
+    };
+
 export type MathOptSolveRequest = {
   type: 'mathOptSolve';
   id: number;
@@ -143,6 +174,7 @@ export type WorkerRequest =
   | RoutingSolveRequest
   | MPSolverSolveRequest
   | KnapsackSolveRequest
+  | GraphSolveRequest
   | MathOptSolveRequest
   | PdlpRequest
   | CancelSolve;
@@ -158,6 +190,7 @@ export type WorkerResponse =
   | { type: 'routingSolveResult'; id: number; result: RoutingSolveResult | null }
   | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'knapsackSolveResult'; id: number; result: string }
+  | { type: 'graphSolveResult'; id: number; result: string }
   | { type: 'mathOptSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'pdlpResult'; id: number; bytes: Uint8Array; value?: number }
   | { type: 'solved_cancelled'; id: number }

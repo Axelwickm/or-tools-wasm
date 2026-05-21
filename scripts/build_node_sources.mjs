@@ -134,6 +134,18 @@ const runtimeSpecs = {
       wasm: 'pdlp_runtime_asyncify.wasm',
     },
   },
+  graph_runtime: {
+    jspi: {
+      nodeJs: '../node-wasm/graph_runtime_node.js',
+      webJs: '../wasm/graph_runtime.js',
+      wasm: 'graph_runtime.wasm',
+    },
+    asyncify: {
+      nodeJs: '../node-wasm/graph_runtime_node_asyncify.js',
+      webJs: '../wasm/graph_runtime_asyncify.js',
+      wasm: 'graph_runtime_asyncify.wasm',
+    },
+  },
 };
 
 const modulePromises = new Map();
@@ -193,6 +205,14 @@ async function createRuntime(runtimeName, flavor = selectRuntimeFlavor(runtimeNa
   return modulePromises.get(key);
 }
 
+export async function terminateLoadedRuntimeThreads() {
+  const modules = await Promise.allSettled(modulePromises.values());
+  for (const moduleResult of modules) {
+    if (moduleResult.status !== 'fulfilled') continue;
+    moduleResult.value.PThread?.terminateAllThreads?.();
+  }
+}
+
 export async function loadRuntime() {
   return createRuntime('cp_sat_runtime');
 }
@@ -231,6 +251,14 @@ export async function loadPdlpRuntime() {
 
 export async function loadPdlpRuntimeAsyncify() {
   return createRuntime('pdlp_runtime', 'asyncify');
+}
+
+export async function loadGraphRuntime() {
+  return createRuntime('graph_runtime');
+}
+
+export async function loadGraphRuntimeAsyncify() {
+  return createRuntime('graph_runtime', 'asyncify');
 }
 
 export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };

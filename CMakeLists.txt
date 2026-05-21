@@ -290,6 +290,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(PDLP_BROWSER_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/pdlp_api.cc")
 
+  set(GRAPH_BROWSER_SOURCES
+    "${PROJECT_SOURCE_DIR}/javascript/graph_api.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/graph/assignment.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/graph/linear_assignment.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/graph/max_flow.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/graph/min_cost_flow.cc")
+
   set(CP_SAT_COMMON_LINK_OPTIONS
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
@@ -324,7 +331,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_JSPI_LINK_OPTIONS
     "-sJSPI=2"
-    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request','pdlp_primal_dual_hybrid_gradient']")
+    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request','pdlp_primal_dual_hybrid_gradient','graph_max_flow_solve_serialized','graph_min_cost_flow_solve_serialized','graph_linear_sum_assignment_solve_serialized']")
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")
@@ -357,7 +364,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       "routing_runtime;ROUTING_BROWSER_SOURCES"
       "mp_solver_runtime;MP_SOLVER_BROWSER_SOURCES"
       "mathopt_runtime;MATHOPT_BROWSER_SOURCES"
-      "pdlp_runtime;PDLP_BROWSER_SOURCES")
+      "pdlp_runtime;PDLP_BROWSER_SOURCES"
+      "graph_runtime;GRAPH_BROWSER_SOURCES")
     list(GET RUNTIME_SPEC 0 RUNTIME_NAME)
     list(GET RUNTIME_SPEC 1 RUNTIME_SOURCES)
 

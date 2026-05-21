@@ -89,6 +89,12 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       profit?: number;
       optimal?: boolean;
     }>;
+    networkFlowResults?: Array<{
+      name?: string;
+      ok?: boolean;
+      status?: number;
+      objectiveValue?: number;
+    }>;
     routingWorkerStatsBefore?: {
       routingSolve?: number;
     };
@@ -106,6 +112,12 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
     };
     knapsackWorkerStatsAfter?: {
       knapsackSolve?: number;
+    };
+    networkFlowWorkerStatsBefore?: {
+      graphSolve?: number;
+    };
+    networkFlowWorkerStatsAfter?: {
+      graphSolve?: number;
     };
   };
   expect(parsedStatus.results).toHaveLength(4);
@@ -190,6 +202,25 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       ok: true,
       profit: 7534,
       optimal: true,
+    }),
+  ]));
+  expect(parsedStatus.networkFlowWorkerStatsBefore?.graphSolve).toBe(0);
+  expect(parsedStatus.networkFlowWorkerStatsAfter?.graphSolve).toBeGreaterThanOrEqual(3);
+  expect(parsedStatus.networkFlowResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      name: 'simple_max_flow_program.py (direct)',
+      ok: true,
+      objectiveValue: 60,
+    }),
+    expect.objectContaining({
+      name: 'simple_min_cost_flow_program.py (worker)',
+      ok: true,
+      objectiveValue: 150,
+    }),
+    expect.objectContaining({
+      name: 'assignment_linear_sum_assignment.py (worker)',
+      ok: true,
+      objectiveValue: 265,
     }),
   ]));
 });

@@ -10,11 +10,15 @@ import {
   initKnapsack,
   initMathOpt,
   initMPSolver,
+  initNetworkFlow,
   initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
   KnapsackSolver,
   KnapsackSolverType,
+  SimpleLinearSumAssignment,
+  SimpleMaxFlow,
+  SimpleMinCostFlow,
   MathOpt,
   MPSolver,
   MPSolverParameters,
@@ -30,6 +34,7 @@ import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts'
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
+import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
@@ -82,6 +87,17 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   });
   if (!knapsackResults.every((result) => result.ok)) {
     throw new Error(`deno Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
+  }
+
+  const networkFlowResults = await runNetworkFlowCases({
+    initNetworkFlow,
+    SimpleMaxFlow,
+    SimpleMinCostFlow,
+    SimpleLinearSumAssignment,
+    setWorkerBridgeEnabled,
+  });
+  if (!networkFlowResults.every((result) => result.ok)) {
+    throw new Error(`deno Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
   }
 
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });

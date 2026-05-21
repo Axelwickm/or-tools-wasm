@@ -236,6 +236,15 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ✅ 🔎 PyWrapAlgorithmsKnapsackSolverTest.testSolveTwoDimensions
   - ✅ 🔎 PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension
 
+## ortools/graph/python and ortools/graph/samples
+- Python graph wrapper tests
+  - ⚪ 🔎 No upstream Python `*_test.py` files were found for `ortools/graph/python/max_flow.cc`, `min_cost_flow.cc`, or `linear_sum_assignment.cc`; parity coverage is based on the Python samples plus the exposed Python wrapper method/status surface.
+- Representative Python sample parity
+  - ✅ 🔎 `ortools/graph/samples/simple_max_flow_program.py` - shared TS/WASM Network Flow fixture uses `SimpleMaxFlow.add_arcs_with_capacity`, checks graph accessors, solves source `0` to sink `4`, verifies `OPTIMAL`, `optimal_flow() == 60`, per-arc flow length/accessors, capacity bounds, source/sink conservation, and min-cut source/sink membership.
+  - ✅ 🔎 `ortools/graph/samples/simple_min_cost_flow_program.py` - shared TS/WASM Network Flow fixture uses `SimpleMinCostFlow.add_arcs_with_capacity_and_unit_cost` and `set_nodes_supplies`, checks graph/supply/cost accessors, verifies `OPTIMAL`, `optimal_cost() == 150`, `maximum_flow() == 20`, per-arc flow length/accessors, capacity bounds, and recomputed cost.
+  - ✅ 🔎 `ortools/graph/samples/assignment_linear_sum_assignment.py` - shared TS/WASM Network Flow fixture uses `SimpleLinearSumAssignment.add_arcs_with_cost`, checks accessors, verifies `OPTIMAL`, `optimal_cost() == 265`, and the expected worker-to-task mates/costs.
+  - 🧪 Worker-bridge coverage note - the same three graph sample cases run in direct and worker-bridge modes across the shared fixture suites. These sample entries are not included in the upstream Python test totals because upstream does not provide Python graph test files for these wrappers.
+
 ## ortools/linear_solver/python/lp_test.py
 - PyWrapLpTest
   - ✅ 🔎 PyWrapLpTest.testApi

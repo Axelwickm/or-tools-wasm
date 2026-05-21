@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Network Flow - Assignment</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 7rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>Network Flow - linear sum assignment</h1>
+    <p><em>Problem: assign every worker to one task so the total assignment cost is as small as possible.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleLinearSumAssignment, setWorkerBridgeEnabled } from 'or-tools-wasm';
+
+setWorkerBridgeEnabled(true);
+await initNetworkFlow();
+
+const costs = [
+  [90, 76, 75, 70],
+  [35, 85, 55, 65],
+  [125, 95, 90, 105],
+  [45, 110, 95, 115],
+];
+
+const leftNodes: number[] = [];
+const rightNodes: number[] = [];
+const arcCosts: number[] = [];
+for (let worker = 0; worker &lt; costs.length; ++worker) {
+  for (let task = 0; task &lt; costs[worker].length; ++task) {
+    leftNodes.push(worker);
+    rightNodes.push(task);
+    arcCosts.push(costs[worker][task]);
+  }
+}
+
+const assignment = new SimpleLinearSumAssignment();
+assignment.add_arcs_with_cost(leftNodes, rightNodes, arcCosts);
+const status = await assignment.solve();
+
+if (status === SimpleLinearSumAssignment.OPTIMAL) {
+  console.log(assignment.optimal_cost());
+  for (let worker = 0; worker &lt; assignment.num_nodes(); ++worker) {
+    console.log(worker, assignment.right_mate(worker), assignment.assignment_cost(worker));
+  }
+}</code></pre>
+      </details>
+    </div>
+    <div class="controls">
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <button id="run" data-idle-label="Solve Assignment">Solve Assignment</button>
+    </div>
+    <div id="solution-output">Run the solver to view the assignment.</div>
+    <p>Status:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./network_flow_assignment.ts"></script>
+  </body>
+</html>

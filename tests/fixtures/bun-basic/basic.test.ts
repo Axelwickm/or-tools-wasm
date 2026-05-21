@@ -10,11 +10,15 @@ import {
   initKnapsack,
   initMathOpt,
   initMPSolver,
+  initNetworkFlow,
   initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
   KnapsackSolver,
   KnapsackSolverType,
+  SimpleLinearSumAssignment,
+  SimpleMaxFlow,
+  SimpleMinCostFlow,
   MathOpt,
   MPSolver,
   MPSolverParameters,
@@ -23,6 +27,7 @@ import {
   RoutingModel,
   isWorkerBridgeEnabled,
   setWorkerBridgeEnabled,
+  terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm';
 import * as OrTools from 'or-tools-wasm';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
@@ -30,9 +35,11 @@ import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts'
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
+import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 
+async function run(): Promise<string> {
 const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(OrTools as never);
 
 const results = await runCpSatCases(CpSat as never);
@@ -87,6 +94,17 @@ if (!knapsackResults.every((result) => result.ok)) {
   throw new Error(`bun Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
 }
 
+const networkFlowResults = await runNetworkFlowCases({
+  initNetworkFlow,
+  SimpleMaxFlow,
+  SimpleMinCostFlow,
+  SimpleLinearSumAssignment,
+  setWorkerBridgeEnabled,
+});
+if (!networkFlowResults.every((result) => result.ok)) {
+  throw new Error(`bun Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
+}
+
 const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
 if (!mathOptResults.every((result) => result.ok)) {
   throw new Error(`bun MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
@@ -101,4 +119,13 @@ if (!pdlpResults.every((result) => result.ok)) {
   throw new Error(`bun PDLP case failed: ${JSON.stringify(pdlpResults)}`);
 }
 
-console.log(`bun ran ${cpSatCases.length} CP-SAT cases, ${highLevelCpSatResults.length} high-level CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${knapsackResults.length} Knapsack cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`);
+return `bun ran ${cpSatCases.length} CP-SAT cases, ${highLevelCpSatResults.length} high-level CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${knapsackResults.length} Knapsack cases, ${networkFlowResults.length} Network Flow cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`;
+}
+
+try {
+  console.log(await run());
+} finally {
+  setWorkerBridgeEnabled(false);
+  await terminateLoadedRuntimeThreads();
+}
+process.exit(0);

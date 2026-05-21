@@ -1019,6 +1019,86 @@ The MPSolver frontend also exposes
 `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.CreateSolver('KNAPSACK')`, and
 the proto solve path for knapsack-shaped 0-1 models.
 
+## Network Flow
+
+The dedicated Network Flow API mirrors the Python graph wrappers for
+`SimpleMaxFlow`, `SimpleMinCostFlow`, and `SimpleLinearSumAssignment`.
+
+```ts
+import { initNetworkFlow, SimpleMaxFlow, setWorkerBridgeEnabled } from 'or-tools-wasm';
+
+setWorkerBridgeEnabled(true);
+await initNetworkFlow();
+
+const maxFlow = new SimpleMaxFlow();
+const arcs = maxFlow.add_arcs_with_capacity(
+  [0, 0, 0, 1, 1, 2, 2, 3, 3],
+  [1, 2, 3, 2, 4, 3, 4, 2, 4],
+  [20, 30, 10, 40, 30, 10, 20, 5, 20],
+);
+const status = await maxFlow.solve(0, 4);
+if (status === SimpleMaxFlow.OPTIMAL) {
+  console.log(maxFlow.optimal_flow(), maxFlow.flows(arcs));
+}
+```
+
+`initNetworkFlow(): Promise<void>` loads the graph WebAssembly runtime.
+
+`SimpleMaxFlow` exposes Python-style snake_case methods and camelCase aliases:
+
+- status constants: `OPTIMAL`, `POSSIBLE_OVERFLOW`, `BAD_INPUT`, `BAD_RESULT`
+- `add_arc_with_capacity(tail, head, capacity): number`
+- `add_arcs_with_capacity(tails, heads, capacities): number[]`
+- `set_arc_capacity(arc, capacity): void`
+- `set_arcs_capacity(arcs, capacities): void`
+- `num_nodes()` / `numNodes(): number`
+- `num_arcs()` / `numArcs(): number`
+- `tail(arc)`, `head(arc)`, `capacity(arc): number`
+- `solve(source, sink): Promise<number>`
+- `optimal_flow()` / `optimalFlow(): number`
+- `flow(arc): number`
+- `flows(arcs): number[]`
+- `get_source_side_min_cut()` / `getSourceSideMinCut(): number[]`
+- `get_sink_side_min_cut()` / `getSinkSideMinCut(): number[]`
+
+`SimpleMinCostFlow` exposes:
+
+- status constants: `NOT_SOLVED`, `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
+  `UNBALANCED`, `BAD_RESULT`, `BAD_COST_RANGE`, `BAD_CAPACITY_RANGE`
+- `add_arc_with_capacity_and_unit_cost(tail, head, capacity, unitCost): number`
+- `add_arcs_with_capacity_and_unit_cost(tails, heads, capacities, unitCosts): number[]`
+- `set_arc_capacity(arc, capacity): void`
+- `set_arc_capacities(arcs, capacities): void`
+- `set_node_supply(node, supply): void`
+- `set_nodes_supplies(nodes, supplies): void`
+- `num_nodes()`, `num_arcs()`, `tail(arc)`, `head(arc)`, `capacity(arc)`
+- `supply(node)`, `unit_cost(arc)` / `unitCost(arc)`
+- `solve(): Promise<number>`
+- `solve_max_flow_with_min_cost()` / `solveMaxFlowWithMinCost(): Promise<number>`
+- `optimal_cost()` / `optimalCost(): number`
+- `maximum_flow()` / `maximumFlow(): number`
+- `flow(arc): number`
+- `flows(arcs): number[]`
+
+`SimpleLinearSumAssignment` exposes:
+
+- status constants: `OPTIMAL`, `INFEASIBLE`, `POSSIBLE_OVERFLOW`
+- `add_arc_with_cost(leftNode, rightNode, cost): number`
+- `add_arcs_with_cost(leftNodes, rightNodes, costs): number[]`
+- `num_nodes()` / `numNodes(): number`
+- `num_arcs()` / `numArcs(): number`
+- `left_node(arc)` / `leftNode(arc): number`
+- `right_node(arc)` / `rightNode(arc): number`
+- `cost(arc): number`
+- `solve(): Promise<number>`
+- `optimal_cost()` / `optimalCost(): number`
+- `right_mate(leftNode)` / `rightMate(leftNode): number`
+- `assignment_cost(leftNode)` / `assignmentCost(leftNode): number`
+
+Network Flow algorithms are single-threaded in this package. They support the
+shared browser worker bridge, so UI code can run graph solves off the main
+thread, but there is no solver thread-count parameter.
+
 ## MathOpt
 
 Import:
@@ -1069,6 +1149,8 @@ Static constructors and aliases:
 - `MPSolver.isWorkerBridgeEnabled(): boolean`
 - `Pdlp.setWorkerBridgeEnabled(enabled): void`
 - `Pdlp.isWorkerBridgeEnabled(): boolean`
+- `NetworkFlow.setWorkerBridgeEnabled(enabled): void`
+- `NetworkFlow.isWorkerBridgeEnabled(): boolean`
 - `RoutingModel.setWorkerBridgeEnabled(enabled): void`
 - `RoutingModel.isWorkerBridgeEnabled(): boolean`
 
@@ -1081,6 +1163,14 @@ Top-level value exports:
 - `MathOptModel`
 - `MathOptObjective`
 - `GlpkParameters`
+- `initNetworkFlow`
+- `NetworkFlow`
+- `SimpleMaxFlow`
+- `SimpleMaxFlowStatus`
+- `SimpleMinCostFlow`
+- `SimpleMinCostFlowStatus`
+- `SimpleLinearSumAssignment`
+- `SimpleLinearSumAssignmentStatus`
 
 Top-level type exports:
 
@@ -1507,12 +1597,13 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 
 ## Browser Worker Bridge
 
-The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, and PDLP paths can
-use the browser worker bridge. Worker bridge availability is independent of
+The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, Network Flow, and
+PDLP paths can use the browser worker bridge. Worker bridge availability is independent of
 solver threading support; for example GLPK and Knapsack are single-threaded but
-can still run through the worker bridge in browser UI code, while CP-SAT, SAT,
-SCIP/GSCIP, CBC, and other threaded-capable paths can also accept solver thread
-settings. Prefer the shared package controls:
+can still run through the worker bridge in browser UI code, Network Flow is
+single-threaded but worker-bridge capable, while CP-SAT, SAT, SCIP/GSCIP, CBC,
+and other threaded-capable paths can also accept solver thread settings. Prefer
+the shared package controls:
 
 ```ts
 import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';
