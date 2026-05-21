@@ -26,9 +26,9 @@ as multithreaded WebAssembly.
 Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in).
 
 `or-tools-wasm` provides solver-specific WebAssembly runtimes and TypeScript
-APIs for CP-SAT, routing, MPSolver, MathOpt, and PDLP. It is published as an
-ESM package and is verified with Vite 7, Webpack 5, Rollup 4, Node 22, Deno 2,
-and Bun.
+APIs for CP-SAT, routing, MPSolver, MathOpt, PDLP, Knapsack, Network Flow, and
+Set Cover. It is published as an ESM package and is verified with Vite 7,
+Webpack 5, Rollup 4, Node 22, Deno 2, and Bun.
 
 ## Usage
 
@@ -123,10 +123,24 @@ console.log(result.response);
 | Assignment algorithms | ✅ | Linear-sum assignment through the dedicated Network Flow API. |
 | Set cover | ✅ | Dedicated weighted set cover model, invariant, and heuristic search API. |
 | RCPSP |  | Resource-constrained project scheduling problem support. |
+| Linear Solver ModelBuilder |  | Python-like `linear_solver.model_builder` API for ergonomic LP/MIP modeling, import/export helpers, and backend solve helpers. |
+| MathOpt incremental/callback/filter APIs |  | Incremental solving, solve/model filters, message callbacks, solve interrupters, indicator helpers, and richer result helpers. |
+| BOP |  | Optional BOP integer-programming backend for remaining legacy MPSolver parity. |
 
 Unchecked rows are planned OR-Tools targets that are not exposed by this package
 yet. Commercial and large third-party native backends such as Gurobi, CPLEX,
 XPRESS, HiGHS, OSQP, ECOS, and SCS are not planned.
+
+## TODO
+
+Near-term parity work:
+
+- Implement RCPSP as the next dedicated OR-Tools surface.
+- Add Linear Solver ModelBuilder if continuing Python API parity beyond solver
+  runtimes.
+- Close the remaining MathOpt API gaps around incremental solving, filters,
+  callbacks, interrupters, indicator helpers, and result helper objects.
+- Consider BOP only if legacy MPSolver backend completeness becomes important.
 
 The TypeScript API mirrors the public OR-Tools API shape where it maps cleanly
 to WebAssembly. CP-SAT exposes both a Python-like high-level builder and the
