@@ -83,6 +83,12 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       objective?: number;
       values?: Record<string, number>;
     }>;
+    knapsackResults?: Array<{
+      name?: string;
+      ok?: boolean;
+      profit?: number;
+      optimal?: boolean;
+    }>;
     routingWorkerStatsBefore?: {
       routingSolve?: number;
     };
@@ -94,6 +100,12 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
     };
     mpSolverWorkerStatsAfter?: {
       mpSolverSolve?: number;
+    };
+    knapsackWorkerStatsBefore?: {
+      knapsackSolve?: number;
+    };
+    knapsackWorkerStatsAfter?: {
+      knapsackSolve?: number;
     };
   };
   expect(parsedStatus.results).toHaveLength(4);
@@ -156,6 +168,28 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       ok: true,
       objective: 23,
       values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
+  ]));
+  expect(parsedStatus.knapsackWorkerStatsBefore?.knapsackSolve).toBe(0);
+  expect(parsedStatus.knapsackWorkerStatsAfter?.knapsackSolve).toBeGreaterThanOrEqual(3);
+  expect(parsedStatus.knapsackResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension (direct)',
+      ok: true,
+      profit: 34,
+      optimal: true,
+    }),
+    expect.objectContaining({
+      name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveTwoDimensions (worker)',
+      ok: true,
+      profit: 30,
+      optimal: true,
+    }),
+    expect.objectContaining({
+      name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension (worker)',
+      ok: true,
+      profit: 7534,
+      optimal: true,
     }),
   ]));
 });

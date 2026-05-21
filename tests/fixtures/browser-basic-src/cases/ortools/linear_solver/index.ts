@@ -139,6 +139,7 @@ export type MPSolverApi = {
     GLPK_MIXED_INTEGER_PROGRAMMING: number;
     SCIP_MIXED_INTEGER_PROGRAMMING: number;
     CBC_MIXED_INTEGER_PROGRAMMING: number;
+    KNAPSACK_MIXED_INTEGER_PROGRAMMING: number;
     SAT_INTEGER_PROGRAMMING: number;
     OPTIMAL: number;
     INFEASIBLE: number;
@@ -365,6 +366,79 @@ async function runCbcWorkerBridgeMatrix(api: MPSolverApi): Promise<MpSolverCaseR
   }
   api.setWorkerBridgeEnabled(false);
   return results;
+}
+
+async function runKnapsackBackendCase(api: MPSolverApi, mode: 'direct' | 'worker'): Promise<MpSolverCaseResult> {
+  // TEMP: parity - covers the dedicated MPSolver KNAPSACK backend with the
+  // same one-dimensional data as knapsack_solver_test.py testSolveOneDimension.
+  api.setWorkerBridgeEnabled(mode === 'worker');
+  const name = `MPSolver: KNAPSACK_MIXED_INTEGER_PROGRAMMING (${mode})`;
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING), `${name}: backend not supported`);
+  assert(api.MPSolver.ParseSolverType('KNAPSACK') === api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING, `${name}: ParseSolverType mismatch`);
+  assert(
+    api.MPSolver.ParseAndCheckSupportForProblemType('KNAPSACK') === api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING,
+    `${name}: ParseAndCheckSupportForProblemType mismatch`,
+  );
+  if (mode === 'worker') {
+    const result = await api.MPSolver.solveModelRequest({
+      solverType: api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING,
+      model: {
+        maximize: true,
+        variable: Array.from({ length: 9 }, (_, item) => ({
+          lowerBound: 0,
+          upperBound: 1,
+          isInteger: true,
+          objectiveCoefficient: item + 1,
+          name: `x_${item}`,
+        })),
+        constraint: [{
+          lowerBound: Number.NEGATIVE_INFINITY,
+          upperBound: 34,
+          varIndex: Array.from({ length: 9 }, (_, item) => item),
+          coefficient: Array.from({ length: 9 }, (_, item) => item + 1),
+          name: 'capacity',
+        }],
+      },
+    });
+    const response = result.response;
+    assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+    assert(near(Number(response.objectiveValue), 34), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+    const variableValues = response.variableValue as number[];
+    assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+    api.setWorkerBridgeEnabled(false);
+    return {
+      name,
+      ok: true,
+      status: api.MPSolver.OPTIMAL,
+      objective: Number(response.objectiveValue),
+      values: Object.fromEntries(variableValues.map((value, item) => [`x_${item}`, value])),
+    };
+  }
+  const solver = createSolver(api, 'KNAPSACK', name);
+  try {
+    const profits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const weights = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const variables = profits.map((_, item) => solver.BoolVar(`x_${item}`));
+    const capacity = solver.Constraint(-solver.infinity(), 34, 'capacity');
+    for (const [item, variable] of variables.entries()) {
+      capacity.SetCoefficient(variable, weights[item]);
+      solver.Objective().SetCoefficient(variable, profits[item]);
+    }
+    solver.Objective().SetMaximization();
+    const status = await solver.Solve();
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+    assert(near(solver.Objective().Value(), 34), `${name}: objective mismatch ${solver.Objective().Value()}`);
+    assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+    return {
+      name,
+      ok: true,
+      status,
+      objective: solver.Objective().Value(),
+      values: Object.fromEntries(variables.map((variable, item) => [`x_${item}`, variable.solution_value()])),
+    };
+  } finally {
+    solver.delete();
+  }
 }
 
 async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
@@ -919,6 +993,8 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     await runGlpkMixedIntegerCase(api),
     await runScipMixedIntegerCase(api),
     await runCbcMixedIntegerCase(api),
+    await runKnapsackBackendCase(api, 'direct'),
+    await runKnapsackBackendCase(api, 'worker'),
     await runBooleanCppStyleCase(api),
     skipped(
       'MPSolver: lp_test.py testApi',

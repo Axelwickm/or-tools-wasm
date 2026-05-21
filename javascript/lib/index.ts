@@ -44,8 +44,11 @@ export type { LinearExprLike, LiteralLike } from './cp_sat_high_level.js';
 export {
   DoubleParam,
   IncrementalityValues,
+  initKnapsack,
   initMPSolver,
   IntegerParam,
+  KnapsackSolver,
+  KnapsackSolverType,
   LpAlgorithmValues,
   MPConstraint,
   MPObjective,

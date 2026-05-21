@@ -7,11 +7,14 @@ import {
   DefaultRoutingModelParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
+  initKnapsack,
   initMathOpt,
   initMPSolver,
   initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
+  KnapsackSolver,
+  KnapsackSolverType,
   MathOpt,
   MPSolver,
   MPSolverParameters,
@@ -26,6 +29,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
+import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
@@ -76,6 +80,16 @@ test('runs the shared MPSolver cases in Node', async () => {
     isWorkerBridgeEnabled,
   });
   assert.equal(mpSolverResults.every((result) => result.ok), true, `node MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
+});
+
+test('runs the shared Knapsack cases in Node', async () => {
+  const knapsackResults = await runKnapsackCases({
+    initKnapsack,
+    KnapsackSolver,
+    KnapsackSolverType,
+    setWorkerBridgeEnabled,
+  });
+  assert.equal(knapsackResults.every((result) => result.ok), true, `node Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
 });
 
 test('runs the shared MathOpt cases in Node', async () => {

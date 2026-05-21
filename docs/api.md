@@ -786,13 +786,13 @@ Loads the MPSolver WebAssembly runtime.
 `GLOP_LINEAR_PROGRAMMING`, `CLP_LINEAR_PROGRAMMING`, `PDLP_LINEAR_PROGRAMMING`,
 `SAT_INTEGER_PROGRAMMING`, `GLPK_LINEAR_PROGRAMMING`,
 `SCIP_MIXED_INTEGER_PROGRAMMING`, `GLPK_MIXED_INTEGER_PROGRAMMING`,
-`CBC_MIXED_INTEGER_PROGRAMMING`, and others. Only problem types compiled into
-the WebAssembly runtime will be supported at runtime; use
+`CBC_MIXED_INTEGER_PROGRAMMING`, `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, and
+others. Only problem types compiled into the WebAssembly runtime will be supported at runtime; use
 `MPSolver.SupportsProblemType()`.
 
 The default package runtime currently includes `GLOP`, `CLP`, and `GLPK_LP` for
-continuous linear programming, plus `SAT`, `GLPK`, `SCIP`, and `CBC` for integer
-linear programming through MPSolver.
+continuous linear programming, plus `SAT`, `GLPK`, `SCIP`, `CBC`, and
+`KNAPSACK` for integer linear programming through MPSolver.
 
 `MPSolverResultStatus` contains `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
 `UNBOUNDED`, `ABNORMAL`, `MODEL_INVALID`, and `NOT_SOLVED`.
@@ -962,6 +962,62 @@ Parameter enums:
 - `LpAlgorithmValues`: `DUAL`, `PRIMAL`, `BARRIER`
 - `IncrementalityValues`: `INCREMENTALITY_OFF`, `INCREMENTALITY_ON`
 - `ScalingValues`: `SCALING_OFF`, `SCALING_ON`
+
+## Knapsack
+
+The dedicated Knapsack API mirrors
+`ortools.algorithms.python.knapsack_solver.KnapsackSolver` and uses the
+MPSolver WebAssembly runtime.
+
+```ts
+import {
+  initKnapsack,
+  KnapsackSolver,
+  KnapsackSolverType,
+  setWorkerBridgeEnabled,
+} from 'or-tools-wasm';
+
+setWorkerBridgeEnabled(true);
+await initKnapsack();
+
+const solver = new KnapsackSolver(
+  KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER,
+  'knapsack',
+);
+solver.init(
+  [360, 83, 59, 130],
+  [[7, 0, 30, 22]],
+  [50],
+);
+
+const profit = await solver.solve();
+const selected = [0, 1, 2, 3].filter((item) => solver.best_solution_contains(item));
+console.log(profit, selected, solver.is_solution_optimal());
+```
+
+`initKnapsack(): Promise<void>` loads the shared MPSolver/Knapsack runtime.
+
+`KnapsackSolverType` exposes the upstream solver ids:
+
+- `KNAPSACK_BRUTE_FORCE_SOLVER`
+- `KNAPSACK_64ITEMS_SOLVER`
+- `KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER`
+- `KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER`
+- `KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER`
+- `KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER`
+- `KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER`
+- `KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER`
+- `KNAPSACK_DIVIDE_AND_CONQUER_SOLVER`
+- `KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER`
+
+`KnapsackSolver` supports `init()` / `Init()`, `solve()` / `Solve()`,
+`best_solution_contains()` / `BestSolutionContains()`,
+`is_solution_optimal()` / `IsSolutionOptimal()`, `set_use_reduction()` /
+`SetUseReduction()`, and `set_time_limit()` / `SetTimeLimit()`.
+
+The MPSolver frontend also exposes
+`KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.CreateSolver('KNAPSACK')`, and
+the proto solve path for knapsack-shaped 0-1 models.
 
 ## MathOpt
 
@@ -1451,12 +1507,12 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 
 ## Browser Worker Bridge
 
-The CP-SAT, MathOpt, Routing, MPSolver proto-solve, and PDLP paths can use the
-browser worker bridge. Worker bridge availability is independent of solver
-threading support; for example GLPK is single-threaded but can still run through
-the worker bridge in browser UI code, while CP-SAT, SAT, SCIP/GSCIP, CBC, and
-other threaded-capable paths can also accept solver thread settings. Prefer the
-shared package controls:
+The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, and PDLP paths can
+use the browser worker bridge. Worker bridge availability is independent of
+solver threading support; for example GLPK and Knapsack are single-threaded but
+can still run through the worker bridge in browser UI code, while CP-SAT, SAT,
+SCIP/GSCIP, CBC, and other threaded-capable paths can also accept solver thread
+settings. Prefer the shared package controls:
 
 ```ts
 import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';

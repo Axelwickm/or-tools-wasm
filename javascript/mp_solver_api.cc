@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -9,6 +10,7 @@
 #include <emscripten/emscripten.h>
 
 #include "generated_proto_schemas.h"
+#include "ortools/algorithms/knapsack_solver.h"
 #include "ortools/linear_solver/linear_solver.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
 
@@ -22,6 +24,7 @@ using operations_research::MPSolutionResponse;
 using operations_research::MPSolver;
 using operations_research::MPSolverParameters;
 using operations_research::MPVariable;
+using operations_research::KnapsackSolver;
 using operations_research::sat::wasm::kLinearSolverProtoSchema;
 using operations_research::sat::wasm::kOptionalBooleanProtoSchema;
 
@@ -89,6 +92,28 @@ const char* StoreString(std::string value) {
   return g_string_result.c_str();
 }
 
+int64_t NumberToInt64(double value) { return static_cast<int64_t>(value); }
+
+std::string JsonEscape(const std::string& value) {
+  std::string escaped;
+  escaped.reserve(value.size());
+  for (const char ch : value) {
+    if (ch == '\\' || ch == '"') {
+      escaped.push_back('\\');
+      escaped.push_back(ch);
+    } else if (ch == '\n') {
+      escaped += "\\n";
+    } else if (ch == '\r') {
+      escaped += "\\r";
+    } else if (ch == '\t') {
+      escaped += "\\t";
+    } else {
+      escaped.push_back(ch);
+    }
+  }
+  return escaped;
+}
+
 uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
                            size_t* out_len) {
   if (out_len == nullptr) return nullptr;
@@ -122,6 +147,67 @@ EMSCRIPTEN_KEEPALIVE const char* get_linear_solver_schema() {
 
 EMSCRIPTEN_KEEPALIVE const char* get_optional_boolean_schema() {
   return kOptionalBooleanProtoSchema;
+}
+
+EMSCRIPTEN_KEEPALIVE const char* knapsack_solve_serialized(
+    int solver_type, const char* name, int use_reduction,
+    double time_limit_seconds, const double* profits_data, int num_items,
+    const double* weights_data, int num_dimensions,
+    const double* capacities_data) {
+  if (name == nullptr || profits_data == nullptr || weights_data == nullptr ||
+      capacities_data == nullptr || num_items < 0 || num_dimensions < 0) {
+    return StoreString(
+        "{\"ok\":false,\"error\":\"KnapsackSolver: invalid input pointers or "
+        "dimensions.\"}");
+  }
+
+  std::vector<int64_t> profits(num_items);
+  for (int i = 0; i < num_items; ++i) {
+    profits[i] = NumberToInt64(profits_data[i]);
+  }
+
+  std::vector<std::vector<int64_t>> weights(num_dimensions,
+                                            std::vector<int64_t>(num_items));
+  for (int dimension = 0; dimension < num_dimensions; ++dimension) {
+    for (int item = 0; item < num_items; ++item) {
+      weights[dimension][item] =
+          NumberToInt64(weights_data[dimension * num_items + item]);
+    }
+  }
+
+  std::vector<int64_t> capacities(num_dimensions);
+  for (int dimension = 0; dimension < num_dimensions; ++dimension) {
+    capacities[dimension] = NumberToInt64(capacities_data[dimension]);
+  }
+
+  try {
+    KnapsackSolver solver(static_cast<KnapsackSolver::SolverType>(solver_type),
+                          name);
+    solver.set_use_reduction(use_reduction != 0);
+    if (time_limit_seconds > 0.0) {
+      solver.set_time_limit(time_limit_seconds);
+    }
+    solver.Init(profits, weights, capacities);
+    const int64_t profit = solver.Solve();
+
+    std::ostringstream out;
+    out << "{\"ok\":true,\"profit\":" << profit << ",\"optimal\":"
+        << (solver.IsSolutionOptimal() ? "true" : "false") << ",\"name\":\""
+        << JsonEscape(solver.GetName()) << "\",\"contains\":[";
+    for (int item = 0; item < num_items; ++item) {
+      if (item > 0) out << ",";
+      out << (solver.BestSolutionContains(item) ? "true" : "false");
+    }
+    out << "]}";
+    return StoreString(out.str());
+  } catch (const std::exception& e) {
+    std::ostringstream out;
+    out << "{\"ok\":false,\"error\":\"" << JsonEscape(e.what()) << "\"}";
+    return StoreString(out.str());
+  } catch (...) {
+    return StoreString(
+        "{\"ok\":false,\"error\":\"KnapsackSolver: unknown native error.\"}");
+  }
 }
 
 EMSCRIPTEN_KEEPALIVE double mp_solver_infinity() {

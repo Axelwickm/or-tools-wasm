@@ -1,5 +1,6 @@
 import { runCpSatHighLevelParityCasesForPackage } from '../../browser-basic-src/cpsat_high_level_runner.ts';
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
+import { runKnapsackCases } from '../../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
@@ -25,6 +26,7 @@ type WorkerStats = {
   routingSolve: number;
   mpSolverSolve: number;
   mathOptSolve: number;
+  knapsackSolve: number;
 };
 
 type CpSatApi = typeof import('or-tools-wasm')['CpSat'];
@@ -78,6 +80,7 @@ function installWorkerSpy() {
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
         mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
+        knapsackSolve: messages.filter((message) => message.type === 'knapsackSolve').length,
       };
     },
   };
@@ -107,10 +110,13 @@ async function main() {
     initRouting,
     LocalSearchMetaheuristic,
     initMPSolver,
+    initKnapsack,
     initMathOpt,
     initPdlp,
     MPSolver,
     MPSolverParameters,
+    KnapsackSolver,
+    KnapsackSolverType,
     MathOpt,
     Pdlp,
     RoutingIndexManager,
@@ -152,6 +158,15 @@ async function main() {
     isWorkerBridgeEnabled,
   });
   const mpSolverWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'knapsack' });
+  const knapsackWorkerStatsBefore = workerSpy.snapshot();
+  const knapsackResults = await runKnapsackCases({
+    initKnapsack,
+    KnapsackSolver,
+    KnapsackSolverType,
+    setWorkerBridgeEnabled,
+  });
+  const knapsackWorkerStatsAfter = workerSpy.snapshot();
   setStatus({ ok: false, phase: 'mathopt' });
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt }, {
@@ -176,12 +191,15 @@ async function main() {
     highLevelCpSatResults,
     routingResults,
     mpSolverResults,
+    knapsackResults,
     mathOptResults,
     pdlpResults,
     routingWorkerStatsBefore,
     routingWorkerStatsAfter,
     mpSolverWorkerStatsBefore,
     mpSolverWorkerStatsAfter,
+    knapsackWorkerStatsBefore,
+    knapsackWorkerStatsAfter,
     mathOptWorkerStatsBefore,
     mathOptWorkerStatsAfter,
   });

@@ -96,7 +96,7 @@ console.log(result.response);
 | --- | --- | --- |
 | CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
 | Routing | ✅ | Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search. |
-| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, and SAT MIP backends. |
+| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, Knapsack MIP, and SAT MIP backends. |
 | MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, GLPK, GSCIP, CP-SAT, and PDLP backends. |
 | GLOP | ✅ | Google's simplex linear programming solver. |
 | PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
@@ -105,7 +105,7 @@ console.log(result.response);
 | GLPK | ✅ | GNU linear and mixed-integer programming backend. |
 | SCIP / GSCIP | ✅ | SCIP-based mixed-integer backend through MPSolver and MathOpt. |
 | CBC | ✅ | COIN-OR branch-and-cut mixed-integer programming backend through MPSolver. |
-| Knapsack |  | Dedicated knapsack mixed-integer programming backend. |
+| Knapsack | ✅ | Dedicated 0-1 and multi-dimensional knapsack solver, plus the MPSolver Knapsack backend. |
 | Network flow algorithms |  | Max-flow and min-cost-flow graph optimization algorithms. |
 | Assignment algorithms |  | Linear-sum assignment and related assignment optimization algorithms. |
 | Set cover |  | Set covering and related covering problem utilities. |
@@ -145,7 +145,8 @@ fail during WebAssembly runtime or worker startup.
 
 Browser solves can run through a hidden worker bridge, so the main thread stays
 available for rendering, input, progress UI, and cancellation. The shared worker
-bridge controls apply across CP-SAT, routing, MPSolver, MathOpt, and PDLP:
+bridge controls apply across CP-SAT, routing, MPSolver, Knapsack, MathOpt, and
+PDLP:
 
 ```ts
 import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm';
@@ -157,7 +158,8 @@ console.log(isWorkerBridgeEnabled());
 Worker bridge support is separate from solver threading. For example, GLPK is
 single-threaded in this package but can still run through the browser worker
 bridge, while CP-SAT, SAT, SCIP/GSCIP, CBC, and other threaded-capable paths may
-also accept solver thread settings. The package loads solver runtimes on demand;
+also accept solver thread settings. Knapsack can run through the worker bridge
+but does not expose solver thread settings. The package loads solver runtimes on demand;
 application code does not need to choose between JSPI and Asyncify manually.
 
 For Vite dev and preview servers, set the headers in `vite.config.ts`:

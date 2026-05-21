@@ -55,6 +55,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(USE_XPRESS OFF CACHE BOOL "Use the Xpress solver" FORCE)
   option(ORTOOLS_WASM_USE_CLP "Build CLP support into the WASM MPSolver runtime" ON)
   option(ORTOOLS_WASM_USE_CBC "Build CBC support into the WASM MPSolver runtime" ON)
+  option(ORTOOLS_WASM_USE_KNAPSACK "Build Knapsack support into the WASM MPSolver runtime" ON)
   option(ORTOOLS_WASM_USE_GLPK "Build GLPK support into the WASM MPSolver and MathOpt runtimes" ON)
   option(ORTOOLS_WASM_USE_SCIP "Build SCIP/GSCIP support into the WASM MPSolver and MathOpt runtimes" ON)
 endif()
@@ -240,6 +241,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   if(ORTOOLS_WASM_USE_CBC)
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/cbc_interface.cc")
+  endif()
+  if(ORTOOLS_WASM_USE_KNAPSACK)
+    list(APPEND MP_SOLVER_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/knapsack_interface.cc")
   endif()
   if(ORTOOLS_WASM_USE_GLPK)
     list(APPEND MP_SOLVER_BROWSER_SOURCES

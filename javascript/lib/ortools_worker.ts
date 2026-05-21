@@ -74,6 +74,56 @@ const copyBytesToHeap = (module: OrToolsWasmModule, bytes: Uint8Array | null) =>
   return ptr;
 };
 
+function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
+  if (!values.length) return 0;
+  const ptr = module._malloc(values.length * Float64Array.BYTES_PER_ELEMENT);
+  const view = new Float64Array(module.HEAPU8.buffer, ptr, values.length);
+  view.set(values);
+  return ptr;
+}
+
+function flattenWeights(weights: number[][], itemCount: number) {
+  const flattened: number[] = [];
+  for (const dimension of weights) {
+    if (dimension.length !== itemCount) {
+      throw new Error('KnapsackSolver: each weight dimension must match profits length.');
+    }
+    flattened.push(...dimension);
+  }
+  return flattened;
+}
+
+async function solveKnapsackInWorker(message: Extract<WorkerRequest, { type: 'knapsackSolve' }>) {
+  const module = await loadMPSolverRuntime();
+  const profitsPtr = copyFloat64ToHeap(module, message.profits);
+  const weightsPtr = copyFloat64ToHeap(module, flattenWeights(message.weights, message.profits.length));
+  const capacitiesPtr = copyFloat64ToHeap(module, message.capacities);
+  const namePtr = module.allocateUTF8(message.name);
+  try {
+    return module.ccall(
+      'knapsack_solve_serialized',
+      'string',
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [
+        message.solverType,
+        namePtr,
+        message.useReduction ? 1 : 0,
+        message.timeLimitSeconds,
+        profitsPtr,
+        message.profits.length,
+        weightsPtr,
+        message.weights.length,
+        capacitiesPtr,
+      ],
+    ) as string;
+  } finally {
+    if (profitsPtr) module._free(profitsPtr);
+    if (weightsPtr) module._free(weightsPtr);
+    if (capacitiesPtr) module._free(capacitiesPtr);
+    module._free(namePtr);
+  }
+}
+
 async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requestId = 0, callbackFlags = 0) {
   const module = await loadCpSatModule();
   const lenPtr = module._malloc(4);
@@ -221,6 +271,14 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         if (requestPtr) module._free(requestPtr);
         module._free(lenPtr);
       }
+      return;
+    } else if (message.type === 'knapsackSolve') {
+      const result = await solveKnapsackInWorker(message);
+      workerScope.postMessage({
+        type: 'knapsackSolveResult',
+        id: message.id,
+        result,
+      } satisfies WorkerResponse);
       return;
     } else if (message.type === 'mathOptSolve') {
       const module = await loadMathOptRuntime();

@@ -1,5 +1,6 @@
 import { runCpSatHighLevelParityCasesForPackage } from '../../browser-basic-src/cpsat_high_level_runner.ts';
 import { runCpSatCases } from '../../browser-basic-src/cpsat_runner.ts';
+import { runKnapsackCases } from '../../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
@@ -14,11 +15,14 @@ import type {
   FindErrorInRoutingSearchParameters as FindErrorInRoutingSearchParametersValue,
   FirstSolutionStrategy as FirstSolutionStrategyValue,
   initMathOpt as initMathOptValue,
+  initKnapsack as initKnapsackValue,
   initMPSolver as initMPSolverValue,
   initPdlp as initPdlpValue,
   initRouting as initRoutingValue,
   LocalSearchMetaheuristic as LocalSearchMetaheuristicValue,
   MathOpt as MathOptValue,
+  KnapsackSolver as KnapsackSolverValue,
+  KnapsackSolverType as KnapsackSolverTypeValue,
   MPSolver as MPSolverValue,
   MPSolverParameters as MPSolverParametersValue,
   Pdlp as PdlpValue,
@@ -63,6 +67,7 @@ function installWorkerSpy() {
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
         mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
+        knapsackSolve: messages.filter((message) => message.type === 'knapsackSolve').length,
       };
     },
   };
@@ -90,11 +95,14 @@ async function main() {
     FindErrorInRoutingSearchParameters,
     FirstSolutionStrategy,
     initMathOpt,
+    initKnapsack,
     initMPSolver,
     initPdlp,
     initRouting,
     LocalSearchMetaheuristic,
     MathOpt,
+    KnapsackSolver,
+    KnapsackSolverType,
     MPSolver,
     MPSolverParameters,
     Pdlp,
@@ -133,6 +141,14 @@ async function main() {
     isWorkerBridgeEnabled,
   });
   const mpSolverWorkerStatsAfter = workerSpy.snapshot();
+  const knapsackWorkerStatsBefore = workerSpy.snapshot();
+  const knapsackResults = await runKnapsackCases({
+    initKnapsack: initKnapsack as typeof initKnapsackValue,
+    KnapsackSolver: KnapsackSolver as typeof KnapsackSolverValue,
+    KnapsackSolverType: KnapsackSolverType as typeof KnapsackSolverTypeValue,
+    setWorkerBridgeEnabled,
+  });
+  const knapsackWorkerStatsAfter = workerSpy.snapshot();
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({
     initMathOpt: initMathOpt as typeof initMathOptValue,
@@ -150,12 +166,15 @@ async function main() {
     highLevelCpSatResults,
     routingResults,
     mpSolverResults,
+    knapsackResults,
     mathOptResults,
     pdlpResults,
     routingWorkerStatsBefore,
     routingWorkerStatsAfter,
     mpSolverWorkerStatsBefore,
     mpSolverWorkerStatsAfter,
+    knapsackWorkerStatsBefore,
+    knapsackWorkerStatsAfter,
     mathOptWorkerStatsBefore,
     mathOptWorkerStatsAfter,
   });

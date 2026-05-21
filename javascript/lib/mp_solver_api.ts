@@ -127,6 +127,17 @@ type MpSolverExports = {
   parametersGetIntegerParam(parametersHandle: number, param: number): number;
   parametersResetIntegerParam(parametersHandle: number, param: number): void;
   parametersReset(parametersHandle: number): void;
+  knapsackSolveSerialized(
+    solverType: number,
+    namePtr: number,
+    useReduction: number,
+    timeLimitSeconds: number,
+    profitsPtr: number,
+    numItems: number,
+    weightsPtr: number,
+    numDimensions: number,
+    capacitiesPtr: number,
+  ): number;
 };
 
 function toNumber(value: unknown): number {
@@ -250,6 +261,17 @@ function createMpSolverExports(module: OrToolsWasmModule): MpSolverExports {
     parametersGetIntegerParam: wrap(module, 'mp_solver_parameters_get_integer_param', 'number', ['number', 'number']),
     parametersResetIntegerParam: wrap(module, 'mp_solver_parameters_reset_integer_param', undefined, ['number', 'number']),
     parametersReset: wrap(module, 'mp_solver_parameters_reset', undefined, ['number']),
+    knapsackSolveSerialized: wrap(module, 'knapsack_solve_serialized', 'number', [
+      'number',
+      'number',
+      'number',
+      'number',
+      'number',
+      'number',
+      'number',
+      'number',
+      'number',
+    ]),
   };
 }
 
@@ -453,6 +475,10 @@ export async function initMPSolver(): Promise<void> {
   await loadMpSolverModule();
 }
 
+export async function initKnapsack(): Promise<void> {
+  await loadMpSolverModule();
+}
+
 export enum OptimizationProblemType {
   CLP_LINEAR_PROGRAMMING = 0,
   GLPK_LINEAR_PROGRAMMING = 1,
@@ -526,6 +552,222 @@ export enum IncrementalityValues {
 export enum ScalingValues {
   SCALING_OFF = 0,
   SCALING_ON = 1,
+}
+
+export enum KnapsackSolverType {
+  KNAPSACK_BRUTE_FORCE_SOLVER = 0,
+  KNAPSACK_64ITEMS_SOLVER = 1,
+  KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER = 2,
+  KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER = 3,
+  KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER = 5,
+  KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER = 6,
+  KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER = 7,
+  KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER = 8,
+  KNAPSACK_DIVIDE_AND_CONQUER_SOLVER = 9,
+  KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER = 10,
+}
+
+type NativeKnapsackResult = {
+  ok: boolean;
+  profit?: number;
+  optimal?: boolean;
+  name?: string;
+  contains?: boolean[];
+  error?: string;
+};
+
+function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]): number {
+  if (!values.length) return 0;
+  const ptr = module._malloc(values.length * Float64Array.BYTES_PER_ELEMENT);
+  const view = new Float64Array(module.HEAPU8.buffer, ptr, values.length);
+  view.set(values);
+  return ptr;
+}
+
+function flattenKnapsackWeights(weights: number[][], itemCount: number): number[] {
+  const flattened: number[] = [];
+  for (const dimension of weights) {
+    if (dimension.length !== itemCount) {
+      throw new Error('KnapsackSolver.init: each weight dimension must match profits length.');
+    }
+    flattened.push(...dimension);
+  }
+  return flattened;
+}
+
+function parseKnapsackResult(serialized: string): NativeKnapsackResult {
+  const result = JSON.parse(serialized) as NativeKnapsackResult;
+  if (!result.ok) {
+    throw new Error(result.error || 'KnapsackSolver.solve: native solve failed.');
+  }
+  return result;
+}
+
+async function solveKnapsackDirect(
+  solverType: KnapsackSolverType,
+  name: string,
+  useReduction: boolean,
+  timeLimitSeconds: number,
+  profits: number[],
+  weights: number[][],
+  capacities: number[],
+): Promise<NativeKnapsackResult> {
+  const module = await loadMpSolverModule();
+  const exports = getMpSolverExports();
+  const flattenedWeights = flattenKnapsackWeights(weights, profits.length);
+  const profitsPtr = copyFloat64ToHeap(module, profits);
+  const weightsPtr = copyFloat64ToHeap(module, flattenedWeights);
+  const capacitiesPtr = copyFloat64ToHeap(module, capacities);
+  try {
+    return withCString(module, name, (namePtr) => {
+      const resultPtr = exports.knapsackSolveSerialized(
+        solverType,
+        namePtr,
+        useReduction ? 1 : 0,
+        timeLimitSeconds,
+        profitsPtr,
+        profits.length,
+        weightsPtr,
+        weights.length,
+        capacitiesPtr,
+      );
+      return parseKnapsackResult(readCString(module, resultPtr));
+    });
+  } finally {
+    if (profitsPtr) module._free(profitsPtr);
+    if (weightsPtr) module._free(weightsPtr);
+    if (capacitiesPtr) module._free(capacitiesPtr);
+  }
+}
+
+async function solveKnapsack(
+  solverType: KnapsackSolverType,
+  name: string,
+  useReduction: boolean,
+  timeLimitSeconds: number,
+  profits: number[],
+  weights: number[][],
+  capacities: number[],
+): Promise<NativeKnapsackResult> {
+  if (shouldUseWorkerBridge()) {
+    const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'knapsackSolveResult' }>>({
+      type: 'knapsackSolve',
+      id: nextWorkerBridgeRequestId(),
+      solverType,
+      name,
+      useReduction,
+      timeLimitSeconds,
+      profits,
+      weights,
+      capacities,
+    });
+    return parseKnapsackResult(response.result);
+  }
+  return solveKnapsackDirect(solverType, name, useReduction, timeLimitSeconds, profits, weights, capacities);
+}
+
+export class KnapsackSolver {
+  static readonly SolverType = KnapsackSolverType;
+  static readonly KNAPSACK_BRUTE_FORCE_SOLVER = KnapsackSolverType.KNAPSACK_BRUTE_FORCE_SOLVER;
+  static readonly KNAPSACK_64ITEMS_SOLVER = KnapsackSolverType.KNAPSACK_64ITEMS_SOLVER;
+  static readonly KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER = KnapsackSolverType.KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER;
+  static readonly KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER;
+  static readonly KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER;
+  static readonly KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER;
+  static readonly KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER;
+  static readonly KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER;
+  static readonly KNAPSACK_DIVIDE_AND_CONQUER_SOLVER = KnapsackSolverType.KNAPSACK_DIVIDE_AND_CONQUER_SOLVER;
+  static readonly KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER;
+
+  private profits: number[] = [];
+  private weights: number[][] = [];
+  private capacities: number[] = [];
+  private useReduction = true;
+  private timeLimitSeconds = 0;
+  private solutionContains: boolean[] = [];
+  private solutionOptimal = false;
+
+  constructor(
+    private readonly solverType: KnapsackSolverType,
+    private readonly solverName: string,
+  ) {
+    getMpSolverModule();
+  }
+
+  init(profits: number[], weights: number[][], capacities: number[]): void {
+    if (weights.length !== capacities.length) {
+      throw new Error('KnapsackSolver.init: weights dimensions must match capacities length.');
+    }
+    flattenKnapsackWeights(weights, profits.length);
+    this.profits = [...profits];
+    this.weights = weights.map((dimension) => [...dimension]);
+    this.capacities = [...capacities];
+    this.solutionContains = [];
+    this.solutionOptimal = false;
+  }
+
+  Init(profits: number[], weights: number[][], capacities: number[]): void {
+    this.init(profits, weights, capacities);
+  }
+
+  async solve(): Promise<number> {
+    const result = await solveKnapsack(
+      this.solverType,
+      this.solverName,
+      this.useReduction,
+      this.timeLimitSeconds,
+      this.profits,
+      this.weights,
+      this.capacities,
+    );
+    this.solutionContains = result.contains ?? [];
+    this.solutionOptimal = result.optimal === true;
+    return Number(result.profit ?? 0);
+  }
+
+  Solve(): Promise<number> {
+    return this.solve();
+  }
+
+  best_solution_contains(itemId: number): boolean {
+    return this.solutionContains[itemId] === true;
+  }
+
+  BestSolutionContains(itemId: number): boolean {
+    return this.best_solution_contains(itemId);
+  }
+
+  is_solution_optimal(): boolean {
+    return this.solutionOptimal;
+  }
+
+  IsSolutionOptimal(): boolean {
+    return this.is_solution_optimal();
+  }
+
+  set_use_reduction(useReduction: boolean): void {
+    this.useReduction = useReduction;
+  }
+
+  SetUseReduction(useReduction: boolean): void {
+    this.set_use_reduction(useReduction);
+  }
+
+  set_time_limit(timeLimitSeconds: number): void {
+    this.timeLimitSeconds = timeLimitSeconds;
+  }
+
+  SetTimeLimit(timeLimitSeconds: number): void {
+    this.set_time_limit(timeLimitSeconds);
+  }
+
+  getName(): string {
+    return this.solverName;
+  }
+
+  GetName(): string {
+    return this.getName();
+  }
 }
 
 export class MPVariable {

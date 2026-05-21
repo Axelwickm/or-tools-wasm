@@ -109,6 +109,18 @@ export type MPSolverSolveRequest = {
   requestBytes: Uint8Array;
 };
 
+export type KnapsackSolveRequest = {
+  type: 'knapsackSolve';
+  id: number;
+  solverType: number;
+  name: string;
+  useReduction: boolean;
+  timeLimitSeconds: number;
+  profits: number[];
+  weights: number[][];
+  capacities: number[];
+};
+
 export type MathOptSolveRequest = {
   type: 'mathOptSolve';
   id: number;
@@ -130,6 +142,7 @@ export type WorkerRequest =
   | SchemaRequest
   | RoutingSolveRequest
   | MPSolverSolveRequest
+  | KnapsackSolveRequest
   | MathOptSolveRequest
   | PdlpRequest
   | CancelSolve;
@@ -144,6 +157,7 @@ export type WorkerResponse =
   | { type: 'schemaResult'; id: number; schemas: { cp_model: string; sat_parameters: string; linear_solver: string; optional_boolean: string } }
   | { type: 'routingSolveResult'; id: number; result: RoutingSolveResult | null }
   | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
+  | { type: 'knapsackSolveResult'; id: number; result: string }
   | { type: 'mathOptSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'pdlpResult'; id: number; bytes: Uint8Array; value?: number }
   | { type: 'solved_cancelled'; id: number }

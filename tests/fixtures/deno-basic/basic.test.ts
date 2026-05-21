@@ -7,11 +7,14 @@ import {
   DefaultRoutingModelParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
+  initKnapsack,
   initMathOpt,
   initMPSolver,
   initPdlp,
   initRouting,
   LocalSearchMetaheuristic,
+  KnapsackSolver,
+  KnapsackSolverType,
   MathOpt,
   MPSolver,
   MPSolverParameters,
@@ -24,6 +27,7 @@ import {
 import * as OrTools from 'or-tools-wasm';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
+import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
@@ -68,6 +72,16 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   });
   if (!mpSolverResults.every((result) => result.ok)) {
     throw new Error(`deno MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
+  }
+
+  const knapsackResults = await runKnapsackCases({
+    initKnapsack,
+    KnapsackSolver,
+    KnapsackSolverType,
+    setWorkerBridgeEnabled,
+  });
+  if (!knapsackResults.every((result) => result.ok)) {
+    throw new Error(`deno Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
   }
 
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });

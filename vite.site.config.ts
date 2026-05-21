@@ -37,6 +37,7 @@ export default defineConfig({
         glpk_simple_lp: path.resolve(siteRoot, 'glpk_simple_lp.html'),
         glpk_simple_mip: path.resolve(siteRoot, 'glpk_simple_mip.html'),
         index: path.resolve(siteRoot, 'index.html'),
+        knapsack_simple: path.resolve(siteRoot, 'knapsack_simple.html'),
         magic_square: path.resolve(siteRoot, 'magic_square.html'),
         mathopt_basic: path.resolve(siteRoot, 'mathopt_basic.html'),
         model_playground: path.resolve(siteRoot, 'model_playground.html'),
