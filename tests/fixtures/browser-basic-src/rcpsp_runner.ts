@@ -163,7 +163,7 @@ async function runParserParity(api: RcpspApi, mode: FixtureMode): Promise<{ make
   return { makespan: null };
 }
 
-async function runCpSatBackedSchedule(api: RcpspApi, mode: FixtureMode): Promise<{ makespan: number | null; statusName: string }> {
+async function runCpSatBackedSchedule(api: RcpspApi, mode: FixtureMode, numWorkers: number): Promise<{ makespan: number | null; statusName: string }> {
   api.setWorkerBridgeEnabled(mode === 'worker');
   const problem = new api.RcpspModelBuilder('house_project')
     .add_resource({ name: 'crew', capacity: 3 })
@@ -177,13 +177,13 @@ async function runCpSatBackedSchedule(api: RcpspApi, mode: FixtureMode): Promise
   assert(proto.resources?.length === 1, `RCPSP CP-SAT sample (${mode}) resources length`);
   assert(proto.tasks?.length === 7, `RCPSP CP-SAT sample (${mode}) source/tasks/sink length`);
   assert((problem.to_cp_sat_model().proto().constraints ?? []).length > 0, `RCPSP CP-SAT sample (${mode}) generated constraints`);
-  const result = await problem.solve({ numWorkers: 1, maxTimeInSeconds: 5 });
-  assert(result.statusName === 'OPTIMAL' || result.statusName === 'FEASIBLE', `RCPSP CP-SAT sample (${mode}) status ${result.statusName}`);
-  assert(result.makespan === 8, `RCPSP CP-SAT sample (${mode}) expected makespan 8, got ${result.makespan}`);
+  const result = await problem.solve({ numWorkers, maxTimeInSeconds: 5 });
+  assert(result.statusName === 'OPTIMAL' || result.statusName === 'FEASIBLE', `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) status ${result.statusName}`);
+  assert(result.makespan === 8, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) expected makespan 8, got ${result.makespan}`);
   const byName = new Map(result.tasks.map((task) => [task.name, task]));
-  assert(byName.get('site')?.start === 0, `RCPSP CP-SAT sample (${mode}) site start`);
-  assert(byName.get('frame')?.start === 3, `RCPSP CP-SAT sample (${mode}) frame start`);
-  assert(byName.get('inspect')?.end === 8, `RCPSP CP-SAT sample (${mode}) inspect end`);
+  assert(byName.get('site')?.start === 0, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) site start`);
+  assert(byName.get('frame')?.start === 3, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) frame start`);
+  assert(byName.get('inspect')?.end === 8, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) inspect end`);
   return { makespan: result.makespan, statusName: result.statusName };
 }
 
@@ -203,8 +203,8 @@ export const rcpspCases: RcpspCase[] = [
     id: 'rcpsp.sample.house_project_cp_sat',
     name: 'RcpspCpSatSample.house_project',
     solver: 'rcpsp',
-    tags: ['contract', 'direct', 'worker', 'cp-sat-backed'],
-    run: (api, context) => runCpSatBackedSchedule(api, context.mode ?? 'direct'),
+    tags: ['contract', 'direct', 'worker', 'cp-sat-backed', 'threading'],
+    run: (api, context) => runCpSatBackedSchedule(api, context.mode ?? 'direct', context.threads ?? 1),
   },
 ];
 
@@ -213,8 +213,15 @@ export async function runRcpspCases(api: RcpspApi): Promise<RcpspCaseResult[]> {
   const results: RcpspCaseResult[] = [];
   for (const mode of ['direct', 'worker'] as const) {
     for (const testCase of rcpspCases) {
-      const result = await testCase.run(api, { mode });
-      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
+      const threadsToRun = testCase.tags?.includes('threading') ? [1, 4] : [undefined];
+      for (const threads of threadsToRun) {
+        const context = { mode, threads };
+        const name = threads === undefined
+          ? `${testCase.name} (${mode})`
+          : `${testCase.name} (${mode}, ${threads} worker${threads === 1 ? '' : 's'})`;
+        const result = await testCase.run(api, context);
+        results.push(passedCase({ ...testCase, name }, context, result));
+      }
     }
   }
   api.setWorkerBridgeEnabled(false);

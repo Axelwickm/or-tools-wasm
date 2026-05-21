@@ -35,12 +35,14 @@ type RunResult = {
 type WorkerStats = {
   total: number;
   pthread: number;
+  cpSatSolve: number;
   routingSolve: number;
   mpSolverSolve: number;
   mathOptSolve: number;
   knapsackSolve: number;
   graphSolve: number;
   setCoverSolve: number;
+  pdlpSolve: number;
 };
 
 type CpSat = typeof import('or-tools-wasm/cp-sat')['CpSat'];
@@ -54,9 +56,11 @@ type RoutingApi = Pick<
   | 'FindErrorInRoutingSearchParameters'
   | 'FirstSolutionStrategy'
   | 'initRouting'
+  | 'isWorkerBridgeEnabled'
   | 'LocalSearchMetaheuristic'
   | 'RoutingIndexManager'
   | 'RoutingModel'
+  | 'setWorkerBridgeEnabled'
 >;
 
 function setStatus(value: unknown) {
@@ -91,12 +95,14 @@ function installWorkerSpy() {
       return {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
+        cpSatSolve: messages.filter((message) => message.type === 'solve').length,
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
         mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
         knapsackSolve: messages.filter((message) => message.type === 'knapsackSolve').length,
         graphSolve: messages.filter((message) => message.type === 'graphSolve').length,
         setCoverSolve: messages.filter((message) => message.type === 'setCover').length,
+        pdlpSolve: messages.filter((message) => message.type === 'pdlp').length,
       };
     },
   };
@@ -123,9 +129,11 @@ async function main() {
     FindErrorInRoutingSearchParameters: RoutingApiModule.FindErrorInRoutingSearchParameters,
     FirstSolutionStrategy: RoutingApiModule.FirstSolutionStrategy,
     initRouting: RoutingApiModule.initRouting,
+    isWorkerBridgeEnabled: RoutingApiModule.isWorkerBridgeEnabled,
     LocalSearchMetaheuristic: RoutingApiModule.LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingApiModule.RoutingIndexManager,
     RoutingModel: RoutingApiModule.RoutingModel,
+    setWorkerBridgeEnabled: RoutingApiModule.setWorkerBridgeEnabled,
   };
   setStatus({ ok: false, phase: 'cp-sat-high-level' });
   const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
@@ -171,7 +179,9 @@ async function main() {
   const setCoverResults = await runSetCoverCases(SetCoverApi as never);
   const setCoverWorkerStatsAfter = workerSpy.snapshot();
   setStatus({ ok: false, phase: 'rcpsp' });
+  const rcpspWorkerStatsBefore = workerSpy.snapshot();
   const rcpspResults = await runRcpspCases(RcpspApi as never);
+  const rcpspWorkerStatsAfter = workerSpy.snapshot();
   setStatus({ ok: false, phase: 'mathopt' });
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({ initMathOpt: MathOptApi.initMathOpt, MathOpt: MathOptApi.MathOpt }, {
@@ -185,11 +195,13 @@ async function main() {
   });
   const mathOptWorkerStatsAfter = workerSpy.snapshot();
   setStatus({ ok: false, phase: 'pdlp' });
+  const pdlpWorkerStatsBefore = workerSpy.snapshot();
   const pdlpResults = await runPdlpCases({
     initPdlp: PdlpApi.initPdlp,
     Pdlp: PdlpApi.Pdlp,
     setWorkerBridgeEnabled: PdlpApi.setWorkerBridgeEnabled,
   });
+  const pdlpWorkerStatsAfter = workerSpy.snapshot();
   setStatus({
     ok: true,
     results,
@@ -212,8 +224,12 @@ async function main() {
     networkFlowWorkerStatsAfter,
     setCoverWorkerStatsBefore,
     setCoverWorkerStatsAfter,
+    rcpspWorkerStatsBefore,
+    rcpspWorkerStatsAfter,
     mathOptWorkerStatsBefore,
     mathOptWorkerStatsAfter,
+    pdlpWorkerStatsBefore,
+    pdlpWorkerStatsAfter,
   });
 }
 

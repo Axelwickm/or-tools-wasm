@@ -108,6 +108,8 @@ export type RoutingApi = {
     maybeEnds?: number[],
   ) => RoutingIndexManagerLike;
   RoutingModel: new (manager: never, parameters?: unknown) => RoutingModelLike;
+  setWorkerBridgeEnabled(enabled: boolean): void;
+  isWorkerBridgeEnabled(): boolean;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -121,23 +123,29 @@ export async function runRoutingCases(routingApi: RoutingApi): Promise<RoutingCa
 
   const results: RoutingCaseResult[] = [];
 
-  for (const routingCase of routingContractCases) {
-    const message = await routingCase.run(routingApi as never);
-    assert(!message.startsWith('TODO:'), message);
-    assert(message.endsWith('PASS'), `${routingCase.name} failed: ${message}`);
-    results.push({
-      id: routingCase.id,
-      name: routingCase.name,
-      solver: routingCase.solver,
-      source: routingCase.source,
-      upstream: routingCase.upstream,
-      tags: routingCase.tags,
-      ok: true,
-      objective: 0,
-      route: [],
-      routeDistance: 0,
-    });
+  for (const mode of ['direct', 'worker'] as const) {
+    routingApi.setWorkerBridgeEnabled(mode === 'worker');
+    assert(routingApi.isWorkerBridgeEnabled() === (mode === 'worker'), `Routing worker bridge state mismatch for ${mode}`);
+
+    for (const routingCase of routingContractCases) {
+      const message = await routingCase.run(routingApi as never);
+      assert(!message.startsWith('TODO:'), message);
+      assert(message.endsWith('PASS'), `${routingCase.name} (${mode}) failed: ${message}`);
+      results.push({
+        id: routingCase.id,
+        name: `${routingCase.name} (${mode})`,
+        solver: routingCase.solver,
+        source: routingCase.source,
+        upstream: routingCase.upstream,
+        tags: routingCase.tags,
+        ok: true,
+        objective: 0,
+        route: [],
+        routeDistance: 0,
+      });
+    }
   }
 
+  routingApi.setWorkerBridgeEnabled(false);
   return results;
 }

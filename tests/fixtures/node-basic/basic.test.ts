@@ -53,9 +53,11 @@ import {
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
+  isWorkerBridgeEnabled as isRoutingWorkerBridgeEnabled,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
+  setWorkerBridgeEnabled as setRoutingWorkerBridgeEnabled,
 } from 'or-tools-wasm/routing';
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
@@ -115,6 +117,8 @@ test('runs the shared Routing cases in Node', async (t) => {
     LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
+    setWorkerBridgeEnabled: setRoutingWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isRoutingWorkerBridgeEnabled,
   });
   await assertCaseResults(t, 'node routing', routingResults);
 });

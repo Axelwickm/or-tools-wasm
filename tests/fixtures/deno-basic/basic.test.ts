@@ -41,9 +41,11 @@ import {
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
+  isWorkerBridgeEnabled as isRoutingWorkerBridgeEnabled,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
+  setWorkerBridgeEnabled as setRoutingWorkerBridgeEnabled,
 } from 'or-tools-wasm/routing';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
@@ -103,6 +105,8 @@ Deno.test('runs the shared CP-SAT cases in Deno', async (t) => {
     LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
+    setWorkerBridgeEnabled: setRoutingWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isRoutingWorkerBridgeEnabled,
   });
   await assertCaseSteps(t, 'deno routing', routingResults);
 

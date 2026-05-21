@@ -17,5 +17,5 @@ export const routingContractCases = [
     .toLowerCase()}`,
   solver: 'routing',
   upstream: testCase.name,
-  tags: ['python-parity', 'direct'],
+  tags: ['python-parity', 'direct', 'worker'],
 }));

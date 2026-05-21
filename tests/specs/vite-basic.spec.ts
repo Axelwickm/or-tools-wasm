@@ -68,6 +68,7 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
       workerStats?: {
         total?: number;
         pthread?: number;
+        cpSatSolve?: number;
       };
     }>;
     highLevelCpSatResults?: Array<{
@@ -151,6 +152,30 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
     networkFlowWorkerStatsAfter?: {
       graphSolve?: number;
     };
+    setCoverWorkerStatsBefore?: {
+      setCoverSolve?: number;
+    };
+    setCoverWorkerStatsAfter?: {
+      setCoverSolve?: number;
+    };
+    rcpspWorkerStatsBefore?: {
+      cpSatSolve?: number;
+    };
+    rcpspWorkerStatsAfter?: {
+      cpSatSolve?: number;
+    };
+    mathOptWorkerStatsBefore?: {
+      mathOptSolve?: number;
+    };
+    mathOptWorkerStatsAfter?: {
+      mathOptSolve?: number;
+    };
+    pdlpWorkerStatsBefore?: {
+      pdlpSolve?: number;
+    };
+    pdlpWorkerStatsAfter?: {
+      pdlpSolve?: number;
+    };
   };
   const expectStableCaseIds = (results: Array<{ id?: string; ok?: boolean }> | undefined, label: string) => {
     expect(results?.length, `${label} result count`).toBeGreaterThan(0);
@@ -185,9 +210,15 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
   );
   expect(parsedStatus.results?.[0].workerStats?.total).toBeGreaterThanOrEqual(4);
   expect(parsedStatus.results?.[2].workerStats?.total).toBeGreaterThanOrEqual(5);
+  expect(parsedStatus.results?.[0].workerStats?.cpSatSolve).toBe(0);
+  expect(parsedStatus.results?.[2].workerStats?.cpSatSolve).toBeGreaterThan(0);
   expect(parsedStatus.routingResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      name: 'TestPyWrapRoutingModel.testRoutingSearchParameters',
+      name: 'TestPyWrapRoutingModel.testRoutingSearchParameters (direct)',
+      ok: true,
+    }),
+    expect.objectContaining({
+      name: 'TestPyWrapRoutingModel.testRoutingSearchParameters (worker)',
       ok: true,
     }),
   ]));
@@ -295,7 +326,10 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
     }),
   ]));
   expectStableCaseIds(parsedStatus.networkFlowResults, 'Network Flow');
+  expect(parsedStatus.setCoverWorkerStatsBefore?.setCoverSolve).toBe(0);
+  expect(parsedStatus.setCoverWorkerStatsAfter?.setCoverSolve).toBeGreaterThanOrEqual(1);
   expectStableCaseIds(parsedStatus.setCoverResults, 'Set Cover');
+  expect(parsedStatus.rcpspWorkerStatsAfter?.cpSatSolve).toBeGreaterThan(parsedStatus.rcpspWorkerStatsBefore?.cpSatSolve ?? 0);
   expect(parsedStatus.rcpspResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
       name: 'RcpspTest.testParseAndAccess (direct)',
@@ -308,19 +342,22 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
       makespan: null,
     }),
     expect.objectContaining({
-      name: 'RcpspCpSatSample.house_project (direct)',
+      name: 'RcpspCpSatSample.house_project (direct, 1 worker)',
       ok: true,
       makespan: 8,
       statusName: 'OPTIMAL',
     }),
     expect.objectContaining({
-      name: 'RcpspCpSatSample.house_project (worker)',
+      name: 'RcpspCpSatSample.house_project (worker, 4 workers)',
       ok: true,
       makespan: 8,
       statusName: 'OPTIMAL',
     }),
   ]));
   expectStableCaseIds(parsedStatus.rcpspResults, 'RCPSP');
+  expect(parsedStatus.mathOptWorkerStatsBefore?.mathOptSolve).toBe(0);
+  expect(parsedStatus.mathOptWorkerStatsAfter?.mathOptSolve).toBeGreaterThanOrEqual(1);
   expectStableCaseIds(parsedStatus.mathOptResults, 'MathOpt');
+  expect(parsedStatus.pdlpWorkerStatsAfter?.pdlpSolve).toBeGreaterThan(parsedStatus.pdlpWorkerStatsBefore?.pdlpSolve ?? 0);
   expectStableCaseIds(parsedStatus.pdlpResults, 'PDLP');
 });
