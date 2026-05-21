@@ -200,6 +200,18 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       values: expect.objectContaining({ analytics: 1, dashboard: 0, alerts: 1 }),
     }),
     expect.objectContaining({
+      name: 'MPSolver: BOP integer production (direct)',
+      ok: true,
+      objective: 19,
+      values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: BOP integer production (worker)',
+      ok: true,
+      objective: 19,
+      values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
+    expect.objectContaining({
       name: 'MPSolver: lp_test.py testBopInfeasible',
       ok: true,
       status: 0,

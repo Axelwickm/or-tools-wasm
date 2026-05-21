@@ -400,6 +400,29 @@ function bopBinaryRequest(api: MPSolverApi) {
   };
 }
 
+function bopIntegerRequest(api: MPSolverApi) {
+  return {
+    solverType: api.MPSolver.BOP_INTEGER_PROGRAMMING,
+    model: {
+      name: 'bop_integer_production',
+      maximize: true,
+      variable: [
+        { lowerBound: 0, upperBound: 4, isInteger: true, objectiveCoefficient: 3, name: 'x' },
+        { lowerBound: 0, upperBound: 3, isInteger: true, objectiveCoefficient: 5, name: 'y' },
+      ],
+      constraint: [
+        {
+          lowerBound: Number.NEGATIVE_INFINITY,
+          upperBound: 7,
+          varIndex: [0, 1],
+          coefficient: [1, 2],
+          name: 'capacity',
+        },
+      ],
+    },
+  };
+}
+
 async function runBopBinaryCase(api: MPSolverApi, mode: 'direct' | 'worker'): Promise<MpSolverCaseResult> {
   api.setWorkerBridgeEnabled(mode === 'worker');
   const name = `MPSolver: BOP binary project selection (${mode})`;
@@ -467,6 +490,60 @@ async function runBopBinaryCase(api: MPSolverApi, mode: 'direct' | 'worker'): Pr
         dashboard: dashboard.solution_value(),
         alerts: alerts.solution_value(),
       },
+    };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runBopIntegerCase(api: MPSolverApi, mode: 'direct' | 'worker'): Promise<MpSolverCaseResult> {
+  api.setWorkerBridgeEnabled(mode === 'worker');
+  const name = `MPSolver: BOP integer production (${mode})`;
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.BOP_INTEGER_PROGRAMMING), `${name}: backend not supported`);
+
+  if (mode === 'worker') {
+    const result = await api.MPSolver.solveModelRequest(bopIntegerRequest(api));
+    const response = result.response;
+    assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+    assert(near(Number(response.objectiveValue), 19), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+    const variableValues = response.variableValue as number[];
+    assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+    assert(near(variableValues[0], 3), `${name}: x mismatch`);
+    assert(near(variableValues[1], 2), `${name}: y mismatch`);
+    api.setWorkerBridgeEnabled(false);
+    return {
+      name,
+      ok: true,
+      status: api.MPSolver.OPTIMAL,
+      objective: Number(response.objectiveValue),
+      values: { x: variableValues[0], y: variableValues[1] },
+    };
+  }
+
+  const solver = createSolver(api, 'BOP', name);
+  try {
+    const x = solver.IntVar(0, 4, 'x');
+    const y = solver.IntVar(0, 3, 'y');
+    const capacity = solver.Constraint(-solver.infinity(), 7, 'capacity');
+    capacity.SetCoefficient(x, 1);
+    capacity.SetCoefficient(y, 2);
+    const objective = solver.Objective();
+    objective.SetCoefficient(x, 3);
+    objective.SetCoefficient(y, 5);
+    objective.SetMaximization();
+
+    const status = await solver.Solve();
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+    assert(near(objective.Value(), 19), `${name}: objective mismatch ${objective.Value()}`);
+    assert(near(x.solution_value(), 3), `${name}: x mismatch`);
+    assert(near(y.solution_value(), 2), `${name}: y mismatch`);
+    assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+    return {
+      name,
+      ok: true,
+      status,
+      objective: objective.Value(),
+      values: { x: x.solution_value(), y: y.solution_value() },
     };
   } finally {
     solver.delete();
@@ -1120,6 +1197,8 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     await runCbcMixedIntegerCase(api),
     await runBopBinaryCase(api, 'direct'),
     await runBopBinaryCase(api, 'worker'),
+    await runBopIntegerCase(api, 'direct'),
+    await runBopIntegerCase(api, 'worker'),
     await runKnapsackBackendCase(api, 'direct'),
     await runKnapsackBackendCase(api, 'worker'),
     await runBooleanCppStyleCase(api),
