@@ -1,9 +1,18 @@
+import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import { passedCase } from './shared_case.ts';
+
 export type NetworkFlowCaseResult = {
+  id: string;
   name: string;
+  solver: string;
+  source?: string;
+  upstream?: string;
+  tags?: string[];
+  mode?: FixtureMode;
   ok: boolean;
   status: number;
   objectiveValue: number;
-};
+} & SharedCaseResult;
 
 type SimpleMaxFlowLike = {
   add_arcs_with_capacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>): number[];
@@ -77,7 +86,7 @@ function assertNumber(actual: number, expected: number, message: string) {
   assert(actual === expected, `${message}: expected ${expected}, got ${actual}`);
 }
 
-async function runMaxFlowSample(api: NetworkFlowApi, mode: 'direct' | 'worker'): Promise<NetworkFlowCaseResult> {
+async function runMaxFlowSample(api: NetworkFlowApi, mode: FixtureMode): Promise<{ status: number; objectiveValue: number }> {
   // TEMP: parity - mirrors ortools/graph/samples/simple_max_flow_program.py
   // with the same graph, source, sink, optimal flow, and flow/min-cut checks.
   const startNodes = [0, 0, 0, 1, 1, 2, 2, 3, 3];
@@ -108,10 +117,10 @@ async function runMaxFlowSample(api: NetworkFlowApi, mode: 'direct' | 'worker'):
   const sinkSide = maxFlow.get_sink_side_min_cut();
   assert(sourceSide.includes(0), `SimpleMaxFlow (${mode}) source-side min cut contains source`);
   assert(sinkSide.includes(4), `SimpleMaxFlow (${mode}) sink-side min cut contains sink`);
-  return { name: `simple_max_flow_program.py (${mode})`, ok: true, status, objectiveValue: maxFlow.optimal_flow() };
+  return { status, objectiveValue: maxFlow.optimal_flow() };
 }
 
-async function runMinCostFlowSample(api: NetworkFlowApi, mode: 'direct' | 'worker'): Promise<NetworkFlowCaseResult> {
+async function runMinCostFlowSample(api: NetworkFlowApi, mode: FixtureMode): Promise<{ status: number; objectiveValue: number }> {
   // TEMP: parity - mirrors ortools/graph/samples/simple_min_cost_flow_program.py
   // with the same arcs, supplies, optimal status, cost, and per-arc cost sum.
   const startNodes = [0, 0, 1, 1, 1, 2, 2, 3, 4];
@@ -144,10 +153,10 @@ async function runMinCostFlowSample(api: NetworkFlowApi, mode: 'direct' | 'worke
     assert(flow >= 0 && flow <= capacities[arc], `SimpleMinCostFlow (${mode}) arc ${arc} flow within capacity`);
     assertNumber(minCostFlow.flow(arc), flow, `SimpleMinCostFlow (${mode}) flow accessor ${arc}`);
   }
-  return { name: `simple_min_cost_flow_program.py (${mode})`, ok: true, status, objectiveValue: minCostFlow.optimal_cost() };
+  return { status, objectiveValue: minCostFlow.optimal_cost() };
 }
 
-async function runAssignmentSample(api: NetworkFlowApi, mode: 'direct' | 'worker'): Promise<NetworkFlowCaseResult> {
+async function runAssignmentSample(api: NetworkFlowApi, mode: FixtureMode): Promise<{ status: number; objectiveValue: number }> {
   // TEMP: parity - mirrors ortools/graph/samples/assignment_linear_sum_assignment.py
   // with the same cost matrix, optimal status, assignment, and optimal cost.
   const costs = [
@@ -185,17 +194,50 @@ async function runAssignmentSample(api: NetworkFlowApi, mode: 'direct' | 'worker
     assertNumber(assignment.right_mate(worker), expectedMates[worker], `SimpleLinearSumAssignment (${mode}) right_mate(${worker})`);
     assertNumber(assignment.assignment_cost(worker), expectedCosts[worker], `SimpleLinearSumAssignment (${mode}) assignment_cost(${worker})`);
   }
-  return { name: `assignment_linear_sum_assignment.py (${mode})`, ok: true, status, objectiveValue: assignment.optimal_cost() };
+  return { status, objectiveValue: assignment.optimal_cost() };
 }
+
+type NetworkFlowCase = SharedCase<NetworkFlowApi, { status: number; objectiveValue: number }>;
+
+export const networkFlowCases: NetworkFlowCase[] = [
+  {
+    id: 'network_flow.sample.simple_max_flow_program',
+    name: 'simple_max_flow_program.py',
+    solver: 'network-flow',
+    source: 'ortools/graph/samples/simple_max_flow_program.py',
+    upstream: 'simple_max_flow_program.py',
+    tags: ['python-sample-parity', 'direct', 'worker', 'max-flow'],
+    run: (api, context) => runMaxFlowSample(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'network_flow.sample.simple_min_cost_flow_program',
+    name: 'simple_min_cost_flow_program.py',
+    solver: 'network-flow',
+    source: 'ortools/graph/samples/simple_min_cost_flow_program.py',
+    upstream: 'simple_min_cost_flow_program.py',
+    tags: ['python-sample-parity', 'direct', 'worker', 'min-cost-flow'],
+    run: (api, context) => runMinCostFlowSample(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'network_flow.sample.assignment_linear_sum_assignment',
+    name: 'assignment_linear_sum_assignment.py',
+    solver: 'network-flow',
+    source: 'ortools/graph/samples/assignment_linear_sum_assignment.py',
+    upstream: 'assignment_linear_sum_assignment.py',
+    tags: ['python-sample-parity', 'direct', 'worker', 'assignment'],
+    run: (api, context) => runAssignmentSample(api, context.mode ?? 'direct'),
+  },
+];
 
 export async function runNetworkFlowCases(api: NetworkFlowApi): Promise<NetworkFlowCaseResult[]> {
   await api.initNetworkFlow();
   const results: NetworkFlowCaseResult[] = [];
   for (const mode of ['direct', 'worker'] as const) {
     api.setWorkerBridgeEnabled(mode === 'worker');
-    results.push(await runMaxFlowSample(api, mode));
-    results.push(await runMinCostFlowSample(api, mode));
-    results.push(await runAssignmentSample(api, mode));
+    for (const testCase of networkFlowCases) {
+      const result = await testCase.run(api, { mode });
+      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
+    }
   }
   api.setWorkerBridgeEnabled(false);
   return results;

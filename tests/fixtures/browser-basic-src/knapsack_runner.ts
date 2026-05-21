@@ -1,10 +1,19 @@
+import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import { passedCase } from './shared_case.ts';
+
 export type KnapsackCaseResult = {
+  id: string;
   name: string;
+  solver: string;
+  source?: string;
+  upstream?: string;
+  tags?: string[];
+  mode?: FixtureMode;
   ok: boolean;
   profit: number;
   selectedItems: number[];
   optimal: boolean;
-};
+} & SharedCaseResult;
 
 type KnapsackSolverLike = {
   init(profits: number[], weights: number[][], capacities: number[]): void;
@@ -150,79 +159,119 @@ async function solveKnapsackProblem(
   return genericResult;
 }
 
-async function runKnapsackParityCase(
+async function runKnapsackProblemCase(
   api: KnapsackApi,
-  mode: 'direct' | 'worker',
+  mode: FixtureMode,
   name: string,
   profits: number[],
   weights: number[][],
   capacities: number[],
   expectedProfit: number,
-): Promise<KnapsackCaseResult> {
+): Promise<{ profit: number; selectedItems: number[]; optimal: boolean }> {
   api.setWorkerBridgeEnabled(mode === 'worker');
   const result = await solveKnapsackProblem(api, profits, weights, capacities);
   assert(result.profit === expectedProfit, `${name} (${mode}): expected profit ${expectedProfit}, got ${result.profit}`);
   assert(result.optimal, `${name} (${mode}): expected proven optimal solution`);
   return {
-    name: `${name} (${mode})`,
-    ok: true,
     profit: result.profit,
     selectedItems: result.selectedItems,
     optimal: result.optimal,
   };
 }
 
+type KnapsackCase = SharedCase<KnapsackApi, {
+  profit: number;
+  selectedItems: number[];
+  optimal: boolean;
+}>;
+
+export const knapsackCases: KnapsackCase[] = [
+  {
+    id: 'knapsack.pywrap_algorithms.test_solve_one_dimension',
+    name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension',
+    solver: 'knapsack',
+    source: 'ortools/algorithms/python/knapsack_solver_test.py',
+    upstream: 'testSolveOneDimension',
+    tags: ['python-parity', 'direct', 'worker'],
+    // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
+    // testSolveOneDimension, including reduction/no-reduction comparisons
+    // across the same applicable one-dimensional solver variants.
+    async run(api, context) {
+      return runKnapsackProblemCase(
+        api,
+        context.mode ?? 'direct',
+        'PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension',
+        [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        [[1, 2, 3, 4, 5, 6, 7, 8, 9]],
+        [34],
+        34,
+      );
+    },
+  },
+  {
+    id: 'knapsack.pywrap_algorithms.test_solve_two_dimensions',
+    name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveTwoDimensions',
+    solver: 'knapsack',
+    source: 'ortools/algorithms/python/knapsack_solver_test.py',
+    upstream: 'testSolveTwoDimensions',
+    tags: ['python-parity', 'direct', 'worker'],
+    // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
+    // testSolveTwoDimensions. Upstream returns after the generic solver for
+    // multi-dimensional cases, so this does the same.
+    async run(api, context) {
+      return runKnapsackProblemCase(
+        api,
+        context.mode ?? 'direct',
+        'PyWrapAlgorithmsKnapsackSolverTest.testSolveTwoDimensions',
+        [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        [[1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 1, 1, 1, 1, 1, 1, 1, 1]],
+        [34, 4],
+        30,
+      );
+    },
+  },
+  {
+    id: 'knapsack.pywrap_algorithms.test_solve_big_one_dimension',
+    name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension',
+    solver: 'knapsack',
+    source: 'ortools/algorithms/python/knapsack_solver_test.py',
+    upstream: 'testSolveBigOneDimension',
+    tags: ['python-parity', 'direct', 'worker'],
+    // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
+    // testSolveBigOneDimension with the same data and expected profit.
+    async run(api, context) {
+      return runKnapsackProblemCase(
+        api,
+        context.mode ?? 'direct',
+        'PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension',
+        [
+          360, 83, 59, 130, 431, 67, 230, 52, 93, 125, 670, 892, 600,
+          38, 48, 147, 78, 256, 63, 17, 120, 164, 432, 35, 92, 110,
+          22, 42, 50, 323, 514, 28, 87, 73, 78, 15, 26, 78, 210,
+          36, 85, 189, 274, 43, 33, 10, 19, 389, 276, 312,
+        ],
+        [[
+          7, 0, 30, 22, 80, 94, 11, 81, 70, 64, 59, 18, 0, 36,
+          3, 8, 15, 42, 9, 0, 42, 47, 52, 32, 26, 48, 55, 6,
+          29, 84, 2, 4, 18, 56, 7, 29, 93, 44, 71, 3, 86, 66,
+          31, 65, 0, 79, 20, 65, 52, 13,
+        ]],
+        [850],
+        7534,
+      );
+    },
+  },
+];
+
 export async function runKnapsackCases(api: KnapsackApi): Promise<KnapsackCaseResult[]> {
   await api.initKnapsack();
   const results: KnapsackCaseResult[] = [];
   for (const mode of ['direct', 'worker'] as const) {
-    // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
-    // testSolveOneDimension, including reduction/no-reduction comparisons
-    // across the same applicable one-dimensional solver variants.
-    results.push(await runKnapsackParityCase(
-      api,
-      mode,
-      'PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension',
-      [1, 2, 3, 4, 5, 6, 7, 8, 9],
-      [[1, 2, 3, 4, 5, 6, 7, 8, 9]],
-      [34],
-      34,
-    ));
-
-    // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
-    // testSolveTwoDimensions. Upstream returns after the generic solver for
-    // multi-dimensional cases, so this does the same.
-    results.push(await runKnapsackParityCase(
-      api,
-      mode,
-      'PyWrapAlgorithmsKnapsackSolverTest.testSolveTwoDimensions',
-      [1, 2, 3, 4, 5, 6, 7, 8, 9],
-      [[1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 1, 1, 1, 1, 1, 1, 1, 1]],
-      [34, 4],
-      30,
-    ));
-
-    // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
-    // testSolveBigOneDimension with the same data and expected profit.
-    results.push(await runKnapsackParityCase(
-      api,
-      mode,
-      'PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension',
-      [
-        360, 83, 59, 130, 431, 67, 230, 52, 93, 125, 670, 892, 600,
-        38, 48, 147, 78, 256, 63, 17, 120, 164, 432, 35, 92, 110,
-        22, 42, 50, 323, 514, 28, 87, 73, 78, 15, 26, 78, 210,
-        36, 85, 189, 274, 43, 33, 10, 19, 389, 276, 312,
-      ],
-      [[
-        7, 0, 30, 22, 80, 94, 11, 81, 70, 64, 59, 18, 0, 36,
-        3, 8, 15, 42, 9, 0, 42, 47, 52, 32, 26, 48, 55, 6,
-        29, 84, 2, 4, 18, 56, 7, 29, 93, 44, 71, 3, 86, 66,
-        31, 65, 0, 79, 20, 65, 52, 13,
-      ]],
-      [850],
-      7534,
-    ));
+    api.setWorkerBridgeEnabled(mode === 'worker');
+    for (const testCase of knapsackCases) {
+      const result = await testCase.run(api, { mode });
+      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
+    }
   }
   api.setWorkerBridgeEnabled(false);
   return results;

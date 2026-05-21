@@ -1,3 +1,6 @@
+import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import { passedCase } from './shared_case.ts';
+
 type PdlpApi = {
   initPdlp(): Promise<void>;
   Pdlp: {
@@ -54,10 +57,15 @@ type PdlpResultLike = {
 };
 
 export type PdlpCaseResult = {
+  id: string;
   name: string;
-  mode: 'direct' | 'worker';
+  solver: string;
+  source?: string;
+  upstream?: string;
+  tags?: string[];
+  mode?: FixtureMode;
   ok: boolean;
-};
+} & SharedCaseResult;
 
 type MPVariableProto = {
   lowerBound?: number;
@@ -481,12 +489,14 @@ function assertProtoQp(proto: Record<string, unknown>): void {
   assert((quadraticObjective.coefficient as number[]).join(',') === '2', 'small_proto_qp: coefficient');
 }
 
-type PdlpCase = {
+type RawPdlpCase = {
   name: string;
   run(api: PdlpApi): Promise<void>;
 };
 
-const pdlpCases: PdlpCase[] = [
+type PdlpCase = SharedCase<PdlpApi, Record<string, never>>;
+
+const pdlpCaseDefinitions: RawPdlpCase[] = [
   {
     name: 'QuadraticProgramTest.test_validate_quadratic_program_dimensions_for_empty_qp',
     async run(api) {
@@ -609,14 +619,38 @@ const pdlpCases: PdlpCase[] = [
   },
 ];
 
+function pdlpCaseId(name: string): string {
+  return `pdlp.${name
+    .replaceAll('.', '_')
+    .replaceAll('/', '_')
+    .replaceAll(/[^a-zA-Z0-9_]+/g, '_')
+    .replaceAll(/^_+|_+$/g, '')
+    .toLowerCase()}`;
+}
+
+const pdlpCases: PdlpCase[] = pdlpCaseDefinitions.map((testCase) => ({
+  id: pdlpCaseId(testCase.name),
+  name: testCase.name,
+  solver: 'pdlp',
+  source: testCase.name.startsWith('QuadraticProgramTest.')
+    ? 'ortools/pdlp/python/quadratic_program_test.py'
+    : 'ortools/pdlp/python/primal_dual_hybrid_gradient_test.py',
+  upstream: testCase.name,
+  tags: ['python-parity', 'direct', 'worker'],
+  async run(api) {
+    await testCase.run(api);
+    return {};
+  },
+}));
+
 export async function runPdlpCases(api: PdlpApi): Promise<PdlpCaseResult[]> {
   await api.initPdlp();
   const results: PdlpCaseResult[] = [];
   for (const mode of ['direct', 'worker'] as const) {
     api.setWorkerBridgeEnabled(mode === 'worker');
     for (const testCase of pdlpCases) {
-      await testCase.run(api);
-      results.push({ name: testCase.name, mode, ok: true });
+      const result = await testCase.run(api, { mode });
+      results.push(passedCase(testCase, { mode }, result));
     }
   }
   api.setWorkerBridgeEnabled(false);

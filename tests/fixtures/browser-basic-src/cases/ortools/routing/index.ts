@@ -8,4 +8,14 @@ export const routingContractCases = [
   ...transitContractCases,
   ...dimensionDisjunctionContractCases,
   ...searchDimensionMiscContractCases,
-];
+].map((testCase) => ({
+  ...testCase,
+  id: `routing.${testCase.name
+    .replaceAll('.', '_')
+    .replaceAll(/[^a-zA-Z0-9_]+/g, '_')
+    .replaceAll(/^_+|_+$/g, '')
+    .toLowerCase()}`,
+  solver: 'routing',
+  upstream: testCase.name,
+  tags: ['python-parity', 'direct'],
+}));

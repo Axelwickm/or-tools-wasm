@@ -3,7 +3,12 @@ import { runMathOptModelContractCases } from './mathopt_model_contract.ts';
 import { mathoptSolveResultContractCases } from './mathopt_solve_result_contract.ts';
 
 export type MathOptCaseResult = {
+  id?: string;
   name: string;
+  solver?: string;
+  source?: string;
+  upstream?: string;
+  tags?: string[];
   mode: 'direct' | 'worker';
   threads: number;
   ok: boolean;
@@ -328,6 +333,33 @@ function assertOptimal(name: string, result: { terminationReason: string }) {
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: expected OPTIMAL, got ${result.terminationReason}`);
 }
 
+function mathOptCaseId(name: string) {
+  return `mathopt.${name
+    .replace(/^MathOpt\./, '')
+    .replaceAll('/', '.')
+    .replaceAll(/[^a-zA-Z0-9_.]+/g, '_')
+    .toLowerCase()}`;
+}
+
+function withMathOptMetadata(
+  result: MathOptCaseResult,
+  metadata: {
+    id?: string;
+    source?: string;
+    upstream?: string;
+    tags?: string[];
+  } = {},
+): MathOptCaseResult {
+  return {
+    id: metadata.id ?? mathOptCaseId(result.name),
+    solver: 'mathopt',
+    source: metadata.source,
+    upstream: metadata.upstream ?? result.name,
+    tags: metadata.tags ?? ['contract', result.mode, `${result.threads}-threads`],
+    ...result,
+  };
+}
+
 const activeSolveResultContractNames = new Set([
   'SolveTest/test_solve_error',
   'SolveTest/test_lp_solve',
@@ -366,7 +398,7 @@ async function runGlopLp(api: MathOptApi, mode: 'direct' | 'worker', threads: nu
   assert(near(result.objectiveValue, 56), `MathOpt GLOP LP: expected objective 56, got ${result.objectiveValue}`);
   assert(near(result.variableValues.x, 0), `MathOpt GLOP LP: expected x=0, got ${result.variableValues.x}`);
   assert(near(result.variableValues.y, 14), `MathOpt GLOP LP: expected y=14, got ${result.variableValues.y}`);
-  return {
+  return withMathOptMetadata({
     name: 'MathOpt.testGlopLinearProgram',
     mode,
     threads,
@@ -374,7 +406,10 @@ async function runGlopLp(api: MathOptApi, mode: 'direct' | 'worker', threads: nu
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
     values: result.variableValues,
-  };
+  }, {
+    id: 'mathopt.backend.glop_linear_program',
+    tags: ['backend', 'glop', mode, `${threads}-threads`],
+  });
 }
 
 async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {
@@ -404,7 +439,7 @@ async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
   assert(near(result.objectiveValue, 8), `MathOpt CP-SAT MIP: expected objective 8, got ${result.objectiveValue}`);
   assert(near(result.variableValues.x, 0), `MathOpt CP-SAT MIP: expected x=0, got ${result.variableValues.x}`);
   assert(near(result.variableValues.y, 4), `MathOpt CP-SAT MIP: expected y=4, got ${result.variableValues.y}`);
-  return {
+  return withMathOptMetadata({
     name: 'MathOpt.testCpSatIntegerProgram',
     mode,
     threads,
@@ -412,7 +447,10 @@ async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
     values: result.variableValues,
-  };
+  }, {
+    id: 'mathopt.backend.cp_sat_integer_program',
+    tags: ['backend', 'cp-sat', mode, `${threads}-threads`],
+  });
 }
 
 async function runGScipMip(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {
@@ -442,7 +480,7 @@ async function runGScipMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
   assert(near(result.objectiveValue, 8), `MathOpt GSCIP MIP: expected objective 8, got ${result.objectiveValue}`);
   assert(near(result.variableValues.x, 0), `MathOpt GSCIP MIP: expected x=0, got ${result.variableValues.x}`);
   assert(near(result.variableValues.y, 4), `MathOpt GSCIP MIP: expected y=4, got ${result.variableValues.y}`);
-  return {
+  return withMathOptMetadata({
     name: 'MathOpt.testGScipIntegerProgram',
     mode,
     threads,
@@ -450,7 +488,10 @@ async function runGScipMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
     values: result.variableValues,
-  };
+  }, {
+    id: 'mathopt.backend.gscip_integer_program',
+    tags: ['backend', 'gscip', mode, `${threads}-threads`],
+  });
 }
 
 async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<MathOptCaseResult> {
@@ -495,7 +536,7 @@ async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<Ma
   }
   assert(rejectedThreads, 'MathOpt GLPK LP: expected threads > 1 to be rejected');
 
-  return {
+  return withMathOptMetadata({
     name: 'MathOpt.testGlpkLinearProgram',
     mode,
     threads: 1,
@@ -503,7 +544,10 @@ async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<Ma
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
     values: result.variableValues,
-  };
+  }, {
+    id: 'mathopt.backend.glpk_linear_program',
+    tags: ['backend', 'glpk', mode, '1-threads'],
+  });
 }
 
 export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
@@ -526,7 +570,7 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
       for (const testCase of mathOptExpressionContractCases) {
         options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
         const output = await testCase.run(api);
-        results.push({
+        results.push(withMathOptMetadata({
           name: `MathOpt.${testCase.name}`,
           mode,
           threads,
@@ -534,15 +578,25 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
           terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
           objectiveValue: null,
           values: {},
-        });
+        }, {
+          source: 'ortools/math_opt/python',
+          upstream: testCase.name,
+          tags: ['python-parity', 'expression', mode, `${threads}-threads`],
+        }));
       }
       options.onProgress?.('MathOpt.modelContract', mode, threads);
-      results.push(...await runMathOptModelContractCases(api, mode, threads));
+      results.push(...(await runMathOptModelContractCases(api, mode, threads)).map((result) =>
+        withMathOptMetadata(result, {
+          source: 'ortools/math_opt/python',
+          upstream: result.name.replace(/^MathOpt\./, ''),
+          tags: ['python-parity', 'model', mode, `${threads}-threads`],
+        })
+      ));
       for (const testCase of mathoptSolveResultContractCases) {
         if (!activeSolveResultContractNames.has(testCase.name)) continue;
         options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
         const output = await testCase.run(api);
-        results.push({
+        results.push(withMathOptMetadata({
           name: `MathOpt.${testCase.name}`,
           mode,
           threads,
@@ -550,7 +604,11 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
           terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
           objectiveValue: null,
           values: {},
-        });
+        }, {
+          source: 'ortools/math_opt/python',
+          upstream: testCase.name,
+          tags: ['python-parity', 'solve-result', mode, `${threads}-threads`],
+        }));
       }
     }
   }

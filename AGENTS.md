@@ -26,6 +26,8 @@ Python parity tests should be converted assertion-by-assertion from the upstream
 
 Fixture location is not the API contract. Node may be the first runner used while iterating, but parity cases should live under shared fixture case modules and target the public package API. Add runner-specific glue only to pass the public API objects into those shared cases, so the same cases can later be executed by browser, webpack, Vite, Deno, Bun, or other fixture suites.
 
+Shared fixture cases should carry stable IDs, upstream references, tags, and runtime context separately from assertion logic. Keep solver cases as isolated `run(api, context)` definitions where practical; adapters may batch initialization for performance, but should report individual case IDs when the host test runner supports subtests or steps.
+
 Be conservative with audit status:
 
 - Mark ✅ only when the implemented test matches upstream functionality and assertions.

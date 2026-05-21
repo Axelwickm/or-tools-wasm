@@ -56,17 +56,39 @@ import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
-Deno.test('runs the shared CP-SAT cases in Deno', async () => {
+type NamedCaseResult = {
+  id?: string;
+  name?: string;
+  ok?: boolean;
+};
+
+function caseLabel(result: NamedCaseResult) {
+  return result.id ?? result.name ?? '<unnamed case>';
+}
+
+async function assertCaseSteps(t: Deno.TestContext, runtime: string, results: NamedCaseResult[]) {
+  for (const result of results) {
+    await t.step(`${runtime}: ${caseLabel(result)}`, () => {
+      if (result.ok !== true) {
+        throw new Error(`${runtime} case failed: ${JSON.stringify(result)}`);
+      }
+    });
+  }
+}
+
+Deno.test('runs the shared CP-SAT cases in Deno', async (t) => {
   if (isWorkerBridgeEnabled()) {
     throw new Error('Deno should use the direct runtime by default');
   }
-  await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
+  const highLevelResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
+  await assertCaseSteps(t, 'deno high-level CP-SAT', highLevelResults);
 
   const results = await runCpSatCases(CpSat as never);
   for (const result of results) {
     if (result.cases.length !== cpSatCases.length) {
       throw new Error(`${result.mode} ran ${result.cases.length} cases, expected ${cpSatCases.length}`);
     }
+    await assertCaseSteps(t, `deno CP-SAT ${result.mode}/${result.workerProfile}`, result.cases);
   }
 
   const routingResults = await runRoutingCases({
@@ -82,9 +104,7 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
   });
-  if (!routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.testRoutingSearchParameters' && result.ok)) {
-    throw new Error(`deno routing case failed: ${JSON.stringify(routingResults)}`);
-  }
+  await assertCaseSteps(t, 'deno routing', routingResults);
 
   const mpSolverResults = await runMPSolverCases({
     initMPSolver,
@@ -93,9 +113,7 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
     setWorkerBridgeEnabled,
     isWorkerBridgeEnabled,
   });
-  if (!mpSolverResults.every((result) => result.ok)) {
-    throw new Error(`deno MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
-  }
+  await assertCaseSteps(t, 'deno MPSolver', mpSolverResults);
 
   const knapsackResults = await runKnapsackCases({
     initKnapsack,
@@ -103,9 +121,7 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
     KnapsackSolverType,
     setWorkerBridgeEnabled,
   });
-  if (!knapsackResults.every((result) => result.ok)) {
-    throw new Error(`deno Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
-  }
+  await assertCaseSteps(t, 'deno Knapsack', knapsackResults);
 
   const networkFlowResults = await runNetworkFlowCases({
     initNetworkFlow,
@@ -114,31 +130,21 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
     SimpleLinearSumAssignment,
     setWorkerBridgeEnabled,
   });
-  if (!networkFlowResults.every((result) => result.ok)) {
-    throw new Error(`deno Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
-  }
+  await assertCaseSteps(t, 'deno Network Flow', networkFlowResults);
 
   const setCoverResults = await runSetCoverCases(SetCoverApi as never);
-  if (!setCoverResults.every((result) => result.ok)) {
-    throw new Error(`deno Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
-  }
+  await assertCaseSteps(t, 'deno Set Cover', setCoverResults);
 
   const rcpspResults = await runRcpspCases(RcpspApi as never);
-  if (!rcpspResults.every((result) => result.ok)) {
-    throw new Error(`deno RCPSP case failed: ${JSON.stringify(rcpspResults)}`);
-  }
+  await assertCaseSteps(t, 'deno RCPSP', rcpspResults);
 
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
-  if (!mathOptResults.every((result) => result.ok)) {
-    throw new Error(`deno MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
-  }
+  await assertCaseSteps(t, 'deno MathOpt', mathOptResults);
 
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
     setWorkerBridgeEnabled,
   });
-  if (!pdlpResults.every((result) => result.ok)) {
-    throw new Error(`deno PDLP case failed: ${JSON.stringify(pdlpResults)}`);
-  }
+  await assertCaseSteps(t, 'deno PDLP', pdlpResults);
 });

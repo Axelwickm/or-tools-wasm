@@ -1,5 +1,10 @@
 export type MpSolverCaseResult = {
+  id?: string;
   name: string;
+  solver?: string;
+  source?: string;
+  upstream?: string;
+  tags?: string[];
   ok: boolean;
   skipped?: boolean;
   reason?: string;
@@ -7,6 +12,26 @@ export type MpSolverCaseResult = {
   objective: number;
   values: Record<string, number>;
 };
+
+function mpSolverCaseId(name: string): string {
+  return `mp_solver.${name
+    .replace(/^MPSolver:\s*/, '')
+    .replaceAll(/[().:,/-]+/g, '_')
+    .replaceAll(/\s+/g, '_')
+    .replaceAll(/^_+|_+$/g, '')
+    .toLowerCase()}`;
+}
+
+function decorateMpSolverResult(result: MpSolverCaseResult): MpSolverCaseResult {
+  return {
+    id: result.id ?? mpSolverCaseId(result.name),
+    solver: result.solver ?? 'mp-solver',
+    source: result.source,
+    upstream: result.upstream ?? result.name.replace(/^MPSolver:\s*/, ''),
+    tags: result.tags ?? ['python-parity'],
+    ...result,
+  };
+}
 
 type MPVariableLike = {
   Lb(): number;
@@ -197,7 +222,7 @@ function near(actual: number, expected: number, tolerance = 1e-7) {
 }
 
 function lpBackends(api: MPSolverApi): LpBackend[] {
-  return [
+  const results: LpBackend[] = [
     {
       solverId: 'GLOP',
       problemType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
@@ -217,6 +242,7 @@ function lpBackends(api: MPSolverApi): LpBackend[] {
       x3ReducedCost: -2.666666666666667,
     },
   ];
+  return results;
 }
 
 function createSolver(api: MPSolverApi, solverId: string, name: string): MPSolverLike {
@@ -1176,7 +1202,7 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     linearCppStyleResults.push(await runLinearCppStyleCase(api, backend));
     solveFromProtoResults.push(await runLpTestSolveFromProtoCase(api, backend));
   }
-  return [
+  const results = [
     await runStatefulProtoSolveCase(api),
     ...protoResults,
     ...externalApiResults,
@@ -1262,4 +1288,5 @@ export async function runMPSolverContractCases(api: MPSolverApi): Promise<MpSolv
     ),
     ...(await runCbcWorkerBridgeMatrix(api)),
   ];
+  return results.map(decorateMpSolverResult);
 }

@@ -61,8 +61,26 @@ import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
+type NamedCaseResult = {
+  id?: string;
+  name?: string;
+  ok?: boolean;
+};
+
+function caseLabel(result: NamedCaseResult) {
+  return result.id ?? result.name ?? '<unnamed case>';
+}
+
+function assertAllCases(runtime: string, results: NamedCaseResult[]) {
+  const failed = results.find((result) => result.ok !== true);
+  if (failed) {
+    throw new Error(`${runtime} case failed: ${caseLabel(failed)} ${JSON.stringify(failed)}`);
+  }
+}
+
 async function run(): Promise<string> {
 const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
+assertAllCases('bun high-level CP-SAT', highLevelCpSatResults);
 
 const results = await runCpSatCases(CpSat as never);
 
@@ -71,11 +89,7 @@ for (const result of results) {
     throw new Error(`bun ${result.workerProfile} ran ${result.cases.length} cases, expected ${cpSatCases.length}`);
   }
 
-  for (const testCase of result.cases) {
-    if (!testCase.ok) {
-      throw new Error(`bun ${result.workerProfile} case failed: ${testCase.name}`);
-    }
-  }
+  assertAllCases(`bun CP-SAT ${result.mode}/${result.workerProfile}`, result.cases);
 }
 
 const routingResults = await runRoutingCases({
@@ -91,9 +105,7 @@ const routingResults = await runRoutingCases({
   RoutingIndexManager: RoutingIndexManager as never,
   RoutingModel: RoutingModel as never,
 });
-if (!routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.testRoutingSearchParameters' && result.ok)) {
-  throw new Error(`bun routing case failed: ${JSON.stringify(routingResults)}`);
-}
+assertAllCases('bun routing', routingResults);
 
 const mpSolverResults = await runMPSolverCases({
   initMPSolver,
@@ -102,9 +114,7 @@ const mpSolverResults = await runMPSolverCases({
   setWorkerBridgeEnabled,
   isWorkerBridgeEnabled,
 });
-if (!mpSolverResults.every((result) => result.ok)) {
-  throw new Error(`bun MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
-}
+assertAllCases('bun MPSolver', mpSolverResults);
 
 const knapsackResults = await runKnapsackCases({
   initKnapsack,
@@ -112,9 +122,7 @@ const knapsackResults = await runKnapsackCases({
   KnapsackSolverType,
   setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
 });
-if (!knapsackResults.every((result) => result.ok)) {
-  throw new Error(`bun Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
-}
+assertAllCases('bun Knapsack', knapsackResults);
 
 const networkFlowResults = await runNetworkFlowCases({
   initNetworkFlow,
@@ -123,33 +131,23 @@ const networkFlowResults = await runNetworkFlowCases({
   SimpleLinearSumAssignment,
   setWorkerBridgeEnabled: setNetworkFlowWorkerBridgeEnabled,
 });
-if (!networkFlowResults.every((result) => result.ok)) {
-  throw new Error(`bun Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
-}
+assertAllCases('bun Network Flow', networkFlowResults);
 
 const setCoverResults = await runSetCoverCases(SetCoverApi as never);
-if (!setCoverResults.every((result) => result.ok)) {
-  throw new Error(`bun Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
-}
+assertAllCases('bun Set Cover', setCoverResults);
 
 const rcpspResults = await runRcpspCases(RcpspApi as never);
-if (!rcpspResults.every((result) => result.ok)) {
-  throw new Error(`bun RCPSP case failed: ${JSON.stringify(rcpspResults)}`);
-}
+assertAllCases('bun RCPSP', rcpspResults);
 
 const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
-if (!mathOptResults.every((result) => result.ok)) {
-  throw new Error(`bun MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
-}
+assertAllCases('bun MathOpt', mathOptResults);
 
 const pdlpResults = await runPdlpCases({
   initPdlp,
   Pdlp,
   setWorkerBridgeEnabled: setPdlpWorkerBridgeEnabled,
 });
-if (!pdlpResults.every((result) => result.ok)) {
-  throw new Error(`bun PDLP case failed: ${JSON.stringify(pdlpResults)}`);
-}
+assertAllCases('bun PDLP', pdlpResults);
 
 return `bun ran ${cpSatCases.length} CP-SAT cases, ${highLevelCpSatResults.length} high-level CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${knapsackResults.length} Knapsack cases, ${networkFlowResults.length} Network Flow cases, ${setCoverResults.length} Set Cover cases, ${rcpspResults.length} RCPSP cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`;
 }

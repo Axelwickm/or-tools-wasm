@@ -58,7 +58,7 @@ import {
   RoutingModel,
 } from 'or-tools-wasm/routing';
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
@@ -70,22 +70,39 @@ import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
-test('runs the shared high-level CP-SAT Python parity cases in Node', async () => {
-  await runCpSatHighLevelParityCasesForPackage(CpSatApi);
+type NamedCaseResult = {
+  id?: string;
+  name?: string;
+  ok?: boolean;
+};
+
+function caseLabel(result: NamedCaseResult) {
+  return result.id ?? result.name ?? '<unnamed case>';
+}
+
+async function assertCaseResults(t: TestContext, runtime: string, results: NamedCaseResult[]) {
+  for (const result of results) {
+    await t.test(`${runtime}: ${caseLabel(result)}`, () => {
+      assert.equal(result.ok, true, `${runtime} case failed: ${JSON.stringify(result)}`);
+    });
+  }
+}
+
+test('runs the shared high-level CP-SAT Python parity cases in Node', async (t) => {
+  const results = await runCpSatHighLevelParityCasesForPackage(CpSatApi);
+  await assertCaseResults(t, 'node high-level CP-SAT', results);
 });
 
-test('runs the shared proto CP-SAT cases in Node', async () => {
+test('runs the shared proto CP-SAT cases in Node', async (t) => {
   const results = await runCpSatCases(CpSat);
 
   for (const result of results) {
     assert.equal(result.cases.length, cpSatCases.length, `node ${result.workerProfile} case count`);
-    for (const testCase of result.cases) {
-      assert.equal(testCase.ok, true, `node ${result.workerProfile} case ${testCase.name}`);
-    }
+    await assertCaseResults(t, `node CP-SAT ${result.mode}/${result.workerProfile}`, result.cases);
   }
 });
 
-test('runs the shared Routing cases in Node', async () => {
+test('runs the shared Routing cases in Node', async (t) => {
   const routingResults = await runRoutingCases({
     BOOL_FALSE,
     BOOL_UNSPECIFIED,
@@ -99,14 +116,10 @@ test('runs the shared Routing cases in Node', async () => {
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
   });
-  assert.equal(
-    routingResults.some((result) => result.name === 'TestPyWrapRoutingModel.testRoutingSearchParameters' && result.ok),
-    true,
-    `node routing case failed: ${JSON.stringify(routingResults)}`,
-  );
+  await assertCaseResults(t, 'node routing', routingResults);
 });
 
-test('runs the shared MPSolver cases in Node', async () => {
+test('runs the shared MPSolver cases in Node', async (t) => {
   const mpSolverResults = await runMPSolverCases({
     initMPSolver,
     MPSolver,
@@ -114,20 +127,20 @@ test('runs the shared MPSolver cases in Node', async () => {
     setWorkerBridgeEnabled,
     isWorkerBridgeEnabled,
   });
-  assert.equal(mpSolverResults.every((result) => result.ok), true, `node MPSolver case failed: ${JSON.stringify(mpSolverResults)}`);
+  await assertCaseResults(t, 'node MPSolver', mpSolverResults);
 });
 
-test('runs the shared Knapsack cases in Node', async () => {
+test('runs the shared Knapsack cases in Node', async (t) => {
   const knapsackResults = await runKnapsackCases({
     initKnapsack,
     KnapsackSolver,
     KnapsackSolverType,
     setWorkerBridgeEnabled,
   });
-  assert.equal(knapsackResults.every((result) => result.ok), true, `node Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
+  await assertCaseResults(t, 'node Knapsack', knapsackResults);
 });
 
-test('runs the shared Network Flow cases in Node', async () => {
+test('runs the shared Network Flow cases in Node', async (t) => {
   const networkFlowResults = await runNetworkFlowCases({
     initNetworkFlow,
     SimpleMaxFlow,
@@ -135,10 +148,10 @@ test('runs the shared Network Flow cases in Node', async () => {
     SimpleLinearSumAssignment,
     setWorkerBridgeEnabled,
   });
-  assert.equal(networkFlowResults.every((result) => result.ok), true, `node Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
+  await assertCaseResults(t, 'node Network Flow', networkFlowResults);
 });
 
-test('runs the shared Set Cover cases in Node', async () => {
+test('runs the shared Set Cover cases in Node', async (t) => {
   const setCoverResults = await runSetCoverCases({
     initSetCover,
     SetCoverModel,
@@ -152,24 +165,24 @@ test('runs the shared Set Cover cases in Node', async () => {
     consistency_level,
     setWorkerBridgeEnabled: setSetCoverWorkerBridgeEnabled,
   });
-  assert.equal(setCoverResults.every((result) => result.ok), true, `node Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
+  await assertCaseResults(t, 'node Set Cover', setCoverResults);
 });
 
-test('runs the shared RCPSP cases in Node', async () => {
+test('runs the shared RCPSP cases in Node', async (t) => {
   const rcpspResults = await runRcpspCases(RcpspApi as never);
-  assert.equal(rcpspResults.every((result) => result.ok), true, `node RCPSP case failed: ${JSON.stringify(rcpspResults)}`);
+  await assertCaseResults(t, 'node RCPSP', rcpspResults);
 });
 
-test('runs the shared MathOpt cases in Node', async () => {
+test('runs the shared MathOpt cases in Node', async (t) => {
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
-  assert.equal(mathOptResults.every((result) => result.ok), true, `node MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
+  await assertCaseResults(t, 'node MathOpt', mathOptResults);
 });
 
-test('runs the shared PDLP cases in Node', async () => {
+test('runs the shared PDLP cases in Node', async (t) => {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
     setWorkerBridgeEnabled,
   });
-  assert.equal(pdlpResults.every((result) => result.ok), true, `node PDLP case failed: ${JSON.stringify(pdlpResults)}`);
+  await assertCaseResults(t, 'node PDLP', pdlpResults);
 });

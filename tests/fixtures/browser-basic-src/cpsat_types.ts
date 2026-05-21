@@ -1,3 +1,5 @@
+import type { SharedCaseMetadata } from './shared_case.ts';
+
 export type ProtoInt64 = number | string | { low: number; high: number; unsigned?: boolean };
 
 export type CpModelProto = Record<string, unknown>;
@@ -35,7 +37,7 @@ export type CpSatLike = {
 
 export type CpSatSolveParams = Record<string, unknown>;
 
-export type CpSatCase = {
+export type CpSatCase = Partial<SharedCaseMetadata> & {
   name: string;
   source: string;
   model: CpModelProto;

@@ -14,6 +14,8 @@ Legend and classification guide:
 
 Decision rule: this is a contract relevance pass, not a promise that every Python test should be ported line-for-line. When a test mixes solver behavior with Python-only syntax, it is marked by the part that determines whether a useful TS/WASM parity test should exist.
 
+Shared fixture case IDs are the stable link between this audit and the runtime suites. Current ID prefixes are `cp_sat.*`, `cp_sat_high_level.*`, `routing.*`, `mp_solver.*`, `knapsack.*`, `network_flow.*`, `set_cover.*`, `rcpsp.*`, `mathopt.*`, and `pdlp.*`. Runtime context such as direct vs worker bridge and thread count is reported separately from the case ID.
+
 ## ortools/sat/python/cp_model_helper_test.py
 - CpModelHelperTest
   - ✅ 🔎 CpModelHelperTest.test_simple_solve

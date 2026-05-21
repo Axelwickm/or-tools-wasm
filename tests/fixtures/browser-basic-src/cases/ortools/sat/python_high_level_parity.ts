@@ -1,3 +1,5 @@
+import type { SharedCaseMetadata } from '../../../shared_case.ts';
+
 type HighLevelApi = {
   CpModel: new () => any;
   CpSolver: new () => any;
@@ -312,7 +314,14 @@ export type CpSatHighLevelParityCase = {
   name: string;
   source: 'ortools/sat/python/cp_model_test.py';
   run(api: HighLevelApi): Promise<void> | void;
-};
+} & Partial<SharedCaseMetadata>;
+
+function cpSatHighLevelCaseId(name: string) {
+  return `cp_sat_high_level.${name
+    .replaceAll('.', '.')
+    .replaceAll(/[^a-zA-Z0-9_.]+/g, '_')
+    .toLowerCase()}`;
+}
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
   if (actual !== expected) {
@@ -3286,8 +3295,12 @@ export async function runCpSatHighLevelParityCases(api: HighLevelApi) {
   for (const testCase of cpSatHighLevelParityCases) {
     await testCase.run(api);
     results.push({
+      id: testCase.id ?? cpSatHighLevelCaseId(testCase.name),
       name: testCase.name,
+      solver: testCase.solver ?? 'cp-sat',
       source: testCase.source,
+      upstream: testCase.upstream ?? testCase.name,
+      tags: testCase.tags ?? ['python-parity', 'high-level'],
       ok: true,
     });
   }

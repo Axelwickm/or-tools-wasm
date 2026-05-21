@@ -1,7 +1,12 @@
 import { routingContractCases } from './cases/ortools/routing/index.ts';
 
 export type RoutingCaseResult = {
+  id: string;
   name: string;
+  solver: string;
+  source?: string;
+  upstream?: string;
+  tags?: string[];
   ok: boolean;
   objective: number;
   route: number[];
@@ -121,7 +126,12 @@ export async function runRoutingCases(routingApi: RoutingApi): Promise<RoutingCa
     assert(!message.startsWith('TODO:'), message);
     assert(message.endsWith('PASS'), `${routingCase.name} failed: ${message}`);
     results.push({
+      id: routingCase.id,
       name: routingCase.name,
+      solver: routingCase.solver,
+      source: routingCase.source,
+      upstream: routingCase.upstream,
+      tags: routingCase.tags,
       ok: true,
       objective: 0,
       route: [],

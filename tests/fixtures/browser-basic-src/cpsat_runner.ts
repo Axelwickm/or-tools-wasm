@@ -41,8 +41,12 @@ export async function runCpSatCases(CpSat: CpSatLike, options: RunOptions = {}) 
       for (const testCase of cpSatCases) {
         const solverStatus = await testCase.run(CpSat, profile.params);
         cases.push({
+          id: testCase.id,
           name: testCase.name,
+          solver: testCase.solver,
           source: testCase.source,
+          upstream: testCase.upstream,
+          tags: testCase.tags,
           ok: true,
           solverStatus,
         });

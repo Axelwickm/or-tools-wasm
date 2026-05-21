@@ -1,6 +1,12 @@
+import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import { passedCase } from './shared_case.ts';
+
 export type SetCoverCaseResult = {
-  name: string;
-  ok: boolean;
+  cost: number;
+  numUncoveredElements: number;
+} & SharedCaseResult;
+
+type SetCoverCaseData = {
   cost: number;
   numUncoveredElements: number;
 };
@@ -106,7 +112,7 @@ function createKnightsCoverModel(api: SetCoverApi, numRows: number, numCols: num
   return model;
 }
 
-async function runSaveReload(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runSaveReload(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_save_reload assertion-by-assertion.
   const model = createKnightsCoverModel(api, 10, 10);
@@ -122,10 +128,10 @@ async function runSaveReload(api: SetCoverApi, mode: 'direct' | 'worker') {
   if (model.row_view_is_valid && reloaded.row_view_is_valid) {
     assertArray(model.rows, reloaded.rows, `SetCoverTest.test_save_reload (${mode}) rows`);
   }
-  return { name: `SetCoverTest.test_save_reload (${mode})`, ok: true, cost: 0, numUncoveredElements: 0 };
+  return { cost: 0, numUncoveredElements: 0 };
 }
 
-async function runSaveReloadTwice(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runSaveReloadTwice(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_save_reload_twice assertion-by-assertion.
   const model = createKnightsCoverModel(api, 3, 3);
@@ -151,10 +157,10 @@ async function runSaveReloadTwice(api: SetCoverApi, mode: 'direct' | 'worker') {
     steepestProto.toString() === reloadedProto.toString(),
     `SetCoverTest.test_save_reload_twice (${mode}) proto string equality`,
   );
-  return { name: `SetCoverTest.test_save_reload_twice (${mode})`, ok: true, cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
+  return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runInitialValues(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runInitialValues(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_initial_values assertion-by-assertion.
   const model = createInitialCoverModel(api);
@@ -174,10 +180,10 @@ async function runInitialValues(api: SetCoverApi, mode: 'direct' | 'worker') {
   steepest.set_max_iterations(500);
   assert(await steepest.next_solution(), `SetCoverTest.test_initial_values (${mode}) steepest next_solution`);
   assert(inv.check_consistency(api.consistency_level.COST_AND_COVERAGE), `SetCoverTest.test_initial_values (${mode}) steepest consistency`);
-  return { name: `SetCoverTest.test_initial_values (${mode})`, ok: true, cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
+  return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runInfeasible(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runInfeasible(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_infeasible assertion-by-assertion.
   const model = new api.SetCoverModel();
@@ -186,18 +192,18 @@ async function runInfeasible(api: SetCoverApi, mode: 'direct' | 'worker') {
   model.add_empty_subset(1.0);
   model.add_element_to_last_subset(3);
   assert(!model.compute_feasibility(), `SetCoverTest.test_infeasible (${mode}) compute_feasibility`);
-  return { name: `SetCoverTest.test_infeasible (${mode})`, ok: true, cost: 0, numUncoveredElements: 0 };
+  return { cost: 0, numUncoveredElements: 0 };
 }
 
-async function runKnightsCoverCreation(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runKnightsCoverCreation(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_creation assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
   assert(model.compute_feasibility(), `SetCoverTest.test_knights_cover_creation (${mode}) compute_feasibility`);
-  return { name: `SetCoverTest.test_knights_cover_creation (${mode})`, ok: true, cost: 0, numUncoveredElements: 0 };
+  return { cost: 0, numUncoveredElements: 0 };
 }
 
-async function runKnightsCoverGreedy(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runKnightsCoverGreedy(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_greedy assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -212,10 +218,10 @@ async function runKnightsCoverGreedy(api: SetCoverApi, mode: 'direct' | 'worker'
   steepest.set_max_iterations(500);
   assert(await steepest.next_solution(), `SetCoverTest.test_knights_cover_greedy (${mode}) steepest next_solution`);
   assert(inv.check_consistency(api.consistency_level.FREE_AND_UNCOVERED), `SetCoverTest.test_knights_cover_greedy (${mode}) steepest consistency`);
-  return { name: `SetCoverTest.test_knights_cover_greedy (${mode})`, ok: true, cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
+  return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverDegree(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runKnightsCoverDegree(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_degree assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -230,10 +236,10 @@ async function runKnightsCoverDegree(api: SetCoverApi, mode: 'direct' | 'worker'
   steepest.set_max_iterations(500);
   assert(await steepest.next_solution(), `SetCoverTest.test_knights_cover_degree (${mode}) steepest next_solution`);
   assert(inv.check_consistency(api.consistency_level.FREE_AND_UNCOVERED), `SetCoverTest.test_knights_cover_degree (${mode}) steepest consistency`);
-  return { name: `SetCoverTest.test_knights_cover_degree (${mode})`, ok: true, cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
+  return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverGls(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runKnightsCoverGls(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_gls assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -248,10 +254,10 @@ async function runKnightsCoverGls(api: SetCoverApi, mode: 'direct' | 'worker') {
   gls.set_max_iterations(500);
   assert(await gls.next_solution(), `SetCoverTest.test_knights_cover_gls (${mode}) gls next_solution`);
   assert(inv.check_consistency(api.consistency_level.FREE_AND_UNCOVERED), `SetCoverTest.test_knights_cover_gls (${mode}) gls consistency`);
-  return { name: `SetCoverTest.test_knights_cover_gls (${mode})`, ok: true, cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
+  return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverRandom(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runKnightsCoverRandom(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_random assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -266,10 +272,10 @@ async function runKnightsCoverRandom(api: SetCoverApi, mode: 'direct' | 'worker'
   steepest.set_max_iterations(500);
   assert(await steepest.next_solution(), `SetCoverTest.test_knights_cover_random (${mode}) steepest next_solution`);
   assert(inv.check_consistency(api.consistency_level.FREE_AND_UNCOVERED), `SetCoverTest.test_knights_cover_random (${mode}) steepest consistency`);
-  return { name: `SetCoverTest.test_knights_cover_random (${mode})`, ok: true, cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
+  return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverTrivial(api: SetCoverApi, mode: 'direct' | 'worker') {
+async function runKnightsCoverTrivial(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_trivial assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -284,24 +290,115 @@ async function runKnightsCoverTrivial(api: SetCoverApi, mode: 'direct' | 'worker
   steepest.set_max_iterations(500);
   assert(await steepest.next_solution(), `SetCoverTest.test_knights_cover_trivial (${mode}) steepest next_solution`);
   assert(inv.check_consistency(api.consistency_level.FREE_AND_UNCOVERED), `SetCoverTest.test_knights_cover_trivial (${mode}) steepest consistency`);
-  return { name: `SetCoverTest.test_knights_cover_trivial (${mode})`, ok: true, cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
+  return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
+
+type SetCoverCase = SharedCase<SetCoverApi, SetCoverCaseData>;
+
+const setCoverSource = 'ortools/set_cover/python/set_cover_test.py';
+
+export const setCoverCases: SetCoverCase[] = [
+  {
+    id: 'set_cover.set_cover_test.test_save_reload',
+    name: 'SetCoverTest.test_save_reload',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_save_reload',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runSaveReload(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_save_reload_twice',
+    name: 'SetCoverTest.test_save_reload_twice',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_save_reload_twice',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runSaveReloadTwice(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_initial_values',
+    name: 'SetCoverTest.test_initial_values',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_initial_values',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runInitialValues(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_infeasible',
+    name: 'SetCoverTest.test_infeasible',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_infeasible',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runInfeasible(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_knights_cover_creation',
+    name: 'SetCoverTest.test_knights_cover_creation',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_knights_cover_creation',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runKnightsCoverCreation(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_knights_cover_greedy',
+    name: 'SetCoverTest.test_knights_cover_greedy',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_knights_cover_greedy',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runKnightsCoverGreedy(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_knights_cover_degree',
+    name: 'SetCoverTest.test_knights_cover_degree',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_knights_cover_degree',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runKnightsCoverDegree(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_knights_cover_gls',
+    name: 'SetCoverTest.test_knights_cover_gls',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_knights_cover_gls',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runKnightsCoverGls(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_knights_cover_random',
+    name: 'SetCoverTest.test_knights_cover_random',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_knights_cover_random',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runKnightsCoverRandom(api, context.mode ?? 'direct'),
+  },
+  {
+    id: 'set_cover.set_cover_test.test_knights_cover_trivial',
+    name: 'SetCoverTest.test_knights_cover_trivial',
+    solver: 'set-cover',
+    source: setCoverSource,
+    upstream: 'SetCoverTest.test_knights_cover_trivial',
+    tags: ['python-parity', 'direct', 'worker'],
+    run: (api, context) => runKnightsCoverTrivial(api, context.mode ?? 'direct'),
+  },
+];
 
 export async function runSetCoverCases(api: SetCoverApi): Promise<SetCoverCaseResult[]> {
   await api.initSetCover();
   const results: SetCoverCaseResult[] = [];
   for (const mode of ['direct', 'worker'] as const) {
     api.setWorkerBridgeEnabled(mode === 'worker');
-    results.push(await runSaveReload(api, mode));
-    results.push(await runSaveReloadTwice(api, mode));
-    results.push(await runInitialValues(api, mode));
-    results.push(await runInfeasible(api, mode));
-    results.push(await runKnightsCoverCreation(api, mode));
-    results.push(await runKnightsCoverGreedy(api, mode));
-    results.push(await runKnightsCoverDegree(api, mode));
-    results.push(await runKnightsCoverGls(api, mode));
-    results.push(await runKnightsCoverRandom(api, mode));
-    results.push(await runKnightsCoverTrivial(api, mode));
+    for (const testCase of setCoverCases) {
+      const result = await testCase.run(api, { mode });
+      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
+    }
   }
   api.setWorkerBridgeEnabled(false);
   return results;

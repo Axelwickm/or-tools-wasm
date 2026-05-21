@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('runs the shared CP-SAT cases with and without the worker bridge', async ({ page }) => {
+test('runs the shared solver fixture cases with and without the worker bridge', async ({ page }) => {
   const browserErrors: string[] = [];
   let failOnPageError: (error: Error) => void = () => {};
   const pageErrorPromise = new Promise<never>((_, reject) => {
@@ -60,6 +60,7 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       solverStatus?: string;
       params?: Record<string, unknown>;
       cases?: Array<{
+        id?: string;
         name?: string;
         ok?: boolean;
         solverStatus?: string;
@@ -69,7 +70,13 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
         pthread?: number;
       };
     }>;
+    highLevelCpSatResults?: Array<{
+      id?: string;
+      name?: string;
+      ok?: boolean;
+    }>;
     routingResults?: Array<{
+      id?: string;
       name?: string;
       ok?: boolean;
       objective?: number;
@@ -77,6 +84,7 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       route?: number[];
     }>;
     mpSolverResults?: Array<{
+      id?: string;
       name?: string;
       ok?: boolean;
       status?: number;
@@ -84,22 +92,40 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       values?: Record<string, number>;
     }>;
     knapsackResults?: Array<{
+      id?: string;
       name?: string;
       ok?: boolean;
       profit?: number;
       optimal?: boolean;
     }>;
     networkFlowResults?: Array<{
+      id?: string;
       name?: string;
       ok?: boolean;
       status?: number;
       objectiveValue?: number;
     }>;
     rcpspResults?: Array<{
+      id?: string;
       name?: string;
       ok?: boolean;
       makespan?: number | null;
       statusName?: string;
+    }>;
+    setCoverResults?: Array<{
+      id?: string;
+      name?: string;
+      ok?: boolean;
+    }>;
+    mathOptResults?: Array<{
+      id?: string;
+      name?: string;
+      ok?: boolean;
+    }>;
+    pdlpResults?: Array<{
+      id?: string;
+      name?: string;
+      ok?: boolean;
     }>;
     routingWorkerStatsBefore?: {
       routingSolve?: number;
@@ -126,6 +152,11 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       graphSolve?: number;
     };
   };
+  const expectStableCaseIds = (results: Array<{ id?: string; ok?: boolean }> | undefined, label: string) => {
+    expect(results?.length, `${label} result count`).toBeGreaterThan(0);
+    expect(results?.every((result) => typeof result.id === 'string' && result.id.length > 0), `${label} stable case IDs`).toBe(true);
+    expect(results?.every((result) => result.ok === true), `${label} ok results`).toBe(true);
+  };
   expect(parsedStatus.results).toHaveLength(4);
   expect(parsedStatus.results).toEqual([
     expect.objectContaining({ mode: 'direct', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
@@ -135,7 +166,9 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
   ]);
   const [directResult] = parsedStatus.results ?? [];
   expect(directResult?.cases?.length).toBeGreaterThan(0);
+  expectStableCaseIds(parsedStatus.highLevelCpSatResults, 'high-level CP-SAT');
   for (const result of parsedStatus.results ?? []) {
+    expectStableCaseIds(result.cases, `CP-SAT ${result.mode}/${result.workerProfile}`);
     expect(result.cases).toEqual(
       directResult?.cases?.map((testCase) =>
         expect.objectContaining({
@@ -158,6 +191,7 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       ok: true,
     }),
   ]));
+  expectStableCaseIds(parsedStatus.routingResults, 'routing');
   expect(parsedStatus.routingWorkerStatsBefore?.routingSolve).toBe(0);
   expect(parsedStatus.routingWorkerStatsAfter?.routingSolve).toBeGreaterThan(1);
   expect(parsedStatus.mpSolverWorkerStatsBefore?.mpSolverSolve).toBe(0);
@@ -217,6 +251,7 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       status: 0,
     }),
   ]));
+  expectStableCaseIds(parsedStatus.mpSolverResults, 'MPSolver');
   expect(parsedStatus.knapsackWorkerStatsBefore?.knapsackSolve).toBe(0);
   expect(parsedStatus.knapsackWorkerStatsAfter?.knapsackSolve).toBeGreaterThanOrEqual(3);
   expect(parsedStatus.knapsackResults).toEqual(expect.arrayContaining([
@@ -239,6 +274,7 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       optimal: true,
     }),
   ]));
+  expectStableCaseIds(parsedStatus.knapsackResults, 'Knapsack');
   expect(parsedStatus.networkFlowWorkerStatsBefore?.graphSolve).toBe(0);
   expect(parsedStatus.networkFlowWorkerStatsAfter?.graphSolve).toBeGreaterThanOrEqual(3);
   expect(parsedStatus.networkFlowResults).toEqual(expect.arrayContaining([
@@ -258,6 +294,8 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       objectiveValue: 265,
     }),
   ]));
+  expectStableCaseIds(parsedStatus.networkFlowResults, 'Network Flow');
+  expectStableCaseIds(parsedStatus.setCoverResults, 'Set Cover');
   expect(parsedStatus.rcpspResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
       name: 'RcpspTest.testParseAndAccess (direct)',
@@ -282,4 +320,7 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       statusName: 'OPTIMAL',
     }),
   ]));
+  expectStableCaseIds(parsedStatus.rcpspResults, 'RCPSP');
+  expectStableCaseIds(parsedStatus.mathOptResults, 'MathOpt');
+  expectStableCaseIds(parsedStatus.pdlpResults, 'PDLP');
 });
