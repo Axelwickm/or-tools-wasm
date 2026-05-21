@@ -16,9 +16,11 @@ import {
   initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
+  setWorkerBridgeEnabled as setKnapsackWorkerBridgeEnabled,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
+  setWorkerBridgeEnabled as setNetworkFlowWorkerBridgeEnabled,
   SimpleLinearSumAssignment,
   SimpleMaxFlow,
   SimpleMinCostFlow,
@@ -33,6 +35,7 @@ import {
 import {
   initPdlp,
   Pdlp,
+  setWorkerBridgeEnabled as setPdlpWorkerBridgeEnabled,
 } from 'or-tools-wasm/pdlp';
 import {
   BOOL_FALSE,
@@ -107,7 +110,7 @@ const knapsackResults = await runKnapsackCases({
   initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
-  setWorkerBridgeEnabled,
+  setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
 });
 if (!knapsackResults.every((result) => result.ok)) {
   throw new Error(`bun Knapsack case failed: ${JSON.stringify(knapsackResults)}`);
@@ -118,7 +121,7 @@ const networkFlowResults = await runNetworkFlowCases({
   SimpleMaxFlow,
   SimpleMinCostFlow,
   SimpleLinearSumAssignment,
-  setWorkerBridgeEnabled,
+  setWorkerBridgeEnabled: setNetworkFlowWorkerBridgeEnabled,
 });
 if (!networkFlowResults.every((result) => result.ok)) {
   throw new Error(`bun Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
@@ -142,7 +145,7 @@ if (!mathOptResults.every((result) => result.ok)) {
 const pdlpResults = await runPdlpCases({
   initPdlp,
   Pdlp,
-  setWorkerBridgeEnabled,
+  setWorkerBridgeEnabled: setPdlpWorkerBridgeEnabled,
 });
 if (!pdlpResults.every((result) => result.ok)) {
   throw new Error(`bun PDLP case failed: ${JSON.stringify(pdlpResults)}`);
@@ -155,6 +158,9 @@ try {
   console.log(await run());
 } finally {
   setWorkerBridgeEnabled(false);
+  setKnapsackWorkerBridgeEnabled(false);
+  setNetworkFlowWorkerBridgeEnabled(false);
+  setPdlpWorkerBridgeEnabled(false);
   SetCoverApi.setWorkerBridgeEnabled(false);
   RcpspApi.setWorkerBridgeEnabled(false);
   await terminateLoadedRuntimeThreads();
