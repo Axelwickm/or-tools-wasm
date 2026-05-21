@@ -87,6 +87,15 @@
       "import": "./build/javascript/browser/network-flow.js",
       "default": "./build/javascript/browser/network-flow.js"
     },
+    "./set-cover": {
+      "types": "./build/javascript/lib/set-cover.d.ts",
+      "bun": "./build/javascript/node/set-cover.js",
+      "deno": "./build/javascript/node/set-cover.js",
+      "node": "./build/javascript/node/set-cover.js",
+      "browser": "./build/javascript/browser/set-cover.js",
+      "import": "./build/javascript/browser/set-cover.js",
+      "default": "./build/javascript/browser/set-cover.js"
+    },
     "./build/javascript/lib/*": "./build/javascript/lib/*"
   },
   "imports": {

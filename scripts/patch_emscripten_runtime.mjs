@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
@@ -15,6 +15,8 @@ const runtimeNames = [
   'pdlp_runtime_asyncify',
   'graph_runtime',
   'graph_runtime_asyncify',
+  'set_cover_runtime',
+  'set_cover_runtime_asyncify',
 ];
 const nodeRuntimePaths = [
   path.join(repoRoot, 'build/javascript/node-wasm/cp_sat_runtime_node.js'),
@@ -29,6 +31,8 @@ const nodeRuntimePaths = [
   path.join(repoRoot, 'build/javascript/node-wasm/pdlp_runtime_node_asyncify.js'),
   path.join(repoRoot, 'build/javascript/node-wasm/graph_runtime_node.js'),
   path.join(repoRoot, 'build/javascript/node-wasm/graph_runtime_node_asyncify.js'),
+  path.join(repoRoot, 'build/javascript/node-wasm/set_cover_runtime_node.js'),
+  path.join(repoRoot, 'build/javascript/node-wasm/set_cover_runtime_node_asyncify.js'),
 ];
 const webRuntimePaths = runtimeNames.map((runtimeName) =>
   path.join(repoRoot, `build/javascript/wasm/${runtimeName}.js`)
@@ -57,6 +61,7 @@ const replacements = [
 ];
 
 for (const nodeRuntimePath of nodeRuntimePaths) {
+  if (!(await exists(nodeRuntimePath))) continue;
   let runtime = await readFile(nodeRuntimePath, 'utf8');
   const original = runtime;
 
@@ -126,6 +131,7 @@ for (const runtimeName of runtimeNames) {
 }
 
 for (const webRuntimePath of webRuntimePaths) {
+  if (!(await exists(webRuntimePath))) continue;
   let runtime = await readFile(webRuntimePath, 'utf8');
   const original = runtime;
 
@@ -137,5 +143,15 @@ for (const webRuntimePath of webRuntimePaths) {
   if (runtime !== original) {
     await writeFile(webRuntimePath, runtime);
     console.log(`Patched ${path.basename(webRuntimePath)}: deno-bun-web-worker-runtime`);
+  }
+}
+
+async function exists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
   }
 }

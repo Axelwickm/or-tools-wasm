@@ -14,6 +14,7 @@ const publicEntryNames = [
   'pdlp',
   'knapsack',
   'network-flow',
+  'set-cover',
 ];
 
 const externalLoaderPlugin = {
@@ -168,6 +169,18 @@ const runtimeSpecs = {
       wasm: 'graph_runtime_asyncify.wasm',
     },
   },
+  set_cover_runtime: {
+    jspi: {
+      nodeJs: '../node-wasm/set_cover_runtime_node.js',
+      webJs: '../wasm/set_cover_runtime.js',
+      wasm: 'set_cover_runtime.wasm',
+    },
+    asyncify: {
+      nodeJs: '../node-wasm/set_cover_runtime_node_asyncify.js',
+      webJs: '../wasm/set_cover_runtime_asyncify.js',
+      wasm: 'set_cover_runtime_asyncify.wasm',
+    },
+  },
 };
 
 const modulePromises = new Map();
@@ -281,6 +294,14 @@ export async function loadGraphRuntime() {
 
 export async function loadGraphRuntimeAsyncify() {
   return createRuntime('graph_runtime', 'asyncify');
+}
+
+export async function loadSetCoverRuntime() {
+  return createRuntime('set_cover_runtime');
+}
+
+export async function loadSetCoverRuntimeAsyncify() {
+  return createRuntime('set_cover_runtime', 'asyncify');
 }
 
 export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };

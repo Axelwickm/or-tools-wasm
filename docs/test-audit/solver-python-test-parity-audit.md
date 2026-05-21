@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 613 upstream tests; 396 ✅ implemented; 23 🟨 placeholders/API gaps; 1 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Double-checked so far: 402; mismatches found: 3.
+Totals: 623 upstream tests; 406 ✅ implemented; 23 🟨 placeholders/API gaps; 1 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Double-checked so far: 412; mismatches found: 3.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -235,6 +235,20 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ✅ 🔎 PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension
   - ✅ 🔎 PyWrapAlgorithmsKnapsackSolverTest.testSolveTwoDimensions
   - ✅ 🔎 PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension
+
+## ortools/set_cover/python/set_cover_test.py
+- SetCoverTest
+  - ✅ 🔎 SetCoverTest.test_save_reload
+  - ✅ 🔎 SetCoverTest.test_save_reload_twice
+  - ✅ 🔎 SetCoverTest.test_initial_values
+  - ✅ 🔎 SetCoverTest.test_infeasible
+  - ✅ 🔎 SetCoverTest.test_knights_cover_creation
+  - ✅ 🔎 SetCoverTest.test_knights_cover_greedy
+  - ✅ 🔎 SetCoverTest.test_knights_cover_degree
+  - ✅ 🔎 SetCoverTest.test_knights_cover_gls
+  - ✅ 🔎 SetCoverTest.test_knights_cover_random
+  - ✅ 🔎 SetCoverTest.test_knights_cover_trivial
+  - ⚪ 🔎 TODO-only upstream cases - `KnightsCoverGreedyAndTabu`, `KnightsCoverGreedyRandomClear`, `KnightsCoverElementDegreeRandomClear`, `KnightsCoverRandomClearMip`, and `KnightsCoverMip` are comments in upstream `set_cover_test.py`, not runnable Python tests.
 
 ## ortools/graph/python and ortools/graph/samples
 - Python graph wrapper tests

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadGraphRuntime, loadMathOptRuntime, loadMPSolverRuntime, loadPdlpRuntime, loadRuntime } from './runtime_loader.js';
+import { loadGraphRuntime, loadMathOptRuntime, loadMPSolverRuntime, loadPdlpRuntime, loadRuntime, loadSetCoverRuntime } from './runtime_loader.js';
 import { solveRoutingInWorker } from './worker_routing.js';
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
@@ -190,6 +190,52 @@ async function solveGraphInWorker(message: Extract<WorkerRequest, { type: 'graph
   }
 }
 
+function setCoverOperationCode(operation: Extract<WorkerRequest, { type: 'setCover' }>['operation']) {
+  switch (operation) {
+    case 'trivial': return 0;
+    case 'greedy': return 1;
+    case 'elementDegree': return 2;
+    case 'lazyElementDegree': return 3;
+    case 'random': return 4;
+    case 'steepest': return 5;
+    case 'guidedLocal': return 6;
+    case 'guidedTabu': return 7;
+  }
+}
+
+async function solveSetCoverInWorker(message: Extract<WorkerRequest, { type: 'setCover' }>) {
+  const module = await loadSetCoverRuntime();
+  const costsPtr = copyFloat64ToHeap(module, message.costs);
+  const startsPtr = copyFloat64ToHeap(module, message.starts);
+  const elementsPtr = copyFloat64ToHeap(module, message.elements);
+  const selectedPtr = copyFloat64ToHeap(module, message.selected.map((value) => value ? 1 : 0));
+  const focusPtr = message.focus ? copyFloat64ToHeap(module, message.focus.map((value) => value ? 1 : 0)) : 0;
+  try {
+    return module.ccall(
+      'set_cover_next_solution_serialized',
+      'string',
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [
+        costsPtr,
+        startsPtr,
+        elementsPtr,
+        message.costs.length,
+        message.elements.length,
+        selectedPtr,
+        focusPtr,
+        setCoverOperationCode(message.operation),
+        message.maxIterations,
+      ],
+    ) as string;
+  } finally {
+    if (costsPtr) module._free(costsPtr);
+    if (startsPtr) module._free(startsPtr);
+    if (elementsPtr) module._free(elementsPtr);
+    if (selectedPtr) module._free(selectedPtr);
+    if (focusPtr) module._free(focusPtr);
+  }
+}
+
 async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requestId = 0, callbackFlags = 0) {
   const module = await loadCpSatModule();
   const lenPtr = module._malloc(4);
@@ -350,6 +396,14 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       const result = await solveGraphInWorker(message);
       workerScope.postMessage({
         type: 'graphSolveResult',
+        id: message.id,
+        result,
+      } satisfies WorkerResponse);
+      return;
+    } else if (message.type === 'setCover') {
+      const result = await solveSetCoverInWorker(message);
+      workerScope.postMessage({
+        type: 'setCoverResult',
         id: message.id,
         result,
       } satisfies WorkerResponse);

@@ -22,6 +22,7 @@ import {
   SimpleMaxFlow,
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
+import * as SetCoverApi from 'or-tools-wasm/set-cover';
 import {
   initMathOpt,
   MathOpt,
@@ -51,6 +52,7 @@ import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
+import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
 Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   if (isWorkerBridgeEnabled()) {
@@ -112,6 +114,11 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   });
   if (!networkFlowResults.every((result) => result.ok)) {
     throw new Error(`deno Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
+  }
+
+  const setCoverResults = await runSetCoverCases(SetCoverApi as never);
+  if (!setCoverResults.every((result) => result.ok)) {
+    throw new Error(`deno Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
   }
 
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });

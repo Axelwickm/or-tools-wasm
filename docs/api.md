@@ -1020,6 +1020,122 @@ The MPSolver frontend also exposes
 `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.CreateSolver('KNAPSACK')`, and
 the proto solve path for knapsack-shaped 0-1 models.
 
+## Set Cover
+
+The dedicated Set Cover API mirrors
+`ortools.set_cover.python.set_cover` for weighted set covering models,
+solution invariants, and heuristic searches. It uses its own Set Cover
+WebAssembly runtime.
+
+```ts
+import {
+  GreedySolutionGenerator,
+  initSetCover,
+  SetCoverInvariant,
+  SetCoverModel,
+  setWorkerBridgeEnabled,
+} from 'or-tools-wasm/set-cover';
+
+setWorkerBridgeEnabled(true);
+await initSetCover();
+
+const model = new SetCoverModel();
+model.add_empty_subset(2.0);
+model.add_element_to_last_subset(0);
+model.add_empty_subset(2.0);
+model.add_element_to_last_subset(1);
+model.add_empty_subset(1.0);
+model.add_element_to_last_subset(0);
+model.add_element_to_last_subset(1);
+
+const inv = new SetCoverInvariant(model);
+const greedy = new GreedySolutionGenerator(inv);
+if (await greedy.next_solution()) {
+  console.log(inv.cost(), inv.export_solution_as_proto().subset);
+}
+```
+
+`initSetCover(): Promise<void>` loads the Set Cover runtime.
+
+`SetCoverModel` exposes Python-style methods and properties:
+
+- properties: `name`, `num_elements`, `num_subsets`, `num_nonzeros`,
+  `fill_rate`, `subset_costs`, `columns`, `rows`, `row_view_is_valid`,
+  `all_subsets`
+- `SubsetRange(): number[]`
+- `ElementRange(): number[]`
+- `set_name(name): void`
+- `add_empty_subset(cost): void`
+- `add_element_to_last_subset(element): void`
+- `add_element_to_subset(element, subset): void`
+- `set_subset_cost(subset, cost): void`
+- `create_sparse_row_view(): void`
+- `sort_elements_in_subsets(): void`
+- `compute_feasibility(): boolean`
+- `resize_num_subsets(numSubsets): void`
+- `reserve_num_elements_in_subset(numElements, subset): void`
+- `export_model_as_proto(): SetCoverModelProto`
+- `import_model_from_proto(proto): void`
+- `compute_cost_stats()`, `compute_row_stats()`, `compute_column_stats()`
+- `compute_row_deciles()`, `compute_column_deciles()`
+
+`SetCoverInvariant` exposes:
+
+- `initialize()`, `clear()`, `model()`
+- `cost(): number`
+- `num_uncovered_elements(): number`
+- `is_selected(): boolean[]`
+- `coverage(): number[]`
+- `num_free_elements(): number[]`
+- `num_coverage_le_1_elements(): number[]`
+- `compute_coverage_in_focus(focus): number[]`
+- `is_redundant(): boolean[]`
+- `trace(): SetCoverDecision[]`, `clear_trace()`, `compress_trace()`
+- `clear_removability_information()`, `newly_removable_subsets()`,
+  `newly_non_removable_subsets()`
+- `load_solution(solution): void`
+- `check_consistency(consistency): boolean`
+- `compute_is_redundant(subset): boolean`
+- `recompute(): void`
+- `select(subset, consistency): boolean`
+- `deselect(subset, consistency): boolean`
+- `export_solution_as_proto(): SetCoverSolutionResponse`
+- `import_solution_from_proto(proto): void`
+
+`consistency_level` / `ConsistencyLevel` exposes
+`COST_AND_COVERAGE`, `FREE_AND_UNCOVERED`, and `REDUNDANCY`.
+
+Solution generators and searches expose `next_solution()` and
+`set_max_iterations()`:
+
+- `TrivialSolutionGenerator`
+- `RandomSolutionGenerator`
+- `GreedySolutionGenerator`
+- `ElementDegreeSolutionGenerator`
+- `LazyElementDegreeSolutionGenerator`
+- `SteepestSearch`
+- `GuidedLocalSearch`
+- `GuidedTabuSearch`
+
+`GuidedTabuSearch` also exposes `set_lagrangian_factor()`,
+`get_lagrangian_factor()`, `set_epsilon()`, `get_epsilon()`,
+`set_penalty_factor()`, `get_penalty_factor()`, `set_tabu_list_size()`, and
+`get_tabu_list_size()`. `TabuList`, `clear_random_subsets()`, and
+`clear_most_covered_elements()` are available for compatibility with the
+Python wrapper surface.
+
+Model and solution proto helpers are object-based in the browser-oriented
+runtime: use `export_model_as_proto()` / `import_model_from_proto()` and
+`export_solution_as_proto()` / `import_solution_from_proto()`. File-based
+helpers such as `read_set_cover_proto()`, `write_set_cover_proto()`,
+`read_orlib_scp()`, `read_orlib_rail()`, and `read_fimi_dat()` are exported for
+API discoverability but throw because package consumers do not share a native
+OR-Tools filesystem.
+
+Set Cover is single-threaded in this package. It supports the shared browser
+worker bridge, so UI code can run heuristic searches off the main thread, but
+there is no solver thread-count parameter.
+
 ## Network Flow
 
 The dedicated Network Flow API mirrors the Python graph wrappers for
@@ -1598,13 +1714,13 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 
 ## Browser Worker Bridge
 
-The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, Network Flow, and
-PDLP paths can use the browser worker bridge. Worker bridge availability is independent of
-solver threading support; for example GLPK and Knapsack are single-threaded but
-can still run through the worker bridge in browser UI code, Network Flow is
-single-threaded but worker-bridge capable, while CP-SAT, SAT, SCIP/GSCIP, CBC,
-and other threaded-capable paths can also accept solver thread settings. Prefer
-the shared package controls:
+The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, Network Flow, Set
+Cover, and PDLP paths can use the browser worker bridge. Worker bridge
+availability is independent of solver threading support; for example GLPK,
+Knapsack, Set Cover, and Network Flow are single-threaded but can still run
+through the worker bridge in browser UI code, while CP-SAT, SAT, SCIP/GSCIP,
+CBC, and other threaded-capable paths can also accept solver thread settings.
+Prefer the shared package controls:
 
 ```ts
 import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm/cp-sat';

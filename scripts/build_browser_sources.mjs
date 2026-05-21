@@ -14,6 +14,7 @@ const publicEntryNames = [
   'pdlp',
   'knapsack',
   'network-flow',
+  'set-cover',
 ];
 
 async function* listTypeScriptFiles(directory) {

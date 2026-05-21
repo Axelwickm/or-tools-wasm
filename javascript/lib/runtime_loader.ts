@@ -2,7 +2,7 @@ import type { OrToolsWasmModule } from './wasm_module_types.js';
 
 type RuntimeModuleFactory = (moduleOverrides?: Record<string, unknown>) => Promise<OrToolsWasmModule>;
 type RuntimeFlavor = 'jspi' | 'asyncify';
-type RuntimeName = 'cp_sat_runtime' | 'routing_runtime' | 'mp_solver_runtime' | 'mathopt_runtime' | 'pdlp_runtime' | 'graph_runtime';
+type RuntimeName = 'cp_sat_runtime' | 'routing_runtime' | 'mp_solver_runtime' | 'mathopt_runtime' | 'pdlp_runtime' | 'graph_runtime' | 'set_cover_runtime';
 type RuntimeKey = `${RuntimeName}:${RuntimeFlavor}`;
 
 type RuntimeAsset = {
@@ -69,6 +69,16 @@ const runtimeAssets: Record<RuntimeName, Record<RuntimeFlavor, RuntimeAsset>> = 
     asyncify: {
       jsUrl: new URL('#internal-wasm/graph_runtime_asyncify.js?no-inline', import.meta.url).href,
       wasmUrl: new URL('#internal-wasm/graph_runtime_asyncify.wasm?no-inline', import.meta.url).href,
+    },
+  },
+  set_cover_runtime: {
+    jspi: {
+      jsUrl: new URL('#internal-wasm/set_cover_runtime.js?no-inline', import.meta.url).href,
+      wasmUrl: new URL('#internal-wasm/set_cover_runtime.wasm?no-inline', import.meta.url).href,
+    },
+    asyncify: {
+      jsUrl: new URL('#internal-wasm/set_cover_runtime_asyncify.js?no-inline', import.meta.url).href,
+      wasmUrl: new URL('#internal-wasm/set_cover_runtime_asyncify.wasm?no-inline', import.meta.url).href,
     },
   },
 };
@@ -208,6 +218,14 @@ export async function loadGraphRuntime(): Promise<OrToolsWasmModule> {
 
 export async function loadGraphRuntimeAsyncify(): Promise<OrToolsWasmModule> {
   return createRuntime('graph_runtime', 'asyncify');
+}
+
+export async function loadSetCoverRuntime(): Promise<OrToolsWasmModule> {
+  return createRuntime('set_cover_runtime');
+}
+
+export async function loadSetCoverRuntimeAsyncify(): Promise<OrToolsWasmModule> {
+  return createRuntime('set_cover_runtime', 'asyncify');
 }
 
 export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };

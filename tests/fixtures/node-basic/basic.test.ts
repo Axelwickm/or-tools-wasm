@@ -23,6 +23,19 @@ import {
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
 import {
+  consistency_level,
+  ElementDegreeSolutionGenerator,
+  GreedySolutionGenerator,
+  GuidedLocalSearch,
+  initSetCover,
+  RandomSolutionGenerator,
+  SetCoverInvariant,
+  SetCoverModel,
+  setWorkerBridgeEnabled as setSetCoverWorkerBridgeEnabled,
+  SteepestSearch,
+  TrivialSolutionGenerator,
+} from 'or-tools-wasm/set-cover';
+import {
   initMathOpt,
   MathOpt,
 } from 'or-tools-wasm/mathopt';
@@ -53,6 +66,7 @@ import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
+import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
 test('runs the shared high-level CP-SAT Python parity cases in Node', async () => {
   await runCpSatHighLevelParityCasesForPackage(CpSatApi);
@@ -120,6 +134,23 @@ test('runs the shared Network Flow cases in Node', async () => {
     setWorkerBridgeEnabled,
   });
   assert.equal(networkFlowResults.every((result) => result.ok), true, `node Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
+});
+
+test('runs the shared Set Cover cases in Node', async () => {
+  const setCoverResults = await runSetCoverCases({
+    initSetCover,
+    SetCoverModel,
+    SetCoverInvariant: SetCoverInvariant as never,
+    TrivialSolutionGenerator: TrivialSolutionGenerator as never,
+    RandomSolutionGenerator: RandomSolutionGenerator as never,
+    GreedySolutionGenerator: GreedySolutionGenerator as never,
+    ElementDegreeSolutionGenerator: ElementDegreeSolutionGenerator as never,
+    SteepestSearch: SteepestSearch as never,
+    GuidedLocalSearch: GuidedLocalSearch as never,
+    consistency_level,
+    setWorkerBridgeEnabled: setSetCoverWorkerBridgeEnabled,
+  });
+  assert.equal(setCoverResults.every((result) => result.ok), true, `node Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
 });
 
 test('runs the shared MathOpt cases in Node', async () => {

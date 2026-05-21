@@ -152,6 +152,18 @@ export type GraphSolveRequest =
       costs: number[];
     };
 
+export type SetCoverRequest = {
+  type: 'setCover';
+  id: number;
+  operation: 'trivial' | 'greedy' | 'elementDegree' | 'lazyElementDegree' | 'random' | 'steepest' | 'guidedLocal' | 'guidedTabu';
+  costs: number[];
+  starts: number[];
+  elements: number[];
+  selected: boolean[];
+  focus: boolean[] | null;
+  maxIterations: number;
+};
+
 export type MathOptSolveRequest = {
   type: 'mathOptSolve';
   id: number;
@@ -175,6 +187,7 @@ export type WorkerRequest =
   | MPSolverSolveRequest
   | KnapsackSolveRequest
   | GraphSolveRequest
+  | SetCoverRequest
   | MathOptSolveRequest
   | PdlpRequest
   | CancelSolve;
@@ -191,6 +204,7 @@ export type WorkerResponse =
   | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'knapsackSolveResult'; id: number; result: string }
   | { type: 'graphSolveResult'; id: number; result: string }
+  | { type: 'setCoverResult'; id: number; result: string }
   | { type: 'mathOptSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'pdlpResult'; id: number; bytes: Uint8Array; value?: number }
   | { type: 'solved_cancelled'; id: number }

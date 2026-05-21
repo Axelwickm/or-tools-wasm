@@ -23,6 +23,8 @@ import {
   SimpleMaxFlow,
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
+import * as SetCoverApi from 'or-tools-wasm/set-cover';
+import { terminateLoadedRuntimeThreads as terminateSetCoverRuntimeThreads } from 'or-tools-wasm/set-cover';
 import {
   initMathOpt,
   MathOpt,
@@ -52,6 +54,7 @@ import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
+import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
 async function run(): Promise<string> {
 const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
@@ -119,6 +122,11 @@ if (!networkFlowResults.every((result) => result.ok)) {
   throw new Error(`bun Network Flow case failed: ${JSON.stringify(networkFlowResults)}`);
 }
 
+const setCoverResults = await runSetCoverCases(SetCoverApi as never);
+if (!setCoverResults.every((result) => result.ok)) {
+  throw new Error(`bun Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
+}
+
 const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
 if (!mathOptResults.every((result) => result.ok)) {
   throw new Error(`bun MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
@@ -133,13 +141,15 @@ if (!pdlpResults.every((result) => result.ok)) {
   throw new Error(`bun PDLP case failed: ${JSON.stringify(pdlpResults)}`);
 }
 
-return `bun ran ${cpSatCases.length} CP-SAT cases, ${highLevelCpSatResults.length} high-level CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${knapsackResults.length} Knapsack cases, ${networkFlowResults.length} Network Flow cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`;
+return `bun ran ${cpSatCases.length} CP-SAT cases, ${highLevelCpSatResults.length} high-level CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${knapsackResults.length} Knapsack cases, ${networkFlowResults.length} Network Flow cases, ${setCoverResults.length} Set Cover cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`;
 }
 
 try {
   console.log(await run());
 } finally {
   setWorkerBridgeEnabled(false);
+  SetCoverApi.setWorkerBridgeEnabled(false);
   await terminateLoadedRuntimeThreads();
+  await terminateSetCoverRuntimeThreads();
 }
 process.exit(0);

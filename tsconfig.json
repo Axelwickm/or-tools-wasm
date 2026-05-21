@@ -17,6 +17,7 @@
       "or-tools-wasm/pdlp": ["javascript/lib/pdlp.ts"],
       "or-tools-wasm/knapsack": ["javascript/lib/knapsack.ts"],
       "or-tools-wasm/network-flow": ["javascript/lib/network-flow.ts"],
+      "or-tools-wasm/set-cover": ["javascript/lib/set-cover.ts"],
       "@internal-wasm/*": ["build/javascript/wasm/*"],
       "#internal-wasm/*": ["build/javascript/wasm/*"]
     }

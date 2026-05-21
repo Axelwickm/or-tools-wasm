@@ -52,6 +52,7 @@ export default defineConfig({
         scip_assignment: path.resolve(siteRoot, 'scip_assignment.html'),
         scip_simple_mip: path.resolve(siteRoot, 'scip_simple_mip.html'),
         schema_viewer: path.resolve(siteRoot, 'schema_viewer.html'),
+        set_cover_simple: path.resolve(siteRoot, 'set_cover_simple.html'),
         gscip_simple_mip: path.resolve(siteRoot, 'gscip_simple_mip.html'),
         sports_scheduling: path.resolve(siteRoot, 'sports_scheduling.html'),
         steel_mill_slab: path.resolve(siteRoot, 'steel_mill_slab.html'),

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Set Cover - Greedy Heuristic</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 7rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>Set Cover - greedy heuristic</h1>
+    <p><em>Problem: choose a minimum-cost collection of subsets whose union covers every required element.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import {
+  GreedySolutionGenerator,
+  initSetCover,
+  SetCoverInvariant,
+  SetCoverModel,
+  setWorkerBridgeEnabled,
+} from 'or-tools-wasm/set-cover';
+
+setWorkerBridgeEnabled(true);
+await initSetCover();
+
+const model = new SetCoverModel();
+model.add_empty_subset(2.0);
+model.add_element_to_last_subset(0);
+model.add_empty_subset(2.0);
+model.add_element_to_last_subset(1);
+model.add_empty_subset(1.0);
+model.add_element_to_last_subset(0);
+model.add_element_to_last_subset(1);
+
+const inv = new SetCoverInvariant(model);
+const greedy = new GreedySolutionGenerator(inv);
+const hasFound = await greedy.next_solution();
+
+if (hasFound) {
+  const solution = inv.export_solution_as_proto();
+  console.log(solution.cost, solution.subset);
+}</code></pre>
+      </details>
+    </div>
+    <p>
+      Direct port of the OR-Tools Set Cover sample through the dedicated Python-like Set Cover API.
+    </p>
+    <div class="controls">
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <button id="run" data-idle-label="Solve Set Cover">Solve Set Cover</button>
+    </div>
+    <div id="solution-output">Run the solver to view the solution.</div>
+    <p>Status:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./set_cover_simple.ts"></script>
+  </body>
+</html>

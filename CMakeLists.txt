@@ -297,6 +297,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/graph/max_flow.cc"
     "${PROJECT_SOURCE_DIR}/ortools/graph/min_cost_flow.cc")
 
+  set(SET_COVER_BROWSER_SOURCES
+    "${PROJECT_SOURCE_DIR}/javascript/set_cover_api.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/set_cover/set_cover_heuristics.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/set_cover/set_cover_invariant.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/set_cover/set_cover_model.cc")
+
   set(CP_SAT_COMMON_LINK_OPTIONS
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
@@ -331,7 +337,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_JSPI_LINK_OPTIONS
     "-sJSPI=2"
-    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request','pdlp_primal_dual_hybrid_gradient','graph_max_flow_solve_serialized','graph_min_cost_flow_solve_serialized','graph_linear_sum_assignment_solve_serialized']")
+    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request','pdlp_primal_dual_hybrid_gradient','graph_max_flow_solve_serialized','graph_min_cost_flow_solve_serialized','graph_linear_sum_assignment_solve_serialized','set_cover_next_solution_serialized']")
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")
@@ -365,7 +371,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       "mp_solver_runtime;MP_SOLVER_BROWSER_SOURCES"
       "mathopt_runtime;MATHOPT_BROWSER_SOURCES"
       "pdlp_runtime;PDLP_BROWSER_SOURCES"
-      "graph_runtime;GRAPH_BROWSER_SOURCES")
+      "graph_runtime;GRAPH_BROWSER_SOURCES"
+      "set_cover_runtime;SET_COVER_BROWSER_SOURCES")
     list(GET RUNTIME_SPEC 0 RUNTIME_NAME)
     list(GET RUNTIME_SPEC 1 RUNTIME_SOURCES)
 

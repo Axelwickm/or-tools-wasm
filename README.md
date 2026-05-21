@@ -61,6 +61,7 @@ import { MathOpt } from 'or-tools-wasm/mathopt';
 import { Pdlp } from 'or-tools-wasm/pdlp';
 import { KnapsackSolver } from 'or-tools-wasm/knapsack';
 import { SimpleMaxFlow } from 'or-tools-wasm/network-flow';
+import { SetCoverModel } from 'or-tools-wasm/set-cover';
 ```
 
 Create or serialize an OR-Tools proto model, validate it, then solve it:
@@ -120,7 +121,7 @@ console.log(result.response);
 | Knapsack | ✅ | Dedicated 0-1 and multi-dimensional knapsack solver, plus the MPSolver Knapsack backend. |
 | Network flow algorithms | ✅ | Dedicated max-flow, min-cost-flow, and linear-sum assignment graph algorithms. |
 | Assignment algorithms | ✅ | Linear-sum assignment through the dedicated Network Flow API. |
-| Set cover |  | Set covering and related covering problem utilities. |
+| Set cover | ✅ | Dedicated weighted set cover model, invariant, and heuristic search API. |
 | RCPSP |  | Resource-constrained project scheduling problem support. |
 
 Unchecked rows are planned OR-Tools targets that are not exposed by this package
@@ -158,7 +159,7 @@ fail during WebAssembly runtime or worker startup.
 Browser solves can run through a hidden worker bridge, so the main thread stays
 available for rendering, input, progress UI, and cancellation. The shared worker
 bridge controls apply across CP-SAT, routing, MPSolver, Knapsack, Network Flow,
-MathOpt, and PDLP:
+Set Cover, MathOpt, and PDLP:
 
 ```ts
 import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm/cp-sat';
@@ -171,9 +172,10 @@ Worker bridge support is separate from solver threading. For example, GLPK is
 single-threaded in this package but can still run through the browser worker
 bridge, while CP-SAT, SAT, SCIP/GSCIP, CBC, and other threaded-capable paths may
 also accept solver thread settings. Knapsack and Network Flow can run through
-the worker bridge but do not expose solver thread settings. The package loads
-solver runtimes on demand; application code does not need to choose between JSPI
-and Asyncify manually.
+the worker bridge but do not expose solver thread settings. Set Cover is also
+single-threaded and worker-bridge capable. The package loads solver runtimes on
+demand; application code does not need to choose between JSPI and Asyncify
+manually.
 
 For Vite dev and preview servers, set the headers in `vite.config.ts`:
 

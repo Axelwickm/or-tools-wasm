@@ -6,11 +6,13 @@ import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
+import { runSetCoverCases } from '../../browser-basic-src/set_cover_runner.ts';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import * as RoutingApiModule from 'or-tools-wasm/routing';
 import * as MPSolverApi from 'or-tools-wasm/mp-solver';
 import * as KnapsackApi from 'or-tools-wasm/knapsack';
 import * as NetworkFlowApi from 'or-tools-wasm/network-flow';
+import * as SetCoverApi from 'or-tools-wasm/set-cover';
 import * as MathOptApi from 'or-tools-wasm/mathopt';
 import * as PdlpApi from 'or-tools-wasm/pdlp';
 
@@ -36,6 +38,7 @@ type WorkerStats = {
   mathOptSolve: number;
   knapsackSolve: number;
   graphSolve: number;
+  setCoverSolve: number;
 };
 
 type CpSat = typeof import('or-tools-wasm/cp-sat')['CpSat'];
@@ -91,6 +94,7 @@ function installWorkerSpy() {
         mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
         knapsackSolve: messages.filter((message) => message.type === 'knapsackSolve').length,
         graphSolve: messages.filter((message) => message.type === 'graphSolve').length,
+        setCoverSolve: messages.filter((message) => message.type === 'setCover').length,
       };
     },
   };
@@ -160,6 +164,10 @@ async function main() {
     setWorkerBridgeEnabled: NetworkFlowApi.setWorkerBridgeEnabled,
   });
   const networkFlowWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'set-cover' });
+  const setCoverWorkerStatsBefore = workerSpy.snapshot();
+  const setCoverResults = await runSetCoverCases(SetCoverApi as never);
+  const setCoverWorkerStatsAfter = workerSpy.snapshot();
   setStatus({ ok: false, phase: 'mathopt' });
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({ initMathOpt: MathOptApi.initMathOpt, MathOpt: MathOptApi.MathOpt }, {
@@ -186,6 +194,7 @@ async function main() {
     mpSolverResults,
     knapsackResults,
     networkFlowResults,
+    setCoverResults,
     mathOptResults,
     pdlpResults,
     routingWorkerStatsBefore,
@@ -196,6 +205,8 @@ async function main() {
     knapsackWorkerStatsAfter,
     networkFlowWorkerStatsBefore,
     networkFlowWorkerStatsAfter,
+    setCoverWorkerStatsBefore,
+    setCoverWorkerStatsAfter,
     mathOptWorkerStatsBefore,
     mathOptWorkerStatsAfter,
   });

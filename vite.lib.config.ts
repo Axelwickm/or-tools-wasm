@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import dts from 'vite-plugin-dts';
 
@@ -18,6 +18,7 @@ const libEntries = {
   pdlp: path.join(libRoot, 'pdlp.ts'),
   knapsack: path.join(libRoot, 'knapsack.ts'),
   'network-flow': path.join(libRoot, 'network-flow.ts'),
+  'set-cover': path.join(libRoot, 'set-cover.ts'),
 };
 
 const unwrapDataUrlWorkers = (code: string) =>
@@ -84,7 +85,16 @@ const emitWasmSourceMapsPlugin = (): Plugin => ({
       'mp_solver_runtime_asyncify.wasm.map',
       'mathopt_runtime.wasm.map',
       'mathopt_runtime_asyncify.wasm.map',
+      'pdlp_runtime.wasm.map',
+      'pdlp_runtime_asyncify.wasm.map',
+      'graph_runtime.wasm.map',
+      'graph_runtime_asyncify.wasm.map',
+      'set_cover_runtime.wasm.map',
+      'set_cover_runtime_asyncify.wasm.map',
     ]) {
+      if (!existsSync(path.join(wasmBuildDir, fileName))) {
+        continue;
+      }
       this.emitFile({
         type: 'asset',
         fileName: `assets/${fileName}`,
