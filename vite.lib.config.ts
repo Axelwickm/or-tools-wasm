@@ -19,6 +19,7 @@ const libEntries = {
   knapsack: path.join(libRoot, 'knapsack.ts'),
   'network-flow': path.join(libRoot, 'network-flow.ts'),
   'set-cover': path.join(libRoot, 'set-cover.ts'),
+  rcpsp: path.join(libRoot, 'rcpsp.ts'),
 };
 
 const unwrapDataUrlWorkers = (code: string) =>

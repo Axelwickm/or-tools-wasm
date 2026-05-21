@@ -46,6 +46,7 @@ export default defineConfig({
         network_flow_max_flow: path.resolve(siteRoot, 'network_flow_max_flow.html'),
         network_flow_min_cost_flow: path.resolve(siteRoot, 'network_flow_min_cost_flow.html'),
         routing_dispatch: path.resolve(siteRoot, 'routing_dispatch.html'),
+        rcpsp_project: path.resolve(siteRoot, 'rcpsp_project.html'),
         routing_simple: path.resolve(siteRoot, 'routing_simple.html'),
         routing_vrp: path.resolve(siteRoot, 'routing_vrp.html'),
         sat_simple_mip: path.resolve(siteRoot, 'sat_simple_mip.html'),

@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 623 upstream tests; 406 ✅ implemented; 23 🟨 placeholders/API gaps; 1 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Double-checked so far: 412; mismatches found: 3.
+Totals: 624 upstream tests; 407 ✅ implemented; 23 🟨 placeholders/API gaps; 1 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Double-checked so far: 413; mismatches found: 3.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -249,6 +249,12 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
   - ✅ 🔎 SetCoverTest.test_knights_cover_random
   - ✅ 🔎 SetCoverTest.test_knights_cover_trivial
   - ⚪ 🔎 TODO-only upstream cases - `KnightsCoverGreedyAndTabu`, `KnightsCoverGreedyRandomClear`, `KnightsCoverElementDegreeRandomClear`, `KnightsCoverRandomClearMip`, and `KnightsCoverMip` are comments in upstream `set_cover_test.py`, not runnable Python tests.
+
+## ortools/scheduling/python/rcpsp_test.py
+- RcpspTest
+  - ✅ 🔎 RcpspTest.testParseAndAccess - shared TS/WASM fixture uses the same `j301_1.sm` PSPLIB data and checks parser success plus `len(resources) == 4` and `len(tasks) == 32`; browser-oriented parity uses `parse_string()` instead of Python's filesystem-only `parse_file()` path.
+- Representative CP-SAT-backed RCPSP coverage
+  - 🧪 Worker-bridge coverage note - shared TS/WASM fixtures also solve a small renewable-resource project schedule through the public `RcpspModelBuilder`, verify generated CP-SAT constraints, direct and worker-bridge solve status, makespan `8`, and selected activity starts/ends. This is not included in upstream Python test totals because upstream `rcpsp_test.py` only tests parser access.
 
 ## ortools/graph/python and ortools/graph/samples
 - Python graph wrapper tests

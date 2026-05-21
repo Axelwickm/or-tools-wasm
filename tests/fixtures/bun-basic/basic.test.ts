@@ -25,6 +25,7 @@ import {
 } from 'or-tools-wasm/network-flow';
 import * as SetCoverApi from 'or-tools-wasm/set-cover';
 import { terminateLoadedRuntimeThreads as terminateSetCoverRuntimeThreads } from 'or-tools-wasm/set-cover';
+import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import {
   initMathOpt,
   MathOpt,
@@ -53,6 +54,7 @@ import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
+import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
@@ -127,6 +129,11 @@ if (!setCoverResults.every((result) => result.ok)) {
   throw new Error(`bun Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
 }
 
+const rcpspResults = await runRcpspCases(RcpspApi as never);
+if (!rcpspResults.every((result) => result.ok)) {
+  throw new Error(`bun RCPSP case failed: ${JSON.stringify(rcpspResults)}`);
+}
+
 const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
 if (!mathOptResults.every((result) => result.ok)) {
   throw new Error(`bun MathOpt case failed: ${JSON.stringify(mathOptResults)}`);
@@ -141,7 +148,7 @@ if (!pdlpResults.every((result) => result.ok)) {
   throw new Error(`bun PDLP case failed: ${JSON.stringify(pdlpResults)}`);
 }
 
-return `bun ran ${cpSatCases.length} CP-SAT cases, ${highLevelCpSatResults.length} high-level CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${knapsackResults.length} Knapsack cases, ${networkFlowResults.length} Network Flow cases, ${setCoverResults.length} Set Cover cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`;
+return `bun ran ${cpSatCases.length} CP-SAT cases, ${highLevelCpSatResults.length} high-level CP-SAT cases, ${routingResults.length} routing cases, ${mpSolverResults.length} MPSolver cases, ${knapsackResults.length} Knapsack cases, ${networkFlowResults.length} Network Flow cases, ${setCoverResults.length} Set Cover cases, ${rcpspResults.length} RCPSP cases, ${mathOptResults.length} MathOpt cases, and ${pdlpResults.length} PDLP cases across ${results.length} worker profiles`;
 }
 
 try {
@@ -149,6 +156,7 @@ try {
 } finally {
   setWorkerBridgeEnabled(false);
   SetCoverApi.setWorkerBridgeEnabled(false);
+  RcpspApi.setWorkerBridgeEnabled(false);
   await terminateLoadedRuntimeThreads();
   await terminateSetCoverRuntimeThreads();
 }

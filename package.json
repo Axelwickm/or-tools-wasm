@@ -96,6 +96,15 @@
       "import": "./build/javascript/browser/set-cover.js",
       "default": "./build/javascript/browser/set-cover.js"
     },
+    "./rcpsp": {
+      "types": "./build/javascript/lib/rcpsp.d.ts",
+      "bun": "./build/javascript/node/rcpsp.js",
+      "deno": "./build/javascript/node/rcpsp.js",
+      "node": "./build/javascript/node/rcpsp.js",
+      "browser": "./build/javascript/browser/rcpsp.js",
+      "import": "./build/javascript/browser/rcpsp.js",
+      "default": "./build/javascript/browser/rcpsp.js"
+    },
     "./build/javascript/lib/*": "./build/javascript/lib/*"
   },
   "imports": {

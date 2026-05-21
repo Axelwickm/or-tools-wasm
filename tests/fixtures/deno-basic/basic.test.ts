@@ -23,6 +23,7 @@ import {
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
 import * as SetCoverApi from 'or-tools-wasm/set-cover';
+import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import {
   initMathOpt,
   MathOpt,
@@ -51,6 +52,7 @@ import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
+import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
@@ -119,6 +121,11 @@ Deno.test('runs the shared CP-SAT cases in Deno', async () => {
   const setCoverResults = await runSetCoverCases(SetCoverApi as never);
   if (!setCoverResults.every((result) => result.ok)) {
     throw new Error(`deno Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
+  }
+
+  const rcpspResults = await runRcpspCases(RcpspApi as never);
+  if (!rcpspResults.every((result) => result.ok)) {
+    throw new Error(`deno RCPSP case failed: ${JSON.stringify(rcpspResults)}`);
   }
 
   const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });

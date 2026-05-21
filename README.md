@@ -26,8 +26,8 @@ as multithreaded WebAssembly.
 Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in).
 
 `or-tools-wasm` provides solver-specific WebAssembly runtimes and TypeScript
-APIs for CP-SAT, routing, MPSolver, MathOpt, PDLP, Knapsack, Network Flow, and
-Set Cover. It is published as an ESM package and is verified with Vite 7,
+APIs for CP-SAT, routing, MPSolver, MathOpt, PDLP, Knapsack, Network Flow, Set
+Cover, and RCPSP. It is published as an ESM package and is verified with Vite 7,
 Webpack 5, Rollup 4, Node 22, Deno 2, and Bun.
 
 ## Usage
@@ -62,6 +62,7 @@ import { Pdlp } from 'or-tools-wasm/pdlp';
 import { KnapsackSolver } from 'or-tools-wasm/knapsack';
 import { SimpleMaxFlow } from 'or-tools-wasm/network-flow';
 import { SetCoverModel } from 'or-tools-wasm/set-cover';
+import { RcpspModelBuilder } from 'or-tools-wasm/rcpsp';
 ```
 
 Create or serialize an OR-Tools proto model, validate it, then solve it:
@@ -122,7 +123,7 @@ console.log(result.response);
 | Network flow algorithms | ✅ | Dedicated max-flow, min-cost-flow, and linear-sum assignment graph algorithms. |
 | Assignment algorithms | ✅ | Linear-sum assignment through the dedicated Network Flow API. |
 | Set cover | ✅ | Dedicated weighted set cover model, invariant, and heuristic search API. |
-| RCPSP |  | Resource-constrained project scheduling problem support. |
+| RCPSP | ✅ | CP-SAT-backed resource-constrained project scheduling model, parser, and visual scheduling surface. |
 | Linear Solver ModelBuilder |  | Python-like `linear_solver.model_builder` API for ergonomic LP/MIP modeling, import/export helpers, and backend solve helpers. |
 | MathOpt incremental/callback/filter APIs |  | Incremental solving, solve/model filters, message callbacks, solve interrupters, indicator helpers, and richer result helpers. |
 | BOP |  | Optional BOP integer-programming backend for remaining legacy MPSolver parity. |
@@ -135,7 +136,6 @@ XPRESS, HiGHS, OSQP, ECOS, and SCS are not planned.
 
 Near-term parity work:
 
-- Implement RCPSP as the next dedicated OR-Tools surface.
 - Add Linear Solver ModelBuilder if continuing Python API parity beyond solver
   runtimes.
 - Close the remaining MathOpt API gaps around incremental solving, filters,
@@ -154,8 +154,8 @@ imports, with no manual copying into `public/` or `static/` required.
 ## API reference
 
 See [docs/api.md](docs/api.md) for the full TypeScript API reference covering
-CP-SAT, routing, MPSolver, MathOpt, PDLP, worker behavior, generated protobuf
-types, and native object cleanup.
+CP-SAT, routing, MPSolver, MathOpt, PDLP, RCPSP, worker behavior, generated
+protobuf types, and native object cleanup.
 
 ## Browser requirements
 
@@ -173,7 +173,7 @@ fail during WebAssembly runtime or worker startup.
 Browser solves can run through a hidden worker bridge, so the main thread stays
 available for rendering, input, progress UI, and cancellation. The shared worker
 bridge controls apply across CP-SAT, routing, MPSolver, Knapsack, Network Flow,
-Set Cover, MathOpt, and PDLP:
+Set Cover, RCPSP, MathOpt, and PDLP:
 
 ```ts
 import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm/cp-sat';
@@ -184,12 +184,12 @@ console.log(isWorkerBridgeEnabled());
 
 Worker bridge support is separate from solver threading. For example, GLPK is
 single-threaded in this package but can still run through the browser worker
-bridge, while CP-SAT, SAT, SCIP/GSCIP, CBC, and other threaded-capable paths may
-also accept solver thread settings. Knapsack and Network Flow can run through
-the worker bridge but do not expose solver thread settings. Set Cover is also
-single-threaded and worker-bridge capable. The package loads solver runtimes on
-demand; application code does not need to choose between JSPI and Asyncify
-manually.
+bridge, while CP-SAT, SAT, SCIP/GSCIP, CBC, RCPSP, and other threaded-capable
+paths may also accept solver thread settings. Knapsack and Network Flow can run
+through the worker bridge but do not expose solver thread settings. Set Cover is
+also single-threaded and worker-bridge capable. The package loads solver
+runtimes on demand; application code does not need to choose between JSPI and
+Asyncify manually.
 
 For Vite dev and preview servers, set the headers in `vite.config.ts`:
 

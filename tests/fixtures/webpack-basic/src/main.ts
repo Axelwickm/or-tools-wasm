@@ -5,6 +5,7 @@ import { runMathOptCases } from '../../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../../browser-basic-src/pdlp_runner.ts';
+import { runRcpspCases } from '../../browser-basic-src/rcpsp_runner.ts';
 import { runRoutingCases } from '../../browser-basic-src/routing_runner.ts';
 import { runSetCoverCases } from '../../browser-basic-src/set_cover_runner.ts';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
@@ -13,6 +14,7 @@ import * as MPSolverApi from 'or-tools-wasm/mp-solver';
 import * as KnapsackApi from 'or-tools-wasm/knapsack';
 import * as NetworkFlowApi from 'or-tools-wasm/network-flow';
 import * as SetCoverApi from 'or-tools-wasm/set-cover';
+import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import * as MathOptApi from 'or-tools-wasm/mathopt';
 import * as PdlpApi from 'or-tools-wasm/pdlp';
 
@@ -168,6 +170,8 @@ async function main() {
   const setCoverWorkerStatsBefore = workerSpy.snapshot();
   const setCoverResults = await runSetCoverCases(SetCoverApi as never);
   const setCoverWorkerStatsAfter = workerSpy.snapshot();
+  setStatus({ ok: false, phase: 'rcpsp' });
+  const rcpspResults = await runRcpspCases(RcpspApi as never);
   setStatus({ ok: false, phase: 'mathopt' });
   const mathOptWorkerStatsBefore = workerSpy.snapshot();
   const mathOptResults = await runMathOptCases({ initMathOpt: MathOptApi.initMathOpt, MathOpt: MathOptApi.MathOpt }, {
@@ -195,6 +199,7 @@ async function main() {
     knapsackResults,
     networkFlowResults,
     setCoverResults,
+    rcpspResults,
     mathOptResults,
     pdlpResults,
     routingWorkerStatsBefore,

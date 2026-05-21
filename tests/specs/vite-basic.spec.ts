@@ -95,6 +95,12 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       status?: number;
       objectiveValue?: number;
     }>;
+    rcpspResults?: Array<{
+      name?: string;
+      ok?: boolean;
+      makespan?: number | null;
+      statusName?: string;
+    }>;
     routingWorkerStatsBefore?: {
       routingSolve?: number;
     };
@@ -221,6 +227,30 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       name: 'assignment_linear_sum_assignment.py (worker)',
       ok: true,
       objectiveValue: 265,
+    }),
+  ]));
+  expect(parsedStatus.rcpspResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      name: 'RcpspTest.testParseAndAccess (direct)',
+      ok: true,
+      makespan: null,
+    }),
+    expect.objectContaining({
+      name: 'RcpspTest.testParseAndAccess (worker)',
+      ok: true,
+      makespan: null,
+    }),
+    expect.objectContaining({
+      name: 'RcpspCpSatSample.house_project (direct)',
+      ok: true,
+      makespan: 8,
+      statusName: 'OPTIMAL',
+    }),
+    expect.objectContaining({
+      name: 'RcpspCpSatSample.house_project (worker)',
+      ok: true,
+      makespan: 8,
+      statusName: 'OPTIMAL',
     }),
   ]));
 });

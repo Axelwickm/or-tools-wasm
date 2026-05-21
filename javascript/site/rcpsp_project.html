@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>RCPSP - Project Schedule</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      .schedule-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 0.8fr);
+        gap: 1rem;
+        align-items: start;
+      }
+
+      .timeline {
+        overflow-x: auto;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 0.75rem;
+      }
+
+      .axis,
+      .task-row,
+      .usage-row {
+        display: grid;
+        grid-template-columns: 8rem repeat(var(--horizon), minmax(2rem, 1fr));
+        min-width: calc(8rem + var(--horizon) * 2rem);
+      }
+
+      .axis-cell,
+      .task-label,
+      .usage-label {
+        color: #57606a;
+        font-size: 0.85rem;
+      }
+
+      .axis-cell {
+        text-align: center;
+        border-bottom: 1px solid #d0d7de;
+        padding-bottom: 0.25rem;
+      }
+
+      .task-row,
+      .usage-row {
+        min-height: 2.3rem;
+        align-items: center;
+        border-bottom: 1px solid #eaeef2;
+      }
+
+      .task-label,
+      .usage-label {
+        padding-right: 0.5rem;
+        white-space: nowrap;
+      }
+
+      .bar {
+        height: 1.35rem;
+        border-radius: 4px;
+        background: #1f883d;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: 700;
+        grid-row: 1;
+      }
+
+      .bar.secondary { background: #0969da; }
+      .bar.warning { background: #bf8700; }
+      .bar.final { background: #8250df; }
+
+      .usage-cell {
+        height: 1.35rem;
+        margin: 0 1px;
+        border-radius: 3px;
+        background: #ddf4ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.78rem;
+        color: #0969da;
+      }
+
+      .usage-cell.full {
+        background: #ffebe9;
+        color: #cf222e;
+        font-weight: 700;
+      }
+
+      .metrics {
+        display: grid;
+        gap: 0.5rem;
+      }
+
+      .metric {
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 0.65rem;
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 1.4rem;
+      }
+
+      @media (max-width: 900px) {
+        .schedule-shell {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>RCPSP - project schedule</h1>
+    <p><em>Problem: schedule dependent project activities as early as possible without exceeding the shared crew capacity.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import {
+  initRcpsp,
+  RcpspModelBuilder,
+  setWorkerBridgeEnabled,
+} from 'or-tools-wasm/rcpsp';
+
+setWorkerBridgeEnabled(true);
+await initRcpsp();
+
+const project = new RcpspModelBuilder('house_project')
+  .add_resource({ name: 'crew', capacity: 3 })
+  .add_activity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
+  .add_activity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
+  .add_activity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
+  .add_activity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
+  .add_activity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
+  .build();
+
+const result = await project.solve({ numWorkers: 4, maxTimeInSeconds: 5 });
+console.log(result.statusName, result.makespan, result.tasks);</code></pre>
+      </details>
+    </div>
+    <div class="controls">
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Workers <input id="workers" class="short-number" type="number" min="1" max="8" value="4"></label>
+      <button id="run" data-idle-label="Solve Schedule">Solve Schedule</button>
+    </div>
+    <div class="schedule-shell">
+      <section>
+        <h2>Gantt schedule</h2>
+        <div id="timeline" class="timeline">Run the solver to view the schedule.</div>
+      </section>
+      <section>
+        <h2>Result</h2>
+        <div id="metrics" class="metrics"></div>
+        <p class="section-heading">Status:</p>
+        <pre id="status"></pre>
+      </section>
+    </div>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./rcpsp_project.ts"></script>
+  </body>
+</html>

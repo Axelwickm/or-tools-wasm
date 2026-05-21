@@ -15,6 +15,7 @@ const publicEntryNames = [
   'knapsack',
   'network-flow',
   'set-cover',
+  'rcpsp',
 ];
 
 const externalLoaderPlugin = {

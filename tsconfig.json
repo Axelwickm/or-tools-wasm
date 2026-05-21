@@ -18,6 +18,7 @@
       "or-tools-wasm/knapsack": ["javascript/lib/knapsack.ts"],
       "or-tools-wasm/network-flow": ["javascript/lib/network-flow.ts"],
       "or-tools-wasm/set-cover": ["javascript/lib/set-cover.ts"],
+      "or-tools-wasm/rcpsp": ["javascript/lib/rcpsp.ts"],
       "@internal-wasm/*": ["build/javascript/wasm/*"],
       "#internal-wasm/*": ["build/javascript/wasm/*"]
     }

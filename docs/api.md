@@ -1136,6 +1136,76 @@ Set Cover is single-threaded in this package. It supports the shared browser
 worker bridge, so UI code can run heuristic searches off the main thread, but
 there is no solver thread-count parameter.
 
+## RCPSP
+
+The dedicated RCPSP API provides a Python-like parser surface for
+`ortools.scheduling.python.rcpsp` and a higher-level TypeScript project
+scheduling builder that compiles to CP-SAT scheduling constraints.
+
+```ts
+import {
+  initRcpsp,
+  RcpspModelBuilder,
+  setWorkerBridgeEnabled,
+} from 'or-tools-wasm/rcpsp';
+
+setWorkerBridgeEnabled(true);
+await initRcpsp();
+
+const project = new RcpspModelBuilder('house_project')
+  .add_resource({ name: 'crew', capacity: 3 })
+  .add_activity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
+  .add_activity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
+  .add_activity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
+  .add_activity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
+  .add_activity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
+  .build();
+
+const result = await project.solve({ numWorkers: 4, maxTimeInSeconds: 5 });
+console.log(result.statusName, result.makespan, result.tasks);
+```
+
+`initRcpsp(): Promise<void>` is available for consistency with other solver
+subpaths. RCPSP currently reuses the CP-SAT runtime instead of loading a
+separate native runtime.
+
+`RcpspModelBuilder` exposes:
+
+- `add_resource({ name, capacity, renewable? })`
+- `add_activity({ name, duration, demands?, successors? })`
+- `build(): RcpspProblem`
+
+`RcpspProblem` exposes:
+
+- `RcpspProblem.from_proto(proto)` / `fromProto(proto)`
+- `RcpspProblem.from_psplib(text)` / `fromPsplib(text)`
+- properties: `name`, `resources`, `tasks`, `horizon`
+- `export_model_as_proto()` / `exportModelAsProto()`
+- `to_cp_sat_model()` / `toCpSatModel()`
+- `solve(params?: SatParameters): Promise<RcpspSolveResult>`
+
+`RcpspSolveResult` contains:
+
+- `status` and `statusName`
+- `makespan`
+- `objectiveValue`
+- scheduled `tasks` with `name`, `start`, `end`, `duration`, `demands`, and
+  `successors`
+- the generated `CpModel`, `starts`, `ends`, and `makespanVar` for callers that
+  need the lower-level CP-SAT model path
+
+`RcpspParser` mirrors the upstream Python wrapper shape with `problem()` and
+`parse_string()`. `parse_file()` is exported for API discoverability but throws
+in this browser-oriented package because consumers do not share a native
+OR-Tools filesystem; pass file contents to `parse_string()` instead.
+
+The CP-SAT-backed builder supports the standard renewable-resource RCPSP case:
+activities, durations, precedence constraints, renewable resource capacities,
+and makespan minimization. RCPSP/Max delays, resource-investment objectives, and
+consumer/producer instances are parsed as proto data but rejected by
+`to_cp_sat_model()` / `solve()` until those variants have a dedicated model
+translation.
+
 ## Network Flow
 
 The dedicated Network Flow API mirrors the Python graph wrappers for
@@ -1715,11 +1785,12 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 ## Browser Worker Bridge
 
 The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, Network Flow, Set
-Cover, and PDLP paths can use the browser worker bridge. Worker bridge
+Cover, RCPSP, and PDLP paths can use the browser worker bridge. Worker bridge
 availability is independent of solver threading support; for example GLPK,
 Knapsack, Set Cover, and Network Flow are single-threaded but can still run
-through the worker bridge in browser UI code, while CP-SAT, SAT, SCIP/GSCIP,
-CBC, and other threaded-capable paths can also accept solver thread settings.
+through the worker bridge in browser UI code, while RCPSP uses CP-SAT and can
+also accept CP-SAT thread settings. CP-SAT, SAT, SCIP/GSCIP, CBC, and other
+threaded-capable paths can also accept solver thread settings.
 Prefer the shared package controls:
 
 ```ts

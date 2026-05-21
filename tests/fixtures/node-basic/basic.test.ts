@@ -43,6 +43,7 @@ import {
   initPdlp,
   Pdlp,
 } from 'or-tools-wasm/pdlp';
+import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import {
   BOOL_FALSE,
   BOOL_UNSPECIFIED,
@@ -65,6 +66,7 @@ import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
 import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
+import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
 import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
 
@@ -151,6 +153,11 @@ test('runs the shared Set Cover cases in Node', async () => {
     setWorkerBridgeEnabled: setSetCoverWorkerBridgeEnabled,
   });
   assert.equal(setCoverResults.every((result) => result.ok), true, `node Set Cover case failed: ${JSON.stringify(setCoverResults)}`);
+});
+
+test('runs the shared RCPSP cases in Node', async () => {
+  const rcpspResults = await runRcpspCases(RcpspApi as never);
+  assert.equal(rcpspResults.every((result) => result.ok), true, `node RCPSP case failed: ${JSON.stringify(rcpspResults)}`);
 });
 
 test('runs the shared MathOpt cases in Node', async () => {
