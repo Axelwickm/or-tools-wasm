@@ -29,6 +29,7 @@ export default defineConfig({
     assetsInlineLimit: 0,
     rollupOptions: {
       input: {
+        bop_project_selection: path.resolve(siteRoot, 'bop_project_selection.html'),
         cbc_simple_mip: path.resolve(siteRoot, 'cbc_simple_mip.html'),
         clp_simple_lp: path.resolve(siteRoot, 'clp_simple_lp.html'),
         clp_transportation: path.resolve(siteRoot, 'clp_transportation.html'),

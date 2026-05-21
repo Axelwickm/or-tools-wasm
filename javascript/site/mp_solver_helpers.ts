@@ -3,7 +3,7 @@ import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, 
 type VariableKind = 'continuous' | 'integer';
 
 export type SimpleMpConfig = {
-  solverId: 'GLOP' | 'CLP' | 'GLPK_LP' | 'GLPK' | 'SAT' | 'SCIP' | 'CBC' | 'KNAPSACK';
+  solverId: 'GLOP' | 'CLP' | 'GLPK_LP' | 'GLPK' | 'SAT' | 'SCIP' | 'CBC' | 'BOP' | 'KNAPSACK';
   variableKind: VariableKind;
   expectedObjective: number;
   workerCount?: number;

@@ -187,6 +187,23 @@ test('runs the shared CP-SAT cases with and without the worker bridge', async ({
       objective: 23,
       values: expect.objectContaining({ x: 3, y: 2 }),
     }),
+    expect.objectContaining({
+      name: 'MPSolver: BOP binary project selection (direct)',
+      ok: true,
+      objective: 13,
+      values: expect.objectContaining({ analytics: 1, dashboard: 0, alerts: 1 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: BOP binary project selection (worker)',
+      ok: true,
+      objective: 13,
+      values: expect.objectContaining({ analytics: 1, dashboard: 0, alerts: 1 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: lp_test.py testBopInfeasible',
+      ok: true,
+      status: 0,
+    }),
   ]));
   expect(parsedStatus.knapsackWorkerStatsBefore?.knapsackSolve).toBe(0);
   expect(parsedStatus.knapsackWorkerStatsAfter?.knapsackSolve).toBeGreaterThanOrEqual(3);

@@ -56,6 +56,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   option(ORTOOLS_WASM_USE_CLP "Build CLP support into the WASM MPSolver runtime" ON)
   option(ORTOOLS_WASM_USE_CBC "Build CBC support into the WASM MPSolver runtime" ON)
   option(ORTOOLS_WASM_USE_KNAPSACK "Build Knapsack support into the WASM MPSolver runtime" ON)
+  option(ORTOOLS_WASM_USE_BOP "Build BOP support into the WASM MPSolver runtime" ON)
   option(ORTOOLS_WASM_USE_GLPK "Build GLPK support into the WASM MPSolver and MathOpt runtimes" ON)
   option(ORTOOLS_WASM_USE_SCIP "Build SCIP/GSCIP support into the WASM MPSolver and MathOpt runtimes" ON)
 endif()
@@ -245,6 +246,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   if(ORTOOLS_WASM_USE_KNAPSACK)
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/knapsack_interface.cc")
+  endif()
+  if(ORTOOLS_WASM_USE_BOP)
+    file(GLOB ORTOOLS_WASM_BOP_SOURCES CONFIGURE_DEPENDS
+      "${PROJECT_SOURCE_DIR}/ortools/bop/*.cc")
+    list(FILTER ORTOOLS_WASM_BOP_SOURCES EXCLUDE REGEX "_test\\.cc$")
+    list(APPEND MP_SOLVER_BROWSER_SOURCES
+      "${PROJECT_SOURCE_DIR}/ortools/linear_solver/bop_interface.cc"
+      ${ORTOOLS_WASM_BOP_SOURCES})
   endif()
   if(ORTOOLS_WASM_USE_GLPK)
     list(APPEND MP_SOLVER_BROWSER_SOURCES
@@ -468,6 +477,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     endforeach()
   endif()
 
+  if(ORTOOLS_WASM_USE_BOP)
+    foreach(MP_SOLVER_TARGET
+        mp_solver_runtime
+        mp_solver_runtime_asyncify
+        mp_solver_runtime_node
+        mp_solver_runtime_node_asyncify)
+      target_compile_definitions(${MP_SOLVER_TARGET} PRIVATE USE_BOP)
+    endforeach()
+  endif()
+
   target_link_options(cp_sat_runtime PRIVATE
     "--emit-tsd"
     "${JS_OUTPUT_DIR}/cp_sat_runtime.d.ts")
@@ -539,8 +558,8 @@ message(STATUS "Build benchmark: ${BUILD_benchmark}")
 # Optional third party solvers (enabled by default)
 ## BOP
 CMAKE_DEPENDENT_OPTION(USE_BOP "Use the BOP solver" OFF "BUILD_CXX" OFF)
-if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-  set(USE_BOP OFF CACHE BOOL "Use the BOP solver" FORCE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND ORTOOLS_WASM_USE_BOP)
+  set(USE_BOP ON CACHE BOOL "Use the BOP solver" FORCE)
 endif()
 message(STATUS "BOP support: ${USE_BOP}")
 

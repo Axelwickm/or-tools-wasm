@@ -110,7 +110,7 @@ console.log(result.response);
 | --- | --- | --- |
 | CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
 | Routing | ✅ | Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search. |
-| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, Knapsack MIP, and SAT MIP backends. |
+| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, BOP MIP, Knapsack MIP, and SAT MIP backends. |
 | MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, GLPK, GSCIP, CP-SAT, and PDLP backends. |
 | GLOP | ✅ | Google's simplex linear programming solver. |
 | PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
@@ -119,6 +119,7 @@ console.log(result.response);
 | GLPK | ✅ | GNU linear and mixed-integer programming backend. |
 | SCIP / GSCIP | ✅ | SCIP-based mixed-integer backend through MPSolver and MathOpt. |
 | CBC | ✅ | COIN-OR branch-and-cut mixed-integer programming backend through MPSolver. |
+| BOP | ✅ | Boolean/integer optimization backend through MPSolver. |
 | Knapsack | ✅ | Dedicated 0-1 and multi-dimensional knapsack solver, plus the MPSolver Knapsack backend. |
 | Network flow algorithms | ✅ | Dedicated max-flow, min-cost-flow, and linear-sum assignment graph algorithms. |
 | Assignment algorithms | ✅ | Linear-sum assignment through the dedicated Network Flow API. |
@@ -126,7 +127,6 @@ console.log(result.response);
 | RCPSP | ✅ | CP-SAT-backed resource-constrained project scheduling model, parser, and visual scheduling surface. |
 | Linear Solver ModelBuilder |  | Python-like `linear_solver.model_builder` API for ergonomic LP/MIP modeling, import/export helpers, and backend solve helpers. |
 | MathOpt incremental/callback/filter APIs |  | Incremental solving, solve/model filters, message callbacks, solve interrupters, indicator helpers, and richer result helpers. |
-| BOP |  | Optional BOP integer-programming backend for remaining legacy MPSolver parity. |
 
 Unchecked rows are planned OR-Tools targets that are not exposed by this package
 yet. Commercial and large third-party native backends such as Gurobi, CPLEX,
@@ -140,7 +140,6 @@ Near-term parity work:
   runtimes.
 - Close the remaining MathOpt API gaps around incremental solving, filters,
   callbacks, interrupters, indicator helpers, and result helper objects.
-- Consider BOP only if legacy MPSolver backend completeness becomes important.
 
 The TypeScript API mirrors the public OR-Tools API shape where it maps cleanly
 to WebAssembly. CP-SAT exposes both a Python-like high-level builder and the
@@ -182,12 +181,12 @@ setWorkerBridgeEnabled(true);
 console.log(isWorkerBridgeEnabled());
 ```
 
-Worker bridge support is separate from solver threading. For example, GLPK is
-single-threaded in this package but can still run through the browser worker
-bridge, while CP-SAT, SAT, SCIP/GSCIP, CBC, RCPSP, and other threaded-capable
-paths may also accept solver thread settings. Knapsack and Network Flow can run
-through the worker bridge but do not expose solver thread settings. Set Cover is
-also single-threaded and worker-bridge capable. The package loads solver
+Worker bridge support is separate from solver threading. For example, GLPK and
+BOP are single-threaded in this package but can still run through the browser
+worker bridge, while CP-SAT, SAT, SCIP/GSCIP, CBC, RCPSP, and other
+threaded-capable paths may also accept solver thread settings. Knapsack and
+Network Flow can run through the worker bridge but do not expose solver thread
+settings. Set Cover is also single-threaded and worker-bridge capable. The package loads solver
 runtimes on demand; application code does not need to choose between JSPI and
 Asyncify manually.
 

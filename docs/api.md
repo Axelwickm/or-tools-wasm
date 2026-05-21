@@ -787,12 +787,13 @@ Loads the MPSolver WebAssembly runtime.
 `GLOP_LINEAR_PROGRAMMING`, `CLP_LINEAR_PROGRAMMING`, `PDLP_LINEAR_PROGRAMMING`,
 `SAT_INTEGER_PROGRAMMING`, `GLPK_LINEAR_PROGRAMMING`,
 `SCIP_MIXED_INTEGER_PROGRAMMING`, `GLPK_MIXED_INTEGER_PROGRAMMING`,
-`CBC_MIXED_INTEGER_PROGRAMMING`, `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, and
+`CBC_MIXED_INTEGER_PROGRAMMING`, `BOP_INTEGER_PROGRAMMING`,
+`KNAPSACK_MIXED_INTEGER_PROGRAMMING`, and
 others. Only problem types compiled into the WebAssembly runtime will be supported at runtime; use
 `MPSolver.SupportsProblemType()`.
 
 The default package runtime currently includes `GLOP`, `CLP`, and `GLPK_LP` for
-continuous linear programming, plus `SAT`, `GLPK`, `SCIP`, `CBC`, and
+continuous linear programming, plus `SAT`, `GLPK`, `SCIP`, `CBC`, `BOP`, and
 `KNAPSACK` for integer linear programming through MPSolver.
 
 `MPSolverResultStatus` contains `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
@@ -1786,7 +1787,7 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 
 The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, Network Flow, Set
 Cover, RCPSP, and PDLP paths can use the browser worker bridge. Worker bridge
-availability is independent of solver threading support; for example GLPK,
+availability is independent of solver threading support; for example GLPK, BOP,
 Knapsack, Set Cover, and Network Flow are single-threaded but can still run
 through the worker bridge in browser UI code, while RCPSP uses CP-SAT and can
 also accept CP-SAT thread settings. CP-SAT, SAT, SCIP/GSCIP, CBC, and other

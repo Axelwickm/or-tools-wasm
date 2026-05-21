@@ -31,6 +31,7 @@ function selectedSolverId() {
     || solverSelect?.value === 'GLPK'
     || solverSelect?.value === 'SCIP'
     || solverSelect?.value === 'CBC'
+    || solverSelect?.value === 'BOP'
     || solverSelect?.value === 'KNAPSACK'
     ? solverSelect.value
     : 'GLOP';
@@ -56,7 +57,7 @@ async function runSimpleLp() {
   if (statusEl) statusEl.textContent = '';
   try {
     const solverId = selectedSolverId();
-    const variableKind = solverId === 'SAT' || solverId === 'GLPK' || solverId === 'SCIP' || solverId === 'CBC' || solverId === 'KNAPSACK' ? 'integer' : 'continuous';
+    const variableKind = solverId === 'SAT' || solverId === 'GLPK' || solverId === 'SCIP' || solverId === 'CBC' || solverId === 'BOP' || solverId === 'KNAPSACK' ? 'integer' : 'continuous';
     const workerCount = solverId === 'SAT' ? getSelectedWorkerCount() : undefined;
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
     appendStatus(statusEl, workerCount
