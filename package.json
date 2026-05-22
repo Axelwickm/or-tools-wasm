@@ -112,6 +112,7 @@
   },
   "scripts": {
     "build:wasm": "bash scripts/build_wasm.sh",
+    "build:wasm:clean": "ORTOOLS_WASM_CLEAN=1 bash scripts/build_wasm.sh",
     "gen:sat-parameters": "node scripts/generate_sat_parameters_types.mjs",
     "patch:wasm-runtime": "node scripts/patch_emscripten_runtime.mjs",
     "build:lib": "npm run build:wasm && npm run patch:wasm-runtime && npm run gen:sat-parameters && tsc && vite build --config vite.lib.config.ts && node scripts/build_browser_sources.mjs && node scripts/build_node_sources.mjs",
