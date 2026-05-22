@@ -73,19 +73,6 @@ async function solveAndAssert(
   return result;
 }
 
-function failResult(name: string, source: string, mode: 'direct' | 'worker', threads: number, error: unknown): MathOptModelCaseResult {
-  return {
-    name,
-    source,
-    mode,
-    threads,
-    ok: false,
-    terminationReason: `ERROR: ${error instanceof Error ? error.message : String(error)}`,
-    objectiveValue: null,
-    values: {},
-  };
-}
-
 function apiOnly(values: Record<string, number> = {}) {
   return Promise.resolve({
     terminationReason: 'API_ONLY',
@@ -1104,25 +1091,20 @@ export async function runMathOptModelContractCases(
   mode: 'direct' | 'worker' = 'direct',
   threads = 1,
 ): Promise<MathOptModelCaseResult[]> {
-  api.MathOpt.setWorkerBridgeEnabled(mode === 'worker');
   await api.initMathOpt();
   const results: MathOptModelCaseResult[] = [];
   for (const testCase of mathOptModelContractCases) {
-    try {
-      const runResult = await testCase.run(api, threads);
-      results.push({
-        name: testCase.name,
-        source: testCase.source,
-        mode,
-        threads,
-        ok: true,
-        terminationReason: runResult.terminationReason,
-        objectiveValue: runResult.objectiveValue ?? null,
-        values: runResult.values,
-      });
-    } catch (error) {
-      results.push(failResult(testCase.name, testCase.source, mode, threads, error));
-    }
+    const runResult = await testCase.run(api, threads);
+    results.push({
+      name: testCase.name,
+      source: testCase.source,
+      mode,
+      threads,
+      ok: true,
+      terminationReason: runResult.terminationReason,
+      objectiveValue: runResult.objectiveValue ?? null,
+      values: runResult.values,
+    });
   }
   return results;
 }

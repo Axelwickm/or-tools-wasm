@@ -1,4 +1,5 @@
 import type { SharedCaseMetadata } from '../../../shared_case.ts';
+import { fixtureModes, withWorkerBridgeMode } from '../../../shared_case.ts';
 
 type HighLevelApi = {
   CpModel: new () => any;
@@ -44,6 +45,8 @@ type HighLevelApi = {
   weightedSum(values: Iterable<unknown>, coeffs: Iterable<number>): any;
   rebuild_from_linear_expression_proto: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
   rebuildFromLinearExpressionProto?: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
+  setWorkerBridgeEnabled(enabled: boolean): void;
+  isWorkerBridgeEnabled(): boolean;
   DecisionStrategyProto_VariableSelectionStrategy: {
     CHOOSE_MIN_DOMAIN_SIZE: unknown;
   };
@@ -315,6 +318,19 @@ export type CpSatHighLevelParityCase = {
   source: 'ortools/sat/python/cp_model_test.py';
   run(api: HighLevelApi): Promise<void> | void;
 } & Partial<SharedCaseMetadata>;
+
+type CpSatHighLevelParityResult = {
+  id: string;
+  name: string;
+  solver: string;
+  source: string;
+  upstream: string;
+  tags: string[];
+  mode: 'direct' | 'worker';
+  workerProfile: string;
+  params: { numWorkers: number };
+  ok: true;
+};
 
 function cpSatHighLevelCaseId(name: string) {
   return `cp_sat_high_level.${name
@@ -3291,17 +3307,39 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
 ];
 
 export async function runCpSatHighLevelParityCases(api: HighLevelApi) {
-  const results = [];
-  for (const testCase of cpSatHighLevelParityCases) {
-    await testCase.run(api);
-    results.push({
-      id: testCase.id ?? cpSatHighLevelCaseId(testCase.name),
-      name: testCase.name,
-      solver: testCase.solver ?? 'cp-sat',
-      source: testCase.source,
-      upstream: testCase.upstream ?? testCase.name,
-      tags: testCase.tags ?? ['python-parity', 'high-level'],
-      ok: true,
+  const results: CpSatHighLevelParityResult[] = [];
+  for (const mode of fixtureModes) {
+    await withWorkerBridgeMode(api, mode, 'high-level CP-SAT', async () => {
+      for (const profile of [
+        { label: '1 worker', numWorkers: 1 },
+        { label: '4 workers', numWorkers: 4 },
+      ]) {
+        class MatrixCpSolver extends api.CpSolver {
+          constructor() {
+            super();
+            this.parameters.numWorkers = profile.numWorkers;
+          }
+        }
+        const matrixApi = {
+          ...api,
+          CpSolver: MatrixCpSolver,
+        };
+        for (const testCase of cpSatHighLevelParityCases) {
+          await testCase.run(matrixApi);
+          results.push({
+            id: testCase.id ?? cpSatHighLevelCaseId(testCase.name),
+            name: `${testCase.name} (${mode}, ${profile.label})`,
+            solver: testCase.solver ?? 'cp-sat',
+            source: testCase.source,
+            upstream: testCase.upstream ?? testCase.name,
+            tags: [...(testCase.tags ?? ['python-parity', 'high-level']), mode, `${profile.numWorkers}-workers`],
+            mode,
+            workerProfile: profile.label,
+            params: { numWorkers: profile.numWorkers },
+            ok: true,
+          });
+        }
+      }
     });
   }
   return results;

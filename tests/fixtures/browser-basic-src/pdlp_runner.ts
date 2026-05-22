@@ -1,5 +1,5 @@
 import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { passedCase } from './shared_case.ts';
+import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
 
 type PdlpApi = {
   initPdlp(): Promise<void>;
@@ -13,6 +13,7 @@ type PdlpApi = {
     primal_dual_hybrid_gradient(qp: QuadraticProgramLike, params?: PdlpParams, initialSolution?: PrimalAndDualSolutionLike): Promise<PdlpResultLike>;
   };
   setWorkerBridgeEnabled: (enabled: boolean) => void;
+  isWorkerBridgeEnabled: () => boolean;
 };
 
 type QuadraticProgramLike = {
@@ -636,7 +637,7 @@ const pdlpCases: PdlpCase[] = pdlpCaseDefinitions.map((testCase) => ({
     ? 'ortools/pdlp/python/quadratic_program_test.py'
     : 'ortools/pdlp/python/primal_dual_hybrid_gradient_test.py',
   upstream: testCase.name,
-  tags: ['python-parity', 'direct', 'worker'],
+  tags: ['python-parity'],
   async run(api) {
     await testCase.run(api);
     return {};
@@ -646,14 +647,14 @@ const pdlpCases: PdlpCase[] = pdlpCaseDefinitions.map((testCase) => ({
 export async function runPdlpCases(api: PdlpApi): Promise<PdlpCaseResult[]> {
   await api.initPdlp();
   const results: PdlpCaseResult[] = [];
-  for (const mode of ['direct', 'worker'] as const) {
-    api.setWorkerBridgeEnabled(mode === 'worker');
-    for (const testCase of pdlpCases) {
-      const result = await testCase.run(api, { mode });
-      results.push(passedCase(testCase, { mode }, result));
-    }
+  for (const mode of fixtureModes) {
+    await withWorkerBridgeMode(api, mode, 'PDLP', async () => {
+      for (const testCase of pdlpCases) {
+        const result = await testCase.run(api, { mode });
+        results.push(passedCase(testCase, { mode }, result));
+      }
+    });
   }
-  api.setWorkerBridgeEnabled(false);
   return results;
 }
 

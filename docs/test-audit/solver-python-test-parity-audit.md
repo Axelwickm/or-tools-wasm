@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 624 upstream tests; 408 ✅ implemented; 23 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Double-checked so far: 414; mismatches found: 3.
+Totals: 624 upstream tests; 408 ✅ implemented; 23 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Open mismatches: 0.
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.

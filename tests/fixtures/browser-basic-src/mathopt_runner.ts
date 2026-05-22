@@ -1,6 +1,7 @@
 import { mathOptExpressionContractCases } from './mathopt_expression_contract.ts';
 import { runMathOptModelContractCases } from './mathopt_model_contract.ts';
 import { mathoptSolveResultContractCases } from './mathopt_solve_result_contract.ts';
+import { fixtureModes, withWorkerBridgeMode } from './shared_case.ts';
 
 export type MathOptCaseResult = {
   id?: string;
@@ -316,6 +317,7 @@ export type MathOptApi = {
       rawResponse: Uint8Array;
     }>;
     setWorkerBridgeEnabled: (enabled: boolean) => void;
+    isWorkerBridgeEnabled: () => boolean;
   };
 };
 
@@ -331,6 +333,17 @@ function near(actual: number | null, expected: number, tolerance = 1e-7) {
 
 function assertOptimal(name: string, result: { terminationReason: string }) {
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: expected OPTIMAL, got ${result.terminationReason}`);
+}
+
+async function assertRejectsContaining(action: () => Promise<unknown>, messagePart: string, label: string) {
+  try {
+    await action();
+  } catch (error) {
+    assert(error instanceof Error, `${label}: expected Error, got ${typeof error}`);
+    assert(error.message.includes(messagePart), `${label}: expected message containing ${JSON.stringify(messagePart)}, got ${JSON.stringify(error.message)}`);
+    return;
+  }
+  throw new Error(`${label}: expected rejection`);
 }
 
 function mathOptCaseId(name: string) {
@@ -528,13 +541,11 @@ async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<Ma
   assert(near(result.variableValues.x, 0), `MathOpt GLPK LP: expected x=0, got ${result.variableValues.x}`);
   assert(near(result.variableValues.y, 14), `MathOpt GLPK LP: expected y=14, got ${result.variableValues.y}`);
 
-  let rejectedThreads = false;
-  try {
-    await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLPK, threads: 4 });
-  } catch (error) {
-    rejectedThreads = error instanceof Error && error.message.includes('GLPK');
-  }
-  assert(rejectedThreads, 'MathOpt GLPK LP: expected threads > 1 to be rejected');
+  await assertRejectsContaining(
+    () => api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLPK, threads: 4 }),
+    'GLPK',
+    'MathOpt GLPK LP threads > 1',
+  );
 
   return withMathOptMetadata({
     name: 'MathOpt.testGlpkLinearProgram',
@@ -553,27 +564,45 @@ async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<Ma
 export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
   await api.initMathOpt();
   const results: MathOptCaseResult[] = [];
-  const modes: Array<'direct' | 'worker'> = ['direct', 'worker'];
-  for (const mode of modes) {
-    api.MathOpt.setWorkerBridgeEnabled(mode === 'worker');
-    for (const threads of [1, 4]) {
-      options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
-      results.push(await runGlopLp(api, mode, threads));
-      options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
-      results.push(await runCpSatMip(api, mode, threads));
-      options.onProgress?.('MathOpt.testGScipIntegerProgram', mode, threads);
-      results.push(await runGScipMip(api, mode, threads));
-      if (threads === 1) {
-        options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
-        results.push(await runGlpkLp(api, mode));
+  for (const mode of fixtureModes) {
+    await withWorkerBridgeMode(api.MathOpt, mode, 'MathOpt', async () => {
+      for (const threads of [1, 4]) {
+        options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
+        results.push(await runGlopLp(api, mode, threads));
+        options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
+        results.push(await runCpSatMip(api, mode, threads));
+        options.onProgress?.('MathOpt.testGScipIntegerProgram', mode, threads);
+        results.push(await runGScipMip(api, mode, threads));
+        if (threads === 1) {
+          options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
+          results.push(await runGlpkLp(api, mode));
+        }
+        for (const testCase of mathoptSolveResultContractCases) {
+          if (!activeSolveResultContractNames.has(testCase.name)) continue;
+          options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
+          const output = await testCase.run(api);
+          results.push(withMathOptMetadata({
+            name: `MathOpt.${testCase.name}`,
+            mode,
+            threads,
+            ok: !output.startsWith('TODO:'),
+            terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
+            objectiveValue: null,
+            values: {},
+          }, {
+            source: 'ortools/math_opt/python',
+            upstream: testCase.name,
+            tags: ['python-parity', 'solve-result', mode, `${threads}-threads`],
+          }));
+        }
       }
       for (const testCase of mathOptExpressionContractCases) {
-        options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
+        options.onProgress?.(`MathOpt.${testCase.name}`, mode, 1);
         const output = await testCase.run(api);
         results.push(withMathOptMetadata({
           name: `MathOpt.${testCase.name}`,
           mode,
-          threads,
+          threads: 1,
           ok: !output.startsWith('TODO:'),
           terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
           objectiveValue: null,
@@ -581,37 +610,18 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
         }, {
           source: 'ortools/math_opt/python',
           upstream: testCase.name,
-          tags: ['python-parity', 'expression', mode, `${threads}-threads`],
+          tags: ['python-parity', 'expression-api', mode],
         }));
       }
-      options.onProgress?.('MathOpt.modelContract', mode, threads);
-      results.push(...(await runMathOptModelContractCases(api, mode, threads)).map((result) =>
+      options.onProgress?.('MathOpt.modelContract', mode, 1);
+      results.push(...(await runMathOptModelContractCases(api, mode, 1)).map((result) =>
         withMathOptMetadata(result, {
           source: 'ortools/math_opt/python',
           upstream: result.name.replace(/^MathOpt\./, ''),
-          tags: ['python-parity', 'model', mode, `${threads}-threads`],
+          tags: ['python-parity', 'model-api', mode],
         })
       ));
-      for (const testCase of mathoptSolveResultContractCases) {
-        if (!activeSolveResultContractNames.has(testCase.name)) continue;
-        options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
-        const output = await testCase.run(api);
-        results.push(withMathOptMetadata({
-          name: `MathOpt.${testCase.name}`,
-          mode,
-          threads,
-          ok: !output.startsWith('TODO:'),
-          terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
-          objectiveValue: null,
-          values: {},
-        }, {
-          source: 'ortools/math_opt/python',
-          upstream: testCase.name,
-          tags: ['python-parity', 'solve-result', mode, `${threads}-threads`],
-        }));
-      }
-    }
+    });
   }
-  api.MathOpt.setWorkerBridgeEnabled(false);
   return results;
 }

@@ -1333,6 +1333,7 @@ Static constructors and aliases:
 - `MathOpt.UpperBoundedExpression`
 - `MathOpt.GlpkParameters`
 - `MathOpt.setWorkerBridgeEnabled(enabled): void`
+- `MathOpt.isWorkerBridgeEnabled(): boolean`
 - `MPSolver.setWorkerBridgeEnabled(enabled): void`
 - `MPSolver.isWorkerBridgeEnabled(): boolean`
 - `Pdlp.setWorkerBridgeEnabled(enabled): void`
@@ -1806,6 +1807,7 @@ Solver-specific aliases are also exposed for existing call sites:
 ```ts
 CpSat.setWorkerBridgeEnabled(true);
 MathOpt.setWorkerBridgeEnabled(true);
+MathOpt.isWorkerBridgeEnabled();
 MPSolver.setWorkerBridgeEnabled(true);
 Pdlp.setWorkerBridgeEnabled(true);
 RoutingModel.setWorkerBridgeEnabled(true);

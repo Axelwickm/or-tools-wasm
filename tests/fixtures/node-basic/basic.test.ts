@@ -13,11 +13,15 @@ import {
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
+  isWorkerBridgeEnabled as isKnapsackWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
+  setWorkerBridgeEnabled as setKnapsackWorkerBridgeEnabled,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
+  isWorkerBridgeEnabled as isNetworkFlowWorkerBridgeEnabled,
+  setWorkerBridgeEnabled as setNetworkFlowWorkerBridgeEnabled,
   SimpleLinearSumAssignment,
   SimpleMaxFlow,
   SimpleMinCostFlow,
@@ -28,6 +32,7 @@ import {
   GreedySolutionGenerator,
   GuidedLocalSearch,
   initSetCover,
+  isWorkerBridgeEnabled as isSetCoverWorkerBridgeEnabled,
   RandomSolutionGenerator,
   SetCoverInvariant,
   SetCoverModel,
@@ -41,7 +46,9 @@ import {
 } from 'or-tools-wasm/mathopt';
 import {
   initPdlp,
+  isWorkerBridgeEnabled as isPdlpWorkerBridgeEnabled,
   Pdlp,
+  setWorkerBridgeEnabled as setPdlpWorkerBridgeEnabled,
 } from 'or-tools-wasm/pdlp';
 import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import {
@@ -139,7 +146,8 @@ test('runs the shared Knapsack cases in Node', async (t) => {
     initKnapsack,
     KnapsackSolver,
     KnapsackSolverType,
-    setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isKnapsackWorkerBridgeEnabled,
   });
   await assertCaseResults(t, 'node Knapsack', knapsackResults);
 });
@@ -150,7 +158,8 @@ test('runs the shared Network Flow cases in Node', async (t) => {
     SimpleMaxFlow,
     SimpleMinCostFlow,
     SimpleLinearSumAssignment,
-    setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled: setNetworkFlowWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isNetworkFlowWorkerBridgeEnabled,
   });
   await assertCaseResults(t, 'node Network Flow', networkFlowResults);
 });
@@ -168,6 +177,7 @@ test('runs the shared Set Cover cases in Node', async (t) => {
     GuidedLocalSearch: GuidedLocalSearch as never,
     consistency_level,
     setWorkerBridgeEnabled: setSetCoverWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isSetCoverWorkerBridgeEnabled,
   });
   await assertCaseResults(t, 'node Set Cover', setCoverResults);
 });
@@ -178,7 +188,10 @@ test('runs the shared RCPSP cases in Node', async (t) => {
 });
 
 test('runs the shared MathOpt cases in Node', async (t) => {
-  const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+  const mathOptResults = await runMathOptCases({
+    initMathOpt,
+    MathOpt,
+  });
   await assertCaseResults(t, 'node MathOpt', mathOptResults);
 });
 
@@ -186,7 +199,8 @@ test('runs the shared PDLP cases in Node', async (t) => {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled: setPdlpWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isPdlpWorkerBridgeEnabled,
   });
   await assertCaseResults(t, 'node PDLP', pdlpResults);
 });

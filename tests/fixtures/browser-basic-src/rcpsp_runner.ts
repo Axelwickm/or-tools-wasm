@@ -1,5 +1,5 @@
 import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { passedCase } from './shared_case.ts';
+import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
 
 export type RcpspCaseResult = {
   id: string;
@@ -50,6 +50,7 @@ export type RcpspApi = {
   };
   RcpspModelBuilder: { new(name?: string): RcpspModelBuilderLike };
   setWorkerBridgeEnabled(enabled: boolean): void;
+  isWorkerBridgeEnabled(): boolean;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -151,7 +152,6 @@ RESOURCEAVAILABILITIES:
 ************************************************************************`;
 
 async function runParserParity(api: RcpspApi, mode: FixtureMode): Promise<{ makespan: null }> {
-  api.setWorkerBridgeEnabled(mode === 'worker');
   // TEMP: parity - mirrors ortools/scheduling/python/rcpsp_test.py
   // RcpspTest.testParseAndAccess assertion-by-assertion, using parse_string()
   // because browser fixtures do not expose Python's filesystem parse_file path.
@@ -164,7 +164,6 @@ async function runParserParity(api: RcpspApi, mode: FixtureMode): Promise<{ make
 }
 
 async function runCpSatBackedSchedule(api: RcpspApi, mode: FixtureMode, numWorkers: number): Promise<{ makespan: number | null; statusName: string }> {
-  api.setWorkerBridgeEnabled(mode === 'worker');
   const problem = new api.RcpspModelBuilder('house_project')
     .add_resource({ name: 'crew', capacity: 3 })
     .add_activity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
@@ -196,14 +195,14 @@ export const rcpspCases: RcpspCase[] = [
     solver: 'rcpsp',
     source: 'ortools/scheduling/python/rcpsp_test.py',
     upstream: 'RcpspTest.testParseAndAccess',
-    tags: ['python-parity', 'direct', 'worker', 'parser'],
+    tags: ['python-parity', 'parser'],
     run: (api, context) => runParserParity(api, context.mode ?? 'direct'),
   },
   {
     id: 'rcpsp.sample.house_project_cp_sat',
     name: 'RcpspCpSatSample.house_project',
     solver: 'rcpsp',
-    tags: ['contract', 'direct', 'worker', 'cp-sat-backed', 'threading'],
+    tags: ['contract', 'cp-sat-backed', 'threading'],
     run: (api, context) => runCpSatBackedSchedule(api, context.mode ?? 'direct', context.threads ?? 1),
   },
 ];
@@ -211,19 +210,20 @@ export const rcpspCases: RcpspCase[] = [
 export async function runRcpspCases(api: RcpspApi): Promise<RcpspCaseResult[]> {
   await api.initRcpsp();
   const results: RcpspCaseResult[] = [];
-  for (const mode of ['direct', 'worker'] as const) {
-    for (const testCase of rcpspCases) {
-      const threadsToRun = testCase.tags?.includes('threading') ? [1, 4] : [undefined];
-      for (const threads of threadsToRun) {
-        const context = { mode, threads };
-        const name = threads === undefined
-          ? `${testCase.name} (${mode})`
-          : `${testCase.name} (${mode}, ${threads} worker${threads === 1 ? '' : 's'})`;
-        const result = await testCase.run(api, context);
-        results.push(passedCase({ ...testCase, name }, context, result));
+  for (const mode of fixtureModes) {
+    await withWorkerBridgeMode(api, mode, 'RCPSP', async () => {
+      for (const testCase of rcpspCases) {
+        const threadsToRun = testCase.tags?.includes('threading') ? [1, 4] : [undefined];
+        for (const threads of threadsToRun) {
+          const context = { mode, threads };
+          const name = threads === undefined
+            ? `${testCase.name} (${mode})`
+            : `${testCase.name} (${mode}, ${threads} worker${threads === 1 ? '' : 's'})`;
+          const result = await testCase.run(api, context);
+          results.push(passedCase({ ...testCase, name }, context, result));
+        }
       }
-    }
+    });
   }
-  api.setWorkerBridgeEnabled(false);
   return results;
 }

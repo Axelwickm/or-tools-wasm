@@ -2,6 +2,7 @@ import type { OrToolsWasmModule } from './wasm_module_types.js';
 import { loadMathOptRuntime } from './runtime_loader.js';
 import type { WorkerResponse } from './worker_protocol.js';
 import {
+  isWorkerBridgeEnabled,
   setWorkerBridgeEnabled,
   nextWorkerBridgeRequestId,
   postWorkerRequest,
@@ -1643,6 +1644,10 @@ export class MathOpt {
 
   static setWorkerBridgeEnabled(enabled: boolean): void {
     setWorkerBridgeEnabled(enabled);
+  }
+
+  static isWorkerBridgeEnabled(): boolean {
+    return isWorkerBridgeEnabled();
   }
 
   static Model(name = ''): MathOptModel {

@@ -1,5 +1,5 @@
 import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { passedCase } from './shared_case.ts';
+import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
 
 export type NetworkFlowCaseResult = {
   id: string;
@@ -74,6 +74,7 @@ export type NetworkFlowApi = {
     new(): SimpleLinearSumAssignmentLike;
   };
   setWorkerBridgeEnabled: (enabled: boolean) => void;
+  isWorkerBridgeEnabled: () => boolean;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -206,7 +207,7 @@ export const networkFlowCases: NetworkFlowCase[] = [
     solver: 'network-flow',
     source: 'ortools/graph/samples/simple_max_flow_program.py',
     upstream: 'simple_max_flow_program.py',
-    tags: ['python-sample-parity', 'direct', 'worker', 'max-flow'],
+    tags: ['python-sample-parity', 'max-flow'],
     run: (api, context) => runMaxFlowSample(api, context.mode ?? 'direct'),
   },
   {
@@ -215,7 +216,7 @@ export const networkFlowCases: NetworkFlowCase[] = [
     solver: 'network-flow',
     source: 'ortools/graph/samples/simple_min_cost_flow_program.py',
     upstream: 'simple_min_cost_flow_program.py',
-    tags: ['python-sample-parity', 'direct', 'worker', 'min-cost-flow'],
+    tags: ['python-sample-parity', 'min-cost-flow'],
     run: (api, context) => runMinCostFlowSample(api, context.mode ?? 'direct'),
   },
   {
@@ -224,7 +225,7 @@ export const networkFlowCases: NetworkFlowCase[] = [
     solver: 'network-flow',
     source: 'ortools/graph/samples/assignment_linear_sum_assignment.py',
     upstream: 'assignment_linear_sum_assignment.py',
-    tags: ['python-sample-parity', 'direct', 'worker', 'assignment'],
+    tags: ['python-sample-parity', 'assignment'],
     run: (api, context) => runAssignmentSample(api, context.mode ?? 'direct'),
   },
 ];
@@ -232,13 +233,13 @@ export const networkFlowCases: NetworkFlowCase[] = [
 export async function runNetworkFlowCases(api: NetworkFlowApi): Promise<NetworkFlowCaseResult[]> {
   await api.initNetworkFlow();
   const results: NetworkFlowCaseResult[] = [];
-  for (const mode of ['direct', 'worker'] as const) {
-    api.setWorkerBridgeEnabled(mode === 'worker');
-    for (const testCase of networkFlowCases) {
-      const result = await testCase.run(api, { mode });
-      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
-    }
+  for (const mode of fixtureModes) {
+    await withWorkerBridgeMode(api, mode, 'Network Flow', async () => {
+      for (const testCase of networkFlowCases) {
+        const result = await testCase.run(api, { mode });
+        results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
+      }
+    });
   }
-  api.setWorkerBridgeEnabled(false);
   return results;
 }

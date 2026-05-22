@@ -1,5 +1,5 @@
 import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { passedCase } from './shared_case.ts';
+import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
 
 export type KnapsackCaseResult = {
   id: string;
@@ -37,6 +37,7 @@ export type KnapsackApi = {
     KNAPSACK_DIVIDE_AND_CONQUER_SOLVER: number;
   };
   setWorkerBridgeEnabled: (enabled: boolean) => void;
+  isWorkerBridgeEnabled: () => boolean;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -168,7 +169,6 @@ async function runKnapsackProblemCase(
   capacities: number[],
   expectedProfit: number,
 ): Promise<{ profit: number; selectedItems: number[]; optimal: boolean }> {
-  api.setWorkerBridgeEnabled(mode === 'worker');
   const result = await solveKnapsackProblem(api, profits, weights, capacities);
   assert(result.profit === expectedProfit, `${name} (${mode}): expected profit ${expectedProfit}, got ${result.profit}`);
   assert(result.optimal, `${name} (${mode}): expected proven optimal solution`);
@@ -192,7 +192,7 @@ export const knapsackCases: KnapsackCase[] = [
     solver: 'knapsack',
     source: 'ortools/algorithms/python/knapsack_solver_test.py',
     upstream: 'testSolveOneDimension',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
     // testSolveOneDimension, including reduction/no-reduction comparisons
     // across the same applicable one-dimensional solver variants.
@@ -214,7 +214,7 @@ export const knapsackCases: KnapsackCase[] = [
     solver: 'knapsack',
     source: 'ortools/algorithms/python/knapsack_solver_test.py',
     upstream: 'testSolveTwoDimensions',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
     // testSolveTwoDimensions. Upstream returns after the generic solver for
     // multi-dimensional cases, so this does the same.
@@ -236,7 +236,7 @@ export const knapsackCases: KnapsackCase[] = [
     solver: 'knapsack',
     source: 'ortools/algorithms/python/knapsack_solver_test.py',
     upstream: 'testSolveBigOneDimension',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     // TEMP: parity - mirrors ortools/algorithms/python/knapsack_solver_test.py
     // testSolveBigOneDimension with the same data and expected profit.
     async run(api, context) {
@@ -266,13 +266,13 @@ export const knapsackCases: KnapsackCase[] = [
 export async function runKnapsackCases(api: KnapsackApi): Promise<KnapsackCaseResult[]> {
   await api.initKnapsack();
   const results: KnapsackCaseResult[] = [];
-  for (const mode of ['direct', 'worker'] as const) {
-    api.setWorkerBridgeEnabled(mode === 'worker');
-    for (const testCase of knapsackCases) {
-      const result = await testCase.run(api, { mode });
-      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
-    }
+  for (const mode of fixtureModes) {
+    await withWorkerBridgeMode(api, mode, 'Knapsack', async () => {
+      for (const testCase of knapsackCases) {
+        const result = await testCase.run(api, { mode });
+        results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
+      }
+    });
   }
-  api.setWorkerBridgeEnabled(false);
   return results;
 }

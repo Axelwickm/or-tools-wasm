@@ -13,11 +13,15 @@ import {
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
+  isWorkerBridgeEnabled as isKnapsackWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
+  setWorkerBridgeEnabled as setKnapsackWorkerBridgeEnabled,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
+  isWorkerBridgeEnabled as isNetworkFlowWorkerBridgeEnabled,
+  setWorkerBridgeEnabled as setNetworkFlowWorkerBridgeEnabled,
   SimpleLinearSumAssignment,
   SimpleMaxFlow,
   SimpleMinCostFlow,
@@ -30,7 +34,9 @@ import {
 } from 'or-tools-wasm/mathopt';
 import {
   initPdlp,
+  isWorkerBridgeEnabled as isPdlpWorkerBridgeEnabled,
   Pdlp,
+  setWorkerBridgeEnabled as setPdlpWorkerBridgeEnabled,
 } from 'or-tools-wasm/pdlp';
 import {
   BOOL_FALSE,
@@ -78,7 +84,7 @@ async function assertCaseSteps(t: Deno.TestContext, runtime: string, results: Na
   }
 }
 
-Deno.test('runs the shared CP-SAT cases in Deno', async (t) => {
+Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   if (isWorkerBridgeEnabled()) {
     throw new Error('Deno should use the direct runtime by default');
   }
@@ -123,7 +129,8 @@ Deno.test('runs the shared CP-SAT cases in Deno', async (t) => {
     initKnapsack,
     KnapsackSolver,
     KnapsackSolverType,
-    setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isKnapsackWorkerBridgeEnabled,
   });
   await assertCaseSteps(t, 'deno Knapsack', knapsackResults);
 
@@ -132,7 +139,8 @@ Deno.test('runs the shared CP-SAT cases in Deno', async (t) => {
     SimpleMaxFlow,
     SimpleMinCostFlow,
     SimpleLinearSumAssignment,
-    setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled: setNetworkFlowWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isNetworkFlowWorkerBridgeEnabled,
   });
   await assertCaseSteps(t, 'deno Network Flow', networkFlowResults);
 
@@ -142,13 +150,17 @@ Deno.test('runs the shared CP-SAT cases in Deno', async (t) => {
   const rcpspResults = await runRcpspCases(RcpspApi as never);
   await assertCaseSteps(t, 'deno RCPSP', rcpspResults);
 
-  const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+  const mathOptResults = await runMathOptCases({
+    initMathOpt,
+    MathOpt,
+  });
   await assertCaseSteps(t, 'deno MathOpt', mathOptResults);
 
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled,
+    setWorkerBridgeEnabled: setPdlpWorkerBridgeEnabled,
+    isWorkerBridgeEnabled: isPdlpWorkerBridgeEnabled,
   });
   await assertCaseSteps(t, 'deno PDLP', pdlpResults);
 });

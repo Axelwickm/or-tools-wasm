@@ -14,12 +14,14 @@ import {
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
+  isWorkerBridgeEnabled as isKnapsackWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
   setWorkerBridgeEnabled as setKnapsackWorkerBridgeEnabled,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
+  isWorkerBridgeEnabled as isNetworkFlowWorkerBridgeEnabled,
   setWorkerBridgeEnabled as setNetworkFlowWorkerBridgeEnabled,
   SimpleLinearSumAssignment,
   SimpleMaxFlow,
@@ -34,6 +36,7 @@ import {
 } from 'or-tools-wasm/mathopt';
 import {
   initPdlp,
+  isWorkerBridgeEnabled as isPdlpWorkerBridgeEnabled,
   Pdlp,
   setWorkerBridgeEnabled as setPdlpWorkerBridgeEnabled,
 } from 'or-tools-wasm/pdlp';
@@ -125,6 +128,7 @@ const knapsackResults = await runKnapsackCases({
   KnapsackSolver,
   KnapsackSolverType,
   setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
+  isWorkerBridgeEnabled: isKnapsackWorkerBridgeEnabled,
 });
 assertAllCases('bun Knapsack', knapsackResults);
 
@@ -134,6 +138,7 @@ const networkFlowResults = await runNetworkFlowCases({
   SimpleMinCostFlow,
   SimpleLinearSumAssignment,
   setWorkerBridgeEnabled: setNetworkFlowWorkerBridgeEnabled,
+  isWorkerBridgeEnabled: isNetworkFlowWorkerBridgeEnabled,
 });
 assertAllCases('bun Network Flow', networkFlowResults);
 
@@ -143,13 +148,17 @@ assertAllCases('bun Set Cover', setCoverResults);
 const rcpspResults = await runRcpspCases(RcpspApi as never);
 assertAllCases('bun RCPSP', rcpspResults);
 
-const mathOptResults = await runMathOptCases({ initMathOpt, MathOpt });
+const mathOptResults = await runMathOptCases({
+  initMathOpt,
+  MathOpt,
+});
 assertAllCases('bun MathOpt', mathOptResults);
 
 const pdlpResults = await runPdlpCases({
   initPdlp,
   Pdlp,
   setWorkerBridgeEnabled: setPdlpWorkerBridgeEnabled,
+  isWorkerBridgeEnabled: isPdlpWorkerBridgeEnabled,
 });
 assertAllCases('bun PDLP', pdlpResults);
 

@@ -12,5 +12,5 @@ export const cpSatCases: CpSatCase[] = pythonApiContractCases.map((testCase) => 
   name: testCase.name.startsWith('CP-SAT: ') ? testCase.name : `CP-SAT: ${testCase.name}`,
   solver: 'cp-sat',
   upstream: testCase.name,
-  tags: ['python-parity', 'direct', 'worker'],
+  tags: ['python-parity'],
 }));

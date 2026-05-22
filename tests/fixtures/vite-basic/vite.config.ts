@@ -1,4 +1,8 @@
 import { defineConfig } from 'vite';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const fixtureDir = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   optimizeDeps: {
@@ -9,6 +13,13 @@ export default defineConfig({
     format: 'es',
   },
   server: {
+    fs: {
+      allow: [
+        fixtureDir,
+        resolve(fixtureDir, '../../../build/javascript/browser'),
+        resolve(fixtureDir, '../../../build/javascript/wasm'),
+      ],
+    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',

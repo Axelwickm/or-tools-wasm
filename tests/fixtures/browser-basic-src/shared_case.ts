@@ -1,5 +1,33 @@
 export type FixtureMode = 'direct' | 'worker';
 
+export const fixtureModes: readonly FixtureMode[] = ['direct', 'worker'];
+
+export type WorkerBridgeApi = {
+  setWorkerBridgeEnabled(enabled: boolean): void;
+  isWorkerBridgeEnabled(): boolean;
+};
+
+export function setWorkerBridgeMode(api: WorkerBridgeApi, mode: FixtureMode, label: string) {
+  api.setWorkerBridgeEnabled(mode === 'worker');
+  if (api.isWorkerBridgeEnabled() !== (mode === 'worker')) {
+    throw new Error(`${label} worker bridge state mismatch for ${mode}`);
+  }
+}
+
+export async function withWorkerBridgeMode<T>(
+  api: WorkerBridgeApi,
+  mode: FixtureMode,
+  label: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  setWorkerBridgeMode(api, mode, label);
+  try {
+    return await run();
+  } finally {
+    api.setWorkerBridgeEnabled(false);
+  }
+}
+
 export type SharedCaseMetadata = {
   id: string;
   name: string;

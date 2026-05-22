@@ -1,5 +1,5 @@
 import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { passedCase } from './shared_case.ts';
+import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
 
 export type SetCoverCaseResult = {
   cost: number;
@@ -56,6 +56,7 @@ export type SetCoverApi = {
     FREE_AND_UNCOVERED: number;
   };
   setWorkerBridgeEnabled: (enabled: boolean) => void;
+  isWorkerBridgeEnabled: () => boolean;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -304,7 +305,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_save_reload',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runSaveReload(api, context.mode ?? 'direct'),
   },
   {
@@ -313,7 +314,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_save_reload_twice',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runSaveReloadTwice(api, context.mode ?? 'direct'),
   },
   {
@@ -322,7 +323,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_initial_values',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runInitialValues(api, context.mode ?? 'direct'),
   },
   {
@@ -331,7 +332,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_infeasible',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runInfeasible(api, context.mode ?? 'direct'),
   },
   {
@@ -340,7 +341,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_knights_cover_creation',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runKnightsCoverCreation(api, context.mode ?? 'direct'),
   },
   {
@@ -349,7 +350,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_knights_cover_greedy',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runKnightsCoverGreedy(api, context.mode ?? 'direct'),
   },
   {
@@ -358,7 +359,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_knights_cover_degree',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runKnightsCoverDegree(api, context.mode ?? 'direct'),
   },
   {
@@ -367,7 +368,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_knights_cover_gls',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runKnightsCoverGls(api, context.mode ?? 'direct'),
   },
   {
@@ -376,7 +377,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_knights_cover_random',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runKnightsCoverRandom(api, context.mode ?? 'direct'),
   },
   {
@@ -385,7 +386,7 @@ export const setCoverCases: SetCoverCase[] = [
     solver: 'set-cover',
     source: setCoverSource,
     upstream: 'SetCoverTest.test_knights_cover_trivial',
-    tags: ['python-parity', 'direct', 'worker'],
+    tags: ['python-parity'],
     run: (api, context) => runKnightsCoverTrivial(api, context.mode ?? 'direct'),
   },
 ];
@@ -393,13 +394,13 @@ export const setCoverCases: SetCoverCase[] = [
 export async function runSetCoverCases(api: SetCoverApi): Promise<SetCoverCaseResult[]> {
   await api.initSetCover();
   const results: SetCoverCaseResult[] = [];
-  for (const mode of ['direct', 'worker'] as const) {
-    api.setWorkerBridgeEnabled(mode === 'worker');
-    for (const testCase of setCoverCases) {
-      const result = await testCase.run(api, { mode });
-      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
-    }
+  for (const mode of fixtureModes) {
+    await withWorkerBridgeMode(api, mode, 'Set Cover', async () => {
+      for (const testCase of setCoverCases) {
+        const result = await testCase.run(api, { mode });
+        results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
+      }
+    });
   }
-  api.setWorkerBridgeEnabled(false);
   return results;
 }
