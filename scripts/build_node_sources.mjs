@@ -193,8 +193,9 @@ function locateNodeRuntimeFile(fileName) {
 
 function isWebWorkerRuntimeHost() {
   const isDeno = typeof globalThis.Deno !== 'undefined';
-  const isBun = typeof globalThis.Bun !== 'undefined';
-  return isDeno || isBun;
+  const isBunWorker = typeof globalThis.Bun !== 'undefined'
+    && typeof globalThis.WorkerGlobalScope !== 'undefined';
+  return isDeno || isBunWorker;
 }
 
 function isDenoRuntime() {
@@ -245,7 +246,11 @@ export async function terminateLoadedRuntimeThreads() {
   const modules = await Promise.allSettled(modulePromises.values());
   for (const moduleResult of modules) {
     if (moduleResult.status !== 'fulfilled') continue;
-    moduleResult.value.PThread?.terminateAllThreads?.();
+    try {
+      moduleResult.value.PThread?.terminateAllThreads?.();
+    } catch (error) {
+      if (!String(error).includes('PThread')) throw error;
+    }
   }
 }
 

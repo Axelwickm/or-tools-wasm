@@ -168,7 +168,11 @@ export async function terminateLoadedRuntimeThreads(): Promise<void> {
   for (const moduleResult of modules) {
     if (moduleResult.status !== 'fulfilled') continue;
     const module = moduleResult.value as RuntimeWithPthreads;
-    module.PThread?.terminateAllThreads?.();
+    try {
+      module.PThread?.terminateAllThreads?.();
+    } catch (error) {
+      if (!String(error).includes('PThread')) throw error;
+    }
   }
 }
 

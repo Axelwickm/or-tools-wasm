@@ -144,7 +144,10 @@
     "test:fixture:node": "npm run test:fixture:node:install && npm --prefix tests/fixtures/node-basic run test",
     "test:fixture:bun:install": "node tests/fixtures/install-packed-package.mjs bun-basic",
     "test:fixture:bun": "npm run test:fixture:bun:install && npm --prefix tests/fixtures/bun-basic run test",
-    "test:fixtures": "npm run test:fixture:vite && npm run test:fixture:webpack && npm run test:fixture:rollup && npm run test:fixture:deno && npm run test:fixture:node && npm run test:fixture:bun"
+    "test:fixtures:browser": "npm run test:fixture:vite && npm run test:fixture:webpack && npm run test:fixture:rollup",
+    "test:fixtures:runtime": "npm run test:fixture:deno && npm run test:fixture:node && npm run test:fixture:bun",
+    "test:fixtures:full": "npm run test:fixtures:browser && npm run test:fixtures:runtime",
+    "test:fixtures": "npm run test:fixtures:full"
   },
   "files": [
     "build/javascript/lib/*.d.ts",
