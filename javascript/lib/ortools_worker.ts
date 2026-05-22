@@ -5,6 +5,8 @@ import { loadGraphRuntime, loadMathOptRuntime, loadMPSolverRuntime, loadPdlpRunt
 import { solveRoutingInWorker } from './worker_routing.js';
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
+Object.assign(globalThis, { __ORTOOLS_WASM_BRIDGE_WORKER: true });
+
 const workerScope = self as DedicatedWorkerGlobalScope;
 
 const SOLUTION_CALLBACK_EVENT = 1;

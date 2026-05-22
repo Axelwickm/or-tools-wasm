@@ -19,9 +19,11 @@ fi
 scripts/ensure-emsdk.sh
 source ./emsdk/emsdk_env.sh
 
-cmake -S . -B build \
-  -DCMAKE_TOOLCHAIN_FILE="${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
-  ${CMAKE_ARGS:-}
+if [[ "${ORTOOLS_WASM_RECONFIGURE:-0}" == "1" || ! -f build/CMakeCache.txt ]]; then
+  cmake -S . -B build \
+    -DCMAKE_TOOLCHAIN_FILE="${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
+    ${CMAKE_ARGS:-}
+fi
 
 if [[ "${ORTOOLS_WASM_CLEAN:-0}" == "1" ]]; then
   rm -rf build/javascript/wasm build/javascript/node-wasm

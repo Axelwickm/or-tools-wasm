@@ -191,11 +191,19 @@ function locateNodeRuntimeFile(fileName) {
   return fileURLToPath(new URL(\`../node-wasm/\${fileName}\`, import.meta.url));
 }
 
-function isWebWorkerRuntimeHost() {
+function isWebWorkerRuntimeHost(runtimeName) {
   const isDeno = typeof globalThis.Deno !== 'undefined';
+  const isBun = typeof globalThis.Bun !== 'undefined';
   const isBunWorker = typeof globalThis.Bun !== 'undefined'
-    && typeof globalThis.WorkerGlobalScope !== 'undefined';
-  return isDeno || isBunWorker;
+    && globalThis.__ORTOOLS_WASM_BRIDGE_WORKER === true;
+  const bunMainWebRuntimes = new Set([
+    'cp_sat_runtime',
+    'routing_runtime',
+    'mp_solver_runtime',
+    'mathopt_runtime',
+    'pdlp_runtime',
+  ]);
+  return isDeno || isBunWorker || (isBun && bunMainWebRuntimes.has(runtimeName));
 }
 
 function isDenoRuntime() {
@@ -227,7 +235,7 @@ async function createRuntime(runtimeName, flavor = selectRuntimeFlavor(runtimeNa
   if (!modulePromises.has(key)) {
     modulePromises.set(key, (async () => {
       const spec = runtimeSpecs[runtimeName][flavor];
-      if (isWebWorkerRuntimeHost()) {
+      if (isWebWorkerRuntimeHost(runtimeName)) {
         const { default: createModule } = await import(new URL(spec.webJs, import.meta.url).href);
         const wasmBinary = await readFile(new URL(\`../wasm/\${spec.wasm}\`, import.meta.url));
         return createModule({
