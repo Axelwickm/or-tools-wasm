@@ -1,6 +1,11 @@
 # Solver Python Test Parity Audit
 
 Totals: 624 upstream tests; 408 ✅ implemented; 23 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Open mismatches: 0.
+Parity is tracked on two axes:
+
+- Behavioral parity: the TS/WASM fixture builds and solves the same kind of model as upstream and checks the same user-visible result assertions.
+- API-surface parity: the TS/WASM fixture proves that the corresponding Python public object, option, parameter, or proto mapping is constructible, serializable, and passable through the public TypeScript API. API-surface parity does not imply that every parameter has a deterministic solver-behavior assertion.
+
 Legend and classification guide:
 
 - ✅ Implemented: there is a current TS/WASM parity fixture that directly covers this upstream Python test or a close public-API equivalent.
@@ -282,11 +287,18 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
 - ✅ 🔎 test_proto
 
 ## ortools/math_opt/python/parameters_test.py
+API-surface parity: this section tracks Python parameter/proto mapping tests separately from solve behavior. Backend-specific parameter wrappers are accepted as parity when the TS API encodes the same upstream proto field path or exposes a raw serialized-proto escape hatch for unsupported details.
+
 - GlpkParameters
   - ✅ 🔎 GlpkParameters.test_to_proto - `compute_unbound_rays_if_possible` true, false, and unset are represented by `MathOpt.GlpkParameters` / `GlpkParameters` and passed into `SolveParametersProto.glpk`
 - ProtoRoundTrip
   - ✅ 🔎 ProtoRoundTrip.test_solver_type_round_trip - `MathOpt.SolverType.GLPK` is exposed and encoded as `SOLVER_TYPE_GLPK`
 - SolveParametersTest
+  - ✅ 🔎 SolveParametersTest common fields - `MathOpt.encodeSolveRequest()` encodes upstream `SolveParametersProto` common fields for time limit, iteration/node/solution/objective/bound/gap limits, output, threads, random seed, LP algorithm, presolve, cuts, heuristics, scaling, and solution pool size
+  - ✅ 🔎 SolveParametersTest backend specifics/gscip - `MathOpt.GScipParameters` encodes emphasis, meta parameters, raw SCIP parameter maps, output controls, solution count, and objective limit into `SolveParametersProto.gscip`
+  - ✅ 🔎 SolveParametersTest backend specifics/glop - `MathOpt.GlopParameters` encodes representative upstream `glop.GlopParameters` fields into `SolveParametersProto.glop`; raw proto bytes remain available for advanced fields
+  - ✅ 🔎 SolveParametersTest backend specifics/cp_sat - `MathOpt.solve(..., { cpSat })` encodes common `SatParameters` fields into `SolveParametersProto.cp_sat`; raw proto bytes remain available for full generated SatParameters coverage
+  - ✅ 🔎 SolveParametersTest backend specifics/pdlp - `MathOpt.PdlpParameters` encodes representative `PrimalDualHybridGradientParams` fields into `SolveParametersProto.pdlp`; raw proto bytes remain available for advanced fields
   - ✅ 🔎 SolveParametersTest.test_to_proto_with_specifics/glpk - `MathOpt.solve(..., { glpk: new GlpkParameters(...) })` encodes the GLPK-specific solve parameters
   - ✅ 🔎 GLPK threading guard - MathOpt GLPK rejects `threads > 1`; upstream native GLPK tests only allow `threads=1` and reject cross-thread GLPK use
 

@@ -1,12 +1,26 @@
 export {
+  GlopParameters,
   GlpkParameters,
+  GScipEmphasis,
+  GScipMetaParamValue,
+  GScipParameters,
   initMathOpt,
   MathOpt,
+  MathOptEmphasis,
+  MathOptLPAlgorithm,
   MathOptModel,
   MathOptObjective,
   MathOptSolverType,
+  PdlpLinesearchRule,
+  PdlpOptimalityNorm,
+  PdlpParameters,
+  PdlpRestartStrategy,
+  PdlpSchedulerType,
 } from './mathopt_api.js';
 export type {
+  GlopParametersOptions,
+  GlpkParametersOptions,
+  GScipParametersOptions,
   MathOptDualSolutionResult,
   MathOptLinearConstraint,
   MathOptLinearConstraintMatrixEntry,
@@ -17,6 +31,7 @@ export type {
   MathOptSolveResult,
   MathOptVariable,
   MathOptVariableOptions,
+  PdlpParametersOptions,
 } from './mathopt_api.js';
 export {
   isWorkerBridgeAvailable,

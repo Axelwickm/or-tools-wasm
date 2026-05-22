@@ -126,7 +126,7 @@ console.log(result.response);
 | Set cover | ✅ | Dedicated weighted set cover model, invariant, and heuristic search API. |
 | RCPSP | ✅ | CP-SAT-backed resource-constrained project scheduling model, parser, and visual scheduling surface. |
 | Linear Solver ModelBuilder |  | Python-like `linear_solver.model_builder` API for ergonomic LP/MIP modeling, import/export helpers, and backend solve helpers. |
-| MathOpt incremental/callback/filter APIs |  | Incremental solving, solve/model filters, message callbacks, solve interrupters, indicator helpers, and richer result helpers. |
+| MathOpt incremental/callback/filter APIs |  | Incremental solving, solve/model filters, message callbacks, solve interrupters, indicator helpers, and richer result helpers. Common solve parameters and typed backend parameters for GSCIP, GLOP, CP-SAT, PDLP, and GLPK are exposed. |
 
 Unchecked rows are planned OR-Tools targets that are not exposed by this package
 yet. Commercial and large third-party native backends such as Gurobi, CPLEX,
@@ -139,7 +139,8 @@ Near-term parity work:
 - Add Linear Solver ModelBuilder if continuing Python API parity beyond solver
   runtimes.
 - Close the remaining MathOpt API gaps around incremental solving, filters,
-  callbacks, interrupters, indicator helpers, and result helper objects.
+  callbacks, interrupters, indicator helpers, model solve parameters, and
+  richer result helper objects.
 
 The TypeScript API mirrors the public OR-Tools API shape where it maps cleanly
 to WebAssembly. CP-SAT exposes both a Python-like high-level builder and the
@@ -149,6 +150,19 @@ MathOpt exposes a TypeScript model builder.
 
 The worker script and WebAssembly files are emitted automatically from package
 imports, with no manual copying into `public/` or `static/` required.
+
+## Fixture test matrix
+
+`npm run test:fixtures` is the full fixture matrix. It runs the shared solver
+cases through Vite, Webpack, Rollup, Deno, Node, and Bun. Browser fixtures cover
+dev and static serving where the bundler supports both, Chromium and Firefox,
+direct runtime execution, the browser worker bridge, and solver thread settings
+where the solver supports them.
+
+For focused iteration, use `npm run test:fixtures:browser`,
+`npm run test:fixtures:runtime`, or an individual fixture script such as
+`npm run test:fixture:node`. The full matrix is the comprehensive check before
+landing solver API, worker bridge, threading, or packaging changes.
 
 ## API reference
 

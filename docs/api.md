@@ -1292,7 +1292,7 @@ thread, but there is no solver thread-count parameter.
 Import:
 
 ```ts
-import { GlpkParameters, initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm/mathopt';
+import { GScipParameters, GlpkParameters, initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm/mathopt';
 ```
 
 Initialize, build a model, and solve:
@@ -1331,6 +1331,17 @@ Static constructors and aliases:
 - `MathOpt.BoundedExpression`
 - `MathOpt.LowerBoundedExpression`
 - `MathOpt.UpperBoundedExpression`
+- `MathOpt.LPAlgorithm`
+- `MathOpt.Emphasis`
+- `MathOpt.GScipEmphasis`
+- `MathOpt.GScipMetaParamValue`
+- `MathOpt.GScipParameters`
+- `MathOpt.GlopParameters`
+- `MathOpt.PdlpParameters`
+- `MathOpt.PdlpOptimalityNorm`
+- `MathOpt.PdlpSchedulerType`
+- `MathOpt.PdlpRestartStrategy`
+- `MathOpt.PdlpLinesearchRule`
 - `MathOpt.GlpkParameters`
 - `MathOpt.setWorkerBridgeEnabled(enabled): void`
 - `MathOpt.isWorkerBridgeEnabled(): boolean`
@@ -1351,6 +1362,9 @@ Top-level value exports:
 - `terminateWorkerBridge`
 - `MathOptModel`
 - `MathOptObjective`
+- `GScipParameters`
+- `GlopParameters`
+- `PdlpParameters`
 - `GlpkParameters`
 - `initNetworkFlow`
 - `NetworkFlow`
@@ -1373,17 +1387,65 @@ Top-level type exports:
 - `MathOptSolveResult`
 - `MathOptVariable`
 - `MathOptVariableOptions`
+- `GScipParametersOptions`
+- `GlopParametersOptions`
+- `GlpkParametersOptions`
+- `PdlpParametersOptions`
 
 Solving:
 
 - `MathOpt.solve(model, options?): Promise<MathOptSolveResult>`
+- `MathOpt.encodeSolveRequest(model, options?): Uint8Array`
 
 `MathOptSolveOptions`:
 
 - `solverType?: MathOptSolverType | keyof typeof MathOptSolverType`
+- `parameters?: Uint8Array`
+- `solveParameters?: Uint8Array`
+- `timeLimitSeconds?: number`
 - `threads?: number`
 - `iterationLimit?: number`
-- `glpk?: GlpkParameters`
+- `nodeLimit?: number`
+- `cutoffLimit?: number`
+- `objectiveLimit?: number`
+- `bestBoundLimit?: number`
+- `solutionLimit?: number`
+- `enableOutput?: boolean`
+- `randomSeed?: number`
+- `absoluteGapTolerance?: number`
+- `relativeGapTolerance?: number`
+- `solutionPoolSize?: number`
+- `lpAlgorithm?: MathOptLPAlgorithm | keyof typeof MathOptLPAlgorithm`
+- `presolve?: MathOptEmphasis | keyof typeof MathOptEmphasis`
+- `cuts?: MathOptEmphasis | keyof typeof MathOptEmphasis`
+- `heuristics?: MathOptEmphasis | keyof typeof MathOptEmphasis`
+- `scaling?: MathOptEmphasis | keyof typeof MathOptEmphasis`
+- `gscip?: GScipParameters | GScipParametersOptions | Uint8Array`
+- `glop?: GlopParameters | GlopParametersOptions | Uint8Array`
+- `cpSat?: SatParameters | Uint8Array`
+- `pdlp?: PdlpParameters | PdlpParametersOptions | Uint8Array`
+- `glpk?: GlpkParameters | GlpkParametersOptions | Uint8Array`
+
+Snake-case aliases are accepted for proto-shaped names where they are useful
+for Python/protobuf parity, for example `time_limit_seconds`,
+`relative_gap_tolerance`, `cp_sat`, and `compute_unbound_rays_if_possible`.
+
+Backend-specific parameter wrappers encode the corresponding upstream MathOpt
+solver-specific proto fields:
+
+- `GScipParameters`: emphasis, meta parameters, raw SCIP bool/int/long/real/char/string maps, output controls, `numSolutions`, and `objectiveLimit`
+- `GlopParameters`: `useScaling`, `maxTimeInSeconds`, `useDualSimplex`, and `usePreprocessing`
+- `PdlpParameters`: termination criteria, threading/sharding, scheduler, logging, restart, rescaling, linesearch, trust-region, and feasibility-polishing controls
+- `GlpkParameters`: `computeUnboundRaysIfPossible`
+
+`cpSat` accepts a `SatParameters`-shaped object for the commonly used MathOpt
+CP-SAT backend fields currently encoded by this package (`numWorkers`,
+`maxTimeInSeconds`, `randomSeed`, and logging flags), or raw `Uint8Array` proto
+bytes for advanced callers.
+
+`parameters` / `solveParameters` and each backend parameter option may be raw
+serialized proto bytes. This preserves a proto escape hatch for fields that do
+not yet have ergonomic TypeScript wrappers.
 
 `GlpkParameters` mirrors the upstream MathOpt GLPK-specific solve parameters:
 

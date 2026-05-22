@@ -258,10 +258,19 @@ export type MathOptApi = {
       CP_SAT: number;
       GLPK: number;
     };
-    GlpkParameters?: new (options?: {
+    LPAlgorithm: Record<string, string | number>;
+    Emphasis: Record<string, string | number>;
+    GScipEmphasis: Record<string, string | number>;
+    GScipMetaParamValue: Record<string, string | number>;
+    PdlpRestartStrategy: Record<string, string | number>;
+    PdlpSchedulerType: Record<string, string | number>;
+    GScipParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
+    GlopParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
+    PdlpParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
+    GlpkParameters: new (options?: {
       computeUnboundRaysIfPossible?: boolean;
       compute_unbound_rays_if_possible?: boolean;
-    }) => unknown;
+    }) => { toProtoBytes(): Uint8Array };
     LinearExpression: abstract new (...args: never[]) => MathOptLinearExpressionLike;
     QuadraticExpression: abstract new (...args: never[]) => MathOptQuadraticExpressionLike;
     QuadraticTermKey: abstract new (...args: never[]) => MathOptQuadraticTermKeyLike;
@@ -292,7 +301,7 @@ export type MathOptApi = {
       solverType?: number | string;
       threads?: number;
       iterationLimit?: number;
-      glpk?: unknown;
+      [key: string]: unknown;
     }): Promise<{
       terminationReason: string;
       primalBound: number | null;
@@ -316,6 +325,12 @@ export type MathOptApi = {
       }>;
       rawResponse: Uint8Array;
     }>;
+    encodeSolveRequest(model: MathOptModelLike, options?: {
+      solverType?: number | string;
+      threads?: number;
+      iterationLimit?: number;
+      [key: string]: unknown;
+    }): Uint8Array;
     setWorkerBridgeEnabled: (enabled: boolean) => void;
     isWorkerBridgeEnabled: () => boolean;
   };
@@ -377,6 +392,8 @@ const activeSolveResultContractNames = new Set([
   'SolveTest/test_solve_error',
   'SolveTest/test_lp_solve',
   'SolveTest/test_cp_sat_mip_like',
+  'parameters_test.py/SolveParameters common proto mappings',
+  'parameters_test.py/backend-specific solve parameter proto mappings',
   'MathOpt API/solve_options_support_check',
   'MathOpt API/duplicate_objective_access',
 ]);

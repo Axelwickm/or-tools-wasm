@@ -59,6 +59,23 @@ async function runMathOptExample() {
     const result = await MathOpt.solve(model, {
       solverType: MathOpt.SolverType[solverType],
       threads,
+      timeLimitSeconds: 5,
+      relativeGapTolerance: solverType === 'GLOP' || solverType === 'GLPK' ? undefined : 1e-6,
+      glop: solverType === 'GLOP'
+        ? new MathOpt.GlopParameters({ usePreprocessing: true, useScaling: true })
+        : undefined,
+      glpk: solverType === 'GLPK'
+        ? new MathOpt.GlpkParameters({ computeUnboundRaysIfPossible: false })
+        : undefined,
+      gscip: solverType === 'GSCIP'
+        ? new MathOpt.GScipParameters({
+          silenceOutput: true,
+          presolve: MathOpt.GScipMetaParamValue.FAST,
+        })
+        : undefined,
+      cpSat: solverType === 'CP_SAT'
+        ? { numWorkers: threads, maxTimeInSeconds: 5 }
+        : undefined,
     });
     renderRows([
       ['Backend', solverType],

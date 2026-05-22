@@ -8,6 +8,7 @@ import {
   postWorkerRequest,
   shouldUseWorkerBridge,
 } from './worker_bridge.js';
+import type { SatParameters } from './generated/sat_parameters.js';
 
 type WireValue = Uint8Array;
 
@@ -64,9 +65,46 @@ export type MathOptVariableOptions = {
 
 export type MathOptSolveOptions = {
   solverType?: MathOptSolverType | keyof typeof MathOptSolverType;
+  parameters?: Uint8Array;
+  solveParameters?: Uint8Array;
+  solve_parameters?: Uint8Array;
+  timeLimitSeconds?: number;
+  time_limit_seconds?: number;
   threads?: number;
   iterationLimit?: number;
-  glpk?: GlpkParameters;
+  iteration_limit?: number;
+  nodeLimit?: number;
+  node_limit?: number;
+  cutoffLimit?: number;
+  cutoff_limit?: number;
+  objectiveLimit?: number;
+  objective_limit?: number;
+  bestBoundLimit?: number;
+  best_bound_limit?: number;
+  solutionLimit?: number;
+  solution_limit?: number;
+  enableOutput?: boolean;
+  enable_output?: boolean;
+  randomSeed?: number;
+  random_seed?: number;
+  absoluteGapTolerance?: number;
+  absolute_gap_tolerance?: number;
+  relativeGapTolerance?: number;
+  relative_gap_tolerance?: number;
+  solutionPoolSize?: number;
+  solution_pool_size?: number;
+  lpAlgorithm?: MathOptLPAlgorithm | keyof typeof MathOptLPAlgorithm;
+  lp_algorithm?: MathOptLPAlgorithm | keyof typeof MathOptLPAlgorithm;
+  presolve?: MathOptEmphasis | keyof typeof MathOptEmphasis;
+  cuts?: MathOptEmphasis | keyof typeof MathOptEmphasis;
+  heuristics?: MathOptEmphasis | keyof typeof MathOptEmphasis;
+  scaling?: MathOptEmphasis | keyof typeof MathOptEmphasis;
+  gscip?: GScipParameters | GScipParametersOptions | Uint8Array;
+  glop?: GlopParameters | GlopParametersOptions | Uint8Array;
+  cpSat?: SatParameters | Uint8Array;
+  cp_sat?: SatParameters | Uint8Array;
+  pdlp?: PdlpParameters | PdlpParametersOptions | Uint8Array;
+  glpk?: GlpkParameters | GlpkParametersOptions | Uint8Array;
 };
 
 export type MathOptSolveResult = {
@@ -164,14 +202,280 @@ export enum MathOptSolverType {
   XPRESS = 13,
 }
 
+export enum MathOptLPAlgorithm {
+  UNSPECIFIED = 0,
+  PRIMAL_SIMPLEX = 1,
+  DUAL_SIMPLEX = 2,
+  BARRIER = 3,
+  FIRST_ORDER = 4,
+}
+
+export enum MathOptEmphasis {
+  UNSPECIFIED = 0,
+  OFF = 1,
+  LOW = 2,
+  MEDIUM = 3,
+  HIGH = 4,
+  VERY_HIGH = 5,
+}
+
+export enum GScipEmphasis {
+  DEFAULT_EMPHASIS = 0,
+  COUNTER = 1,
+  CP_SOLVER = 2,
+  EASY_CIP = 3,
+  FEASIBILITY = 4,
+  HARD_LP = 5,
+  OPTIMALITY = 6,
+  PHASE_FEAS = 7,
+  PHASE_IMPROVE = 8,
+  PHASE_PROOF = 9,
+}
+
+export enum GScipMetaParamValue {
+  DEFAULT_META_PARAM_VALUE = 0,
+  AGGRESSIVE = 1,
+  FAST = 2,
+  OFF = 3,
+}
+
+export enum PdlpOptimalityNorm {
+  UNSPECIFIED = 0,
+  L_INF = 1,
+  L2 = 2,
+  L_INF_COMPONENTWISE = 3,
+}
+
+export enum PdlpSchedulerType {
+  UNSPECIFIED = 0,
+  GOOGLE_THREADPOOL = 1,
+  EIGEN_THREADPOOL = 3,
+}
+
+export enum PdlpRestartStrategy {
+  UNSPECIFIED = 0,
+  NO_RESTARTS = 1,
+  EVERY_MAJOR_ITERATION = 2,
+  ADAPTIVE_HEURISTIC = 3,
+  ADAPTIVE_DISTANCE_BASED = 4,
+}
+
+export enum PdlpLinesearchRule {
+  UNSPECIFIED = 0,
+  ADAPTIVE_LINESEARCH_RULE = 1,
+  MALITSKY_POCK_LINESEARCH_RULE = 2,
+  CONSTANT_STEP_SIZE_RULE = 3,
+}
+
+export type GScipParametersOptions = {
+  emphasis?: GScipEmphasis | keyof typeof GScipEmphasis;
+  heuristics?: GScipMetaParamValue | keyof typeof GScipMetaParamValue;
+  presolve?: GScipMetaParamValue | keyof typeof GScipMetaParamValue;
+  separating?: GScipMetaParamValue | keyof typeof GScipMetaParamValue;
+  boolParams?: Record<string, boolean>;
+  bool_params?: Record<string, boolean>;
+  intParams?: Record<string, number>;
+  int_params?: Record<string, number>;
+  longParams?: Record<string, number | bigint>;
+  long_params?: Record<string, number | bigint>;
+  realParams?: Record<string, number>;
+  real_params?: Record<string, number>;
+  charParams?: Record<string, string>;
+  char_params?: Record<string, string>;
+  stringParams?: Record<string, string>;
+  string_params?: Record<string, string>;
+  silenceOutput?: boolean;
+  silence_output?: boolean;
+  printDetailedSolvingStats?: boolean;
+  print_detailed_solving_stats?: boolean;
+  printScipModel?: boolean;
+  print_scip_model?: boolean;
+  searchLogsFilename?: string;
+  search_logs_filename?: string;
+  detailedSolvingStatsFilename?: string;
+  detailed_solving_stats_filename?: string;
+  scipModelFilename?: string;
+  scip_model_filename?: string;
+  numSolutions?: number;
+  num_solutions?: number;
+  objectiveLimit?: number;
+  objective_limit?: number;
+};
+
+export class GScipParameters {
+  constructor(readonly options: GScipParametersOptions = {}) {}
+
+  toProtoBytes(): Uint8Array {
+    const options = this.options;
+    return message([
+      enumField(1, options.emphasis, GScipEmphasis),
+      enumField(2, options.heuristics, GScipMetaParamValue),
+      enumField(3, options.presolve, GScipMetaParamValue),
+      enumField(4, options.separating, GScipMetaParamValue),
+      ...mapFields(5, options.boolParams ?? options.bool_params, fieldBool),
+      ...mapFields(6, options.intParams ?? options.int_params, fieldVarint),
+      ...mapFields(7, options.longParams ?? options.long_params, fieldVarint),
+      ...mapFields(8, options.realParams ?? options.real_params, fieldDouble),
+      ...mapFields(9, options.charParams ?? options.char_params, fieldString),
+      ...mapFields(10, options.stringParams ?? options.string_params, fieldString),
+      optionalBoolField(11, options.silenceOutput ?? options.silence_output),
+      optionalBoolField(12, options.printDetailedSolvingStats ?? options.print_detailed_solving_stats),
+      optionalBoolField(13, options.printScipModel ?? options.print_scip_model),
+      optionalStringField(14, options.searchLogsFilename ?? options.search_logs_filename),
+      optionalStringField(15, options.detailedSolvingStatsFilename ?? options.detailed_solving_stats_filename),
+      optionalStringField(16, options.scipModelFilename ?? options.scip_model_filename),
+      optionalVarintField(17, options.numSolutions ?? options.num_solutions),
+      optionalDoubleField(18, options.objectiveLimit ?? options.objective_limit),
+    ]);
+  }
+}
+
+export type GlopParametersOptions = {
+  useScaling?: boolean;
+  use_scaling?: boolean;
+  maxTimeInSeconds?: number;
+  max_time_in_seconds?: number;
+  useDualSimplex?: boolean;
+  use_dual_simplex?: boolean;
+  usePreprocessing?: boolean;
+  use_preprocessing?: boolean;
+};
+
+export class GlopParameters {
+  constructor(readonly options: GlopParametersOptions = {}) {}
+
+  toProtoBytes(): Uint8Array {
+    const options = this.options;
+    return message([
+      optionalBoolField(16, options.useScaling ?? options.use_scaling),
+      optionalDoubleField(26, options.maxTimeInSeconds ?? options.max_time_in_seconds),
+      optionalBoolField(31, options.useDualSimplex ?? options.use_dual_simplex),
+      optionalBoolField(34, options.usePreprocessing ?? options.use_preprocessing),
+    ]);
+  }
+}
+
+export type PdlpParametersOptions = {
+  terminationCriteria?: {
+    optimalityNorm?: PdlpOptimalityNorm | keyof typeof PdlpOptimalityNorm;
+    optimality_norm?: PdlpOptimalityNorm | keyof typeof PdlpOptimalityNorm;
+    iterationLimit?: number;
+    iteration_limit?: number;
+    timeSecLimit?: number;
+    time_sec_limit?: number;
+    kktMatrixPassLimit?: number;
+    kkt_matrix_pass_limit?: number;
+    epsPrimalInfeasible?: number;
+    eps_primal_infeasible?: number;
+    epsDualInfeasible?: number;
+    eps_dual_infeasible?: number;
+    simpleOptimalityCriteria?: {
+      epsOptimalAbsolute?: number;
+      eps_optimal_absolute?: number;
+      epsOptimalRelative?: number;
+      eps_optimal_relative?: number;
+    };
+    simple_optimality_criteria?: {
+      eps_optimal_absolute?: number;
+      eps_optimal_relative?: number;
+    };
+  };
+  termination_criteria?: PdlpParametersOptions['terminationCriteria'];
+  numThreads?: number;
+  num_threads?: number;
+  numShards?: number;
+  num_shards?: number;
+  schedulerType?: PdlpSchedulerType | keyof typeof PdlpSchedulerType;
+  scheduler_type?: PdlpSchedulerType | keyof typeof PdlpSchedulerType;
+  recordIterationStats?: boolean;
+  record_iteration_stats?: boolean;
+  verbosityLevel?: number;
+  verbosity_level?: number;
+  logIntervalSeconds?: number;
+  log_interval_seconds?: number;
+  majorIterationFrequency?: number;
+  major_iteration_frequency?: number;
+  terminationCheckFrequency?: number;
+  termination_check_frequency?: number;
+  restartStrategy?: PdlpRestartStrategy | keyof typeof PdlpRestartStrategy;
+  restart_strategy?: PdlpRestartStrategy | keyof typeof PdlpRestartStrategy;
+  primalWeightUpdateSmoothing?: number;
+  primal_weight_update_smoothing?: number;
+  initialPrimalWeight?: number;
+  initial_primal_weight?: number;
+  lInfRuizIterations?: number;
+  l_inf_ruiz_iterations?: number;
+  l2NormRescaling?: boolean;
+  l2_norm_rescaling?: boolean;
+  sufficientReductionForRestart?: number;
+  sufficient_reduction_for_restart?: number;
+  necessaryReductionForRestart?: number;
+  necessary_reduction_for_restart?: number;
+  linesearchRule?: PdlpLinesearchRule | keyof typeof PdlpLinesearchRule;
+  linesearch_rule?: PdlpLinesearchRule | keyof typeof PdlpLinesearchRule;
+  initialStepSizeScaling?: number;
+  initial_step_size_scaling?: number;
+  randomProjectionSeeds?: number[];
+  random_projection_seeds?: number[];
+  infiniteConstraintBoundThreshold?: number;
+  infinite_constraint_bound_threshold?: number;
+  useDiagonalQpTrustRegionSolver?: boolean;
+  use_diagonal_qp_trust_region_solver?: boolean;
+  diagonalQpTrustRegionSolverTolerance?: number;
+  diagonal_qp_trust_region_solver_tolerance?: number;
+  useFeasibilityPolishing?: boolean;
+  use_feasibility_polishing?: boolean;
+  applyFeasibilityPolishingAfterLimitsReached?: boolean;
+  apply_feasibility_polishing_after_limits_reached?: boolean;
+  applyFeasibilityPolishingIfSolverIsInterrupted?: boolean;
+  apply_feasibility_polishing_if_solver_is_interrupted?: boolean;
+};
+
+export class PdlpParameters {
+  constructor(readonly options: PdlpParametersOptions = {}) {}
+
+  toProtoBytes(): Uint8Array {
+    const options = this.options;
+    return message([
+      fieldMessageIfPresent(1, encodePdlpTerminationCriteria(options.terminationCriteria ?? options.termination_criteria)),
+      optionalVarintField(2, options.numThreads ?? options.num_threads),
+      optionalBoolField(3, options.recordIterationStats ?? options.record_iteration_stats),
+      optionalVarintField(4, options.majorIterationFrequency ?? options.major_iteration_frequency),
+      optionalVarintField(5, options.terminationCheckFrequency ?? options.termination_check_frequency),
+      enumField(6, options.restartStrategy ?? options.restart_strategy, PdlpRestartStrategy),
+      optionalDoubleField(7, options.primalWeightUpdateSmoothing ?? options.primal_weight_update_smoothing),
+      optionalDoubleField(8, options.initialPrimalWeight ?? options.initial_primal_weight),
+      optionalVarintField(9, options.lInfRuizIterations ?? options.l_inf_ruiz_iterations),
+      optionalBoolField(10, options.l2NormRescaling ?? options.l2_norm_rescaling),
+      optionalDoubleField(11, options.sufficientReductionForRestart ?? options.sufficient_reduction_for_restart),
+      enumField(12, options.linesearchRule ?? options.linesearch_rule, PdlpLinesearchRule),
+      optionalDoubleField(17, options.necessaryReductionForRestart ?? options.necessary_reduction_for_restart),
+      optionalDoubleField(25, options.initialStepSizeScaling ?? options.initial_step_size_scaling),
+      optionalVarintField(26, options.verbosityLevel ?? options.verbosity_level),
+      optionalVarintField(27, options.numShards ?? options.num_shards),
+      fieldPackedVarintsIfPresent(28, options.randomProjectionSeeds ?? options.random_projection_seeds),
+      optionalDoubleField(22, options.infiniteConstraintBoundThreshold ?? options.infinite_constraint_bound_threshold),
+      optionalBoolField(23, options.useDiagonalQpTrustRegionSolver ?? options.use_diagonal_qp_trust_region_solver),
+      optionalDoubleField(24, options.diagonalQpTrustRegionSolverTolerance ?? options.diagonal_qp_trust_region_solver_tolerance),
+      optionalDoubleField(31, options.logIntervalSeconds ?? options.log_interval_seconds),
+      enumField(32, options.schedulerType ?? options.scheduler_type, PdlpSchedulerType),
+      optionalBoolField(30, options.useFeasibilityPolishing ?? options.use_feasibility_polishing),
+      optionalBoolField(33, options.applyFeasibilityPolishingAfterLimitsReached ?? options.apply_feasibility_polishing_after_limits_reached),
+      optionalBoolField(34, options.applyFeasibilityPolishingIfSolverIsInterrupted ?? options.apply_feasibility_polishing_if_solver_is_interrupted),
+    ]);
+  }
+}
+
+export type GlpkParametersOptions = {
+  computeUnboundRaysIfPossible?: boolean;
+  compute_unbound_rays_if_possible?: boolean;
+};
+
 export class GlpkParameters {
   readonly computeUnboundRaysIfPossible?: boolean;
   readonly compute_unbound_rays_if_possible?: boolean;
 
-  constructor(options: {
-    computeUnboundRaysIfPossible?: boolean;
-    compute_unbound_rays_if_possible?: boolean;
-  } = {}) {
+  constructor(options: GlpkParametersOptions = {}) {
     this.computeUnboundRaysIfPossible = options.computeUnboundRaysIfPossible
       ?? options.compute_unbound_rays_if_possible;
     this.compute_unbound_rays_if_possible = this.computeUnboundRaysIfPossible;
@@ -1633,6 +1937,17 @@ export async function initMathOpt(): Promise<void> {
 
 export class MathOpt {
   static readonly SolverType = MathOptSolverType;
+  static readonly LPAlgorithm = MathOptLPAlgorithm;
+  static readonly Emphasis = MathOptEmphasis;
+  static readonly GScipEmphasis = GScipEmphasis;
+  static readonly GScipMetaParamValue = GScipMetaParamValue;
+  static readonly GScipParameters = GScipParameters;
+  static readonly GlopParameters = GlopParameters;
+  static readonly PdlpParameters = PdlpParameters;
+  static readonly PdlpOptimalityNorm = PdlpOptimalityNorm;
+  static readonly PdlpSchedulerType = PdlpSchedulerType;
+  static readonly PdlpRestartStrategy = PdlpRestartStrategy;
+  static readonly PdlpLinesearchRule = PdlpLinesearchRule;
   static readonly GlpkParameters = GlpkParameters;
   static readonly LinearExpression = MathOptLinearExpression;
   static readonly QuadraticExpression = MathOptQuadraticExpression;
@@ -1655,11 +1970,15 @@ export class MathOpt {
   }
 
   static async solve(model: MathOptModel, options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
-    const requestBytes = encodeSolveRequest(model, options);
+    const requestBytes = MathOpt.encodeSolveRequest(model, options);
     const responseBytes = shouldUseWorkerBridge()
       ? await solveViaWorker(requestBytes)
       : await solveDirect(requestBytes);
     return decodeSolveResponse(responseBytes, model);
+  }
+
+  static encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions = {}): Uint8Array {
+    return encodeSolveRequest(model, options);
   }
 
   static linearTerm(variable: MathOptVariable, coefficient = 1): MathOptLinearTerm {
@@ -1827,19 +2146,44 @@ function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): 
   if (solverType === MathOptSolverType.GLPK && options.threads !== undefined && options.threads !== 1) {
     throw new Error('GLPK does not support multi-threaded MathOpt solves; use threads: 1 or omit threads.');
   }
+  const parameters = encodeMathOptSolveParameters(options);
   return message([
     fieldVarint(1, solverType),
     fieldMessage(2, model.encodeModelProto()),
-    options.threads || options.iterationLimit
-      ? fieldMessage(4, message([
-        options.iterationLimit ? fieldVarint(2, options.iterationLimit) : empty(),
-        options.threads ? fieldVarint(4, options.threads) : empty(),
-        options.glpk ? fieldMessage(26, options.glpk.toProtoBytes()) : empty(),
-      ]))
-      : options.glpk
-        ? fieldMessage(4, message([fieldMessage(26, options.glpk.toProtoBytes())]))
-      : empty(),
+    fieldMessageIfPresent(4, parameters),
   ]);
+}
+
+function encodeMathOptSolveParameters(options: MathOptSolveOptions): Uint8Array | null {
+  const raw = options.parameters ?? options.solveParameters ?? options.solve_parameters;
+  if (raw) return raw;
+  const fields = [
+    fieldDurationSeconds(1, options.timeLimitSeconds ?? options.time_limit_seconds),
+    optionalVarintField(2, options.iterationLimit ?? options.iteration_limit),
+    optionalBoolField(3, options.enableOutput ?? options.enable_output),
+    optionalVarintField(4, options.threads),
+    optionalVarintField(5, options.randomSeed ?? options.random_seed),
+    enumField(6, options.lpAlgorithm ?? options.lp_algorithm, MathOptLPAlgorithm),
+    enumField(7, options.presolve, MathOptEmphasis),
+    enumField(8, options.cuts, MathOptEmphasis),
+    enumField(9, options.heuristics, MathOptEmphasis),
+    enumField(10, options.scaling, MathOptEmphasis),
+    fieldMessageIfPresent(12, backendParametersBytes(options.gscip, GScipParameters)),
+    fieldMessageIfPresent(14, backendParametersBytes(options.glop, GlopParameters)),
+    fieldMessageIfPresent(15, encodeSatParameters(options.cpSat ?? options.cp_sat)),
+    fieldMessageIfPresent(16, backendParametersBytes(options.pdlp, PdlpParameters)),
+    optionalDoubleField(17, options.relativeGapTolerance ?? options.relative_gap_tolerance),
+    optionalDoubleField(18, options.absoluteGapTolerance ?? options.absolute_gap_tolerance),
+    optionalDoubleField(20, options.cutoffLimit ?? options.cutoff_limit),
+    optionalDoubleField(21, options.objectiveLimit ?? options.objective_limit),
+    optionalDoubleField(22, options.bestBoundLimit ?? options.best_bound_limit),
+    optionalVarintField(23, options.solutionLimit ?? options.solution_limit),
+    optionalVarintField(24, options.nodeLimit ?? options.node_limit),
+    optionalVarintField(25, options.solutionPoolSize ?? options.solution_pool_size),
+    fieldMessageIfPresent(26, backendParametersBytes(options.glpk, GlpkParameters)),
+  ];
+  const encoded = message(fields);
+  return encoded.length > 0 ? encoded : null;
 }
 
 function objectiveData(
@@ -2147,8 +2491,32 @@ function fieldMessage(field: number, value: Uint8Array): Uint8Array {
   return fieldLengthDelimited(field, value);
 }
 
+function fieldMessageIfPresent(field: number, value: Uint8Array | null | undefined): Uint8Array {
+  return value && value.length > 0 ? fieldMessage(field, value) : empty();
+}
+
+function optionalVarintField(field: number, value: number | bigint | undefined): Uint8Array {
+  return value === undefined ? empty() : fieldVarint(field, value);
+}
+
+function optionalBoolField(field: number, value: boolean | undefined): Uint8Array {
+  return value === undefined ? empty() : fieldBool(field, value);
+}
+
+function optionalDoubleField(field: number, value: number | undefined): Uint8Array {
+  return value === undefined ? empty() : fieldDouble(field, value);
+}
+
+function optionalStringField(field: number, value: string | undefined): Uint8Array {
+  return value === undefined ? empty() : fieldString(field, value);
+}
+
 function fieldPackedVarints(field: number, values: Array<number | bigint>): Uint8Array {
   return fieldLengthDelimited(field, concat(values.map((value) => writeVarint(BigInt(value)))));
+}
+
+function fieldPackedVarintsIfPresent(field: number, values: Array<number | bigint> | undefined): Uint8Array {
+  return values === undefined ? empty() : fieldPackedVarints(field, values);
 }
 
 function fieldPackedBools(field: number, values: boolean[]): Uint8Array {
@@ -2167,6 +2535,107 @@ function fieldLengthDelimited(field: number, payload: Uint8Array): Uint8Array {
     writeVarint(BigInt((field << 3) | 2)),
     writeVarint(BigInt(payload.length)),
     payload,
+  ]);
+}
+
+function fieldDurationSeconds(field: number, seconds: number | undefined): Uint8Array {
+  if (seconds === undefined) return empty();
+  const wholeSeconds = Math.trunc(seconds);
+  const nanos = Math.round((seconds - wholeSeconds) * 1_000_000_000);
+  return fieldMessage(field, message([
+    fieldVarint(1, wholeSeconds),
+    nanos === 0 ? empty() : fieldVarint(2, nanos),
+  ]));
+}
+
+function enumField<T extends Record<string, string | number>>(
+  field: number,
+  value: number | keyof T | undefined,
+  enumObject: T,
+): Uint8Array {
+  if (value === undefined) return empty();
+  return fieldVarint(field, enumValue(value, enumObject));
+}
+
+function enumValue<T extends Record<string, string | number>>(
+  value: number | keyof T,
+  enumObject: T,
+): number {
+  if (typeof value === 'number') return value;
+  const resolved = enumObject[value as string];
+  if (typeof resolved !== 'number') {
+    throw new Error(`Unknown enum value: ${String(value)}`);
+  }
+  return resolved;
+}
+
+function mapFields<T>(
+  field: number,
+  values: Record<string, T> | undefined,
+  encodeValue: (field: number, value: T) => Uint8Array,
+): Uint8Array[] {
+  if (!values) return [];
+  return Object.entries(values).map(([key, value]) => fieldMessage(field, message([
+    fieldString(1, key),
+    encodeValue(2, value),
+  ])));
+}
+
+function backendParametersBytes<TOptions, TParameters extends { toProtoBytes(): Uint8Array }>(
+  value: TParameters | TOptions | Uint8Array | undefined,
+  ctor: new (options: TOptions) => TParameters,
+): Uint8Array | null {
+  if (value === undefined) return null;
+  if (value instanceof Uint8Array) return value;
+  if (typeof (value as { toProtoBytes?: unknown }).toProtoBytes === 'function') {
+    return (value as TParameters).toProtoBytes();
+  }
+  return new ctor(value as TOptions).toProtoBytes();
+}
+
+function encodePdlpTerminationCriteria(criteria: PdlpParametersOptions['terminationCriteria'] | undefined): Uint8Array | null {
+  if (!criteria) return null;
+  const simple = (criteria.simpleOptimalityCriteria ?? criteria.simple_optimality_criteria) as {
+    epsOptimalAbsolute?: number;
+    eps_optimal_absolute?: number;
+    epsOptimalRelative?: number;
+    eps_optimal_relative?: number;
+  } | undefined;
+  const encoded = message([
+    enumField(1, criteria.optimalityNorm ?? criteria.optimality_norm, PdlpOptimalityNorm),
+    optionalDoubleField(4, criteria.epsPrimalInfeasible ?? criteria.eps_primal_infeasible),
+    optionalDoubleField(5, criteria.epsDualInfeasible ?? criteria.eps_dual_infeasible),
+    optionalDoubleField(6, criteria.timeSecLimit ?? criteria.time_sec_limit),
+    optionalVarintField(7, criteria.iterationLimit ?? criteria.iteration_limit),
+    optionalDoubleField(8, criteria.kktMatrixPassLimit ?? criteria.kkt_matrix_pass_limit),
+    simple
+      ? fieldMessage(9, message([
+        optionalDoubleField(1, simple.epsOptimalAbsolute ?? simple.eps_optimal_absolute),
+        optionalDoubleField(2, simple.epsOptimalRelative ?? simple.eps_optimal_relative),
+      ]))
+      : empty(),
+  ]);
+  return encoded.length > 0 ? encoded : null;
+}
+
+function encodeSatParameters(parameters: SatParameters | Uint8Array | undefined): Uint8Array | null {
+  if (parameters === undefined) return null;
+  if (parameters instanceof Uint8Array) return parameters;
+  const params = parameters as SatParameters & {
+    max_time_in_seconds?: number;
+    random_seed?: number;
+    log_search_progress?: boolean;
+    log_to_stdout?: boolean;
+    log_to_response?: boolean;
+    num_workers?: number;
+  };
+  return message([
+    optionalVarintField(31, params.randomSeed ?? params.random_seed),
+    optionalDoubleField(36, params.maxTimeInSeconds ?? params.max_time_in_seconds),
+    optionalBoolField(41, params.logSearchProgress ?? params.log_search_progress),
+    optionalBoolField(186, params.logToStdout ?? params.log_to_stdout),
+    optionalBoolField(187, params.logToResponse ?? params.log_to_response),
+    optionalVarintField(206, params.numWorkers ?? params.num_workers),
   ]);
 }
 
