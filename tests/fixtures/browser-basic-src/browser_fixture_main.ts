@@ -183,6 +183,13 @@ export async function runBrowserFixture() {
     MPSolverParameters: MPSolverApi.MPSolverParameters,
     setWorkerBridgeEnabled: MPSolverApi.setWorkerBridgeEnabled,
     isWorkerBridgeEnabled: MPSolverApi.isWorkerBridgeEnabled,
+  }, {
+    onProgress: (caseName, context) => setStatus({
+      ok: false,
+      phase: 'mp-solver',
+      caseName,
+      ...context,
+    }),
   }));
   setStatus({ ok: false, phase: 'knapsack' });
   const knapsack = await runWithWorkerStats(workerSpy, () => runKnapsackCases({
