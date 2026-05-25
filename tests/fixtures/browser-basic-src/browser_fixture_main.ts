@@ -8,21 +8,20 @@ import { runPdlpCases } from './pdlp_runner.ts';
 import { runRcpspCases } from './rcpsp_runner.ts';
 import { runRoutingCases } from './routing_runner.ts';
 import { runSetCoverCases } from './set_cover_runner.ts';
-import * as CpSatApi from 'or-tools-wasm/cp-sat';
-import * as RoutingApiModule from 'or-tools-wasm/routing';
-import * as MPSolverApi from 'or-tools-wasm/mp-solver';
-import * as KnapsackApi from 'or-tools-wasm/knapsack';
-import * as NetworkFlowApi from 'or-tools-wasm/network-flow';
-import * as SetCoverApi from 'or-tools-wasm/set-cover';
-import * as RcpspApi from 'or-tools-wasm/rcpsp';
-import * as MathOptApi from 'or-tools-wasm/mathopt';
-import * as PdlpApi from 'or-tools-wasm/pdlp';
 
-type _MathOptResultTypeExports = [
-  MathOptApi.MathOptBasisResult,
-  MathOptApi.MathOptDualRayResult,
-  MathOptApi.MathOptPrimalRayResult,
-];
+type PackageModule = Record<string, any>;
+
+export type BrowserFixtureApis = {
+  CpSatApi: PackageModule;
+  RoutingApiModule: PackageModule;
+  MPSolverApi: PackageModule;
+  KnapsackApi: PackageModule;
+  NetworkFlowApi: PackageModule;
+  SetCoverApi: PackageModule;
+  RcpspApi: PackageModule;
+  MathOptApi: PackageModule;
+  PdlpApi: PackageModule;
+};
 
 const statusEl = document.getElementById('status');
 
@@ -53,24 +52,6 @@ type WorkerStats = {
   setCoverSolve: number;
   pdlpSolve: number;
 };
-
-type CpSat = typeof import('or-tools-wasm/cp-sat')['CpSat'];
-type RoutingApi = Pick<
-  typeof import('or-tools-wasm/routing'),
-  | 'BOOL_FALSE'
-  | 'BOOL_UNSPECIFIED'
-  | 'BoundCost'
-  | 'DefaultRoutingModelParameters'
-  | 'DefaultRoutingSearchParameters'
-  | 'FindErrorInRoutingSearchParameters'
-  | 'FirstSolutionStrategy'
-  | 'initRouting'
-  | 'isWorkerBridgeEnabled'
-  | 'LocalSearchMetaheuristic'
-  | 'RoutingIndexManager'
-  | 'RoutingModel'
-  | 'setWorkerBridgeEnabled'
->;
 
 function setStatus(value: unknown) {
   if (statusEl) {
@@ -150,12 +131,23 @@ async function runWithWorkerStats<T>(
   return { before, result, after };
 }
 
-export async function runBrowserFixture() {
+export async function runBrowserFixture(apis: BrowserFixtureApis) {
+  const {
+    CpSatApi,
+    RoutingApiModule,
+    MPSolverApi,
+    KnapsackApi,
+    NetworkFlowApi,
+    SetCoverApi,
+    RcpspApi,
+    MathOptApi,
+    PdlpApi,
+  } = apis;
   setStatus({ ok: false, phase: 'running' });
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
-  const typedCpSat: CpSat = CpSatApi.CpSat;
-  const routingApi: RoutingApi = {
+  const typedCpSat = CpSatApi.CpSat;
+  const routingApi = {
     BOOL_FALSE: RoutingApiModule.BOOL_FALSE,
     BOOL_UNSPECIFIED: RoutingApiModule.BOOL_UNSPECIFIED,
     BoundCost: RoutingApiModule.BoundCost,
