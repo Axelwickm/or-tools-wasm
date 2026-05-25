@@ -196,14 +196,21 @@ function isWebWorkerRuntimeHost(runtimeName) {
   const isBun = typeof globalThis.Bun !== 'undefined';
   const isBunWorker = typeof globalThis.Bun !== 'undefined'
     && globalThis.__ORTOOLS_WASM_BRIDGE_WORKER === true;
+  const bunWorkerWebRuntimes = new Set([
+    'cp_sat_runtime',
+    'routing_runtime',
+    'mp_solver_runtime',
+    'mathopt_runtime',
+  ]);
   const bunMainWebRuntimes = new Set([
     'cp_sat_runtime',
     'routing_runtime',
     'mp_solver_runtime',
     'mathopt_runtime',
-    'pdlp_runtime',
   ]);
-  return isDeno || isBunWorker || (isBun && bunMainWebRuntimes.has(runtimeName));
+  return isDeno
+    || (isBunWorker && bunWorkerWebRuntimes.has(runtimeName))
+    || (isBun && bunMainWebRuntimes.has(runtimeName));
 }
 
 function isDenoRuntime() {

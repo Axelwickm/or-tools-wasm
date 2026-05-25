@@ -74,6 +74,7 @@ export type GraphSolvePayload = MaxFlowSolvePayload | MinCostFlowSolvePayload | 
 let graphModulePromise: Promise<OrToolsWasmModule> | null = null;
 let graphModule: OrToolsWasmModule | null = null;
 let graphExports: GraphExports | null = null;
+const isBunRuntime = 'Bun' in globalThis;
 
 function wrap<T extends (...args: never[]) => unknown>(
   module: OrToolsWasmModule,
@@ -114,6 +115,9 @@ function createGraphExports(module: OrToolsWasmModule): GraphExports {
 }
 
 export async function initNetworkFlow(): Promise<void> {
+  if (isBunRuntime) {
+    return;
+  }
   graphModulePromise ??= loadGraphRuntime().then((module) => {
     graphModule = module;
     graphExports = createGraphExports(module);
@@ -246,8 +250,7 @@ function solveLinearSumAssignmentDirect(payload: LinearSumAssignmentSolvePayload
 }
 
 export async function solveGraphPayload(payload: GraphSolvePayload): Promise<NativeSuccess> {
-  await initNetworkFlow();
-  if (shouldUseWorkerBridge()) {
+  if (isBunRuntime || shouldUseWorkerBridge()) {
     const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'graphSolveResult' }>>({
       type: 'graphSolve',
       id: nextWorkerBridgeRequestId(),
@@ -255,6 +258,7 @@ export async function solveGraphPayload(payload: GraphSolvePayload): Promise<Nat
     });
     return parseResult(response.result);
   }
+  await initNetworkFlow();
   if (payload.algorithm === 'maxFlow') return solveMaxFlowDirect(payload);
   if (payload.algorithm === 'minCostFlow') return solveMinCostFlowDirect(payload);
   return solveLinearSumAssignmentDirect(payload);

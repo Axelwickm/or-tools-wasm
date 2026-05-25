@@ -181,6 +181,28 @@ type MathOptModelLike = {
     expression?: unknown;
     name?: string;
   } | MathOptBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptLowerBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptUpperBoundedExpressionLike<MathOptLinearExpressionLike>): MathOptLinearConstraintLike;
+  addIndicatorConstraint?(options?: {
+    indicator?: MathOptVariableLike;
+    activateOnZero?: boolean;
+    activate_on_zero?: boolean;
+    impliedConstraint?: unknown;
+    implied_constraint?: unknown;
+    lowerBound?: number;
+    upperBound?: number;
+    terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
+    expression?: unknown;
+    name?: string;
+  }): unknown;
+  add_indicator_constraint?(options?: {
+    indicator?: MathOptVariableLike;
+    activate_on_zero?: boolean;
+    implied_constraint?: unknown;
+    lower_bound?: number;
+    upper_bound?: number;
+    terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
+    expression?: unknown;
+    name?: string;
+  }): unknown;
   add_linear_constraint?(options?: {
     lb?: number;
     ub?: number;
@@ -271,6 +293,24 @@ export type MathOptApi = {
       computeUnboundRaysIfPossible?: boolean;
       compute_unbound_rays_if_possible?: boolean;
     }) => { toProtoBytes(): Uint8Array };
+    SolveInterrupter: new () => {
+      readonly interrupted: boolean;
+      interrupt(): void;
+      isInterrupted?(): boolean;
+      is_interrupted?(): boolean;
+    };
+    SolveParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
+    ModelSolveParameters: {
+      new (options?: Record<string, unknown>): { toProtoBytes(): Uint8Array };
+      onlySomePrimalVariables?(variables: MathOptVariableLike[]): { toProtoBytes(): Uint8Array };
+      only_some_primal_variables?(variables: MathOptVariableLike[]): { toProtoBytes(): Uint8Array };
+    };
+    SparseVectorFilter: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
+    SolutionHint: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
+    IncrementalSolver: new (...args: any[]) => {
+      solve(options?: Record<string, unknown>): Promise<any>;
+      close(): Promise<void>;
+    };
     LinearExpression: abstract new (...args: never[]) => MathOptLinearExpressionLike;
     QuadraticExpression: abstract new (...args: never[]) => MathOptQuadraticExpressionLike;
     QuadraticTermKey: abstract new (...args: never[]) => MathOptQuadraticTermKeyLike;
@@ -301,11 +341,23 @@ export type MathOptApi = {
       solverType?: number | string;
       threads?: number;
       iterationLimit?: number;
+      interrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean; is_interrupted?(): boolean };
+      solveInterrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean; is_interrupted?(): boolean };
+      solve_interrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean; is_interrupted?(): boolean };
+      messageCallback?: (messages: string[]) => void;
+      message_callback?: (messages: string[]) => void;
+      msgCb?: (messages: string[]) => void;
+      msg_cb?: (messages: string[]) => void;
       [key: string]: unknown;
     }): Promise<{
       terminationReason: string;
+      terminationLimit: string | null;
       primalBound: number | null;
       dualBound: number | null;
+      solveTimeSeconds: number | null;
+      primalStatus?: string | null;
+      dualStatus?: string | null;
+      primalOrDualInfeasible?: boolean;
       objectiveValue: number | null;
       variableValues: Record<string, number>;
       variableValuesById: Record<number, number>;
@@ -314,6 +366,7 @@ export type MathOptApi = {
           objectiveValue: number | null;
           variableValues: Record<string, number>;
           variableValuesById: Record<number, number>;
+          feasibilityStatus?: string;
         } | null;
         dualSolution: {
           objectiveValue: number | null;
@@ -321,9 +374,60 @@ export type MathOptApi = {
           dualValuesById: Record<number, number>;
           reducedCosts: Record<string, number>;
           reducedCostsById: Record<number, number>;
+          feasibilityStatus?: string;
+        } | null;
+        basis?: {
+          variableStatus: Record<string, string>;
+          variableStatusById: Record<number, string>;
+          constraintStatus: Record<string, string>;
+          constraintStatusById: Record<number, string>;
         } | null;
       }>;
+      primalRays?: Array<{
+        variableValues: Record<string, number>;
+        variableValuesById: Record<number, number>;
+      }>;
+      dualRays?: Array<{
+        dualValues: Record<string, number>;
+        dualValuesById: Record<number, number>;
+        reducedCosts: Record<string, number>;
+        reducedCostsById: Record<number, number>;
+      }>;
+      messages: string[];
       rawResponse: Uint8Array;
+      solve_time(): number | null;
+      best_objective_bound(): number | null;
+      has_primal_feasible_solution(): boolean;
+      has_dual_feasible_solution(): boolean;
+      has_ray(): boolean;
+      has_dual_ray(): boolean;
+      has_basis(): boolean;
+      bounded(): boolean;
+      objective_value(): number;
+      variable_values(): Record<string, number>;
+      variable_values(variable: MathOptVariableLike): number;
+      variable_values(variables: MathOptVariableLike[]): number[];
+      reduced_costs(): Record<string, number>;
+      reduced_costs(variable: MathOptVariableLike): number;
+      reduced_costs(variables: MathOptVariableLike[]): number[];
+      dual_values(): Record<string, number>;
+      dual_values(linearConstraint: MathOptLinearConstraintLike): number;
+      dual_values(linearConstraints: MathOptLinearConstraintLike[]): number[];
+      ray_variable_values(): Record<string, number>;
+      ray_variable_values(variable: MathOptVariableLike): number;
+      ray_variable_values(variables: MathOptVariableLike[]): number[];
+      ray_reduced_costs(): Record<string, number>;
+      ray_reduced_costs(variable: MathOptVariableLike): number;
+      ray_reduced_costs(variables: MathOptVariableLike[]): number[];
+      ray_dual_values(): Record<string, number>;
+      ray_dual_values(linearConstraint: MathOptLinearConstraintLike): number;
+      ray_dual_values(linearConstraints: MathOptLinearConstraintLike[]): number[];
+      variable_status(): Record<string, string>;
+      variable_status(variable: MathOptVariableLike): string;
+      variable_status(variables: MathOptVariableLike[]): string[];
+      constraint_status(): Record<string, string>;
+      constraint_status(linearConstraint: MathOptLinearConstraintLike): string;
+      constraint_status(linearConstraints: MathOptLinearConstraintLike[]): string[];
     }>;
     encodeSolveRequest(model: MathOptModelLike, options?: {
       solverType?: number | string;
@@ -392,10 +496,27 @@ const activeSolveResultContractNames = new Set([
   'SolveTest/test_solve_error',
   'SolveTest/test_lp_solve',
   'SolveTest/test_cp_sat_mip_like',
+  'SolveTest/test_indicator',
+  'SolveTest/test_filters',
+  'SolveTest/test_message_callback',
+  'SolveTest/test_solve_interrupter',
+  'SolveTest/test_solve_duplicated_names_and_remove_names',
+  'SolveTest/test_incremental_solve_remove_names',
+  'SolveTest/test_incremental_solve_init_error',
+  'SolveTest/test_incremental_solve_error',
+  'SolveTest/test_incremental_lp',
+  'SolveTest/test_incremental_mip',
+  'SolveTest/test_incremental_mip_with_message_cb',
+  'SolveTest/test_incremental_solve_interrupter',
+  'SolveTest/test_incremental_solve_error_on_reject',
+  'SolveTest/test_incremental_solve_rejected',
+  'SolveTest/test_multiple_incremental_lps',
+  'SolveTest/test_incremental_solver_close',
   'parameters_test.py/SolveParameters common proto mappings',
   'parameters_test.py/backend-specific solve parameter proto mappings',
+  'parameters_test.py/ModelSolveParameters proto mappings',
   'MathOpt API/solve_options_support_check',
-  'MathOpt API/duplicate_objective_access',
+  'result_test.py/SolveResult helper methods',
 ]);
 
 async function runGlopLp(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {

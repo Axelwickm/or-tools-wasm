@@ -1343,6 +1343,12 @@ Static constructors and aliases:
 - `MathOpt.PdlpRestartStrategy`
 - `MathOpt.PdlpLinesearchRule`
 - `MathOpt.GlpkParameters`
+- `MathOpt.SolveInterrupter`
+- `MathOpt.IncrementalSolver`
+- `MathOpt.SolveParameters`
+- `MathOpt.ModelSolveParameters`
+- `MathOpt.SparseVectorFilter`
+- `MathOpt.SolutionHint`
 - `MathOpt.setWorkerBridgeEnabled(enabled): void`
 - `MathOpt.isWorkerBridgeEnabled(): boolean`
 - `MPSolver.setWorkerBridgeEnabled(enabled): void`
@@ -1362,6 +1368,9 @@ Top-level value exports:
 - `terminateWorkerBridge`
 - `MathOptModel`
 - `MathOptObjective`
+- `MathOptIndicatorConstraint`
+- `MathOptSolveInterrupter`
+- `MathOptIncrementalSolver`
 - `GScipParameters`
 - `GlopParameters`
 - `PdlpParameters`
@@ -1378,11 +1387,16 @@ Top-level value exports:
 Top-level type exports:
 
 - `MathOptDualSolutionResult`
+- `MathOptDualRayResult`
+- `MathOptBasisResult`
+- `MathOptIndicatorConstraintOptions`
 - `MathOptLinearConstraint`
 - `MathOptLinearConstraintMatrixEntry`
 - `MathOptLinearTerm`
 - `MathOptPrimalSolutionResult`
+- `MathOptPrimalRayResult`
 - `MathOptSolutionResult`
+- `MathOptSolveInterrupterLike`
 - `MathOptSolveOptions`
 - `MathOptSolveResult`
 - `MathOptVariable`
@@ -1396,12 +1410,20 @@ Solving:
 
 - `MathOpt.solve(model, options?): Promise<MathOptSolveResult>`
 - `MathOpt.encodeSolveRequest(model, options?): Uint8Array`
+- `new MathOpt.IncrementalSolver(model, solverType?, options?)`
+- `incrementalSolver.solve(options?): Promise<MathOptSolveResult>`
+- `incrementalSolver.close(): Promise<void>`
 
 `MathOptSolveOptions`:
 
 - `solverType?: MathOptSolverType | keyof typeof MathOptSolverType`
-- `parameters?: Uint8Array`
-- `solveParameters?: Uint8Array`
+- `removeNames?: boolean`
+- `interrupter?: MathOptSolveInterrupter`
+- `messageCallback?: (messages: string[]) => void`
+- `msg_cb?: (messages: string[]) => void`
+- `parameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions`
+- `solveParameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions`
+- `modelParameters?: Uint8Array | MathOptModelSolveParameters | MathOptModelSolveParametersOptions`
 - `timeLimitSeconds?: number`
 - `threads?: number`
 - `iterationLimit?: number`
@@ -1428,7 +1450,31 @@ Solving:
 
 Snake-case aliases are accepted for proto-shaped names where they are useful
 for Python/protobuf parity, for example `time_limit_seconds`,
-`relative_gap_tolerance`, `cp_sat`, and `compute_unbound_rays_if_possible`.
+`relative_gap_tolerance`, `remove_names`, `cp_sat`, and
+`compute_unbound_rays_if_possible`.
+
+`removeNames` / `remove_names` omits model, variable, linear constraint, and
+indicator constraint names from the encoded `ModelProto`, matching upstream
+MathOpt `solve(remove_names=True)` behavior for models with duplicate names.
+
+`messageCallback` / `msg_cb` receives batched solver log lines after the WASM
+solve returns. Passing a message callback enables solver output capture and
+also stores the captured lines on `MathOptSolveResult.messages`.
+
+`MathOpt.SolveInterrupter` mirrors the upstream one-shot interrupter shape for
+MathOpt solves. Call `interrupt()` before passing it as `interrupter` to request
+early termination; the result exposes the corresponding termination limit.
+
+`MathOpt.IncrementalSolver` keeps a native MathOpt solver handle alive across
+solves and sends tracked model updates for variable bounds, linear constraint
+bounds, objective changes, new/deleted variables and linear constraints, matrix
+coefficient changes, and new/deleted indicator constraints. `solve()` accepts
+the same solve options as `MathOpt.solve()`, including message callbacks and
+pre-interrupted solve interrupters. `close()` releases the native handle and is
+safe to call more than once. If a backend rejects an update but can solve the
+full updated model, the wrapper recreates the native solver and solves from the
+current full model. The non-incremental `MathOpt.solve()` and
+`encodeSolveRequest()` proto path remain available.
 
 Backend-specific parameter wrappers encode the corresponding upstream MathOpt
 solver-specific proto fields:
@@ -1443,9 +1489,28 @@ CP-SAT backend fields currently encoded by this package (`numWorkers`,
 `maxTimeInSeconds`, `randomSeed`, and logging flags), or raw `Uint8Array` proto
 bytes for advanced callers.
 
-`parameters` / `solveParameters` and each backend parameter option may be raw
-serialized proto bytes. This preserves a proto escape hatch for fields that do
-not yet have ergonomic TypeScript wrappers.
+`parameters` / `solveParameters`, `modelParameters`, and each backend parameter
+option may be raw serialized proto bytes. This preserves a proto escape hatch
+for fields that do not yet have ergonomic TypeScript wrappers.
+
+`MathOpt.SolveParameters` wraps the same solver-independent fields accepted by
+`MathOptSolveOptions`, so callers can either pass flat solve options or an
+explicit parameter object.
+
+`MathOpt.ModelSolveParameters` encodes model-specific solve controls:
+
+- `variableValuesFilter` / `variable_values_filter`
+- `dualValuesFilter` / `dual_values_filter`
+- `reducedCostsFilter` / `reduced_costs_filter`
+- `quadraticDualValuesFilter` / `quadratic_dual_values_filter`
+- `initialBasis` / `initial_basis` as raw `BasisProto` bytes
+- `solutionHints` / `solution_hints`
+- `branchingPriorities` / `branching_priorities`
+- `lazyLinearConstraints`, `lazyLinearConstraintIds`, and snake-case aliases
+
+`MathOpt.SparseVectorFilter` accepts `skipZeroValues`, `filterByIds`, and
+either numeric ids or model elements with an `id`. `MathOpt.SolutionHint`
+accepts primal variable values and dual linear constraint values.
 
 `GlpkParameters` mirrors the upstream MathOpt GLPK-specific solve parameters:
 
@@ -1458,24 +1523,67 @@ GLPK is single-threaded in this package. MathOpt GLPK solves reject
 `MathOptSolveResult`:
 
 - `terminationReason: string`
+- `terminationLimit: string | null`
+- `solveTimeSeconds: number | null`
 - `primalBound: number | null`
 - `dualBound: number | null`
+- `primalStatus: string | null`
+- `dualStatus: string | null`
+- `primalOrDualInfeasible: boolean`
 - `objectiveValue: number | null`
 - `variableValues: Record<string, number>`
 - `variableValuesById: Record<number, number>`
 - `solutions: MathOptSolutionResult[]`
+- `primalRays: MathOptPrimalRayResult[]`
+- `dualRays: MathOptDualRayResult[]`
+- `messages: string[]`
 - `rawResponse: Uint8Array`
+- `solve_time(): number | null`
+- `best_objective_bound(): number | null`
+- `has_primal_feasible_solution(): boolean`
+- `has_dual_feasible_solution(): boolean`
+- `has_ray(): boolean`
+- `has_dual_ray(): boolean`
+- `has_basis(): boolean`
+- `bounded(): boolean`
+- `objective_value(): number`
+- `variable_values(): Record<string, number>`
+- `variable_values(variable): number`
+- `variable_values(variables): number[]`
+- `reduced_costs(): Record<string, number>`
+- `reduced_costs(variable): number`
+- `reduced_costs(variables): number[]`
+- `dual_values(): Record<string, number>`
+- `dual_values(linearConstraint): number`
+- `dual_values(linearConstraints): number[]`
+- `ray_variable_values(): Record<string, number>`
+- `ray_variable_values(variable): number`
+- `ray_variable_values(variables): number[]`
+- `ray_reduced_costs(): Record<string, number>`
+- `ray_reduced_costs(variable): number`
+- `ray_reduced_costs(variables): number[]`
+- `ray_dual_values(): Record<string, number>`
+- `ray_dual_values(linearConstraint): number`
+- `ray_dual_values(linearConstraints): number[]`
+- `variable_status(): Record<string, string>`
+- `variable_status(variable): string`
+- `variable_status(variables): string[]`
+- `constraint_status(): Record<string, string>`
+- `constraint_status(linearConstraint): string`
+- `constraint_status(linearConstraints): string[]`
 
 `MathOptSolutionResult`:
 
 - `primalSolution: MathOptPrimalSolutionResult | null`
 - `dualSolution: MathOptDualSolutionResult | null`
+- `basis: MathOptBasisResult | null`
 
 `MathOptPrimalSolutionResult`:
 
 - `objectiveValue: number | null`
 - `variableValues: Record<string, number>`
 - `variableValuesById: Record<number, number>`
+- `feasibilityStatus: string`
 
 `MathOptDualSolutionResult`:
 
@@ -1484,6 +1592,27 @@ GLPK is single-threaded in this package. MathOpt GLPK solves reject
 - `dualValuesById: Record<number, number>`
 - `reducedCosts: Record<string, number>`
 - `reducedCostsById: Record<number, number>`
+- `feasibilityStatus: string`
+
+`MathOptPrimalRayResult`:
+
+- `variableValues: Record<string, number>`
+- `variableValuesById: Record<number, number>`
+
+`MathOptDualRayResult`:
+
+- `dualValues: Record<string, number>`
+- `dualValuesById: Record<number, number>`
+- `reducedCosts: Record<string, number>`
+- `reducedCostsById: Record<number, number>`
+
+`MathOptBasisResult`:
+
+- `variableStatus: Record<string, string>`
+- `variableStatusById: Record<number, string>`
+- `constraintStatus: Record<string, string>`
+- `constraintStatusById: Record<number, string>`
+- `basicDualFeasibility: string`
 
 Solver type enum:
 
@@ -1572,6 +1701,11 @@ Linear constraints:
 - `rowNonzeros(constraint)` / `row_nonzeros(constraint): MathOptVariable[]`
 - `linearConstraintMatrixEntries()` / `linear_constraint_matrix_entries(): MathOptLinearConstraintMatrixEntry[]`
 
+Indicator constraints:
+
+- `addIndicatorConstraint(options?): MathOptIndicatorConstraint`
+- `add_indicator_constraint(options?): MathOptIndicatorConstraint`
+
 `MathOptLinearConstraintMatrixEntry` contains:
 
 - `linearConstraint` / `linear_constraint: MathOptLinearConstraint`
@@ -1621,6 +1755,21 @@ Objective and encoding:
 
 It also accepts `MathOpt.boundedExpression()`, `MathOpt.lowerBoundedExpression()`,
 and `MathOpt.upperBoundedExpression()` results.
+
+`addIndicatorConstraint()` accepts:
+
+- `indicator?: MathOptVariable`
+- `activateOnZero?: boolean`
+- `activate_on_zero?: boolean`
+- `impliedConstraint?: MathOpt.boundedExpression()` / `lowerBoundedExpression()` / `upperBoundedExpression()`
+- `implied_constraint?: ...`
+- `lb` / `lowerBound` and `ub` / `upperBound`
+- `expr` / `expression`
+- `terms?: MathOptLinearTerm[]`
+- `name?: string`
+
+Indicator constraints are encoded into `ModelProto.indicator_constraints` and
+are supported by linked MathOpt backends that accept them, such as GSCIP.
 
 ### `MathOptVariable`
 

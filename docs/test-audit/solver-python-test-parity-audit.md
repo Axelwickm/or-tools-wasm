@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 624 upstream tests; 408 ✅ implemented; 23 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 193 ⚪ not applicable. Open mismatches: 0.
+Totals: 624 upstream tests; 437 ✅ implemented; 0 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 187 ⚪ not applicable. Open mismatches: 0.
 Parity is tracked on two axes:
 
 - Behavioral parity: the TS/WASM fixture builds and solves the same kind of model as upstream and checks the same user-visible result assertions.
@@ -283,7 +283,7 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
   - ✅ 🔎 PyWrapLpTest.testExportToMps
 
 ## ortools/linear_solver/python/lp_api_test.py
-- 🟨 🔎 test_sum_no_brackets - placeholder: Python generator/list summation helper behavior only
+- ⚪ 🔎 test_sum_no_brackets - outside current TS contract: upstream only exercises a local Python generator/list summation helper and does not touch OR-Tools solver APIs
 - ✅ 🔎 test_proto
 
 ## ortools/math_opt/python/parameters_test.py
@@ -300,6 +300,7 @@ API-surface parity: this section tracks Python parameter/proto mapping tests sep
   - ✅ 🔎 SolveParametersTest backend specifics/cp_sat - `MathOpt.solve(..., { cpSat })` encodes common `SatParameters` fields into `SolveParametersProto.cp_sat`; raw proto bytes remain available for full generated SatParameters coverage
   - ✅ 🔎 SolveParametersTest backend specifics/pdlp - `MathOpt.PdlpParameters` encodes representative `PrimalDualHybridGradientParams` fields into `SolveParametersProto.pdlp`; raw proto bytes remain available for advanced fields
   - ✅ 🔎 SolveParametersTest.test_to_proto_with_specifics/glpk - `MathOpt.solve(..., { glpk: new GlpkParameters(...) })` encodes the GLPK-specific solve parameters
+  - ✅ 🔎 ModelSolveParameters proto mappings - `MathOpt.ModelSolveParameters`, `MathOpt.SparseVectorFilter`, and `MathOpt.SolutionHint` encode model-specific solve filters, solution hints, branching priorities, and lazy linear constraints into `SolveRequest.model_parameters`; raw proto bytes remain available for unsupported model parameter details
   - ✅ 🔎 GLPK threading guard - MathOpt GLPK rejects `threads > 1`; upstream native GLPK tests only allow `threads=1` and reject cross-thread GLPK use
 
 ## ortools/linear_solver/python/model_builder_test.py
@@ -419,7 +420,7 @@ API-surface parity: this section tracks Python parameter/proto mapping tests sep
   - ✅ 🔎 ModelTest.test_linear_constraint_number_eq_expression
   - ✅ 🔎 ModelTest.test_linear_constraint_expression_eq_expression
   - ✅ 🔎 ModelTest.test_linear_constraint_variable_eq_variable
-  - 🟨 🔎 ModelTest.test_linear_constraint_errors - placeholder/API gap: most assertions validate Python operator-overload error paths, chained comparisons, and keyword conflicts that the current TS public API cannot express directly; direct TS helper errors are covered elsewhere
+  - ⚪ 🔎 ModelTest.test_linear_constraint_errors - outside current TS contract: most assertions validate Python operator-overload error paths, chained comparisons, and keyword conflicts that TypeScript cannot express directly; `ModelTest/test_linear_constraint_errors_direct_api` covers the public TS helper error subset for unsupported options, unsupported expressions, and infinite expression offsets
   - ✅ 🔎 ModelTest.test_linear_constraint_matrix_with_variable_deletion
   - ✅ 🔎 ModelTest.test_linear_constraint_matrix_with_linear_constraint_deletion
   - ✅ 🔎 ModelTest.test_linear_constraint_matrix_wrong_model
@@ -715,27 +716,27 @@ API-surface parity: this section tracks Python parameter/proto mapping tests sep
   - ✅ 🔎 SolveTest.test_solve_error
   - ✅ 🔎 SolveTest.test_lp_solve
   - 🧪 GSCIP backend MIP coverage - GSCIP now runs shared TS/WASM MathOpt solve cases in direct and worker modes with `threads: 1` and `threads: 4`, checking optimal termination, objective value, and variable values. This is backend coverage, not full parity for the GSCIP-specific upstream tests below.
-  - 🟨 🔎 SolveTest.test_indicator - GSCIP is linked, but MathOpt indicator constraint helpers are not exposed in TS
-  - 🟨 🔎 SolveTest.test_filters - placeholder: model/solve filters not exposed in TS MathOpt API
-  - 🟨 🔎 SolveTest.test_message_callback - GSCIP is linked, but MathOpt message callback solve options are not exposed in TS
-  - 🟨 🔎 SolveTest.test_solve_interrupter - GSCIP is linked, but MathOpt solve interrupter support is not exposed in TS
-  - 🟨 🔎 SolveTest.test_solve_duplicated_names - GSCIP is linked, but this exact name-removal/duplicate-name solve contract is not ported yet
-  - 🟨 🔎 SolveTest.test_solve_remove_names - GSCIP is linked, but this exact name-removal solve contract is not ported yet
-  - 🟨 🔎 SolveTest.test_incremental_solve_remove_names - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solve_init_error - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solve_error - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solve_error_on_reject - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_lp - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_mip - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_mip_with_message_cb - placeholder: IncrementalSolver API and message callbacks not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solve_interrupter - placeholder: IncrementalSolver API and solve interrupter support not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solve_rejected - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_multiple_incremental_lps - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solver_delete - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solver_close - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solver_close_twice - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solver_context_manager - placeholder: IncrementalSolver API not available in TS MathOpt
-  - 🟨 🔎 SolveTest.test_incremental_solver_context_manager_exception - placeholder: IncrementalSolver API not available in TS MathOpt
+  - ✅ 🔎 SolveTest.test_indicator - TS `MathOptModel.addIndicatorConstraint()` builds the upstream indicator model, solves with GSCIP, and checks optimal termination, objective value, and variable values
+  - ✅ 🔎 SolveTest.test_filters - `MathOpt.ModelSolveParameters` and sparse vector filters solve the upstream GLOP model while checking filtered primal values, dual values, and reduced costs
+  - ✅ 🔎 SolveTest.test_message_callback - `MathOpt.solve(..., { msg_cb })` captures GSCIP solver messages, returns them on the result, and verifies the upstream "problem is solved" log assertion
+  - ✅ 🔎 SolveTest.test_solve_interrupter - `MathOpt.SolveInterrupter` can be interrupted before solve, passed to GSCIP, and returns `NO_SOLUTION_FOUND` with `LIMIT_INTERRUPTED`
+  - ✅ 🔎 SolveTest.test_solve_duplicated_names - duplicate variable names are rejected by GSCIP through `MathOpt.solve()`
+  - ✅ 🔎 SolveTest.test_solve_remove_names - `MathOpt.solve(..., { removeNames: true })` omits names from `ModelProto` and solves the duplicate-name model
+  - ✅ 🔎 SolveTest.test_incremental_solve_remove_names - `MathOpt.IncrementalSolver` accepts `removeNames`/`remove_names` and duplicate variable names do not fail initialization
+  - ✅ 🔎 SolveTest.test_incremental_solve_init_error - `MathOpt.IncrementalSolver` rejects duplicate names at construction when `removeNames` is not set
+  - ✅ 🔎 SolveTest.test_incremental_solve_error - invalid initial variable bounds are surfaced by `IncrementalSolver.solve()`
+  - ✅ 🔎 SolveTest.test_incremental_solve_error_on_reject - CP-SAT rejected-update fallback first solves the original model, then duplicate names added before the second solve are rejected
+  - ✅ 🔎 SolveTest.test_incremental_lp - GLOP `MathOpt.IncrementalSolver` updates a variable upper bound and resolves with upstream objective/value assertions
+  - ✅ 🔎 SolveTest.test_incremental_mip - GSCIP `MathOpt.IncrementalSolver` updates a linear constraint upper bound and resolves with upstream objective/value assertions
+  - ✅ 🔎 SolveTest.test_incremental_mip_with_message_cb - GSCIP incremental MIP solve captures message callbacks, excludes the incremental marker on the first solve, includes it after the model update, and checks upstream objective/value assertions
+  - ✅ 🔎 SolveTest.test_incremental_solve_interrupter - `MathOpt.IncrementalSolver.solve()` accepts a pre-interrupted `SolveInterrupter` and returns `NO_SOLUTION_FOUND` with `LIMIT_INTERRUPTED`
+  - ✅ 🔎 SolveTest.test_incremental_solve_rejected - CP-SAT rejected-update fallback recreates the full model and solves the updated upper-bound model with upstream objective/value assertions
+  - ✅ 🔎 SolveTest.test_multiple_incremental_lps - repeated GLOP incremental upper-bound updates over `[2.0, 3.0, 4.0, 5.0]` match upstream objective/value assertions
+  - ⚪ 🔎 SolveTest.test_incremental_solver_delete - outside current TS contract: Python destructor/debug solver-count behavior has no deterministic JavaScript equivalent; explicit `close()` lifecycle parity is covered below
+  - ✅ 🔎 SolveTest.test_incremental_solver_close - `MathOpt.IncrementalSolver.close()` releases the native handle and solve-after-close rejects
+  - ✅ 🔎 SolveTest.test_incremental_solver_close_twice - `MathOpt.IncrementalSolver.close()` is idempotent
+  - ⚪ 🔎 SolveTest.test_incremental_solver_context_manager - outside current TS contract: Python `with` context-manager behavior has no direct TS equivalent; explicit `close()` lifecycle parity is covered above
+  - ⚪ 🔎 SolveTest.test_incremental_solver_context_manager_exception - outside current TS contract: Python `with` exception propagation has no direct TS equivalent
 
 ## ortools/math_opt/python/result_test.py
 - TerminationTest
@@ -752,24 +753,25 @@ API-surface parity: this section tracks Python parameter/proto mapping tests sep
 - ParseSolveStats
   - ⚪ ParseSolveStats.test_problem_status_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
 - SolveResultAuxiliaryFunctionsTest
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_solve_time - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_best_objective_bound - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_has_feasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 SolveResult helper method coverage - `MathOptSolveResult` now exposes Python-style `solve_time()`, `objective_value()`, `variable_values()`, `best_objective_bound()`, primal/dual feasibility predicates, dual values, reduced costs, primal ray values for an unbounded GLPK solve, dual ray values/reduced costs for an infeasible GLOP solve, missing-ray errors, basis status accessors, and `bounded()` on real solve results while preserving existing property and raw-response access; constructed-result parser/proto-object-only negative cases remain below
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_solve_time
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_best_objective_bound
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_primal_solution_has_feasible
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_feasible - outside current TS contract: Python result parser/proto object API is not exposed
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_primal - outside current TS contract: Python result parser/proto object API is not exposed
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_has_feasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_dual_solution_has_feasible
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_feasible - outside current TS contract: Python result parser/proto object API is not exposed
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_dual_in_best_solution - outside current TS contract: Python result parser/proto object API is not exposed
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_ray_has_ray - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_ray_no_ray - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_ray_has_ray - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_ray_no_ray - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_has_basis - outside current TS contract: Python result parser/proto object API is not exposed
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_primal_ray_has_ray
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_primal_ray_no_ray
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_dual_ray_has_ray
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_dual_ray_no_ray
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_basis_has_basis
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_no_basis_in_best_solution - outside current TS contract: Python result parser/proto object API is not exposed
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_bounded - outside current TS contract: Python result parser/proto object API is not exposed
+  - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_bounded
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_not_bounded_primal_infeasible - outside current TS contract: Python result parser/proto object API is not exposed
   - ⚪ SolveResultAuxiliaryFunctionsTest.test_not_bounded_dual_infeasible - outside current TS contract: Python result parser/proto object API is not exposed
 - SolveResultTest

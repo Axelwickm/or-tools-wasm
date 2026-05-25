@@ -54,6 +54,17 @@ function assertThrows(fn: () => unknown, message: string) {
   assert(threw, message);
 }
 
+function assertThrowsContaining(fn: () => unknown, messagePart: string, message: string) {
+  try {
+    fn();
+  } catch (error) {
+    const text = error instanceof Error ? error.message : String(error);
+    assert(text.includes(messagePart), `${message}: expected ${JSON.stringify(messagePart)}, got ${JSON.stringify(text)}`);
+    return;
+  }
+  throw new Error(message);
+}
+
 function variableLabel(variable: { id: number; name: string }) {
   return variable.name || `variable_${variable.id}`;
 }
@@ -783,6 +794,33 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       assertNear(f.lowerBound, 0, 'f lowerBound');
       assertNear(f.upperBound, 0, 'f upperBound');
       return apiOnly({ f: f.id });
+    },
+  },
+  {
+    name: 'ModelTest/test_linear_constraint_errors_direct_api',
+    source: MODEL_SOURCE,
+    async run(api) {
+      await api.initMathOpt();
+      const model = api.MathOpt.Model('test_model');
+      const addLinearConstraint = (input: unknown) => {
+        return model.add_linear_constraint?.(input as never) ?? model.addLinearConstraint(input as never);
+      };
+      assertThrowsContaining(
+        () => addLinearConstraint(true),
+        'Unsupported type for bounded_expr argument',
+        'boolean linear constraint input should throw',
+      );
+      assertThrowsContaining(
+        () => addLinearConstraint({ expression: 'string' }),
+        'Unsupported MathOpt linear expression input',
+        'string linear constraint expression should throw',
+      );
+      assertThrowsContaining(
+        () => addLinearConstraint({ expression: Number.POSITIVE_INFINITY, lowerBound: 0 }),
+        'infinite offset',
+        'infinite linear constraint expression should throw',
+      );
+      return apiOnly();
     },
   },
   {

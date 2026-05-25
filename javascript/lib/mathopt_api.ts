@@ -52,6 +52,26 @@ export type MathOptLinearConstraintOptions = {
   name?: string;
 };
 
+export type MathOptIndicatorConstraintOptions = {
+  indicator?: MathOptVariable;
+  activateOnZero?: boolean;
+  activate_on_zero?: boolean;
+  impliedConstraint?: MathOptBoundedExpression<MathOptLinearExpression>
+    | MathOptLowerBoundedExpression<MathOptLinearExpression>
+    | MathOptUpperBoundedExpression<MathOptLinearExpression>;
+  implied_constraint?: MathOptIndicatorConstraintOptions['impliedConstraint'];
+  lowerBound?: number;
+  lower_bound?: number;
+  lb?: number;
+  upperBound?: number;
+  upper_bound?: number;
+  ub?: number;
+  expression?: MathOptLinearExpressionInput;
+  expr?: MathOptLinearExpressionInput;
+  terms?: MathOptLinearTerm[];
+  name?: string;
+};
+
 export type MathOptVariableOptions = {
   lb?: number;
   ub?: number;
@@ -65,9 +85,20 @@ export type MathOptVariableOptions = {
 
 export type MathOptSolveOptions = {
   solverType?: MathOptSolverType | keyof typeof MathOptSolverType;
-  parameters?: Uint8Array;
-  solveParameters?: Uint8Array;
-  solve_parameters?: Uint8Array;
+  removeNames?: boolean;
+  remove_names?: boolean;
+  interrupter?: MathOptSolveInterrupter | MathOptSolveInterrupterLike;
+  solveInterrupter?: MathOptSolveInterrupter | MathOptSolveInterrupterLike;
+  solve_interrupter?: MathOptSolveInterrupter | MathOptSolveInterrupterLike;
+  messageCallback?: (messages: string[]) => void;
+  message_callback?: (messages: string[]) => void;
+  msgCb?: (messages: string[]) => void;
+  msg_cb?: (messages: string[]) => void;
+  parameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions;
+  solveParameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions;
+  solve_parameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions;
+  modelParameters?: Uint8Array | MathOptModelSolveParameters | MathOptModelSolveParametersOptions;
+  model_parameters?: Uint8Array | MathOptModelSolveParameters | MathOptModelSolveParametersOptions;
   timeLimitSeconds?: number;
   time_limit_seconds?: number;
   threads?: number;
@@ -107,21 +138,116 @@ export type MathOptSolveOptions = {
   glpk?: GlpkParameters | GlpkParametersOptions | Uint8Array;
 };
 
+export type MathOptSparseVectorFilterOptions<TElement = unknown> = {
+  skipZeroValues?: boolean;
+  skip_zero_values?: boolean;
+  filterByIds?: boolean;
+  filter_by_ids?: boolean;
+  ids?: Array<number | bigint>;
+  filteredIds?: Array<number | bigint>;
+  filtered_ids?: Array<number | bigint>;
+  elements?: TElement[];
+};
+
+export type MathOptSparseVectorFilterInput<TElement = unknown> =
+  | MathOptSparseVectorFilter<TElement>
+  | MathOptSparseVectorFilterOptions<TElement>
+  | TElement[]
+  | Array<number | bigint>;
+
+export type MathOptSolutionHintOptions = {
+  variableValues?: MathOptLinearTerm[];
+  variable_values?: MathOptLinearTerm[];
+  dualValues?: Array<{ linearConstraint: MathOptLinearConstraint; value: number }>;
+  dual_values?: Array<{ linear_constraint?: MathOptLinearConstraint; linearConstraint?: MathOptLinearConstraint; value: number }>;
+};
+
+export type MathOptModelSolveParametersOptions = {
+  variableValuesFilter?: MathOptSparseVectorFilterInput<MathOptVariable>;
+  variable_values_filter?: MathOptSparseVectorFilterInput<MathOptVariable>;
+  dualValuesFilter?: MathOptSparseVectorFilterInput<MathOptLinearConstraint>;
+  dual_values_filter?: MathOptSparseVectorFilterInput<MathOptLinearConstraint>;
+  quadraticDualValuesFilter?: MathOptSparseVectorFilterInput<number | bigint>;
+  quadratic_dual_values_filter?: MathOptSparseVectorFilterInput<number | bigint>;
+  reducedCostsFilter?: MathOptSparseVectorFilterInput<MathOptVariable>;
+  reduced_costs_filter?: MathOptSparseVectorFilterInput<MathOptVariable>;
+  initialBasis?: Uint8Array;
+  initial_basis?: Uint8Array;
+  solutionHints?: Array<MathOptSolutionHint | MathOptSolutionHintOptions | Uint8Array>;
+  solution_hints?: Array<MathOptSolutionHint | MathOptSolutionHintOptions | Uint8Array>;
+  branchingPriorities?: Array<{ variable: MathOptVariable; priority: number }>;
+  branching_priorities?: Array<{ variable: MathOptVariable; priority: number }>;
+  lazyLinearConstraints?: Array<MathOptLinearConstraint | number | bigint>;
+  lazy_linear_constraints?: Array<MathOptLinearConstraint | number | bigint>;
+  lazyLinearConstraintIds?: Array<number | bigint>;
+  lazy_linear_constraint_ids?: Array<number | bigint>;
+};
+
+export type MathOptSolveInterrupterLike = {
+  readonly interrupted?: boolean;
+  isInterrupted?(): boolean;
+  is_interrupted?(): boolean;
+};
+
+export type MathOptSolveParametersOptions = Omit<MathOptSolveOptions, 'solverType' | 'removeNames' | 'remove_names' | 'interrupter' | 'solveInterrupter' | 'solve_interrupter' | 'messageCallback' | 'message_callback' | 'msgCb' | 'msg_cb' | 'parameters' | 'solveParameters' | 'solve_parameters' | 'modelParameters' | 'model_parameters'>;
+
 export type MathOptSolveResult = {
   terminationReason: string;
+  terminationLimit: string | null;
+  solveTimeSeconds: number | null;
   primalBound: number | null;
   dualBound: number | null;
+  primalStatus: string | null;
+  dualStatus: string | null;
+  primalOrDualInfeasible: boolean;
   objectiveValue: number | null;
   variableValues: Record<string, number>;
   variableValuesById: Record<number, number>;
   solutions: MathOptSolutionResult[];
+  primalRays: MathOptPrimalRayResult[];
+  dualRays: MathOptDualRayResult[];
+  messages: string[];
   rawResponse: Uint8Array;
+  solve_time(): number | null;
+  best_objective_bound(): number | null;
+  has_primal_feasible_solution(): boolean;
+  has_dual_feasible_solution(): boolean;
+  has_ray(): boolean;
+  has_dual_ray(): boolean;
+  has_basis(): boolean;
+  bounded(): boolean;
+  objective_value(): number;
+  variable_values(): Record<string, number>;
+  variable_values(variable: MathOptVariable): number;
+  variable_values(variables: MathOptVariable[]): number[];
+  reduced_costs(): Record<string, number>;
+  reduced_costs(variable: MathOptVariable): number;
+  reduced_costs(variables: MathOptVariable[]): number[];
+  dual_values(): Record<string, number>;
+  dual_values(linearConstraint: MathOptLinearConstraint): number;
+  dual_values(linearConstraints: MathOptLinearConstraint[]): number[];
+  ray_variable_values(): Record<string, number>;
+  ray_variable_values(variable: MathOptVariable): number;
+  ray_variable_values(variables: MathOptVariable[]): number[];
+  ray_reduced_costs(): Record<string, number>;
+  ray_reduced_costs(variable: MathOptVariable): number;
+  ray_reduced_costs(variables: MathOptVariable[]): number[];
+  ray_dual_values(): Record<string, number>;
+  ray_dual_values(linearConstraint: MathOptLinearConstraint): number;
+  ray_dual_values(linearConstraints: MathOptLinearConstraint[]): number[];
+  variable_status(): Record<string, string>;
+  variable_status(variable: MathOptVariable): string;
+  variable_status(variables: MathOptVariable[]): string[];
+  constraint_status(): Record<string, string>;
+  constraint_status(linearConstraint: MathOptLinearConstraint): string;
+  constraint_status(linearConstraints: MathOptLinearConstraint[]): string[];
 };
 
 export type MathOptPrimalSolutionResult = {
   objectiveValue: number | null;
   variableValues: Record<string, number>;
   variableValuesById: Record<number, number>;
+  feasibilityStatus: string;
 };
 
 export type MathOptDualSolutionResult = {
@@ -130,11 +256,33 @@ export type MathOptDualSolutionResult = {
   dualValuesById: Record<number, number>;
   reducedCosts: Record<string, number>;
   reducedCostsById: Record<number, number>;
+  feasibilityStatus: string;
+};
+
+export type MathOptPrimalRayResult = {
+  variableValues: Record<string, number>;
+  variableValuesById: Record<number, number>;
+};
+
+export type MathOptDualRayResult = {
+  dualValues: Record<string, number>;
+  dualValuesById: Record<number, number>;
+  reducedCosts: Record<string, number>;
+  reducedCostsById: Record<number, number>;
+};
+
+export type MathOptBasisResult = {
+  variableStatus: Record<string, string>;
+  variableStatusById: Record<number, string>;
+  constraintStatus: Record<string, string>;
+  constraintStatusById: Record<number, string>;
+  basicDualFeasibility: string;
 };
 
 export type MathOptSolutionResult = {
   primalSolution: MathOptPrimalSolutionResult | null;
   dualSolution: MathOptDualSolutionResult | null;
+  basis: MathOptBasisResult | null;
 };
 
 type MathOptObjectiveData = {
@@ -142,6 +290,49 @@ type MathOptObjectiveData = {
   linearTerms: MathOptLinearTerm[];
   quadraticTerms: MathOptQuadraticTerm[];
   offset: number;
+};
+
+type MathOptVariableSnapshot = {
+  id: number;
+  lowerBound: number;
+  upperBound: number;
+  integer: boolean;
+  name: string;
+  deleted: boolean;
+};
+
+type MathOptLinearConstraintSnapshot = {
+  id: number;
+  lowerBound: number;
+  upperBound: number;
+  terms: Array<{ variableId: number; coefficient: number }>;
+  name: string;
+  deleted: boolean;
+};
+
+type MathOptIndicatorConstraintSnapshot = {
+  id: number;
+  indicatorId?: number;
+  activateOnZero: boolean;
+  lowerBound: number;
+  upperBound: number;
+  terms: Array<{ variableId: number; coefficient: number }>;
+  name: string;
+  deleted: boolean;
+};
+
+type MathOptObjectiveSnapshot = {
+  maximize: boolean;
+  offset: number;
+  linearTerms: Array<{ variableId: number; coefficient: number }>;
+  quadraticTerms: Array<{ firstVariableId: number; secondVariableId: number; coefficient: number }>;
+};
+
+type MathOptModelSnapshot = {
+  variables: MathOptVariableSnapshot[];
+  linearConstraints: MathOptLinearConstraintSnapshot[];
+  indicatorConstraints: MathOptIndicatorConstraintSnapshot[];
+  objective: MathOptObjectiveSnapshot;
 };
 
 export class MathOptVarEqVar {
@@ -185,6 +376,22 @@ type LinearConstraintData = {
   terms: MathOptLinearTerm[];
   name: string;
   deleted: boolean;
+};
+
+type IndicatorConstraintData = {
+  id: number;
+  indicator?: MathOptVariable;
+  activateOnZero: boolean;
+  lowerBound: number;
+  upperBound: number;
+  terms: MathOptLinearTerm[];
+  name: string;
+  deleted: boolean;
+};
+
+type MathOptSolveInterrupterState = {
+  useInterrupter: boolean;
+  interrupted: boolean;
 };
 
 export enum MathOptSolverType {
@@ -490,6 +697,95 @@ export class GlpkParameters {
   }
 }
 
+export class MathOptSolveInterrupter {
+  private interruptedValue = false;
+
+  interrupt(): void {
+    this.interruptedValue = true;
+  }
+
+  get interrupted(): boolean {
+    return this.interruptedValue;
+  }
+
+  isInterrupted(): boolean {
+    return this.interruptedValue;
+  }
+
+  is_interrupted(): boolean {
+    return this.isInterrupted();
+  }
+}
+
+export class MathOptSolveParameters {
+  constructor(readonly options: MathOptSolveParametersOptions = {}) {}
+
+  toProtoBytes(): Uint8Array {
+    return encodeMathOptSolveParameters(this.options) ?? empty();
+  }
+}
+
+export class MathOptSparseVectorFilter<TElement = unknown> {
+  constructor(readonly options: MathOptSparseVectorFilterOptions<TElement> = {}) {}
+
+  toProtoBytes(): Uint8Array {
+    return encodeSparseVectorFilter(this.options);
+  }
+}
+
+export class MathOptSolutionHint {
+  constructor(readonly options: MathOptSolutionHintOptions = {}) {}
+
+  toProtoBytes(): Uint8Array {
+    const variableValues = this.options.variableValues ?? this.options.variable_values;
+    const dualValues = this.options.dualValues ?? this.options.dual_values;
+    return message([
+      fieldMessageIfPresent(1, variableValues === undefined ? null : encodeSparseDoubleVector(variableValues)),
+      fieldMessageIfPresent(2, dualValues === undefined ? null : encodeLinearConstraintDoubleVector(dualValues.map((entry) => {
+        const normalized = entry as { linearConstraint?: MathOptLinearConstraint; linear_constraint?: MathOptLinearConstraint; value: number };
+        const linearConstraint = normalized.linearConstraint ?? normalized.linear_constraint;
+        if (!linearConstraint) throw new Error('MathOpt solution hint dual values must include a linear constraint.');
+        return { linearConstraint, value: entry.value };
+      }))),
+    ]);
+  }
+}
+
+export class MathOptModelSolveParameters {
+  constructor(readonly options: MathOptModelSolveParametersOptions = {}) {}
+
+  toProtoBytes(): Uint8Array {
+    const options = this.options;
+    const solutionHints = options.solutionHints ?? options.solution_hints;
+    const branchingPriorities = options.branchingPriorities ?? options.branching_priorities;
+    const lazyLinearConstraintIds = options.lazyLinearConstraintIds
+      ?? options.lazy_linear_constraint_ids
+      ?? (options.lazyLinearConstraints ?? options.lazy_linear_constraints)?.map((constraint) =>
+        typeof constraint === 'object' ? constraint.id : constraint
+      );
+    return message([
+      fieldMessageIfPresent(1, modelFilterBytes(options.variableValuesFilter ?? options.variable_values_filter)),
+      fieldMessageIfPresent(2, modelFilterBytes(options.dualValuesFilter ?? options.dual_values_filter)),
+      fieldMessageIfPresent(10, modelFilterBytes(options.quadraticDualValuesFilter ?? options.quadratic_dual_values_filter)),
+      fieldMessageIfPresent(3, modelFilterBytes(options.reducedCostsFilter ?? options.reduced_costs_filter)),
+      fieldMessageIfPresent(4, options.initialBasis ?? options.initial_basis),
+      ...(solutionHints ?? []).map((hint) => fieldMessage(5, solutionHintBytes(hint))),
+      fieldMessageIfPresent(6, branchingPriorities === undefined ? null : encodeVariableInt32Vector(branchingPriorities)),
+      fieldPackedVarintsIfPresent(9, lazyLinearConstraintIds),
+    ]);
+  }
+
+  static onlySomePrimalVariables(variables: MathOptVariable[]): MathOptModelSolveParameters {
+    return new MathOptModelSolveParameters({
+      variableValuesFilter: { elements: variables, filterByIds: true },
+    });
+  }
+
+  static only_some_primal_variables(variables: MathOptVariable[]): MathOptModelSolveParameters {
+    return MathOptModelSolveParameters.onlySomePrimalVariables(variables);
+  }
+}
+
 export class MathOptQuadraticTermKey {
   readonly firstVariable: MathOptVariable;
   readonly secondVariable: MathOptVariable;
@@ -750,6 +1046,45 @@ const terminationReasonNames: Record<number, string> = {
   9: 'TERMINATION_REASON_FEASIBLE',
 };
 
+const terminationLimitNames: Record<number, string> = {
+  0: 'LIMIT_UNSPECIFIED',
+  1: 'LIMIT_UNDETERMINED',
+  2: 'LIMIT_ITERATION',
+  3: 'LIMIT_TIME',
+  4: 'LIMIT_NODE',
+  5: 'LIMIT_SOLUTION',
+  6: 'LIMIT_MEMORY',
+  7: 'LIMIT_OBJECTIVE',
+  8: 'LIMIT_NORM',
+  9: 'LIMIT_INTERRUPTED',
+  10: 'LIMIT_SLOW_PROGRESS',
+  11: 'LIMIT_OTHER',
+  12: 'LIMIT_CUTOFF',
+};
+
+const solutionStatusNames: Record<number, string> = {
+  0: 'SOLUTION_STATUS_UNSPECIFIED',
+  1: 'SOLUTION_STATUS_UNDETERMINED',
+  2: 'SOLUTION_STATUS_FEASIBLE',
+  3: 'SOLUTION_STATUS_INFEASIBLE',
+};
+
+const feasibilityStatusNames: Record<number, string> = {
+  0: 'FEASIBILITY_STATUS_UNSPECIFIED',
+  1: 'FEASIBILITY_STATUS_UNDETERMINED',
+  2: 'FEASIBILITY_STATUS_FEASIBLE',
+  3: 'FEASIBILITY_STATUS_INFEASIBLE',
+};
+
+const basisStatusNames: Record<number, string> = {
+  0: 'BASIS_STATUS_UNSPECIFIED',
+  1: 'BASIS_STATUS_FREE',
+  2: 'BASIS_STATUS_AT_LOWER_BOUND',
+  3: 'BASIS_STATUS_AT_UPPER_BOUND',
+  4: 'BASIS_STATUS_FIXED_VALUE',
+  5: 'BASIS_STATUS_BASIC',
+};
+
 let mathOptModulePromise: Promise<OrToolsWasmModule> | null = null;
 
 function loadMathOptModule(): Promise<OrToolsWasmModule> {
@@ -761,6 +1096,7 @@ export class MathOptModel {
   readonly name: string;
   private readonly variableData: VariableData[] = [];
   private readonly constraints: LinearConstraintData[] = [];
+  private readonly indicatorConstraints: IndicatorConstraintData[] = [];
   private objectiveDataValue: MathOptObjectiveData = {
     maximize: false,
     linearTerms: [],
@@ -816,6 +1152,9 @@ export class MathOptModel {
     const expression = normalizedOptions.expression === undefined
       ? new MathOptLinearExpression(normalizedOptions.terms ?? [])
       : asFlatLinearExpression(normalizedOptions.expression).add(new MathOptLinearExpression(normalizedOptions.terms ?? []));
+    if (!Number.isFinite(expression.offset)) {
+      throw new Error('linear constraint expression has an infinite offset.');
+    }
     const constraint: LinearConstraintData = {
       id,
       lowerBound: (normalizedOptions.lowerBound ?? Number.NEGATIVE_INFINITY) - expression.offset,
@@ -832,6 +1171,36 @@ export class MathOptModel {
     return this.addLinearConstraint(options);
   }
 
+  addIndicatorConstraint(options: MathOptIndicatorConstraintOptions = {}): MathOptIndicatorConstraint {
+    const id = this.indicatorConstraints.length;
+    const normalizedOptions = this.normalizeIndicatorConstraintOptions(options);
+    if (normalizedOptions.indicator) {
+      this.assertOwnsVariable(normalizedOptions.indicator);
+    }
+    const expression = normalizedOptions.expression === undefined
+      ? new MathOptLinearExpression(normalizedOptions.terms ?? [])
+      : asFlatLinearExpression(normalizedOptions.expression).add(new MathOptLinearExpression(normalizedOptions.terms ?? []));
+    if (!Number.isFinite(expression.offset)) {
+      throw new Error('indicator constraint expression has an infinite offset.');
+    }
+    const constraint: IndicatorConstraintData = {
+      id,
+      indicator: normalizedOptions.indicator,
+      activateOnZero: normalizedOptions.activateOnZero ?? false,
+      lowerBound: (normalizedOptions.lowerBound ?? Number.NEGATIVE_INFINITY) - expression.offset,
+      upperBound: (normalizedOptions.upperBound ?? Number.POSITIVE_INFINITY) - expression.offset,
+      terms: linearTermEntries(expression),
+      name: normalizedOptions.name ?? '',
+      deleted: false,
+    };
+    this.indicatorConstraints.push(constraint);
+    return new MathOptIndicatorConstraint(this, constraint);
+  }
+
+  add_indicator_constraint(options: MathOptIndicatorConstraintOptions = {}): MathOptIndicatorConstraint {
+    return this.addIndicatorConstraint(options);
+  }
+
   private normalizeLinearConstraintOptions(
     options: Partial<MathOptLinearConstraintOptions> | MathOptBoundedExpression<MathOptLinearExpression> | MathOptLowerBoundedExpression<MathOptLinearExpression> | MathOptUpperBoundedExpression<MathOptLinearExpression>,
   ): Partial<MathOptLinearConstraintOptions> {
@@ -844,11 +1213,68 @@ export class MathOptModel {
     if (options instanceof MathOptUpperBoundedExpression) {
       return { lowerBound: Number.NEGATIVE_INFINITY, upperBound: options.upperBound, expression: options.expression };
     }
+    if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError(`Unsupported type for bounded_expr argument: ${mathOptOperandType(options)}`);
+    }
     return {
       ...options,
       lowerBound: options.lowerBound ?? options.lb,
       upperBound: options.upperBound ?? options.ub,
       expression: options.expression ?? options.expr,
+    };
+  }
+
+  private normalizeIndicatorConstraintOptions(options: MathOptIndicatorConstraintOptions): {
+    indicator?: MathOptVariable;
+    activateOnZero?: boolean;
+    lowerBound?: number;
+    upperBound?: number;
+    terms?: MathOptLinearTerm[];
+    expression?: MathOptLinearExpressionInput;
+    name?: string;
+  } {
+    if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError(`Unsupported type for indicator constraint options: ${mathOptOperandType(options)}`);
+    }
+    const implied = options.impliedConstraint ?? options.implied_constraint;
+    if (implied instanceof MathOptBoundedExpression) {
+      return {
+        indicator: options.indicator,
+        activateOnZero: options.activateOnZero ?? options.activate_on_zero,
+        lowerBound: implied.lowerBound,
+        upperBound: implied.upperBound,
+        expression: implied.expression,
+        name: options.name,
+      };
+    }
+    if (implied instanceof MathOptLowerBoundedExpression) {
+      return {
+        indicator: options.indicator,
+        activateOnZero: options.activateOnZero ?? options.activate_on_zero,
+        lowerBound: implied.lowerBound,
+        upperBound: Number.POSITIVE_INFINITY,
+        expression: implied.expression,
+        name: options.name,
+      };
+    }
+    if (implied instanceof MathOptUpperBoundedExpression) {
+      return {
+        indicator: options.indicator,
+        activateOnZero: options.activateOnZero ?? options.activate_on_zero,
+        lowerBound: Number.NEGATIVE_INFINITY,
+        upperBound: implied.upperBound,
+        expression: implied.expression,
+        name: options.name,
+      };
+    }
+    return {
+      indicator: options.indicator,
+      activateOnZero: options.activateOnZero ?? options.activate_on_zero,
+      lowerBound: options.lowerBound ?? options.lower_bound ?? options.lb,
+      upperBound: options.upperBound ?? options.upper_bound ?? options.ub,
+      expression: options.expression ?? options.expr,
+      terms: options.terms,
+      name: options.name,
     };
   }
 
@@ -860,6 +1286,12 @@ export class MathOptModel {
     variable.data.deleted = true;
     for (const constraint of this.constraints) {
       constraint.terms = constraint.terms.filter((term) => term.variable.id !== variable.id);
+    }
+    for (const constraint of this.indicatorConstraints) {
+      constraint.terms = constraint.terms.filter((term) => term.variable.id !== variable.id);
+      if (constraint.indicator?.id === variable.id) {
+        constraint.indicator = undefined;
+      }
     }
     this.objectiveDataValue.linearTerms = this.objectiveDataValue.linearTerms.filter((term) => term.variable.id !== variable.id);
     this.objectiveDataValue.quadraticTerms = this.objectiveDataValue.quadraticTerms.filter((term) => {
@@ -1137,6 +1569,53 @@ export class MathOptModel {
     return this.constraints[id]?.name ?? String(id);
   }
 
+  snapshot(): MathOptModelSnapshot {
+    return {
+      variables: this.variableData.map((variable) => ({ ...variable })),
+      linearConstraints: this.constraints.map((constraint) => ({
+        id: constraint.id,
+        lowerBound: constraint.lowerBound,
+        upperBound: constraint.upperBound,
+        terms: constraint.terms.map((term) => ({
+          variableId: term.variable.id,
+          coefficient: term.coefficient,
+        })),
+        name: constraint.name,
+        deleted: constraint.deleted,
+      })),
+      indicatorConstraints: this.indicatorConstraints.map((constraint) => ({
+        id: constraint.id,
+        indicatorId: constraint.indicator?.id,
+        activateOnZero: constraint.activateOnZero,
+        lowerBound: constraint.lowerBound,
+        upperBound: constraint.upperBound,
+        terms: constraint.terms.map((term) => ({
+          variableId: term.variable.id,
+          coefficient: term.coefficient,
+        })),
+        name: constraint.name,
+        deleted: constraint.deleted,
+      })),
+      objective: {
+        maximize: this.objectiveDataValue.maximize,
+        offset: this.objectiveDataValue.offset,
+        linearTerms: this.objectiveDataValue.linearTerms.map((term) => ({
+          variableId: term.variable.id,
+          coefficient: term.coefficient,
+        })),
+        quadraticTerms: this.objectiveDataValue.quadraticTerms.map((term) => ({
+          firstVariableId: Math.min(term.firstVariable.id, term.secondVariable.id),
+          secondVariableId: Math.max(term.firstVariable.id, term.secondVariable.id),
+          coefficient: term.coefficient,
+        })),
+      },
+    };
+  }
+
+  encodeModelUpdateSince(snapshot: MathOptModelSnapshot, options: { removeNames?: boolean } = {}): Uint8Array | null {
+    return encodeModelUpdate(this, snapshot, options);
+  }
+
   assertOwnsVariable(variable: MathOptVariable): void {
     if (variable.model !== this) {
       throw new Error('Variable belongs to a different MathOpt model.');
@@ -1151,24 +1630,26 @@ export class MathOptModel {
     constraint.assertLive();
   }
 
-  encodeModelProto(): Uint8Array {
+  encodeModelProto(options: { removeNames?: boolean } = {}): Uint8Array {
+    const removeNames = options.removeNames ?? false;
     return message([
-      fieldString(1, this.name),
-      fieldMessage(2, this.encodeVariables()),
+      removeNames ? empty() : fieldString(1, this.name),
+      fieldMessage(2, this.encodeVariables({ removeNames })),
       fieldMessage(3, this.encodeObjective()),
-      fieldMessage(4, this.encodeLinearConstraints()),
+      fieldMessage(4, this.encodeLinearConstraints({ removeNames })),
       fieldMessage(5, this.encodeLinearConstraintMatrix()),
+      ...this.encodeIndicatorConstraints({ removeNames }),
     ]);
   }
 
-  private encodeVariables(): Uint8Array {
+  private encodeVariables(options: { removeNames?: boolean } = {}): Uint8Array {
     const activeVariables = this.variableData.filter((variable) => !variable.deleted);
     return message([
       fieldPackedVarints(1, activeVariables.map((variable) => variable.id)),
       fieldPackedDoubles(2, activeVariables.map((variable) => variable.lowerBound)),
       fieldPackedDoubles(3, activeVariables.map((variable) => variable.upperBound)),
       fieldPackedBools(4, activeVariables.map((variable) => variable.integer)),
-      ...activeVariables.map((variable) => fieldString(5, variable.name)),
+      ...(options.removeNames ? [] : activeVariables.map((variable) => fieldString(5, variable.name))),
     ]);
   }
 
@@ -1185,13 +1666,13 @@ export class MathOptModel {
     ]);
   }
 
-  private encodeLinearConstraints(): Uint8Array {
+  private encodeLinearConstraints(options: { removeNames?: boolean } = {}): Uint8Array {
     const activeConstraints = this.constraints.filter((constraint) => !constraint.deleted);
     return message([
       fieldPackedVarints(1, activeConstraints.map((constraint) => constraint.id)),
       fieldPackedDoubles(2, activeConstraints.map((constraint) => constraint.lowerBound)),
       fieldPackedDoubles(3, activeConstraints.map((constraint) => constraint.upperBound)),
-      ...activeConstraints.map((constraint) => fieldString(4, constraint.name)),
+      ...(options.removeNames ? [] : activeConstraints.map((constraint) => fieldString(4, constraint.name))),
     ]);
   }
 
@@ -1211,6 +1692,21 @@ export class MathOptModel {
       fieldPackedVarints(2, entries.map((entry) => entry.columnId)),
       fieldPackedDoubles(3, entries.map((entry) => entry.coefficient)),
     ]);
+  }
+
+  private encodeIndicatorConstraints(options: { removeNames?: boolean } = {}): Uint8Array[] {
+    const activeConstraints = this.indicatorConstraints.filter((constraint) => !constraint.deleted);
+    return activeConstraints.map((constraint) => fieldMessage(9, message([
+      fieldVarint(1, constraint.id),
+      fieldMessage(2, message([
+        constraint.indicator === undefined ? empty() : fieldVarint(1, constraint.indicator.id),
+        constraint.activateOnZero ? fieldBool(6, true) : empty(),
+        fieldMessage(2, encodeSparseDoubleVector(constraint.terms)),
+        fieldDouble(3, constraint.lowerBound),
+        fieldDouble(4, constraint.upperBound),
+        options.removeNames ? empty() : fieldString(5, constraint.name),
+      ])),
+    ])));
   }
 }
 
@@ -1404,6 +1900,62 @@ export class MathOptLinearConstraint {
   assertLive(): void {
     if (this.data.deleted) {
       throw new Error(`Linear constraint ${this.id} has been deleted.`);
+    }
+  }
+}
+
+export class MathOptIndicatorConstraint {
+  constructor(readonly model: MathOptModel, readonly data: IndicatorConstraintData) {}
+
+  get id(): number {
+    return this.data.id;
+  }
+
+  get name(): string {
+    this.assertLive();
+    return this.data.name;
+  }
+
+  get indicator(): MathOptVariable | undefined {
+    this.assertLive();
+    return this.data.indicator;
+  }
+
+  get activateOnZero(): boolean {
+    this.assertLive();
+    return this.data.activateOnZero;
+  }
+
+  get activate_on_zero(): boolean {
+    return this.activateOnZero;
+  }
+
+  get lowerBound(): number {
+    this.assertLive();
+    return this.data.lowerBound;
+  }
+
+  get lower_bound(): number {
+    return this.lowerBound;
+  }
+
+  get upperBound(): number {
+    this.assertLive();
+    return this.data.upperBound;
+  }
+
+  get upper_bound(): number {
+    return this.upperBound;
+  }
+
+  terms(): MathOptLinearTerm[] {
+    this.assertLive();
+    return [...this.data.terms].filter((term) => term.coefficient !== 0);
+  }
+
+  assertLive(): void {
+    if (this.data.deleted) {
+      throw new Error(`Indicator constraint ${this.id} has been deleted.`);
     }
   }
 }
@@ -1935,6 +2487,88 @@ export async function initMathOpt(): Promise<void> {
   await loadMathOptModule();
 }
 
+export class MathOptIncrementalSolver {
+  private readonly initPromise: Promise<number>;
+  private checkpoint: MathOptModelSnapshot;
+  private handle: number | null = null;
+  private closed = false;
+
+  constructor(
+    readonly model: MathOptModel,
+    readonly solverType: MathOptSolverType | keyof typeof MathOptSolverType = MathOptSolverType.GLOP,
+    readonly options: Omit<MathOptSolveOptions, 'solverType'> = {},
+  ) {
+    this.checkpoint = model.snapshot();
+    if (!(options.removeNames ?? options.remove_names ?? false)) {
+      assertNoDuplicateNamesForIncrementalSolver(this.checkpoint);
+    }
+    this.initPromise = this.create();
+  }
+
+  private async create(): Promise<number> {
+    const requestBytes = MathOpt.encodeSolveRequest(this.model, {
+      ...this.options,
+      solverType: this.solverType,
+    });
+    const responseBytes = await incrementalCreateDirect(requestBytes);
+    const response = readMessage(responseBytes);
+    const statusBytes = response.messages.get(3)?.[0];
+    if (statusBytes) {
+      const status = readMessage(statusBytes);
+      throw new Error(status.strings.get(2)?.[0] ?? 'MathOpt incremental solver creation failed.');
+    }
+    const handleText = response.strings.get(2)?.[0];
+    const handle = handleText === undefined ? 0 : Number(handleText);
+    if (!Number.isInteger(handle) || handle <= 0) {
+      throw new Error('MathOpt incremental solver creation returned no solver handle.');
+    }
+    this.handle = handle;
+    return handle;
+  }
+
+  async solve(options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
+    if (this.closed) {
+      throw new Error('MathOpt IncrementalSolver is closed.');
+    }
+    const handle = await this.initPromise;
+    const mergedOptions: MathOptSolveOptions = {
+      ...this.options,
+      ...options,
+      solverType: this.solverType,
+    };
+    const removeNames = mergedOptions.removeNames ?? mergedOptions.remove_names ?? false;
+    const updateBytes = this.model.encodeModelUpdateSince(this.checkpoint, { removeNames });
+    const requestBytes = MathOpt.encodeSolveRequest(this.model, mergedOptions);
+    const interrupterState = solveInterrupterState(mergedOptions);
+    const responseBytes = await incrementalSolveDirect(handle, requestBytes, updateBytes, interrupterState);
+    const result = decodeSolveResponse(responseBytes, this.model);
+    this.checkpoint = this.model.snapshot();
+    const messageCallback = solveMessageCallback(mergedOptions);
+    if (messageCallback && result.messages.length > 0) {
+      messageCallback(result.messages);
+    }
+    return result;
+  }
+
+  async Solve(options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
+    return this.solve(options);
+  }
+
+  async close(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    try {
+      const handle = this.handle ?? await this.initPromise.catch(() => 0);
+      if (handle > 0) {
+        const module = await loadMathOptModule();
+        module.ccall('mathopt_incremental_delete', undefined, ['number'], [handle]);
+      }
+    } finally {
+      this.handle = null;
+    }
+  }
+}
+
 export class MathOpt {
   static readonly SolverType = MathOptSolverType;
   static readonly LPAlgorithm = MathOptLPAlgorithm;
@@ -1949,6 +2583,12 @@ export class MathOpt {
   static readonly PdlpRestartStrategy = PdlpRestartStrategy;
   static readonly PdlpLinesearchRule = PdlpLinesearchRule;
   static readonly GlpkParameters = GlpkParameters;
+  static readonly SolveInterrupter = MathOptSolveInterrupter;
+  static readonly SolveParameters = MathOptSolveParameters;
+  static readonly ModelSolveParameters = MathOptModelSolveParameters;
+  static readonly SparseVectorFilter = MathOptSparseVectorFilter;
+  static readonly SolutionHint = MathOptSolutionHint;
+  static readonly IncrementalSolver = MathOptIncrementalSolver;
   static readonly LinearExpression = MathOptLinearExpression;
   static readonly QuadraticExpression = MathOptQuadraticExpression;
   static readonly QuadraticTermKey = MathOptQuadraticTermKey;
@@ -1971,10 +2611,16 @@ export class MathOpt {
 
   static async solve(model: MathOptModel, options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
     const requestBytes = MathOpt.encodeSolveRequest(model, options);
+    const interrupterState = solveInterrupterState(options);
     const responseBytes = shouldUseWorkerBridge()
-      ? await solveViaWorker(requestBytes)
-      : await solveDirect(requestBytes);
-    return decodeSolveResponse(responseBytes, model);
+      ? await solveViaWorker(requestBytes, interrupterState)
+      : await solveDirect(requestBytes, interrupterState);
+    const result = decodeSolveResponse(responseBytes, model);
+    const messageCallback = solveMessageCallback(options);
+    if (messageCallback && result.messages.length > 0) {
+      messageCallback(result.messages);
+    }
+    return result;
   }
 
   static encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions = {}): Uint8Array {
@@ -2101,22 +2747,46 @@ export class MathOpt {
   }
 }
 
-async function solveViaWorker(requestBytes: Uint8Array): Promise<Uint8Array> {
+async function solveViaWorker(requestBytes: Uint8Array, interrupterState: MathOptSolveInterrupterState): Promise<Uint8Array> {
   const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'mathOptSolveResult' }>>({
     type: 'mathOptSolve',
     id: nextWorkerBridgeRequestId(),
     requestBytes,
+    useInterrupter: interrupterState.useInterrupter,
+    interruptAtStart: interrupterState.interrupted,
   });
   return new Uint8Array(response.bytes);
 }
 
-async function solveDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
+async function solveDirect(requestBytes: Uint8Array, interrupterState: MathOptSolveInterrupterState): Promise<Uint8Array> {
   const module = await loadMathOptModule();
   const requestPtr = copyBytesToHeap(module, requestBytes);
   const lenPtr = module._malloc(4);
   try {
     const ptr = (await module.ccall(
       'mathopt_solve_request',
+      'number',
+      ['number', 'number', 'number', 'number', 'number'],
+      [requestPtr, requestBytes.length, interrupterState.useInterrupter ? 1 : 0, interrupterState.interrupted ? 1 : 0, lenPtr],
+      { async: true },
+    )) as number;
+    const length = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
+    const bytes = ptr && length > 0 ? new Uint8Array(module.HEAPU8.subarray(ptr, ptr + length)) : new Uint8Array();
+    if (ptr) module._free(ptr);
+    return bytes;
+  } finally {
+    if (requestPtr) module._free(requestPtr);
+    module._free(lenPtr);
+  }
+}
+
+async function incrementalCreateDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
+  const module = await loadMathOptModule();
+  const requestPtr = copyBytesToHeap(module, requestBytes);
+  const lenPtr = module._malloc(4);
+  try {
+    const ptr = (await module.ccall(
+      'mathopt_incremental_create',
       'number',
       ['number', 'number', 'number'],
       [requestPtr, requestBytes.length, lenPtr],
@@ -2128,6 +2798,45 @@ async function solveDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
     return bytes;
   } finally {
     if (requestPtr) module._free(requestPtr);
+    module._free(lenPtr);
+  }
+}
+
+async function incrementalSolveDirect(
+  handle: number,
+  requestBytes: Uint8Array,
+  updateBytes: Uint8Array | null,
+  interrupterState: MathOptSolveInterrupterState,
+): Promise<Uint8Array> {
+  const module = await loadMathOptModule();
+  const requestPtr = copyBytesToHeap(module, requestBytes);
+  const updatePtr = updateBytes ? copyBytesToHeap(module, updateBytes) : 0;
+  const lenPtr = module._malloc(4);
+  try {
+    const ptr = (await module.ccall(
+      'mathopt_incremental_solve',
+      'number',
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [
+        handle,
+        requestPtr,
+        requestBytes.length,
+        updatePtr,
+        updateBytes?.length ?? 0,
+        updateBytes ? 1 : 0,
+        interrupterState.useInterrupter ? 1 : 0,
+        interrupterState.interrupted ? 1 : 0,
+        lenPtr,
+      ],
+      { async: true },
+    )) as number;
+    const length = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
+    const bytes = ptr && length > 0 ? new Uint8Array(module.HEAPU8.subarray(ptr, ptr + length)) : new Uint8Array();
+    if (ptr) module._free(ptr);
+    return bytes;
+  } finally {
+    if (requestPtr) module._free(requestPtr);
+    if (updatePtr) module._free(updatePtr);
     module._free(lenPtr);
   }
 }
@@ -2147,20 +2856,24 @@ function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): 
     throw new Error('GLPK does not support multi-threaded MathOpt solves; use threads: 1 or omit threads.');
   }
   const parameters = encodeMathOptSolveParameters(options);
+  const modelParameters = modelParametersBytes(options.modelParameters ?? options.model_parameters);
+  const removeNames = options.removeNames ?? options.remove_names ?? false;
   return message([
     fieldVarint(1, solverType),
-    fieldMessage(2, model.encodeModelProto()),
+    fieldMessage(2, model.encodeModelProto({ removeNames })),
     fieldMessageIfPresent(4, parameters),
+    fieldMessageIfPresent(5, modelParameters),
   ]);
 }
 
 function encodeMathOptSolveParameters(options: MathOptSolveOptions): Uint8Array | null {
   const raw = options.parameters ?? options.solveParameters ?? options.solve_parameters;
-  if (raw) return raw;
+  if (raw) return solveParametersBytes(raw);
+  const enableOutput = options.enableOutput ?? options.enable_output ?? (solveMessageCallback(options) ? true : undefined);
   const fields = [
     fieldDurationSeconds(1, options.timeLimitSeconds ?? options.time_limit_seconds),
     optionalVarintField(2, options.iterationLimit ?? options.iteration_limit),
-    optionalBoolField(3, options.enableOutput ?? options.enable_output),
+    optionalBoolField(3, enableOutput),
     optionalVarintField(4, options.threads),
     optionalVarintField(5, options.randomSeed ?? options.random_seed),
     enumField(6, options.lpAlgorithm ?? options.lp_algorithm, MathOptLPAlgorithm),
@@ -2234,6 +2947,22 @@ function encodeSparseDoubleVector(terms: MathOptLinearTerm[]): Uint8Array {
   ]);
 }
 
+function encodeLinearConstraintDoubleVector(terms: Array<{ linearConstraint: MathOptLinearConstraint; value: number }>): Uint8Array {
+  const sortedTerms = [...terms].sort((a, b) => a.linearConstraint.id - b.linearConstraint.id);
+  return message([
+    fieldPackedVarints(1, sortedTerms.map((term) => term.linearConstraint.id)),
+    fieldPackedDoubles(2, sortedTerms.map((term) => term.value)),
+  ]);
+}
+
+function encodeVariableInt32Vector(terms: Array<{ variable: MathOptVariable; priority: number }>): Uint8Array {
+  const sortedTerms = [...terms].sort((a, b) => a.variable.id - b.variable.id);
+  return message([
+    fieldPackedVarints(1, sortedTerms.map((term) => term.variable.id)),
+    fieldPackedVarints(2, sortedTerms.map((term) => term.priority)),
+  ]);
+}
+
 function encodeSparseDoubleMatrix(
   terms: Array<{ rowId: number; columnId: number; coefficient: number }>,
 ): Uint8Array {
@@ -2245,8 +2974,262 @@ function encodeSparseDoubleMatrix(
   ]);
 }
 
+function encodeModelUpdate(
+  model: MathOptModel,
+  snapshot: MathOptModelSnapshot,
+  options: { removeNames?: boolean } = {},
+): Uint8Array | null {
+  const current = model.snapshot();
+  const previousVariables = new Map(snapshot.variables.map((variable) => [variable.id, variable]));
+  const currentVariables = new Map(current.variables.map((variable) => [variable.id, variable]));
+  const previousConstraints = new Map(snapshot.linearConstraints.map((constraint) => [constraint.id, constraint]));
+  const currentConstraints = new Map(current.linearConstraints.map((constraint) => [constraint.id, constraint]));
+  const previousIndicators = new Map(snapshot.indicatorConstraints.map((constraint) => [constraint.id, constraint]));
+  const currentIndicators = new Map(current.indicatorConstraints.map((constraint) => [constraint.id, constraint]));
+
+  const deletedVariableIds = snapshot.variables
+    .filter((variable) => !variable.deleted && currentVariables.get(variable.id)?.deleted)
+    .map((variable) => variable.id);
+  const deletedLinearConstraintIds = snapshot.linearConstraints
+    .filter((constraint) => !constraint.deleted && currentConstraints.get(constraint.id)?.deleted)
+    .map((constraint) => constraint.id);
+  const deletedIndicatorConstraintIds = snapshot.indicatorConstraints
+    .filter((constraint) => !constraint.deleted && currentIndicators.get(constraint.id)?.deleted)
+    .map((constraint) => constraint.id);
+
+  const newVariables = current.variables.filter((variable) => {
+    const previous = previousVariables.get(variable.id);
+    return !variable.deleted && (!previous || previous.deleted);
+  });
+  const newLinearConstraints = current.linearConstraints.filter((constraint) => {
+    const previous = previousConstraints.get(constraint.id);
+    return !constraint.deleted && (!previous || previous.deleted);
+  });
+  const newIndicatorConstraints = current.indicatorConstraints.filter((constraint) => {
+    const previous = previousIndicators.get(constraint.id);
+    return !constraint.deleted && (!previous || previous.deleted);
+  });
+
+  const variableLowerUpdates = changedValues(snapshot.variables, current.variables, (item) => item.lowerBound);
+  const variableUpperUpdates = changedValues(snapshot.variables, current.variables, (item) => item.upperBound);
+  const variableIntegerUpdates = changedValues(snapshot.variables, current.variables, (item) => item.integer);
+  const linearLowerUpdates = changedValues(snapshot.linearConstraints, current.linearConstraints, (item) => item.lowerBound);
+  const linearUpperUpdates = changedValues(snapshot.linearConstraints, current.linearConstraints, (item) => item.upperBound);
+  const matrixUpdates = changedMatrixEntries(snapshot.linearConstraints, current.linearConstraints);
+  const objectiveUpdate = encodeObjectiveUpdate(snapshot.objective, current.objective);
+
+  const indicatorUpdate = message([
+    deletedIndicatorConstraintIds.length ? fieldPackedVarints(1, deletedIndicatorConstraintIds.sort((a, b) => a - b)) : empty(),
+    ...newIndicatorConstraints.map((constraint) => fieldMessage(2, message([
+      fieldVarint(1, constraint.id),
+      fieldMessage(2, encodeIndicatorConstraintSnapshot(constraint, options)),
+    ]))),
+  ]);
+
+  const encoded = message([
+    deletedVariableIds.length ? fieldPackedVarints(1, deletedVariableIds.sort((a, b) => a - b)) : empty(),
+    deletedLinearConstraintIds.length ? fieldPackedVarints(2, deletedLinearConstraintIds.sort((a, b) => a - b)) : empty(),
+    fieldMessageIfPresent(3, message([
+      vectorUpdate(1, variableLowerUpdates, fieldPackedDoubles),
+      vectorUpdate(2, variableUpperUpdates, fieldPackedDoubles),
+      vectorUpdate(3, variableIntegerUpdates, fieldPackedBools),
+    ])),
+    fieldMessageIfPresent(4, message([
+      vectorUpdate(1, linearLowerUpdates, fieldPackedDoubles),
+      vectorUpdate(2, linearUpperUpdates, fieldPackedDoubles),
+    ])),
+    fieldMessageIfPresent(5, encodeVariablesSnapshot(newVariables, options)),
+    fieldMessageIfPresent(6, encodeLinearConstraintsSnapshot(newLinearConstraints, options)),
+    fieldMessageIfPresent(7, objectiveUpdate),
+    fieldMessageIfPresent(8, matrixUpdates.length ? encodeSparseDoubleMatrix(matrixUpdates) : null),
+    fieldMessageIfPresent(12, indicatorUpdate.length ? indicatorUpdate : null),
+  ]);
+  return encoded.length > 0 ? encoded : null;
+}
+
+function assertNoDuplicateNamesForIncrementalSolver(snapshot: MathOptModelSnapshot): void {
+  const seen = new Set<string>();
+  for (const name of [
+    ...snapshot.variables.filter((variable) => !variable.deleted).map((variable) => variable.name),
+    ...snapshot.linearConstraints.filter((constraint) => !constraint.deleted).map((constraint) => constraint.name),
+    ...snapshot.indicatorConstraints.filter((constraint) => !constraint.deleted).map((constraint) => constraint.name),
+  ]) {
+    if (name === '') continue;
+    if (seen.has(name)) {
+      throw new Error(`duplicate name: ${name}`);
+    }
+    seen.add(name);
+  }
+}
+
+function encodeVariablesSnapshot(
+  variables: MathOptVariableSnapshot[],
+  options: { removeNames?: boolean } = {},
+): Uint8Array | null {
+  const active = [...variables].filter((variable) => !variable.deleted).sort((a, b) => a.id - b.id);
+  if (active.length === 0) return null;
+  return message([
+    fieldPackedVarints(1, active.map((variable) => variable.id)),
+    fieldPackedDoubles(2, active.map((variable) => variable.lowerBound)),
+    fieldPackedDoubles(3, active.map((variable) => variable.upperBound)),
+    fieldPackedBools(4, active.map((variable) => variable.integer)),
+    ...(options.removeNames ? [] : active.map((variable) => fieldString(5, variable.name))),
+  ]);
+}
+
+function encodeLinearConstraintsSnapshot(
+  constraints: MathOptLinearConstraintSnapshot[],
+  options: { removeNames?: boolean } = {},
+): Uint8Array | null {
+  const active = [...constraints].filter((constraint) => !constraint.deleted).sort((a, b) => a.id - b.id);
+  if (active.length === 0) return null;
+  return message([
+    fieldPackedVarints(1, active.map((constraint) => constraint.id)),
+    fieldPackedDoubles(2, active.map((constraint) => constraint.lowerBound)),
+    fieldPackedDoubles(3, active.map((constraint) => constraint.upperBound)),
+    ...(options.removeNames ? [] : active.map((constraint) => fieldString(4, constraint.name))),
+  ]);
+}
+
+function encodeIndicatorConstraintSnapshot(
+  constraint: MathOptIndicatorConstraintSnapshot,
+  options: { removeNames?: boolean } = {},
+): Uint8Array {
+  return message([
+    constraint.indicatorId === undefined ? empty() : fieldVarint(1, constraint.indicatorId),
+    constraint.activateOnZero ? fieldBool(6, true) : empty(),
+    fieldMessage(2, encodeSparseDoubleVectorById(constraint.terms)),
+    fieldDouble(3, constraint.lowerBound),
+    fieldDouble(4, constraint.upperBound),
+    options.removeNames ? empty() : fieldString(5, constraint.name),
+  ]);
+}
+
+function encodeSparseDoubleVectorById(terms: Array<{ variableId: number; coefficient: number }>): Uint8Array {
+  const sortedTerms = [...terms].filter((term) => term.coefficient !== 0).sort((a, b) => a.variableId - b.variableId);
+  return message([
+    fieldPackedVarints(1, sortedTerms.map((term) => term.variableId)),
+    fieldPackedDoubles(2, sortedTerms.map((term) => term.coefficient)),
+  ]);
+}
+
+function changedValues<T extends { id: number; deleted: boolean }, TValue extends number | boolean>(
+  previous: T[],
+  current: T[],
+  value: (item: T) => TValue,
+): Array<{ id: number; value: TValue }> {
+  const currentById = new Map(current.map((item) => [item.id, item]));
+  return previous.flatMap((oldItem) => {
+    if (oldItem.deleted) return [];
+    const newItem = currentById.get(oldItem.id);
+    if (!newItem || newItem.deleted) return [];
+    return Object.is(value(oldItem), value(newItem)) ? [] : [{ id: oldItem.id, value: value(newItem) }];
+  });
+}
+
+function vectorUpdate<TValue extends number | boolean>(
+  field: number,
+  updates: Array<{ id: number; value: TValue }>,
+  encodeValues: (field: number, values: any[]) => Uint8Array,
+): Uint8Array {
+  if (updates.length === 0) return empty();
+  const sorted = [...updates].sort((a, b) => a.id - b.id);
+  return fieldMessage(field, message([
+    fieldPackedVarints(1, sorted.map((update) => update.id)),
+    encodeValues(2, sorted.map((update) => update.value)),
+  ]));
+}
+
+function changedMatrixEntries(
+  previous: MathOptLinearConstraintSnapshot[],
+  current: MathOptLinearConstraintSnapshot[],
+): Array<{ rowId: number; columnId: number; coefficient: number }> {
+  const previousById = new Map(previous.map((constraint) => [constraint.id, constraint]));
+  const updates: Array<{ rowId: number; columnId: number; coefficient: number }> = [];
+  for (const constraint of current) {
+    if (constraint.deleted) continue;
+    const previousConstraint = previousById.get(constraint.id);
+    const previousTerms = termsByVariableId(previousConstraint && !previousConstraint.deleted ? previousConstraint.terms : []);
+    const currentTerms = termsByVariableId(constraint.terms);
+    const variableIds = new Set([...previousTerms.keys(), ...currentTerms.keys()]);
+    for (const variableId of variableIds) {
+      const oldCoefficient = previousTerms.get(variableId) ?? 0;
+      const newCoefficient = currentTerms.get(variableId) ?? 0;
+      if (!Object.is(oldCoefficient, newCoefficient)) {
+        updates.push({ rowId: constraint.id, columnId: variableId, coefficient: newCoefficient });
+      }
+    }
+  }
+  return updates;
+}
+
+function termsByVariableId(terms: Array<{ variableId: number; coefficient: number }>): Map<number, number> {
+  const result = new Map<number, number>();
+  for (const term of terms) {
+    result.set(term.variableId, (result.get(term.variableId) ?? 0) + term.coefficient);
+  }
+  return result;
+}
+
+function encodeObjectiveUpdate(previous: MathOptObjectiveSnapshot, current: MathOptObjectiveSnapshot): Uint8Array | null {
+  const linearUpdates = changedTermMap(
+    previous.linearTerms.map((term) => [term.variableId, term.coefficient] as const),
+    current.linearTerms.map((term) => [term.variableId, term.coefficient] as const),
+  );
+  const quadraticUpdates = changedQuadraticTermMap(previous.quadraticTerms, current.quadraticTerms);
+  const encoded = message([
+    previous.maximize === current.maximize ? empty() : fieldBool(1, current.maximize),
+    Object.is(previous.offset, current.offset) ? empty() : fieldDouble(2, current.offset),
+    fieldMessageIfPresent(3, linearUpdates.length ? encodeSparseDoubleVectorById(
+      linearUpdates.map((term) => ({ variableId: term.id, coefficient: term.coefficient })),
+    ) : null),
+    fieldMessageIfPresent(4, quadraticUpdates.length ? encodeSparseDoubleMatrix(
+      quadraticUpdates.map((term) => ({ rowId: term.firstVariableId, columnId: term.secondVariableId, coefficient: term.coefficient })),
+    ) : null),
+  ]);
+  return encoded.length > 0 ? encoded : null;
+}
+
+function changedTermMap(
+  previousEntries: Array<readonly [number, number]>,
+  currentEntries: Array<readonly [number, number]>,
+): Array<{ id: number; coefficient: number }> {
+  const previous = new Map(previousEntries);
+  const current = new Map(currentEntries);
+  const ids = new Set([...previous.keys(), ...current.keys()]);
+  const updates: Array<{ id: number; coefficient: number }> = [];
+  for (const id of ids) {
+    const oldCoefficient = previous.get(id) ?? 0;
+    const newCoefficient = current.get(id) ?? 0;
+    if (!Object.is(oldCoefficient, newCoefficient)) updates.push({ id, coefficient: newCoefficient });
+  }
+  return updates;
+}
+
+function changedQuadraticTermMap(
+  previousTerms: MathOptObjectiveSnapshot['quadraticTerms'],
+  currentTerms: MathOptObjectiveSnapshot['quadraticTerms'],
+): MathOptObjectiveSnapshot['quadraticTerms'] {
+  const key = (term: { firstVariableId: number; secondVariableId: number }) => `${term.firstVariableId}:${term.secondVariableId}`;
+  const previous = new Map(previousTerms.map((term) => [key(term), term]));
+  const current = new Map(currentTerms.map((term) => [key(term), term]));
+  const keys = new Set([...previous.keys(), ...current.keys()]);
+  const updates: MathOptObjectiveSnapshot['quadraticTerms'] = [];
+  for (const termKey of keys) {
+    const oldTerm = previous.get(termKey);
+    const newTerm = current.get(termKey);
+    const coefficient = newTerm?.coefficient ?? 0;
+    if (!Object.is(oldTerm?.coefficient ?? 0, coefficient)) {
+      const [firstVariableId, secondVariableId] = termKey.split(':').map(Number);
+      updates.push({ firstVariableId, secondVariableId, coefficient });
+    }
+  }
+  return updates;
+}
+
 function decodeSolveResponse(bytes: Uint8Array, model: MathOptModel): MathOptSolveResult {
   const response = readMessage(bytes);
+  const messages = response.strings.get(2) ?? [];
   const statusBytes = response.messages.get(3)?.[0];
   if (statusBytes) {
     const status = readMessage(statusBytes);
@@ -2263,35 +3246,236 @@ function decodeSolveResponse(bytes: Uint8Array, model: MathOptModel): MathOptSol
   const termination = result.messages.get(2)?.[0];
   const terminationMessage = termination ? readMessage(termination) : undefined;
   const terminationReasonNumber = terminationMessage ? Number(terminationMessage.varints.get(1)?.[0] ?? 0n) : 0;
+  const terminationLimitNumber = terminationMessage ? Number(terminationMessage.varints.get(2)?.[0] ?? 0n) : 0;
   const objectiveBounds = terminationMessage?.messages.get(5)?.[0];
   const objectiveBoundsMessage = objectiveBounds ? readMessage(objectiveBounds) : undefined;
-  const primalBound = objectiveBoundsMessage?.doubles.get(2)?.[0] ?? null;
-  const dualBound = objectiveBoundsMessage?.doubles.get(3)?.[0] ?? null;
+  const solveStatsBytes = result.messages.get(6)?.[0];
+  const solveStats = solveStatsBytes ? readMessage(solveStatsBytes) : undefined;
+  const primalBound = objectiveBoundsMessage?.doubles.get(2)?.[0] ?? solveStats?.doubles.get(2)?.[0] ?? null;
+  const dualBound = objectiveBoundsMessage?.doubles.get(3)?.[0] ?? solveStats?.doubles.get(3)?.[0] ?? null;
+  const problemStatusBytes = terminationMessage?.messages.get(4)?.[0];
+  const statsProblemStatusBytes = solveStats?.messages.get(4)?.[0];
+  const problemStatusMessage = problemStatusBytes
+    ? readMessage(problemStatusBytes)
+    : statsProblemStatusBytes
+      ? readMessage(statsProblemStatusBytes)
+      : undefined;
+  const primalStatus = Number(problemStatusMessage?.varints.get(1)?.[0] ?? 0n);
+  const dualStatus = Number(problemStatusMessage?.varints.get(2)?.[0] ?? 0n);
+  const primalOrDualInfeasible = Boolean(Number(problemStatusMessage?.varints.get(3)?.[0] ?? 0n));
+  const solveTime = solveStats?.messages.get(1)?.[0];
+  const solveTimeSeconds = solveTime ? decodeDurationSeconds(solveTime) : null;
   const solutions = (result.messages.get(3) ?? []).map((solutionBytes) => decodeSolution(solutionBytes, model));
+  const primalRays = (result.messages.get(4) ?? []).map((rayBytes) => decodePrimalRay(rayBytes, model));
+  const dualRays = (result.messages.get(5) ?? []).map((rayBytes) => decodeDualRay(rayBytes, model));
   const firstPrimalSolution = solutions.find((solution) => solution.primalSolution !== null)?.primalSolution ?? null;
+  const bestSolution = solutions[0] ?? null;
+  const firstDualRay = dualRays[0] ?? null;
+  const firstPrimalRay = primalRays[0] ?? null;
   const objectiveValue = firstPrimalSolution?.objectiveValue ?? null;
   const variableValues = firstPrimalSolution?.variableValues ?? {};
   const variableValuesById = firstPrimalSolution?.variableValuesById ?? {};
 
-  return {
+  const solveResult: MathOptSolveResult = {
     terminationReason: terminationReasonNames[terminationReasonNumber] ?? `TERMINATION_REASON_${terminationReasonNumber}`,
+    terminationLimit: terminationLimitNumber === 0
+      ? null
+      : terminationLimitNames[terminationLimitNumber] ?? `LIMIT_${terminationLimitNumber}`,
+    solveTimeSeconds,
     primalBound,
     dualBound,
+    primalStatus: problemStatusMessage ? feasibilityStatusNames[primalStatus] ?? `FEASIBILITY_STATUS_${primalStatus}` : null,
+    dualStatus: problemStatusMessage ? feasibilityStatusNames[dualStatus] ?? `FEASIBILITY_STATUS_${dualStatus}` : null,
+    primalOrDualInfeasible,
     objectiveValue,
     variableValues,
     variableValuesById,
     solutions,
+    primalRays,
+    dualRays,
+    messages,
     rawResponse: bytes,
+    solve_time() {
+      return solveTimeSeconds;
+    },
+    best_objective_bound() {
+      return dualBound;
+    },
+    has_primal_feasible_solution() {
+      return firstPrimalSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE';
+    },
+    has_dual_feasible_solution() {
+      return bestSolution?.dualSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE';
+    },
+    has_ray() {
+      return firstPrimalRay !== null;
+    },
+    has_dual_ray() {
+      return firstDualRay !== null;
+    },
+    has_basis() {
+      return bestSolution?.basis !== null && bestSolution?.basis !== undefined;
+    },
+    bounded() {
+      return primalStatus === 2 && dualStatus === 2 && !primalOrDualInfeasible;
+    },
+    objective_value() {
+      if (objectiveValue === null || firstPrimalSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
+        throw new Error('MathOpt solve result has no primal feasible solution.');
+      }
+      return objectiveValue;
+    },
+    variable_values: ((input?: MathOptVariable | MathOptVariable[]) => {
+      if (firstPrimalSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
+        throw new Error('MathOpt solve result has no primal feasible solution.');
+      }
+      if (input === undefined) {
+        return variableValues;
+      }
+      if (Array.isArray(input)) {
+        return input.map((variable) => variableValueForResult(model, firstPrimalSolution, variable));
+      }
+      return variableValueForResult(model, firstPrimalSolution, input);
+    }) as MathOptSolveResult['variable_values'],
+    reduced_costs: ((input?: MathOptVariable | MathOptVariable[]) => {
+      const dualSolution = bestSolution?.dualSolution ?? null;
+      if (dualSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
+        throw new Error('Best solution does not have a dual feasible solution.');
+      }
+      return variableMapAccessor(model, dualSolution.reducedCosts, dualSolution.reducedCostsById, input, 'reduced_costs');
+    }) as MathOptSolveResult['reduced_costs'],
+    dual_values: ((input?: MathOptLinearConstraint | MathOptLinearConstraint[]) => {
+      const dualSolution = bestSolution?.dualSolution ?? null;
+      if (dualSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
+        throw new Error('Best solution does not have a dual feasible solution.');
+      }
+      return constraintMapAccessor(model, dualSolution.dualValues, dualSolution.dualValuesById, input, 'dual_values');
+    }) as MathOptSolveResult['dual_values'],
+    ray_variable_values: ((input?: MathOptVariable | MathOptVariable[]) => {
+      if (firstPrimalRay === null) {
+        throw new Error('MathOpt solve result has no primal ray.');
+      }
+      return variableMapAccessor(model, firstPrimalRay.variableValues, firstPrimalRay.variableValuesById, input, 'ray_variable_values');
+    }) as MathOptSolveResult['ray_variable_values'],
+    ray_reduced_costs: ((input?: MathOptVariable | MathOptVariable[]) => {
+      if (firstDualRay === null) {
+        throw new Error('MathOpt solve result has no dual ray.');
+      }
+      return variableMapAccessor(model, firstDualRay.reducedCosts, firstDualRay.reducedCostsById, input, 'ray_reduced_costs');
+    }) as MathOptSolveResult['ray_reduced_costs'],
+    ray_dual_values: ((input?: MathOptLinearConstraint | MathOptLinearConstraint[]) => {
+      if (firstDualRay === null) {
+        throw new Error('MathOpt solve result has no dual ray.');
+      }
+      return constraintMapAccessor(model, firstDualRay.dualValues, firstDualRay.dualValuesById, input, 'ray_dual_values');
+    }) as MathOptSolveResult['ray_dual_values'],
+    variable_status: ((input?: MathOptVariable | MathOptVariable[]) => {
+      const basis = bestSolution?.basis ?? null;
+      if (basis === null) {
+        throw new Error('Best solution does not have a basis.');
+      }
+      return variableMapAccessor(model, basis.variableStatus, basis.variableStatusById, input, 'variable_status');
+    }) as MathOptSolveResult['variable_status'],
+    constraint_status: ((input?: MathOptLinearConstraint | MathOptLinearConstraint[]) => {
+      const basis = bestSolution?.basis ?? null;
+      if (basis === null) {
+        throw new Error('Best solution does not have a basis.');
+      }
+      return constraintMapAccessor(model, basis.constraintStatus, basis.constraintStatusById, input, 'constraint_status');
+    }) as MathOptSolveResult['constraint_status'],
   };
+  return solveResult;
+}
+
+function variableValueForResult(
+  model: MathOptModel,
+  solution: MathOptPrimalSolutionResult,
+  variable: MathOptVariable,
+): number {
+  if (!(variable instanceof MathOptVariable)) {
+    throw new Error('MathOpt variable_values() expects a MathOptVariable or an array of MathOptVariable.');
+  }
+  if (variable.model !== model) {
+    throw new Error('Variable belongs to a different MathOpt model.');
+  }
+  variable.assertLive();
+  if (!(variable.id in solution.variableValuesById)) {
+    throw new Error(`Variable ${variable.toString()} is not present in MathOpt variable_values().`);
+  }
+  return solution.variableValuesById[variable.id];
+}
+
+function variableMapAccessor<TValue>(
+  model: MathOptModel,
+  byName: Record<string, TValue>,
+  byId: Record<number, TValue>,
+  input: MathOptVariable | MathOptVariable[] | undefined,
+  methodName: string,
+): Record<string, TValue> | TValue | TValue[] {
+  if (input === undefined) return byName;
+  if (Array.isArray(input)) return input.map((variable) => variableValueFromMap(model, byId, variable, methodName));
+  return variableValueFromMap(model, byId, input, methodName);
+}
+
+function variableValueFromMap<TValue>(
+  model: MathOptModel,
+  byId: Record<number, TValue>,
+  variable: MathOptVariable,
+  methodName: string,
+): TValue {
+  if (!(variable instanceof MathOptVariable)) {
+    throw new Error(`MathOpt ${methodName}() expects a MathOptVariable or an array of MathOptVariable.`);
+  }
+  if (variable.model !== model) {
+    throw new Error(`Variable ${variable.toString()} belongs to a different MathOpt model.`);
+  }
+  variable.assertLive();
+  if (!(variable.id in byId)) {
+    throw new Error(`Variable ${variable.toString()} is not present in MathOpt ${methodName}().`);
+  }
+  return byId[variable.id];
+}
+
+function constraintMapAccessor<TValue>(
+  model: MathOptModel,
+  byName: Record<string, TValue>,
+  byId: Record<number, TValue>,
+  input: MathOptLinearConstraint | MathOptLinearConstraint[] | undefined,
+  methodName: string,
+): Record<string, TValue> | TValue | TValue[] {
+  if (input === undefined) return byName;
+  if (Array.isArray(input)) return input.map((constraint) => constraintValueFromMap(model, byId, constraint, methodName));
+  return constraintValueFromMap(model, byId, input, methodName);
+}
+
+function constraintValueFromMap<TValue>(
+  model: MathOptModel,
+  byId: Record<number, TValue>,
+  constraint: MathOptLinearConstraint,
+  methodName: string,
+): TValue {
+  if (!(constraint instanceof MathOptLinearConstraint)) {
+    throw new Error(`MathOpt ${methodName}() expects a MathOptLinearConstraint or an array of MathOptLinearConstraint.`);
+  }
+  if (constraint.model !== model) {
+    throw new Error(`Linear constraint ${constraint.toString()} belongs to a different MathOpt model.`);
+  }
+  constraint.assertLive();
+  if (!(constraint.id in byId)) {
+    throw new Error(`Linear constraint ${constraint.toString()} is not present in MathOpt ${methodName}().`);
+  }
+  return byId[constraint.id];
 }
 
 function decodeSolution(bytes: Uint8Array, model: MathOptModel): MathOptSolutionResult {
   const solution = readMessage(bytes);
   const primalBytes = solution.messages.get(1)?.[0];
   const dualBytes = solution.messages.get(2)?.[0];
+  const basisBytes = solution.messages.get(3)?.[0];
   return {
     primalSolution: primalBytes ? decodePrimalSolution(primalBytes, model) : null,
     dualSolution: dualBytes ? decodeDualSolution(dualBytes, model) : null,
+    basis: basisBytes ? decodeBasis(basisBytes, model) : null,
   };
 }
 
@@ -2305,6 +3489,7 @@ function decodePrimalSolution(bytes: Uint8Array, model: MathOptModel): MathOptPr
     objectiveValue: primal.doubles.get(2)?.[0] ?? null,
     variableValues: variableValues.byName,
     variableValuesById: variableValues.byId,
+    feasibilityStatus: solutionStatusNames[Number(primal.varints.get(3)?.[0] ?? 0n)] ?? `SOLUTION_STATUS_${Number(primal.varints.get(3)?.[0] ?? 0n)}`,
   };
 }
 
@@ -2324,7 +3509,85 @@ function decodeDualSolution(bytes: Uint8Array, model: MathOptModel): MathOptDual
     dualValuesById: dualValues.byId,
     reducedCosts: reducedCosts.byName,
     reducedCostsById: reducedCosts.byId,
+    feasibilityStatus: solutionStatusNames[Number(dual.varints.get(4)?.[0] ?? 0n)] ?? `SOLUTION_STATUS_${Number(dual.varints.get(4)?.[0] ?? 0n)}`,
   };
+}
+
+function decodePrimalRay(bytes: Uint8Array, model: MathOptModel): MathOptPrimalRayResult {
+  const ray = readMessage(bytes);
+  const variableValues = decodeSparseDoubleVector(
+    ray.messages.get(1)?.[0],
+    (id) => model.variableName(id),
+  );
+  return {
+    variableValues: variableValues.byName,
+    variableValuesById: variableValues.byId,
+  };
+}
+
+function decodeDualRay(bytes: Uint8Array, model: MathOptModel): MathOptDualRayResult {
+  const ray = readMessage(bytes);
+  const dualValues = decodeSparseDoubleVector(
+    ray.messages.get(1)?.[0],
+    (id) => model.linearConstraintName(id),
+  );
+  const reducedCosts = decodeSparseDoubleVector(
+    ray.messages.get(2)?.[0],
+    (id) => model.variableName(id),
+  );
+  return {
+    dualValues: dualValues.byName,
+    dualValuesById: dualValues.byId,
+    reducedCosts: reducedCosts.byName,
+    reducedCostsById: reducedCosts.byId,
+  };
+}
+
+function decodeBasis(bytes: Uint8Array, model: MathOptModel): MathOptBasisResult {
+  const basis = readMessage(bytes);
+  const constraintStatus = decodeSparseBasisStatusVector(
+    basis.messages.get(1)?.[0],
+    (id) => model.linearConstraintName(id),
+  );
+  const variableStatus = decodeSparseBasisStatusVector(
+    basis.messages.get(2)?.[0],
+    (id) => model.variableName(id),
+  );
+  const basicDualFeasibilityNumber = Number(basis.varints.get(3)?.[0] ?? 0n);
+  return {
+    variableStatus: variableStatus.byName,
+    variableStatusById: variableStatus.byId,
+    constraintStatus: constraintStatus.byName,
+    constraintStatusById: constraintStatus.byId,
+    basicDualFeasibility: solutionStatusNames[basicDualFeasibilityNumber] ?? `SOLUTION_STATUS_${basicDualFeasibilityNumber}`,
+  };
+}
+
+function decodeDurationSeconds(bytes: Uint8Array): number {
+  const duration = readMessage(bytes);
+  const seconds = Number(duration.varints.get(1)?.[0] ?? 0n);
+  const nanos = Number(duration.varints.get(2)?.[0] ?? 0n);
+  return seconds + nanos / 1e9;
+}
+
+function decodeSparseBasisStatusVector(
+  bytes: Uint8Array | undefined,
+  nameForId: (id: number) => string,
+): { byId: Record<number, string>; byName: Record<string, string> } {
+  const byId: Record<number, string> = {};
+  const byName: Record<string, string> = {};
+  if (!bytes) return { byId, byName };
+  const sparse = readMessage(bytes);
+  const ids = sparse.packedVarints.get(1) ?? [];
+  const values = sparse.packedVarints.get(2) ?? [];
+  ids.forEach((id, index) => {
+    const numericId = Number(id);
+    const statusNumber = Number(values[index] ?? 0n);
+    const status = basisStatusNames[statusNumber] ?? `BASIS_STATUS_${statusNumber}`;
+    byId[numericId] = status;
+    byName[nameForId(numericId)] = status;
+  });
+  return { byId, byName };
 }
 
 function decodeSparseDoubleVector(
@@ -2579,6 +3842,83 @@ function mapFields<T>(
     fieldString(1, key),
     encodeValue(2, value),
   ])));
+}
+
+function solveParametersBytes(value: MathOptSolveParameters | MathOptSolveParametersOptions | Uint8Array): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (typeof (value as { toProtoBytes?: unknown }).toProtoBytes === 'function') {
+    return (value as MathOptSolveParameters).toProtoBytes();
+  }
+  return new MathOptSolveParameters(value as MathOptSolveParametersOptions).toProtoBytes();
+}
+
+function modelParametersBytes(
+  value: MathOptModelSolveParameters | MathOptModelSolveParametersOptions | Uint8Array | undefined,
+): Uint8Array | null {
+  if (!value) return null;
+  if (value instanceof Uint8Array) return value;
+  if (typeof (value as { toProtoBytes?: unknown }).toProtoBytes === 'function') {
+    return (value as MathOptModelSolveParameters).toProtoBytes();
+  }
+  return new MathOptModelSolveParameters(value as MathOptModelSolveParametersOptions).toProtoBytes();
+}
+
+function solveMessageCallback(options: MathOptSolveOptions): ((messages: string[]) => void) | undefined {
+  return options.messageCallback ?? options.message_callback ?? options.msgCb ?? options.msg_cb;
+}
+
+function solveInterrupterState(options: MathOptSolveOptions): MathOptSolveInterrupterState {
+  const interrupter = options.interrupter ?? options.solveInterrupter ?? options.solve_interrupter;
+  if (!interrupter) {
+    return { useInterrupter: false, interrupted: false };
+  }
+  const interrupted = typeof interrupter.isInterrupted === 'function'
+    ? interrupter.isInterrupted()
+    : typeof interrupter.is_interrupted === 'function'
+      ? interrupter.is_interrupted()
+      : interrupter.interrupted === true;
+  return { useInterrupter: true, interrupted };
+}
+
+function solutionHintBytes(value: MathOptSolutionHint | MathOptSolutionHintOptions | Uint8Array): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (typeof (value as { toProtoBytes?: unknown }).toProtoBytes === 'function') {
+    return (value as MathOptSolutionHint).toProtoBytes();
+  }
+  return new MathOptSolutionHint(value as MathOptSolutionHintOptions).toProtoBytes();
+}
+
+function modelFilterBytes<TElement>(value: MathOptSparseVectorFilterInput<TElement> | undefined): Uint8Array | null {
+  if (!value) return null;
+  if (typeof (value as { toProtoBytes?: unknown }).toProtoBytes === 'function') {
+    return (value as MathOptSparseVectorFilter<TElement>).toProtoBytes();
+  }
+  return encodeSparseVectorFilter(normalizeSparseVectorFilter(value));
+}
+
+function normalizeSparseVectorFilter<TElement>(
+  value: MathOptSparseVectorFilterInput<TElement>,
+): MathOptSparseVectorFilterOptions<TElement> {
+  if (Array.isArray(value)) {
+    return { elements: value as TElement[], filterByIds: true };
+  }
+  return value as MathOptSparseVectorFilterOptions<TElement>;
+}
+
+function encodeSparseVectorFilter<TElement>(options: MathOptSparseVectorFilterOptions<TElement>): Uint8Array {
+  const explicitIds = options.ids ?? options.filteredIds ?? options.filtered_ids;
+  const elementIds = options.elements?.map((element) => {
+    if (typeof element === 'number' || typeof element === 'bigint') return element;
+    const id = (element as { id?: number | bigint }).id;
+    if (id === undefined) throw new Error('MathOpt sparse filter elements must expose an id.');
+    return id;
+  });
+  const ids = explicitIds ?? elementIds ?? [];
+  return message([
+    optionalBoolField(1, options.skipZeroValues ?? options.skip_zero_values),
+    optionalBoolField(2, options.filterByIds ?? options.filter_by_ids ?? (ids.length > 0 ? true : undefined)),
+    ids.length === 0 ? empty() : fieldPackedVarints(3, ids),
+  ]);
 }
 
 function backendParametersBytes<TOptions, TParameters extends { toProtoBytes(): Uint8Array }>(

@@ -168,6 +168,8 @@ export type MathOptSolveRequest = {
   type: 'mathOptSolve';
   id: number;
   requestBytes: Uint8Array;
+  useInterrupter?: boolean;
+  interruptAtStart?: boolean;
 };
 
 export type PdlpRequest = {

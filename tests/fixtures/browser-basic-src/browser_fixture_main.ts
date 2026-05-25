@@ -18,6 +18,12 @@ import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import * as MathOptApi from 'or-tools-wasm/mathopt';
 import * as PdlpApi from 'or-tools-wasm/pdlp';
 
+type _MathOptResultTypeExports = [
+  MathOptApi.MathOptBasisResult,
+  MathOptApi.MathOptDualRayResult,
+  MathOptApi.MathOptPrimalRayResult,
+];
+
 const statusEl = document.getElementById('status');
 
 type RunResult = {

@@ -419,8 +419,14 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         responsePtr = (await module.ccall(
           'mathopt_solve_request',
           'number',
-          ['number', 'number', 'number'],
-          [requestPtr, message.requestBytes.length, lenPtr],
+          ['number', 'number', 'number', 'number', 'number'],
+          [
+            requestPtr,
+            message.requestBytes.length,
+            message.useInterrupter ? 1 : 0,
+            message.interruptAtStart ? 1 : 0,
+            lenPtr,
+          ],
           { async: true },
         )) as number;
         const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
