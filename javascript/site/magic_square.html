@@ -110,6 +110,15 @@ console.log(result.response?.solution);</code></pre>
 		</div>
 		<p>This page exercises the <code>cp_sat_api</code>
 			WASM module by building and solving a magic square model directly in the browser.</p>
+		<div class="example-explanation">
+			<h2>Model</h2>
+			<ul>
+				<li>Each grid cell is an integer decision variable.</li>
+				<li>All numbers in the square must be distinct.</li>
+				<li>Every row, column, and diagonal must have the same magic sum.</li>
+				<li>CP-SAT searches for a grid assignment satisfying all arithmetic constraints.</li>
+			</ul>
+		</div>
 		<div class="controls">
 			<label>Size <input id="size" class="short-number" type="number" value="5" min="1"></label>
 			<label>Workers <input id="workers" class="short-number" type="number" value="4" min="1"></label>

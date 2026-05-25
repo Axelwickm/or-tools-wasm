@@ -5,6 +5,15 @@
     <title>Network Flow - Assignment</title>
     <link rel="stylesheet" href="./example.css">
     <style>
+      #assignment-graph {
+        display: block;
+        width: 100%;
+        max-width: 960px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        margin: 1rem 0;
+      }
       #solution-output { margin: 0.75rem 0; }
       #status { min-height: 7rem; }
     </style>
@@ -15,7 +24,7 @@
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>Network Flow - linear sum assignment</h1>
-    <p><em>Problem: assign every worker to one task so the total assignment cost is as small as possible.</em></p>
+    <p><em>Problem: assign every worker to one task so the total assignment cost is as small as possible; this is the classic Hungarian algorithm problem.</em></p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
@@ -54,10 +63,31 @@ if (status === SimpleLinearSumAssignment.OPTIMAL) {
 }</code></pre>
       </details>
     </div>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Each worker must be matched to exactly one task.</li>
+        <li>Each task must receive exactly one worker.</li>
+        <li>Every worker-task pair has an assignment cost.</li>
+        <li>The solver finds the one-to-one matching with minimum total cost.</li>
+        <li>The visualization highlights the selected worker-task pairs after solving.</li>
+      </ul>
+    </div>
     <div class="controls">
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Size <input id="assignment-size" class="short-number" type="number" min="2" value="4"></label>
+      <button id="randomize" type="button">Randomize</button>
       <button id="run" data-idle-label="Solve Assignment">Solve Assignment</button>
     </div>
+    <ul class="example-notes">
+      <li>Workers are green nodes and tasks are red nodes.</li>
+      <li>This is the linear assignment problem, commonly associated with the Hungarian algorithm.</li>
+      <li>Every worker can be matched to one task with a different cost.</li>
+      <li>Use Size and Randomize to generate a new square worker-task cost matrix.</li>
+      <li>The solver chooses one task per worker while minimizing total assignment cost.</li>
+      <li>After solving, selected matches are emphasized in the cost matrix.</li>
+    </ul>
+    <svg id="assignment-graph" viewBox="0 0 960 520" role="img" aria-label="Assignment graph"></svg>
     <div id="solution-output">Run the solver to view the assignment.</div>
     <p>Status:</p>
     <pre id="status"></pre>

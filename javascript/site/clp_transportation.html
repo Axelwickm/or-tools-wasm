@@ -7,6 +7,109 @@
     <style>
       #solution-output { margin: 0.75rem 0; }
       #status { min-height: 8rem; }
+      .transport-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 900px);
+        gap: 0.75rem;
+        margin: 1rem 0;
+        align-items: start;
+      }
+      .transport-viz {
+        max-width: 900px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #ffffff;
+        overflow: hidden;
+      }
+      .transport-viz svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .transport-node rect {
+        fill: #f6f8fa;
+        stroke: #8c959f;
+        transition: stroke-width 160ms ease, filter 160ms ease;
+      }
+      .transport-node.plant rect {
+        fill: #eef6ff;
+        stroke: #0969da;
+      }
+      .transport-node.warehouse rect {
+        fill: #fff8c5;
+        stroke: #9a6700;
+      }
+      .transport-node text {
+        font-size: 14px;
+        fill: #24292f;
+      }
+      .transport-node .metric {
+        font-size: 12px;
+        fill: #57606a;
+      }
+      .transport-node {
+        cursor: pointer;
+      }
+      .transport-node.highlight rect {
+        stroke-width: 3;
+        filter: drop-shadow(0 2px 5px rgba(36, 41, 47, 0.18));
+      }
+      .transport-viz.has-focus .transport-node:not(.highlight) {
+        opacity: 0.38;
+      }
+      .transport-lane {
+        fill: none;
+        stroke-linecap: round;
+        cursor: pointer;
+        transition: stroke-width 180ms ease, opacity 180ms ease, filter 180ms ease;
+      }
+      .transport-lane.unsolved {
+        stroke: #8c959f;
+        opacity: 0.22;
+        stroke-width: 2;
+      }
+      .transport-lane.zero {
+        opacity: 0.08;
+        stroke-width: 1.5;
+      }
+      .transport-lane.highlight {
+        opacity: 1;
+        filter: drop-shadow(0 2px 4px rgba(36, 41, 47, 0.22));
+      }
+      .transport-viz.has-focus .transport-lane:not(.highlight) {
+        opacity: 0.08;
+      }
+      .transport-lane-label {
+        font-size: 11px;
+        fill: #57606a;
+        paint-order: stroke;
+        stroke: #ffffff;
+        stroke-width: 3px;
+        pointer-events: none;
+      }
+      .transport-explanation {
+        max-width: 900px;
+        margin: 1rem 0;
+      }
+      .transport-explanation ul {
+        margin-top: 0.35rem;
+        margin-bottom: 0;
+        padding-left: 1.25rem;
+      }
+      .transport-detail {
+        color: #57606a;
+        margin: 0;
+      }
+      .transport-editor {
+        max-width: 900px;
+        margin: 1rem 0;
+      }
+      .transport-editor table input {
+        width: 5.5rem;
+      }
+      .transport-editor .name-input {
+        width: 7rem;
+      }
     </style>
   </head>
   <body>
@@ -25,6 +128,7 @@ setWorkerBridgeEnabled(true);
 await initMPSolver();
 const solver = MPSolver.CreateSolver('CLP');
 if (!solver) throw new Error('CLP is unavailable');
+solver.SetNumThreads(4);
 
 const plants = [
   { name: 'Detroit', supply: 350 },
@@ -75,9 +179,28 @@ console.log(objective.Value());</code></pre>
       while meeting demand at minimum cost with the COIN-OR CLP backend.
     </p>
     <div class="controls">
-      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve transportation LP">Solve transportation LP</button>
+      <button id="reset" type="button">Reset data</button>
+    </div>
+    <div class="transport-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Each plant can ship up to its supply limit.</li>
+        <li>Each warehouse must receive exactly its demand.</li>
+        <li>Every plant-to-warehouse lane has a per-unit shipping cost.</li>
+        <li>CLP chooses continuous shipment quantities that minimize total cost.</li>
+        <li>After solving, thicker lanes carry more product.</li>
+      </ul>
+    </div>
+    <div class="transport-layout">
+      <div id="transport-viz" class="transport-viz" aria-label="Transportation network visualization"></div>
+      <p id="transport-detail" class="transport-detail">Hover a plant, warehouse, or lane to inspect it.</p>
+    </div>
+    <div class="transport-editor">
+      <h2>Problem Data</h2>
+      <div id="transport-editor"></div>
     </div>
     <div id="solution-output">Run the solver to view shipment quantities and total cost.</div>
     <p>Status / Response:</p>

@@ -5,6 +5,131 @@
     <title>GLOP - Stigler Diet</title>
     <link rel="stylesheet" href="./example.css">
     <style>
+      .example-notes {
+        max-width: 56rem;
+      }
+      .diet-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+        gap: 0.75rem;
+        max-width: 960px;
+        margin: 1rem 0;
+      }
+      .diet-summary div,
+      .food-card,
+      .receipt-card,
+      .nutrient-card {
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #fff;
+      }
+      .diet-summary div {
+        padding: 0.65rem 0.75rem;
+      }
+      .diet-summary strong {
+        display: block;
+        font-size: 1.25rem;
+      }
+      .diet-summary span,
+      .food-card small,
+      .receipt-card small,
+      .nutrient-card small {
+        color: #57606a;
+      }
+      .diet-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 28rem);
+        gap: 1rem;
+        align-items: start;
+      }
+      .food-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: 0.75rem;
+      }
+      .food-card {
+        padding: 0.65rem 0.75rem;
+        border-left: 5px solid var(--food-color);
+        transition: opacity 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+      }
+      .food-card.selected {
+        box-shadow: 0 0 0 2px var(--food-color);
+      }
+      .food-card.dimmed {
+        opacity: 0.34;
+      }
+      .food-card h3,
+      .receipt-card h3 {
+        font-size: 1rem;
+        margin: 0 0 0.25rem;
+      }
+      .category-icon {
+        display: inline-block;
+        width: 1.4rem;
+        text-align: center;
+      }
+      .food-editor {
+        margin-top: 0.55rem;
+      }
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+        gap: 0.45rem;
+        margin-top: 0.45rem;
+      }
+      .field-grid label {
+        display: grid;
+        gap: 0.2rem;
+        font-size: 0.85rem;
+      }
+      .field-grid input {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .food-actions {
+        display: flex;
+        gap: 0.45rem;
+        margin-top: 0.55rem;
+        flex-wrap: wrap;
+      }
+      .nutrient-panel {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .nutrient-card,
+      .receipt-card {
+        padding: 0.65rem 0.75rem;
+      }
+      .nutrient-row {
+        display: grid;
+        gap: 0.25rem;
+        margin: 0.55rem 0;
+      }
+      .nutrient-row label {
+        display: grid;
+        grid-template-columns: 1fr 5rem;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .bar-track {
+        height: 0.55rem;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #eaeef2;
+      }
+      .bar-fill {
+        height: 100%;
+        width: var(--fill);
+        max-width: 100%;
+        border-radius: inherit;
+        background: var(--bar-color, #0969da);
+      }
+      .receipt-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+      }
       #solution-output { margin: 0.75rem 0; }
       #status { min-height: 8rem; }
     </style>
@@ -24,6 +149,7 @@
 setWorkerBridgeEnabled(true);
 await initMPSolver();
 const solver = MPSolver.CreateSolver('GLOP');
+solver.SetNumThreads(4);
 
 const nutrients = [
   { name: 'Calories (kcal)', minimum: 3 },
@@ -53,15 +179,37 @@ objective.SetMinimization();
 await solver.Solve();</code></pre>
       </details>
     </div>
-    <p>
-      Direct port of <code>ortools/linear_solver/samples/stigler_diet.py</code>,
-      a continuous diet LP with many foods and nutrient lower bounds.
-    </p>
+    <ul class="example-notes">
+      <li>This is a continuous linear program: foods can be bought in fractional daily units.</li>
+      <li>The objective is to minimize annual food cost.</li>
+      <li>Each nutrient is a lower-bound constraint that the selected food mix must satisfy.</li>
+      <li>Expand any food card to edit its label, unit, color, and nutrient contributions.</li>
+      <li>Change the nutrient requirement inputs to make the diet easier, harder, or impossible.</li>
+      <li>The result is a mathematically cheap diet, not a realistic meal plan.</li>
+    </ul>
     <div class="controls">
-      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve diet">Solve diet</button>
+      <button id="clear-solution" type="button">Clear solution</button>
+      <button id="add-food" type="button">Add food</button>
+      <button id="clear-foods" type="button">Clear foods</button>
+      <button id="reset-foods" type="button">Reset foods</button>
     </div>
+    <div id="diet-summary" class="diet-summary"></div>
+    <div class="diet-layout">
+      <section>
+        <h2>Food Catalog</h2>
+        <div id="food-catalog" class="food-grid"></div>
+      </section>
+      <section class="nutrient-panel">
+        <div>
+          <h2>Nutrient Requirements</h2>
+          <div id="nutrient-gauges"></div>
+        </div>
+      </section>
+    </div>
+    <h2>Receipt</h2>
     <div id="solution-output">Run the solver to view the annual diet cost and selected foods.</div>
     <p>Status / Response:</p>
     <pre id="status"></pre>

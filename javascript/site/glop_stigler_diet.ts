@@ -1,10 +1,19 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
-import { appendStatus, configureWorkerBridge, formatNumber, setRunning } from './mp_solver_helpers.js';
+import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import {
+  appendStatus,
+  applySolverThreads,
+  configureSolverThreadsInput,
+  configureWorkerBridge,
+  formatNumber,
+  getSelectedSolverThreads,
+  setRunning,
+} from './mp_solver_helpers.js';
+import { getMaxWorkerCount } from './worker_limits.js';
 
 type Nutrient = { name: string; minimum: number };
-type Food = { name: string; unit: string; nutrients: number[] };
+type Food = { name: string; unit: string; nutrients: number[]; color?: string };
 
-const nutrients: Nutrient[] = [
+const defaultNutrients: Nutrient[] = [
   { name: 'Calories (kcal)', minimum: 3 },
   { name: 'Protein (g)', minimum: 70 },
   { name: 'Calcium (g)', minimum: 0.8 },
@@ -16,7 +25,7 @@ const nutrients: Nutrient[] = [
   { name: 'Vitamin C (mg)', minimum: 75 },
 ];
 
-const data: Food[] = [
+const defaultData: Food[] = [
   { name: 'Wheat Flour (Enriched)', unit: '10 lb.', nutrients: [44.7, 1411, 2, 365, 0, 55.4, 33.3, 441, 0] },
   { name: 'Macaroni', unit: '1 lb.', nutrients: [11.6, 418, 0.7, 54, 0, 3.2, 1.9, 68, 0] },
   { name: 'Wheat Cereal (Enriched)', unit: '28 oz.', nutrients: [11.8, 377, 14.4, 175, 0, 14.4, 8.8, 114, 0] },
@@ -96,13 +105,173 @@ const data: Food[] = [
   { name: 'Strawberry Preserves', unit: '1 lb.', nutrients: [6.4, 11, 0.4, 7, 0.2, 0.2, 0.4, 3, 0] },
 ];
 
+const cloneNutrient = (nutrient: Nutrient): Nutrient => ({ ...nutrient });
+const cloneFood = (food: Food): Food => ({ ...food, nutrients: [...food.nutrients] });
+
+let nutrients: Nutrient[] = defaultNutrients.map(cloneNutrient);
+let data: Food[] = defaultData.map(cloneFood);
+
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const workerInput = document.getElementById('workers') as HTMLInputElement | null;
+const dietSummary = document.getElementById('diet-summary');
+const foodCatalog = document.getElementById('food-catalog');
+const nutrientGauges = document.getElementById('nutrient-gauges');
+const clearSolutionButton = document.getElementById('clear-solution') as HTMLButtonElement | null;
+const addFoodButton = document.getElementById('add-food') as HTMLButtonElement | null;
+const clearFoodsButton = document.getElementById('clear-foods') as HTMLButtonElement | null;
+const resetFoodsButton = document.getElementById('reset-foods') as HTMLButtonElement | null;
 const solverId = document.body.dataset.solverId === 'CLP' ? 'CLP' : 'GLOP';
+const maxWorkerCount = getMaxWorkerCount();
 
 configureWorkerBridge(workerBridgeToggle);
+configureSolverThreadsInput(workerInput, maxWorkerCount);
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const normalizeFoodNutrients = (food: Food) => {
+  while (food.nutrients.length < nutrients.length) food.nutrients.push(0);
+  if (food.nutrients.length > nutrients.length) food.nutrients.length = nutrients.length;
+};
+
+const categoryForFood = (food: Food) => {
+  const name = food.name.toLowerCase();
+  let category = { label: 'Grain', icon: 'G', color: '#8250df' };
+  if (/(milk|cheese|cream|butter)/.test(name)) category = { label: 'Dairy', icon: 'D', color: '#0969da' };
+  if (/(steak|roast|lamb|pork|bacon|ham|chicken|veal|salmon|eggs|liver)/.test(name)) category = { label: 'Protein', icon: 'P', color: '#cf222e' };
+  if (/(apples|bananas|lemons|oranges|beans|cabbage|carrots|celery|lettuce|onions|potatoes|spinach|tomatoes|peas|asparagus|corn)/.test(name)) category = { label: 'Produce', icon: 'V', color: '#1a7f37' };
+  if (/(coffee|tea|cocoa|chocolate|sugar|syrup|molasses|preserves|cake)/.test(name)) category = { label: 'Pantry', icon: 'S', color: '#bf8700' };
+  return { ...category, color: food.color ?? category.color };
+};
+
+const selectedFoodMap = (selectedFoods: Array<{ food: Food; dailyUnits: number }>) =>
+  new Map(selectedFoods.map((entry) => [entry.food, entry.dailyUnits]));
+
+function renderSummary(
+  annualCost: number | null,
+  selectedFoods: Array<{ food: Food; dailyUnits: number }> = [],
+  nutrientTotals: number[] = Array(nutrients.length).fill(0),
+) {
+  if (!dietSummary) return;
+  const satisfied = nutrientTotals.filter((total, index) => total + 1e-8 >= nutrients[index].minimum).length;
+  const hasSolution = annualCost !== null;
+  dietSummary.innerHTML = `
+    <div><strong>${annualCost === null ? '--' : `$${formatNumber(annualCost)}`}</strong><span>annual cost</span></div>
+    <div><strong>${selectedFoods.length || '--'}</strong><span>selected foods</span></div>
+    <div><strong>${hasSolution ? `${satisfied}/${nutrients.length}` : '--'}</strong><span>nutrients satisfied</span></div>
+    <div><strong>${data.length}</strong><span>foods available</span></div>
+  `;
+}
+
+function renderFoodCatalog(selectedFoods: Array<{ food: Food; dailyUnits: number }> = []) {
+  if (!foodCatalog) return;
+  if (!data.length) {
+    foodCatalog.innerHTML = '<p><small>No foods available. Add a food before solving.</small></p>';
+    return;
+  }
+  const selected = selectedFoodMap(selectedFoods);
+  foodCatalog.innerHTML = data.map((food, foodIndex) => {
+    normalizeFoodNutrients(food);
+    const category = categoryForFood(food);
+    const dailyUnits = selected.get(food) ?? 0;
+    const chosen = dailyUnits > 1e-8;
+    const topNutrients = food.nutrients
+      .map((amount, index) => ({ amount, nutrient: nutrients[index] }))
+      .sort((a, b) => b.amount / Math.max(b.nutrient.minimum, 1e-9) - a.amount / Math.max(a.nutrient.minimum, 1e-9))
+      .slice(0, 2)
+      .map(({ nutrient }) => nutrient.name.split(' ')[0])
+      .join(', ');
+    return `
+      <section class="food-card ${chosen ? 'selected' : selectedFoods.length ? 'dimmed' : ''}" style="--food-color: ${category.color}" title="${escapeHtml(food.name)}: ${category.label}, unit ${escapeHtml(food.unit)}${chosen ? `, ${formatNumber(dailyUnits)} units/day` : ''}">
+        <h3><span class="category-icon">${category.icon}</span>${escapeHtml(food.name)}</h3>
+        <small>${category.label} · ${escapeHtml(food.unit)}</small>
+        <small>${topNutrients ? `strong: ${topNutrients}` : 'no major nutrient contribution'}</small>
+        ${chosen ? `<strong>$${formatNumber(365 * dailyUnits)}</strong><small>${formatNumber(dailyUnits)} units/day</small>` : ''}
+        <details class="food-editor">
+          <summary>Edit food</summary>
+          <div class="field-grid">
+            <label>Name <input data-food-index="${foodIndex}" data-food-field="name" value="${escapeHtml(food.name)}"></label>
+            <label>Unit <input data-food-index="${foodIndex}" data-food-field="unit" value="${escapeHtml(food.unit)}"></label>
+            <label>Color <input type="color" data-food-index="${foodIndex}" data-food-field="color" value="${category.color}"></label>
+          </div>
+          <div class="field-grid">
+            ${nutrients.map((nutrient, nutrientIndex) => `
+              <label>${escapeHtml(nutrient.name.split(' ')[0])}
+                <input type="number" min="0" step="any" data-food-index="${foodIndex}" data-nutrient-index="${nutrientIndex}" value="${food.nutrients[nutrientIndex] ?? 0}">
+              </label>
+            `).join('')}
+          </div>
+          <div class="food-actions">
+            <button type="button" data-remove-food="${foodIndex}">Remove food</button>
+          </div>
+        </details>
+      </section>
+    `;
+  }).join('');
+}
+
+function renderNutrientGauges(nutrientTotals: number[] = Array(nutrients.length).fill(0)) {
+  if (!nutrientGauges) return;
+  nutrientGauges.innerHTML = `
+    <div class="nutrient-card">
+      ${nutrients.map((nutrient, index) => {
+        const total = nutrientTotals[index] ?? 0;
+        const ratio = nutrient.minimum > 0 ? total / nutrient.minimum : 1;
+        const fill = Math.max(0, Math.min(100, ratio * 100));
+        const satisfied = total + 1e-8 >= nutrient.minimum;
+        return `
+          <div class="nutrient-row">
+            <label>
+              <strong>${escapeHtml(nutrient.name)}</strong>
+              <input type="number" min="0" step="any" data-nutrient-min="${index}" value="${nutrient.minimum}">
+            </label>
+            <small>${formatNumber(total)} / ${formatNumber(nutrient.minimum)} minimum</small>
+            <div class="bar-track">
+              <div class="bar-fill" style="--fill: ${fill}%; --bar-color: ${satisfied ? '#1a7f37' : '#bf8700'}"></div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderReceipt(
+  selectedFoods: Array<{ food: Food; dailyUnits: number }>,
+  wallTime: number,
+  iterations: number,
+  solverThreadSummary: string,
+) {
+  if (!solutionOutput) return;
+  if (!selectedFoods.length) {
+    solutionOutput.textContent = 'Run the solver to view the annual diet cost and selected foods.';
+    return;
+  }
+  solutionOutput.innerHTML = `
+    <div class="receipt-grid">
+      ${selectedFoods.map(({ food, dailyUnits }) => {
+        const category = categoryForFood(food);
+        return `
+          <section class="receipt-card" style="border-left: 5px solid ${category.color}">
+            <h3>${escapeHtml(food.name)}</h3>
+            <small>${escapeHtml(food.unit)}</small>
+            <strong>$${formatNumber(365 * dailyUnits)} / year</strong>
+            <small>${formatNumber(dailyUnits)} units/day</small>
+          </section>
+        `;
+      }).join('')}
+    </div>
+    <p><small>Wall time ${wallTime} ms · ${iterations} simplex iterations · ${solverThreadSummary}</small></p>
+  `;
+}
 
 function renderDietResult(
   annualCost: number,
@@ -110,45 +279,43 @@ function renderDietResult(
   nutrientTotals: number[],
   wallTime: number,
   iterations: number,
+  solverThreadSummary: string,
 ) {
-  if (!solutionOutput) return;
-  solutionOutput.innerHTML = `
-    <table>
-      <tbody>
-        <tr><th>Annual cost</th><td>$${formatNumber(annualCost)}</td></tr>
-        <tr><th>Worker bridge</th><td>${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}</td></tr>
-        <tr><th>Solver workers</th><td>1</td></tr>
-        <tr><th>Selected foods</th><td>${selectedFoods.length}</td></tr>
-        <tr><th>Wall time</th><td>${wallTime} ms</td></tr>
-        <tr><th>Iterations</th><td>${iterations}</td></tr>
-      </tbody>
-    </table>
-    <h2>Annual Foods</h2>
-    <table>
-      <thead><tr><th>Food</th><th>Unit</th><th>Annual spend</th></tr></thead>
-      <tbody>
-        ${selectedFoods.map(({ food, dailyUnits }) => `<tr><td>${food.name}</td><td>${food.unit}</td><td>$${formatNumber(365 * dailyUnits)}</td></tr>`).join('')}
-      </tbody>
-    </table>
-    <h2>Nutrients Per Day</h2>
-    <table>
-      <thead><tr><th>Nutrient</th><th>Minimum</th><th>Result</th></tr></thead>
-      <tbody>
-        ${nutrients.map((nutrient, index) => `<tr><td>${nutrient.name}</td><td>${formatNumber(nutrient.minimum)}</td><td>${formatNumber(nutrientTotals[index])}</td></tr>`).join('')}
-      </tbody>
-    </table>
-  `;
+  renderSummary(annualCost, selectedFoods, nutrientTotals);
+  renderFoodCatalog(selectedFoods);
+  renderNutrientGauges(nutrientTotals);
+  renderReceipt(selectedFoods, wallTime, iterations, solverThreadSummary);
 }
+
+function resetSolvedView() {
+  renderSummary(null);
+  renderFoodCatalog();
+  renderNutrientGauges();
+  renderReceipt([], 0, 0, 'threads not applied');
+  if (statusEl) statusEl.textContent = '';
+}
+
+const numericInputValue = (input: HTMLInputElement, fallback = 0) => {
+  const value = Number(input.value);
+  return Number.isFinite(value) ? value : fallback;
+};
+
+const nonnegativeInputValue = (input: HTMLInputElement, fallback = 0) =>
+  Math.max(0, numericInputValue(input, fallback));
 
 async function runStiglerDiet() {
   setRunning(runButton, true);
   if (statusEl) statusEl.textContent = '';
   try {
+    if (!data.length) throw new Error('Add at least one food before solving.');
+    data.forEach(normalizeFoodNutrients);
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
     await initMPSolver();
     const solver = MPSolver.CreateSolver(solverId);
     if (!solver) throw new Error(`${solverId} is unavailable in this build.`);
     try {
+      const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
+      const threadConfig = applySolverThreads(solver, solverThreads);
       const foods: MPVariable[] = data.map((food) => solver.NumVar(0, solver.infinity(), food.name));
       for (const [nutrientIndex, nutrient] of nutrients.entries()) {
         const constraint = solver.Constraint(nutrient.minimum, solver.infinity(), nutrient.name);
@@ -163,7 +330,7 @@ async function runStiglerDiet() {
       }
       objective.SetMinimization();
 
-      appendStatus(statusEl, `Solving with ${solver.SolverVersion()}...`);
+      appendStatus(statusEl, `Solving with ${solver.SolverVersion()}, requested solver threads=${solverThreads}...`);
       const status = await solver.Solve();
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
 
@@ -179,7 +346,14 @@ async function runStiglerDiet() {
         }
       }
 
-      renderDietResult(365 * objective.Value(), selectedFoods, nutrientTotals, solver.WallTime(), solver.Iterations());
+      renderDietResult(
+        365 * objective.Value(),
+        selectedFoods,
+        nutrientTotals,
+        solver.WallTime(),
+        solver.Iterations(),
+        `threads ${threadConfig.requested}, accepted ${threadConfig.accepted ? 'yes' : 'no'}, active ${threadConfig.active}`,
+      );
       appendStatus(statusEl, `Objective: $${formatNumber(365 * objective.Value())} annual cost`);
       appendStatus(statusEl, `Variables: ${solver.NumVariables()}`);
       appendStatus(statusEl, `Constraints: ${solver.NumConstraints()}`);
@@ -197,3 +371,73 @@ async function runStiglerDiet() {
 runButton?.addEventListener('click', () => {
   void runStiglerDiet();
 });
+
+clearSolutionButton?.addEventListener('click', resetSolvedView);
+
+addFoodButton?.addEventListener('click', () => {
+  data.push({
+    name: `Custom Food ${data.length + 1}`,
+    unit: '1 unit',
+    nutrients: Array.from({ length: nutrients.length }, () => 0),
+    color: '#0969da',
+  });
+  resetSolvedView();
+});
+
+clearFoodsButton?.addEventListener('click', () => {
+  data = [];
+  resetSolvedView();
+});
+
+resetFoodsButton?.addEventListener('click', () => {
+  nutrients = defaultNutrients.map(cloneNutrient);
+  data = defaultData.map(cloneFood);
+  resetSolvedView();
+});
+
+foodCatalog?.addEventListener('change', (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const foodIndex = Number(input.dataset.foodIndex);
+  if (!Number.isInteger(foodIndex) || !data[foodIndex]) return;
+
+  const food = data[foodIndex];
+  const field = input.dataset.foodField;
+  if (field === 'name') {
+    food.name = input.value.trim() || `Food ${foodIndex + 1}`;
+  } else if (field === 'unit') {
+    food.unit = input.value.trim() || '1 unit';
+  } else if (field === 'color') {
+    food.color = input.value;
+  } else if (input.dataset.nutrientIndex !== undefined) {
+    const nutrientIndex = Number(input.dataset.nutrientIndex);
+    if (!Number.isInteger(nutrientIndex)) return;
+    normalizeFoodNutrients(food);
+    food.nutrients[nutrientIndex] = nonnegativeInputValue(input);
+  } else {
+    return;
+  }
+  resetSolvedView();
+});
+
+foodCatalog?.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('[data-remove-food]');
+  if (!button) return;
+  const foodIndex = Number(button.dataset.removeFood);
+  if (!Number.isInteger(foodIndex) || !data[foodIndex]) return;
+  data.splice(foodIndex, 1);
+  resetSolvedView();
+});
+
+nutrientGauges?.addEventListener('change', (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const nutrientIndex = Number(input.dataset.nutrientMin);
+  if (!Number.isInteger(nutrientIndex) || !nutrients[nutrientIndex]) return;
+  nutrients[nutrientIndex].minimum = nonnegativeInputValue(input, nutrients[nutrientIndex].minimum);
+  resetSolvedView();
+});
+
+resetSolvedView();

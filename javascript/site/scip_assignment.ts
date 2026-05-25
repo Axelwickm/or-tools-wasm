@@ -1,5 +1,14 @@
 import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, type MPVariable } from 'or-tools-wasm/mp-solver';
-import { appendStatus, configureWorkerBridge, formatNumber, setRunning } from './mp_solver_helpers.js';
+import {
+  appendStatus,
+  applySolverThreads,
+  configureSolverThreadsInput,
+  configureWorkerBridge,
+  formatNumber,
+  getSelectedSolverThreads,
+  setRunning,
+} from './mp_solver_helpers.js';
+import { getMaxWorkerCount } from './worker_limits.js';
 
 const costs = [
   [90, 76, 75, 70, 50, 74, 12, 68],
@@ -19,9 +28,12 @@ const totalSizeMax = 15;
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+const maxWorkerCount = getMaxWorkerCount();
 
 configureWorkerBridge(workerBridgeToggle);
+configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 async function runAssignment() {
   setRunning(runButton, true);
@@ -34,6 +46,8 @@ async function runAssignment() {
     if (!solver) throw new Error('SCIP backend is unavailable');
 
     try {
+      const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
+      const threadConfig = applySolverThreads(solver, solverThreads);
       const numWorkers = costs.length;
       const numTasks = costs[0].length;
       const x: MPVariable[][] = [];
@@ -66,7 +80,7 @@ async function runAssignment() {
       }
       objective.SetMinimization();
 
-      appendStatus(statusEl, 'Solving assignment MIP with SCIP...');
+      appendStatus(statusEl, `Solving assignment MIP with SCIP, requested solver threads=${solverThreads}...`);
       const status = await solver.Solve();
       if (status !== MPSolver.OPTIMAL && status !== MPSolver.FEASIBLE) {
         throw new Error(`expected OPTIMAL or FEASIBLE, got ${status}`);
@@ -87,6 +101,9 @@ async function runAssignment() {
             <tbody>
               <tr><th>Status</th><td>${status === MPSolver.OPTIMAL ? 'OPTIMAL' : 'FEASIBLE'}</td></tr>
               <tr><th>Worker bridge</th><td>${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}</td></tr>
+              <tr><th>Requested solver threads</th><td>${threadConfig.requested}</td></tr>
+              <tr><th>Thread request accepted</th><td>${threadConfig.accepted ? 'yes' : 'no'}</td></tr>
+              <tr><th>Active solver threads</th><td>${threadConfig.active}</td></tr>
               <tr><th>Total cost</th><td>${formatNumber(objective.Value())}</td></tr>
               <tr><th>Variables</th><td>${solver.NumVariables()}</td></tr>
               <tr><th>Constraints</th><td>${solver.NumConstraints()}</td></tr>

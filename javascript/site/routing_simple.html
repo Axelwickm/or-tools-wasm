@@ -5,7 +5,34 @@
 		<title>Routing - Simple Routing</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
-			#route-output { margin: 0.75rem 0; }
+			.example-notes {
+				max-width: 56rem;
+			}
+			.route-visual-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 960px) minmax(14rem, 22rem);
+				gap: 1rem;
+				align-items: start;
+				margin: 1rem 0;
+			}
+			#route-map {
+				display: block;
+				width: 100%;
+				max-width: 960px;
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				background: #f6f8fa;
+			}
+			.route-panel {
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				padding: 0.75rem;
+				background: #fff;
+			}
+			.route-panel h2 {
+				margin-top: 0;
+			}
+			#route-output { margin: 0.75rem 0 0; }
 			#status { min-height: 9rem; }
 		</style>
 	</head>
@@ -20,7 +47,6 @@
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import {
-  CpSat,
   DefaultRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
@@ -32,11 +58,21 @@
 setWorkerBridgeEnabled(true);
 await initRouting();
 
-const manager = new RoutingIndexManager(5, 1, 0);
+const locations = [
+  { x: 480, y: 310 },
+  ...Array.from({ length: 20 }, () =&gt; ({
+    x: 52 + Math.random() * 856,
+    y: 52 + Math.random() * 516,
+  })),
+];
+
+const manager = new RoutingIndexManager(locations.length, 1, 0);
 const routing = new RoutingModel(manager);
-const transit = routing.RegisterTransitCallback((from, to) =&gt;
-  Math.abs(manager.IndexToNode(to) - manager.IndexToNode(from)),
-);
+const transit = routing.RegisterTransitCallback((from, to) =&gt; {
+  const a = locations[manager.IndexToNode(from)];
+  const b = locations[manager.IndexToNode(to)];
+  return Math.round(Math.hypot(a.x - b.x, a.y - b.y));
+});
 routing.SetArcCostEvaluatorOfAllVehicles(transit);
 
 const params = DefaultRoutingSearchParameters();
@@ -44,12 +80,26 @@ params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 const assignment = await routing.SolveWithParameters(params);</code></pre>
 			</details>
 		</div>
-		<p>This adapts <code>simple_routing_program.py</code>: one vehicle visits five locations and minimizes arc distance.</p>
+		<ul class="example-notes">
+			<li>One vehicle starts and ends at the depot.</li>
+			<li>Every customer location must be visited exactly once.</li>
+			<li>The travel cost is the straight-line distance between two locations.</li>
+			<li>Before solving, the map shows the locations without a chosen route.</li>
+			<li>After solving, the route line shows the visit order and return to the depot.</li>
+		</ul>
 		<div class="controls">
 			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<label>Destinations <input id="node-count" class="short-number" type="number" min="3" value="20"></label>
+			<button id="randomize" type="button">Randomize</button>
 			<button id="run">Solve route</button>
 		</div>
-		<div id="route-output">Run the solver to view the route.</div>
+		<div class="route-visual-layout">
+			<svg id="route-map" viewBox="0 0 960 620" role="img" aria-label="Simple routing map"></svg>
+			<section class="route-panel">
+				<h2>Route</h2>
+				<div id="route-output">Run the solver to view the route.</div>
+			</section>
+		</div>
 		<p>Status / Response:</p>
 		<pre id="status"></pre>
 

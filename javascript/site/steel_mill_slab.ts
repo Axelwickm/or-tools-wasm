@@ -283,13 +283,14 @@ const statusEl = document.getElementById('status') as HTMLPreElement | null;
 const summaryEl = document.getElementById('summary') as HTMLElement | null;
 const readyIndicator = document.getElementById('ready-indicator') as HTMLElement | null;
 const slabTable = document.getElementById('slab-table') as HTMLTableElement | null;
+const slabDrawing = document.getElementById('slab-drawing') as SVGSVGElement | null;
+const orderDrawing = document.getElementById('order-drawing') as HTMLElement | null;
 const solverSelect = document.getElementById('solver-method') as HTMLSelectElement | null;
 const problemSelect = document.getElementById('problem-id') as HTMLSelectElement | null;
 const breakSymCheckbox = document.getElementById('break-symmetries') as HTMLInputElement | null;
 const workersInput = document.getElementById('workers') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
-const paramsInput = document.getElementById('params') as HTMLInputElement | null;
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
@@ -332,30 +333,6 @@ if (workersInput) {
 }
 
 const shouldUseWorkerBridge = () => Boolean(workerBridgeToggle?.checked);
-
-const toCamelCase = (value: string) =>
-  value.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-
-const parseParamsInput = (text: string | null): Record<string, unknown> => {
-  if (!text) return {};
-  return text
-    .split(',')
-    .map((token) => token.trim())
-    .filter(Boolean)
-    .reduce<Record<string, unknown>>((params, pair) => {
-      const [key, value] = pair.split(':').map((part) => part.trim());
-      if (!key || value === undefined) return params;
-      const normalizedKey = toCamelCase(key);
-      if (/^(true|false)$/i.test(value)) {
-        params[normalizedKey] = value.toLowerCase() === 'true';
-      } else if (!Number.isNaN(Number(value))) {
-        params[normalizedKey] = Number(value);
-      } else {
-        params[normalizedKey] = value;
-      }
-      return params;
-    }, {});
-};
 
 const createProblemSelector = () => {
   if (!problemSelect) return;
@@ -818,6 +795,179 @@ type SlabRow = {
   colors: string;
 };
 
+type DrawOrder = {
+  id: number;
+  width: number;
+  color: number;
+};
+
+const orderColor = (color: number) => {
+  const hue = (color * 137.508) % 360;
+  return `hsl(${hue.toFixed(1)} 68% 42%)`;
+};
+
+const escapeXml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+const parseDrawOrders = (orders: string): DrawOrder[] => {
+  const parsed: DrawOrder[] = [];
+  const pattern = /#(\d+)\s+\(w(\d+),\s+c(\d+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(orders)) !== null) {
+    parsed.push({
+      id: Number(match[1]),
+      width: Number(match[2]),
+      color: Number(match[3]),
+    });
+  }
+  return parsed;
+};
+
+const clearOrderHover = () => {
+  slabDrawing?.classList.remove('has-hover');
+  orderDrawing?.querySelector('.order-grid')?.classList.remove('has-hover');
+  document.querySelectorAll('[data-order-id].is-hovered').forEach((el) => {
+    el.classList.remove('is-hovered');
+  });
+};
+
+const setOrderHover = (orderId: number | null) => {
+  clearOrderHover();
+  if (orderId === null) return;
+  slabDrawing?.classList.add('has-hover');
+  orderDrawing?.querySelector('.order-grid')?.classList.add('has-hover');
+  document.querySelectorAll(`[data-order-id="${orderId}"]`).forEach((el) => {
+    el.classList.add('is-hovered');
+  });
+};
+
+const bindOrderHover = (element: Element | null) => {
+  if (!element) return;
+  element.querySelectorAll('[data-order-id]').forEach((target) => {
+    target.addEventListener('mouseenter', () => {
+      setOrderHover(Number(target.getAttribute('data-order-id')));
+    });
+    target.addEventListener('mouseleave', () => {
+      setOrderHover(null);
+    });
+  });
+};
+
+const renderSlabDrawing = (rows: SlabRow[]) => {
+  if (!slabDrawing) return;
+  const visibleRows = rows.filter((row) => row.load > 0);
+  if (visibleRows.length === 0) {
+    slabDrawing.classList.add('hidden');
+    slabDrawing.innerHTML = '';
+    return;
+  }
+
+  const drawingWidth = 980;
+  const left = 110;
+  const top = 42;
+  const slabWidth = 720;
+  const slabHeight = 28;
+  const depthX = 24;
+  const depthY = 14;
+  const rowGap = 74;
+  const maxCapacity = Math.max(...visibleRows.map((row) => row.load + row.loss), 1);
+  const height = top + visibleRows.length * rowGap + 26;
+  const defs = `
+    <defs>
+      <pattern id="waste-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="8" height="8" fill="#f6f8fa"></rect>
+        <line x1="0" y1="0" x2="0" y2="8" stroke="#8c959f" stroke-width="2"></line>
+      </pattern>
+      <filter id="slab-shadow" x="-10%" y="-20%" width="130%" height="150%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#57606a" flood-opacity="0.25"></feDropShadow>
+      </filter>
+    </defs>
+  `;
+  const body = visibleRows.map((row, rowIndex) => {
+    const y = top + rowIndex * rowGap;
+    const capacity = Math.max(row.load + row.loss, 1);
+    const scale = slabWidth / maxCapacity;
+    let x = left;
+    const orders = parseDrawOrders(row.orders);
+    const orderRects = orders.map((order) => {
+      const width = Math.max(2, order.width * scale);
+      const fill = orderColor(order.color);
+      const label = width > 26 ? `#${order.id}` : '';
+      const rect = `
+        <g class="order-segment" data-order-id="${order.id}">
+          <title>Order #${order.id}: width ${order.width}, color ${order.color}</title>
+          <polygon points="${x},${y} ${x + depthX},${y - depthY} ${x + width + depthX},${y - depthY} ${x + width},${y}" fill="${fill}" opacity="0.72" stroke="#24292f" stroke-opacity="0.14"></polygon>
+          <rect x="${x}" y="${y}" width="${width}" height="${slabHeight}" fill="${fill}" stroke="#24292f" stroke-opacity="0.22"></rect>
+          <text x="${x + width / 2}" y="${y + 18}" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">${label}</text>
+        </g>
+      `;
+      x += width;
+      return rect;
+    }).join('');
+    const loadWidth = row.load * scale;
+    const capacityWidth = capacity * scale;
+    const wasteWidth = Math.max(0, row.loss * scale);
+    const waste = wasteWidth > 0 ? `
+      <g>
+        <title>Waste/loss ${row.loss}</title>
+        <polygon points="${left + loadWidth},${y} ${left + loadWidth + depthX},${y - depthY} ${left + capacityWidth + depthX},${y - depthY} ${left + capacityWidth},${y}" fill="#d0d7de" opacity="0.7" stroke="#8c959f"></polygon>
+        <rect x="${left + loadWidth}" y="${y}" width="${wasteWidth}" height="${slabHeight}" fill="url(#waste-hatch)" stroke="#8c959f"></rect>
+      </g>
+    ` : '';
+    return `
+      <g filter="url(#slab-shadow)">
+        <text x="16" y="${y + 18}" font-size="13" fill="#24292f" font-weight="700">${escapeXml(row.slabLabel)}</text>
+        <polygon points="${left},${y} ${left + depthX},${y - depthY} ${left + capacityWidth + depthX},${y - depthY} ${left + capacityWidth},${y}" fill="#eaeef2" stroke="#8c959f"></polygon>
+        <polygon points="${left + capacityWidth},${y} ${left + capacityWidth + depthX},${y - depthY} ${left + capacityWidth + depthX},${y + slabHeight - depthY} ${left + capacityWidth},${y + slabHeight}" fill="#d0d7de" stroke="#8c959f"></polygon>
+        <rect x="${left}" y="${y}" width="${capacityWidth}" height="${slabHeight}" fill="#fff" stroke="#57606a" stroke-width="1.5"></rect>
+        ${orderRects}
+        ${waste}
+        <rect x="${left}" y="${y}" width="${capacityWidth}" height="${slabHeight}" fill="none" stroke="#24292f" stroke-width="1.5"></rect>
+        <text x="${left}" y="${y + slabHeight + 20}" font-size="12" fill="#57606a">load ${row.load} / size ${capacity}, loss ${row.loss}, color groups ${escapeXml(row.colors)}</text>
+      </g>
+    `;
+  }).join('');
+
+  slabDrawing.setAttribute('viewBox', `0 0 ${drawingWidth} ${height}`);
+  slabDrawing.setAttribute('width', String(drawingWidth));
+  slabDrawing.setAttribute('height', String(height));
+  slabDrawing.classList.remove('hidden');
+  slabDrawing.innerHTML = `${defs}${body}`;
+  bindOrderHover(slabDrawing);
+};
+
+const renderOrderDrawing = (problem: ProblemData, rows: SlabRow[]) => {
+  if (!orderDrawing) return;
+  const maxWidth = Math.max(...problem.orders.map((order) => order.width), 1);
+  const assignmentByOrder = new Map<number, string>();
+  rows.forEach((row) => {
+    parseDrawOrders(row.orders).forEach((order) => {
+      assignmentByOrder.set(order.id, row.slabLabel);
+    });
+  });
+  const cards = problem.orders.map((order, orderId) => {
+    const fill = orderColor(order.color);
+    const barWidth = Math.max(8, (order.width / maxWidth) * 100);
+    const assignedTo = assignmentByOrder.get(orderId) ?? 'unassigned';
+    return `
+      <div class="order-card" data-order-id="${orderId}" style="--order-color: ${fill}">
+        <strong>#${orderId}</strong>
+        <small><span class="order-swatch"></span>color group ${order.color}</small>
+        <small>width ${order.width}</small>
+        <small>${escapeXml(assignedTo)}</small>
+        <div class="order-width" style="width: ${barWidth}%"></div>
+      </div>
+    `;
+  }).join('');
+  orderDrawing.innerHTML = `<div class="order-grid">${cards}</div>`;
+  orderDrawing.classList.remove('hidden');
+  bindOrderHover(orderDrawing);
+};
+
 const renderTable = (rows: SlabRow[]) => {
   if (!slabTable) return;
   slabTable.innerHTML = '';
@@ -933,14 +1083,23 @@ const runExperiment = async () => {
     Math.max(1, Number.parseInt(workersInput?.value ?? '1', 10)),
     maxWorkerCount,
   );
-  const params = parseParamsInput(paramsInput?.value ?? '') ?? {};
-  params.logSearchProgress = true;
-  params.numSearchWorkers = workerCount;
-  delete params.numWorkers;
+  const params: Record<string, unknown> = {
+    logSearchProgress: true,
+    maxTimeInSeconds: 10,
+    numSearchWorkers: workerCount,
+  };
 
   resetStatus();
   if (summaryEl) {
     summaryEl.textContent = 'Running…';
+  }
+  if (slabDrawing) {
+    slabDrawing.classList.add('hidden');
+    slabDrawing.innerHTML = '';
+  }
+  if (orderDrawing) {
+    orderDrawing.classList.add('hidden');
+    orderDrawing.innerHTML = '';
   }
   appendStatus(`Building ${solverMethod} model for problem ${problemId}…`);
   const problem = buildProblem(problemId);
@@ -985,8 +1144,12 @@ const runExperiment = async () => {
       }
 
       renderTable(rows);
+      renderSlabDrawing(rows);
+      renderOrderDrawing(bundle.metadata.problem, rows);
       if (summaryEl) {
-        summaryEl.textContent = `Solver ${bundle.metadata.solver} used ${rows.length} slabs.`;
+        const totalLoss = rows.reduce((sum, row) => sum + row.loss, 0);
+        summaryEl.textContent =
+          `Solver ${bundle.metadata.solver} used ${rows.length} slabs with total loss ${totalLoss}.`;
       }
     } catch (error) {
       const err = error as Error;

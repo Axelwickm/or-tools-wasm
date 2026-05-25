@@ -1,10 +1,22 @@
 import { initMPSolver, isWorkerBridgeEnabled, MPSolver } from 'or-tools-wasm/mp-solver';
-import { appendStatus, configureWorkerBridge, formatNumber, renderSimpleMpResult, setRunning } from './mp_solver_helpers.js';
+import {
+  appendStatus,
+  applySolverThreads,
+  configureSolverThreadsInput,
+  configureWorkerBridge,
+  formatNumber,
+  getSelectedSolverThreads,
+  renderSimpleMpResult,
+  setRunning,
+} from './mp_solver_helpers.js';
+import { getMaxWorkerCount } from './worker_limits.js';
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const workerInput = document.getElementById('workers') as HTMLInputElement | null;
+const maxWorkerCount = getMaxWorkerCount();
 const solverId = document.body.dataset.solverId === 'CLP'
   ? 'CLP'
   : document.body.dataset.solverId === 'GLPK_LP'
@@ -12,6 +24,7 @@ const solverId = document.body.dataset.solverId === 'CLP'
     : 'GLOP';
 
 configureWorkerBridge(workerBridgeToggle);
+configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 async function runSimpleGlop() {
   setRunning(runButton, true);
@@ -37,7 +50,9 @@ async function runSimpleGlop() {
       objective.SetCoefficient(y, 10);
       objective.SetMaximization();
 
-      appendStatus(statusEl, `Solving with ${solver.SolverVersion()}...`);
+      const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
+      const threadConfig = applySolverThreads(solver, solverThreads);
+      appendStatus(statusEl, `Solving with ${solver.SolverVersion()}, requested solver threads=${solverThreads}...`);
       const status = await solver.Solve();
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
 
@@ -52,6 +67,9 @@ async function runSimpleGlop() {
         iterations: solver.Iterations(),
         nodes: solver.nodes(),
         usedWorkerBridge: isWorkerBridgeEnabled(),
+        solverThreads: threadConfig.requested,
+        solverThreadsAccepted: threadConfig.accepted,
+        activeSolverThreads: threadConfig.active,
       });
       appendStatus(statusEl, `Objective: ${formatNumber(objective.Value())}`);
       appendStatus(statusEl, `x = ${formatNumber(x.solution_value())}`);

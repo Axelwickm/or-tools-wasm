@@ -5,6 +5,15 @@
     <title>Network Flow - Min Cost Flow</title>
     <link rel="stylesheet" href="./example.css">
     <style>
+      #flow-graph {
+        display: block;
+        width: 100%;
+        max-width: 960px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        margin: 1rem 0;
+      }
       #solution-output { margin: 0.75rem 0; }
       #status { min-height: 7rem; }
     </style>
@@ -52,10 +61,31 @@ if (status === SimpleMinCostFlow.OPTIMAL) {
 }</code></pre>
       </details>
     </div>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Supply nodes provide flow and demand nodes consume flow.</li>
+        <li>Transit nodes can pass flow along capacity-limited directed arcs.</li>
+        <li>Every arc has a per-unit cost and a maximum capacity.</li>
+        <li>The solver satisfies all demand at minimum total shipping cost.</li>
+        <li>After solving, arc labels show how much flow is sent on each chosen route.</li>
+      </ul>
+    </div>
     <div class="controls">
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Supply nodes <input id="supply-count" class="short-number" type="number" min="1" value="2"></label>
+      <label>Transit nodes <input id="transit-count" class="short-number" type="number" min="1" value="6"></label>
+      <label>Demand nodes <input id="demand-count" class="short-number" type="number" min="1" value="3"></label>
+      <button id="randomize" type="button">Randomize</button>
       <button id="run" data-idle-label="Solve Min-Cost Flow">Solve Min-Cost Flow</button>
     </div>
+    <ul class="example-notes">
+      <li>Green nodes supply flow and red nodes demand flow.</li>
+      <li>Each arc has a capacity and a unit shipping cost.</li>
+      <li>The solver routes flow to satisfy demand with minimum total cost.</li>
+      <li>After solving, blue arc thickness shows shipped flow.</li>
+    </ul>
+    <svg id="flow-graph" viewBox="0 0 960 620" role="img" aria-label="Min-cost flow network"></svg>
     <div id="solution-output">Run the solver to view the min-cost flow solution.</div>
     <p>Status:</p>
     <pre id="status"></pre>

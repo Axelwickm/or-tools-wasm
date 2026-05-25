@@ -18,6 +18,82 @@
 				font-weight: 600;
 				margin-bottom: 0.5rem;
 			}
+			#slab-drawing {
+				display: block;
+				max-width: 100%;
+				margin: 0.75rem 0;
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				background: #f6f8fa;
+			}
+			#slab-drawing.hidden {
+				display: none;
+			}
+			.solution-visuals {
+				display: grid;
+				grid-template-columns: minmax(0, 980px) minmax(18rem, 30rem);
+				gap: 1rem;
+				align-items: start;
+			}
+			#order-drawing.hidden {
+				display: none;
+			}
+			.order-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(6.75rem, 1fr));
+				gap: 0.5rem;
+				margin: 0.75rem 0;
+			}
+			.order-card {
+				border: 1px solid #d0d7de;
+				border-left: 0.45rem solid var(--order-color);
+				border-radius: 6px;
+				padding: 0.45rem 0.55rem;
+				background: #fff;
+				cursor: default;
+				transition: opacity 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+			}
+			.order-card strong {
+				display: block;
+			}
+			.order-card small {
+				display: block;
+				color: #57606a;
+			}
+			.order-swatch {
+				display: inline-block;
+				width: 0.7rem;
+				height: 0.7rem;
+				margin-right: 0.3rem;
+				border: 1px solid rgba(31, 35, 40, 0.22);
+				border-radius: 2px;
+				background: var(--order-color);
+				vertical-align: -0.08rem;
+			}
+			.order-width {
+				height: 0.4rem;
+				margin-top: 0.35rem;
+				border-radius: 999px;
+				background: var(--order-color);
+			}
+			.order-card.is-hovered {
+				box-shadow: 0 0 0 2px var(--order-color), 0 0.35rem 0.9rem rgba(31, 35, 40, 0.12);
+				transform: translateY(-1px);
+			}
+			.order-grid.has-hover .order-card:not(.is-hovered) {
+				opacity: 0.32;
+			}
+			#slab-drawing .order-segment {
+				transition: opacity 120ms ease;
+			}
+			#slab-drawing.has-hover .order-segment:not(.is-hovered) {
+				opacity: 0.25;
+			}
+			#slab-drawing .order-segment.is-hovered rect,
+			#slab-drawing .order-segment.is-hovered polygon {
+				stroke: #24292f;
+				stroke-width: 3;
+			}
 		</style>
 	</head>
 	<body>
@@ -26,7 +102,7 @@
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>CP-SAT - Steel Mill Slab</h1>
-		<p><em>Problem: assign steel orders to slabs while respecting slab capacities and color limits, minimizing wasted capacity.</em></p>
+		<p><em>Problem: pack steel orders onto large steel slabs while minimizing unused steel.</em></p>
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
@@ -110,10 +186,15 @@ const result = await CpSat.solve(model, params);
 console.log(result.response?.objectiveValue, result.response?.solution);</code></pre>
 			</details>
 		</div>
-		<p>This demo reimplements the <code>steel_mill_slab_sat.py</code>
-			sample entirely in TypeScript:
-			you can choose between three solution approaches (standard SAT, SAT with table constraints, and
-			column generation) and inspect the slab assignment returned by the WebAssembly module.</p>
+		<ul class="example-notes">
+			<li>A slab is a large steel blank that can be used to satisfy several orders.</li>
+			<li>Each order consumes some slab width and belongs to a color group.</li>
+			<li>Slabs come in fixed sizes; unused width on a chosen slab is loss.</li>
+			<li>Each slab may contain orders from at most two color groups.</li>
+			<li>The solver assigns every order to exactly one slab while minimizing wasted width.</li>
+			<li>The solver menu compares three CP-SAT formulations of the same packing problem.</li>
+			<li>The drawing shows each used slab as colored order segments plus hatched waste.</li>
+		</ul>
 		<div class="controls">
 			<div>
 				<label>
@@ -146,16 +227,14 @@ console.log(result.response?.objectiveValue, result.response?.solution);</code><
 				Use worker bridge</label>
 			</div>
 		</div>
-		<div class="spaced">
-			<label>
-				Solver parameters (comma-separated key:value pairs)
-				<input id="params" class="full-width" type="text" value="max_time_in_seconds:10,log_search_progress:true">
-			</label>
-		</div>
 		<button id="run">Run steel mill slab</button>
 		<button id="stop" disabled>Stop solving</button>
 		<h2 class="section-heading">Solution</h2>
 		<div id="summary">No solution yet.</div>
+		<div class="solution-visuals">
+			<svg id="slab-drawing" class="hidden" role="img" aria-label="Steel slab packing drawing"></svg>
+			<div id="order-drawing" class="hidden" aria-label="Steel order drawing"></div>
+		</div>
 		<table id="slab-table"></table>
 		<p>Status / Response:</p>
 		<pre id="status"></pre>

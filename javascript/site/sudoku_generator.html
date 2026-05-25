@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>CP-SAT - Sudoku Generator</title>
+		<title>MathOpt - Sudoku Generator</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
 			.sudoku-layout {
@@ -65,235 +65,91 @@
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
-		<h1>CP-SAT - Sudoku Generator</h1>
-		<p><em>Problem: generate a filled Sudoku grid, remove clues, and keep only removals where CP-SAT can prove the puzzle has a unique solution.</em></p>
+		<h1>MathOpt - Sudoku Generator</h1>
+		<p><em>Problem: generate a filled Sudoku grid, remove clues, and keep only removals where a selected MathOpt backend can prove the puzzle has a unique solution.</em></p>
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { CpSat, type CpModelProto, type CpSolverResponse, type SatParameters } from 'or-tools-wasm/cp-sat';
+				<pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
 
-type Grid = number[];
-
-const size = 9;
-const cells = size * size;
-const digits = 9;
+await initMathOpt();
 
 function varIndex(row: number, col: number, digit: number) {
-  return (row * size + col) * digits + (digit - 1);
+  return (row * 9 + col) * 9 + (digit - 1);
 }
 
-function rowOf(index: number) {
-  return Math.floor(index / size);
-}
-
-function colOf(index: number) {
-  return index % size;
-}
-
-function mulberry32(seed: number) {
-  let value = seed &gt;&gt;&gt; 0;
-  return () =&gt; {
-    value += 0x6D2B79F5;
-    let t = value;
-    t = Math.imul(t ^ (t &gt;&gt;&gt; 15), t | 1);
-    t ^= t + Math.imul(t ^ (t &gt;&gt;&gt; 7), t | 61);
-    return ((t ^ (t &gt;&gt;&gt; 14)) &gt;&gt;&gt; 0) / 4294967296;
-  };
-}
-
-function shuffled&lt;T&gt;(items: T[], random: () =&gt; number) {
-  const copy = [...items];
-  for (let i = copy.length - 1; i &gt; 0; --i) {
-    const j = Math.floor(random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-function clueCount(grid: Grid) {
-  return grid.filter((value) =&gt; value !== 0).length;
-}
-
-function addExactlyOneConstraint(constraints: NonNullable&lt;CpModelProto['constraints']&gt;, vars: number[]) {
-  constraints.push({
-    linear: {
-      vars,
-      coeffs: vars.map(() =&gt; 1),
-      domain: [1, 1],
-    },
-  });
-}
-
-function buildSudokuModel(clues: Grid, blockedSolution?: Grid): CpModelProto {
-  const variables = Array.from({ length: cells * digits }, (_, index) =&gt; ({
-    name: `r${Math.floor(index / 81) + 1}c${Math.floor((index % 81) / 9) + 1}_${(index % 9) + 1}`,
-    domain: [0, 1],
-  }));
-  const constraints: NonNullable&lt;CpModelProto['constraints']&gt; = [];
-
-  for (let row = 0; row &lt; size; ++row) {
-    for (let col = 0; col &lt; size; ++col) {
-      addExactlyOneConstraint(
-        constraints,
-        Array.from({ length: digits }, (_, digit) =&gt; varIndex(row, col, digit + 1)),
-      );
-    }
-  }
-
-  for (let row = 0; row &lt; size; ++row) {
-    for (let digit = 1; digit &lt;= digits; ++digit) {
-      addExactlyOneConstraint(
-        constraints,
-        Array.from({ length: size }, (_, col) =&gt; varIndex(row, col, digit)),
-      );
-    }
-  }
-
-  for (let col = 0; col &lt; size; ++col) {
-    for (let digit = 1; digit &lt;= digits; ++digit) {
-      addExactlyOneConstraint(
-        constraints,
-        Array.from({ length: size }, (_, row) =&gt; varIndex(row, col, digit)),
-      );
-    }
-  }
-
-  for (let boxRow = 0; boxRow &lt; 3; ++boxRow) {
-    for (let boxCol = 0; boxCol &lt; 3; ++boxCol) {
-      for (let digit = 1; digit &lt;= digits; ++digit) {
-        const vars: number[] = [];
-        for (let rowOffset = 0; rowOffset &lt; 3; ++rowOffset) {
-          for (let colOffset = 0; colOffset &lt; 3; ++colOffset) {
-            vars.push(varIndex(boxRow * 3 + rowOffset, boxCol * 3 + colOffset, digit));
-          }
-        }
-        addExactlyOneConstraint(constraints, vars);
-      }
-    }
-  }
-
-  clues.forEach((digit, index) =&gt; {
-    if (digit === 0) return;
-    constraints.push({
-      linear: {
-        vars: [varIndex(rowOf(index), colOf(index), digit)],
-        coeffs: [1],
-        domain: [1, 1],
-      },
-    });
+const model = MathOpt.Model('sudoku');
+const x = Array.from({ length: 9 * 9 * 9 }, (_, index) =&gt;
+  model.addBinaryVariable({ name: `x_${index}` }),
+);
+const exactlyOne = (vars: typeof x) =&gt;
+  model.addLinearConstraint({
+    lowerBound: 1,
+    upperBound: 1,
+    terms: vars.map((variable) =&gt; ({ variable, coefficient: 1 })),
   });
 
-  if (blockedSolution) {
-    constraints.push({
-      linear: {
-        vars: blockedSolution.map((digit, index) =&gt; varIndex(rowOf(index), colOf(index), digit)),
-        coeffs: Array(cells).fill(1),
-        domain: [0, cells - 1],
-      },
-    });
+for (let row = 0; row &lt; 9; row++) {
+  for (let col = 0; col &lt; 9; col++) {
+    exactlyOne(Array.from({ length: 9 }, (_, digit) =&gt; x[varIndex(row, col, digit + 1)]));
   }
-
-  return {
-    name: 'sudoku_generator',
-    variables,
-    constraints,
-  };
 }
-
-function parseSolution(response: CpSolverResponse | null): Grid | null {
-  const solution = response?.solution;
-  if (!Array.isArray(solution) || solution.length &lt; cells * digits) return null;
-  const grid = Array(cells).fill(0);
-  for (let row = 0; row &lt; size; ++row) {
-    for (let col = 0; col &lt; size; ++col) {
-      for (let digit = 1; digit &lt;= digits; ++digit) {
-        if (Number(solution[varIndex(row, col, digit)]) === 1) {
-          grid[row * size + col] = digit;
-          break;
-        }
-      }
+for (let row = 0; row &lt; 9; row++) {
+  for (let digit = 1; digit &lt;= 9; digit++) {
+    exactlyOne(Array.from({ length: 9 }, (_, col) =&gt; x[varIndex(row, col, digit)]));
+  }
+}
+for (let col = 0; col &lt; 9; col++) {
+  for (let digit = 1; digit &lt;= 9; digit++) {
+    exactlyOne(Array.from({ length: 9 }, (_, row) =&gt; x[varIndex(row, col, digit)]));
+  }
+}
+for (let boxRow = 0; boxRow &lt; 3; boxRow++) {
+  for (let boxCol = 0; boxCol &lt; 3; boxCol++) {
+    for (let digit = 1; digit &lt;= 9; digit++) {
+      exactlyOne([0, 1, 2].flatMap((rowOffset) =&gt;
+        [0, 1, 2].map((colOffset) =&gt;
+          x[varIndex(boxRow * 3 + rowOffset, boxCol * 3 + colOffset, digit)]),
+      ));
     }
   }
-  return grid;
 }
 
-async function solveSudoku(clues: Grid, params: SatParameters, blockedSolution?: Grid) {
-  const model = await CpSat.createModel(buildSudokuModel(clues, blockedSolution));
-  const validation = await CpSat.validate(model);
-  if (!validation.ok) throw new Error(validation.message);
-  const result = await CpSat.solve(model, params);
-  return {
-    status: result.response?.status,
-    grid: parseSolution(result.response),
-  };
-}
-
-function isFeasibleStatus(status: unknown) {
-  return status === 'OPTIMAL' || status === 'FEASIBLE';
-}
-
-async function hasUniqueSolution(clues: Grid, workers: number) {
-  const first = await solveSudoku(clues, {
-    maxTimeInSeconds: 3,
-    numWorkers: workers,
-    stopAfterFirstSolution: true,
-  });
-  if (!isFeasibleStatus(first.status) || !first.grid) {
-    return { unique: false, solution: null, status: String(first.status ?? 'NO_RESPONSE') };
-  }
-  const second = await solveSudoku(clues, {
-    maxTimeInSeconds: 3,
-    numWorkers: 1,
-    stopAfterFirstSolution: true,
-  }, first.grid);
-  return {
-    unique: second.status === 'INFEASIBLE',
-    solution: first.grid,
-    status: String(second.status ?? 'NO_RESPONSE'),
-  };
-}
-
-async function generateFullGrid(seed: number, workers: number) {
-  const result = await solveSudoku(Array(cells).fill(0), {
-    maxTimeInSeconds: 5,
-    numWorkers: workers,
-    randomSeed: seed,
-    randomizeSearch: true,
-    stopAfterFirstSolution: true,
-  });
-  if (!isFeasibleStatus(result.status) || !result.grid) {
-    throw new Error(`Unable to generate a complete grid, status=${String(result.status)}`);
-  }
-  return result.grid;
-}
-
-async function generatePuzzle(target: number, seed: number, workers: number) {
-  const full = await generateFullGrid(seed, workers);
-  const puzzle = [...full];
-  const random = mulberry32(seed);
-  const order = shuffled(Array.from({ length: cells }, (_, index) =&gt; index), random);
-
-  for (const index of order) {
-    if (clueCount(puzzle) &lt;= target) break;
-    const previous = puzzle[index];
-    puzzle[index] = 0;
-
-    const check = await hasUniqueSolution(puzzle, workers);
-    if (!check.unique) {
-      puzzle[index] = previous;
-    }
-  }
-
-  return puzzle;
-}</code></pre>
+model.minimize([]);
+const solverType = MathOpt.SolverType.CP_SAT;
+const result = await MathOpt.solve(model, {
+  solverType,
+  threads: 4,
+  solutionLimit: 1,
+  cpSat: { numWorkers: 4, stopAfterFirstSolution: true },
+});
+console.log(result.terminationReason, result.variableValues);</code></pre>
 			</details>
 		</div>
 		<p>
-			Generate a Sudoku puzzle by solving a full CP-SAT model, removing clues one by one, and proving after each removal that the puzzle still has a unique solution.
+			Generate a Sudoku puzzle by solving a full MathOpt binary model with a selectable backend, removing clues one by one, and proving after each removal that the puzzle still has a unique solution.
 		</p>
+		<div class="example-explanation">
+			<h2>Model</h2>
+			<ul>
+				<li>Each row, column, cell, and 3x3 box is encoded with exactly-one constraints.</li>
+				<li>Filled cells become fixed equality constraints in the MathOpt model.</li>
+				<li>Generation first solves an empty grid to get a complete Sudoku solution.</li>
+				<li>Then clues are removed one at a time only when a second solve proves uniqueness.</li>
+				<li>The backend selector changes which MathOpt backend runs each Sudoku solve.</li>
+			</ul>
+		</div>
 		<div class="controls">
 			<label>Target clues <input id="target-clues" class="short-number" type="number" value="0" min="0" max="81"></label>
 			<label>Seed <input id="seed" class="medium-number" type="number" value="1" min="1"></label>
+			<label>
+				Backend
+				<select id="solver">
+					<option value="CP_SAT">CP-SAT</option>
+					<option value="GSCIP">GSCIP</option>
+					<option value="GLPK">GLPK</option>
+				</select>
+			</label>
 			<label>Workers <input id="workers" class="short-number" type="number" value="1" min="1"></label>
 			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
 			<button id="generate">Generate</button>
@@ -305,7 +161,7 @@ async function generatePuzzle(target: number, seed: number, workers: number) {
 			<div id="sudoku-board" aria-label="Sudoku board"></div>
 			<div>
 				<p>Status / Search:</p>
-				<pre id="status">Generate a puzzle to watch CP-SAT remove clues.</pre>
+				<pre id="status">Generate a puzzle to watch MathOpt remove clues.</pre>
 			</div>
 		</div>
 		<script type="module" src="./code_highlight.ts"></script>

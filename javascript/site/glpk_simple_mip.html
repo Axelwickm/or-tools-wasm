@@ -25,6 +25,7 @@ setWorkerBridgeEnabled(true);
 await initMPSolver();
 const solver = MPSolver.CreateSolver('GLPK');
 if (!solver) throw new Error('GLPK backend is unavailable');
+solver.SetNumThreads(4);
 
 const x = solver.IntVar(0, solver.infinity(), 'x');
 const y = solver.IntVar(0, solver.infinity(), 'y');
@@ -45,8 +46,17 @@ await solver.Solve();</code></pre>
     <p>
       Direct port of <code>simple_mip_program.py</code> through the MPSolver GLPK integer backend.
     </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>The decision variables are integer values for <code>x</code> and <code>y</code>.</li>
+        <li>The linear constraints define which integer points are feasible.</li>
+        <li>The objective maximizes a linear score over those feasible points.</li>
+        <li>GLPK searches the integer feasible set and returns the best assignment.</li>
+      </ul>
+    </div>
     <div class="controls">
-      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve MIP">Solve MIP</button>
     </div>

@@ -5,18 +5,59 @@
     <title>RCPSP - Project Schedule</title>
     <link rel="stylesheet" href="./example.css">
     <style>
-      .schedule-shell {
-        display: grid;
-        grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 0.8fr);
-        gap: 1rem;
-        align-items: start;
-      }
-
       .timeline {
         overflow-x: auto;
         border: 1px solid #d0d7de;
         border-radius: 6px;
         padding: 0.75rem;
+      }
+
+      .example-notes {
+        margin: 0.75rem 0;
+        padding-left: 1.25rem;
+      }
+
+      .example-notes li {
+        margin-bottom: 0.25rem;
+      }
+
+      .activity-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: 0.75rem;
+        margin: 0.75rem 0 1rem;
+      }
+
+      .activity-card {
+        border: 1px solid #d0d7de;
+        border-left: 0.4rem solid var(--activity-color);
+        border-radius: 6px;
+        padding: 0.65rem;
+      }
+
+      .activity-card.related {
+        background: #f6f8ff;
+        border-color: #8250df;
+        border-left-color: var(--activity-color);
+      }
+
+      .activity-card.dimmed,
+      .bar.dimmed {
+        opacity: 0.35;
+      }
+
+      .activity-card-title {
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+      }
+
+      .activity-card-line {
+        color: #57606a;
+        font-size: 0.9rem;
+      }
+
+      .activity-card-line input {
+        width: 4rem;
       }
 
       .axis,
@@ -56,7 +97,7 @@
       .bar {
         height: 1.35rem;
         border-radius: 4px;
-        background: #1f883d;
+        background: var(--activity-color);
         color: white;
         display: flex;
         align-items: center;
@@ -66,9 +107,10 @@
         grid-row: 1;
       }
 
-      .bar.secondary { background: #0969da; }
-      .bar.warning { background: #bf8700; }
-      .bar.final { background: #8250df; }
+      .bar.related {
+        outline: 3px solid color-mix(in srgb, var(--activity-color) 28%, transparent);
+        outline-offset: 2px;
+      }
 
       .usage-cell {
         height: 1.35rem;
@@ -88,26 +130,14 @@
         font-weight: 700;
       }
 
-      .metrics {
-        display: grid;
-        gap: 0.5rem;
+      .solution-panel {
+        margin-bottom: 0.75rem;
       }
 
-      .metric {
-        border: 1px solid #d0d7de;
-        border-radius: 6px;
-        padding: 0.65rem;
-      }
-
-      .metric strong {
-        display: block;
+      .summary-value {
         font-size: 1.4rem;
-      }
-
-      @media (max-width: 900px) {
-        .schedule-shell {
-          grid-template-columns: 1fr;
-        }
+        font-weight: 700;
+        margin-bottom: 0.35rem;
       }
     </style>
   </head>
@@ -143,23 +173,33 @@ const result = await project.solve({ numWorkers: 4, maxTimeInSeconds: 5 });
 console.log(result.statusName, result.makespan, result.tasks);</code></pre>
       </details>
     </div>
+    <ul class="example-notes">
+      <li>Activities have durations and crew demands.</li>
+      <li>Dependencies force some activities to finish before others can start.</li>
+      <li>The crew resource has capacity 3 at every time step.</li>
+      <li>The solver chooses start times that respect dependencies and crew capacity.</li>
+      <li>The makespan is the project finish time; lower is better.</li>
+      <li>Hover an activity card or Gantt bar to highlight the same activity and its direct dependencies.</li>
+    </ul>
     <div class="controls">
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <label>Workers <input id="workers" class="short-number" type="number" min="1" max="8" value="4"></label>
       <button id="run" data-idle-label="Solve Schedule">Solve Schedule</button>
     </div>
-    <div class="schedule-shell">
-      <section>
-        <h2>Gantt schedule</h2>
-        <div id="timeline" class="timeline">Run the solver to view the schedule.</div>
-      </section>
-      <section>
-        <h2>Result</h2>
-        <div id="metrics" class="metrics"></div>
-        <p class="section-heading">Status:</p>
-        <pre id="status"></pre>
-      </section>
-    </div>
+    <section>
+      <h2>Activities</h2>
+      <div id="activities" class="activity-grid"></div>
+    </section>
+    <section>
+      <h2>Gantt schedule</h2>
+      <div id="timeline" class="timeline">Run the solver to view the schedule.</div>
+    </section>
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="metrics">Run the solver to view the solution.</div>
+    </section>
+    <p>Status:</p>
+    <pre id="status"></pre>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./rcpsp_project.ts"></script>
   </body>

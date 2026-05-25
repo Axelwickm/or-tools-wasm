@@ -41,6 +41,7 @@ setWorkerBridgeEnabled(true);
 await initMPSolver();
 const solver = MPSolver.CreateSolver('SCIP');
 if (!solver) throw new Error('SCIP backend is unavailable');
+solver.SetNumThreads(4);
 
 const x = costs.map((row, worker) =>
   row.map((_, task) => solver.BoolVar(`x[${worker},${task}]`)));
@@ -74,7 +75,17 @@ console.log(status, objective.Value());</code></pre>
       Adapted from <code>ortools/linear_solver/samples/assignment_task_sizes_mip.py</code>.
       This is a binary MIP with 80 decision variables, capacity constraints, and exactly-one assignment constraints.
     </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Each worker-task pair is a binary decision variable.</li>
+        <li>Every task must be assigned to exactly one worker.</li>
+        <li>Each worker has a capacity limit based on task sizes.</li>
+        <li>The objective minimizes total assignment cost while respecting worker capacity.</li>
+      </ul>
+    </div>
     <div class="controls">
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve assignment">Solve assignment</button>
     </div>

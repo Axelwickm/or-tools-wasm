@@ -5,6 +5,16 @@
     <title>Network Flow - Max Flow</title>
     <link rel="stylesheet" href="./example.css">
     <style>
+      .example-notes { max-width: 56rem; }
+      #flow-graph {
+        display: block;
+        width: 100%;
+        max-width: 960px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        margin: 1rem 0;
+      }
       #solution-output { margin: 0.75rem 0; }
       #status { min-height: 7rem; }
     </style>
@@ -24,30 +34,25 @@
 setWorkerBridgeEnabled(true);
 await initNetworkFlow();
 
-const startNodes = [0, 0, 0, 1, 1, 2, 2, 3, 3];
-const endNodes = [1, 2, 3, 2, 4, 3, 4, 2, 4];
-const capacities = [20, 30, 10, 40, 30, 10, 20, 5, 20];
-
 const maxFlow = new SimpleMaxFlow();
-const allArcs = maxFlow.add_arcs_with_capacity(startNodes, endNodes, capacities);
-const status = await maxFlow.solve(0, 4);
-
-if (status === SimpleMaxFlow.OPTIMAL) {
-  console.log(maxFlow.optimal_flow());
-  console.log(allArcs.map((arc) => ({
-    tail: maxFlow.tail(arc),
-    head: maxFlow.head(arc),
-    capacity: maxFlow.capacity(arc),
-    flow: maxFlow.flow(arc),
-  })));
-  console.log(maxFlow.get_source_side_min_cut(), maxFlow.get_sink_side_min_cut());
-}</code></pre>
+maxFlow.add_arcs_with_capacity(startNodes, endNodes, capacities);
+const status = await maxFlow.solve(sourceNode, sinkNode);</code></pre>
       </details>
     </div>
+    <ul class="example-notes">
+      <li>Flow starts at the green source node and must reach the red sink node.</li>
+      <li>Each directed arc has a capacity: the maximum flow it can carry.</li>
+      <li>The solver chooses arc flows that maximize total source-to-sink throughput.</li>
+      <li>After solving, thicker blue arcs carry more flow and labels show flow/capacity.</li>
+      <li>The min cut identifies the bottleneck separating source-side and sink-side nodes.</li>
+    </ul>
     <div class="controls">
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Transit nodes <input id="middle-count" class="short-number" type="number" min="3" value="8"></label>
+      <button id="randomize" type="button">Randomize</button>
       <button id="run" data-idle-label="Solve Max Flow">Solve Max Flow</button>
     </div>
+    <svg id="flow-graph" viewBox="0 0 960 620" role="img" aria-label="Max flow network"></svg>
     <div id="solution-output">Run the solver to view the max-flow solution.</div>
     <p>Status:</p>
     <pre id="status"></pre>

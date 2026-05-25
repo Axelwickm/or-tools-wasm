@@ -1,4 +1,4 @@
-import { CpSat, setWorkerBridgeEnabled, type CpModelProto, type CpSolverResponse, type SatParameters } from 'or-tools-wasm/cp-sat';
+import { initMathOpt, MathOpt, setWorkerBridgeEnabled, type MathOptVariable } from 'or-tools-wasm/mathopt';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Grid = number[];
@@ -11,6 +11,7 @@ const boardEl = document.getElementById('sudoku-board') as HTMLElement | null;
 const statusEl = document.getElementById('status') as HTMLPreElement | null;
 const targetInput = document.getElementById('target-clues') as HTMLInputElement | null;
 const seedInput = document.getElementById('seed') as HTMLInputElement | null;
+const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const generateButton = document.getElementById('generate') as HTMLButtonElement | null;
@@ -20,7 +21,10 @@ const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
 
 let cancelled = false;
 let givens = new Set<number>();
+let activeInterrupter: InstanceType<typeof MathOpt.SolveInterrupter> | null = null;
 const maxWorkerCount = getMaxWorkerCount();
+
+type SudokuBackend = 'CP_SAT' | 'GSCIP' | 'GLPK';
 
 function varIndex(row: number, col: number, digit: number) {
   return (row * size + col) * digits + (digit - 1);
@@ -82,7 +86,26 @@ function setRunning(running: boolean) {
   if (stopButton) stopButton.disabled = !running;
 }
 
-function configureCpSat() {
+function selectedBackend(): SudokuBackend {
+  const value = solverSelect?.value;
+  if (value === 'GSCIP' || value === 'GLPK') return value;
+  return 'CP_SAT';
+}
+
+function backendLabel(backend: SudokuBackend) {
+  if (backend === 'CP_SAT') return 'CP-SAT';
+  return backend;
+}
+
+function updateBackendControls() {
+  if (!workerInput) return;
+  const glpk = selectedBackend() === 'GLPK';
+  workerInput.disabled = glpk;
+  if (glpk) workerInput.value = '1';
+}
+
+function configureMathOpt() {
+  const backend = selectedBackend();
   const workers = Math.min(
     maxWorkerCount,
     Math.max(1, Number.parseInt(workerInput?.value ?? '1', 10) || 1),
@@ -93,7 +116,7 @@ function configureCpSat() {
     workerInput.value = String(workers);
   }
   setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
-  return workers;
+  return { backend, workers: backend === 'GLPK' ? 1 : workers };
 }
 
 function createBoard() {
@@ -144,28 +167,28 @@ function clueCount(grid: Grid) {
   return grid.filter((value) => value !== 0).length;
 }
 
-function addExactlyOneConstraint(constraints: NonNullable<CpModelProto['constraints']>, vars: number[]) {
-  constraints.push({
-    linear: {
-      vars,
-      coeffs: vars.map(() => 1),
-      domain: [1, 1],
-    },
+function addExactlyOneConstraint(model: ReturnType<typeof MathOpt.Model>, vars: MathOptVariable[]) {
+  model.addLinearConstraint({
+    lowerBound: 1,
+    upperBound: 1,
+    terms: vars.map((variable) => ({ variable, coefficient: 1 })),
   });
 }
 
-function buildSudokuModel(clues: Grid, blockedSolution?: Grid): CpModelProto {
-  const variables = Array.from({ length: cells * digits }, (_, index) => ({
-    name: `r${Math.floor(index / 81) + 1}c${Math.floor((index % 81) / 9) + 1}_${(index % 9) + 1}`,
-    domain: [0, 1],
-  }));
-  const constraints: NonNullable<CpModelProto['constraints']> = [];
+function buildSudokuModel(clues: Grid, blockedSolution?: Grid) {
+  const model = MathOpt.Model('sudoku_generator');
+  const variables = Array.from({ length: cells * digits }, (_, index) =>
+    model.addBinaryVariable({
+      name: `r${Math.floor(index / 81) + 1}c${Math.floor((index % 81) / 9) + 1}_${(index % 9) + 1}`,
+    }),
+  );
+  const sudokuVar = (row: number, col: number, digit: number) => variables[varIndex(row, col, digit)];
 
   for (let row = 0; row < size; ++row) {
     for (let col = 0; col < size; ++col) {
       addExactlyOneConstraint(
-        constraints,
-        Array.from({ length: digits }, (_, digit) => varIndex(row, col, digit + 1)),
+        model,
+        Array.from({ length: digits }, (_, digit) => sudokuVar(row, col, digit + 1)),
       );
     }
   }
@@ -173,8 +196,8 @@ function buildSudokuModel(clues: Grid, blockedSolution?: Grid): CpModelProto {
   for (let row = 0; row < size; ++row) {
     for (let digit = 1; digit <= digits; ++digit) {
       addExactlyOneConstraint(
-        constraints,
-        Array.from({ length: size }, (_, col) => varIndex(row, col, digit)),
+        model,
+        Array.from({ length: size }, (_, col) => sudokuVar(row, col, digit)),
       );
     }
   }
@@ -182,8 +205,8 @@ function buildSudokuModel(clues: Grid, blockedSolution?: Grid): CpModelProto {
   for (let col = 0; col < size; ++col) {
     for (let digit = 1; digit <= digits; ++digit) {
       addExactlyOneConstraint(
-        constraints,
-        Array.from({ length: size }, (_, row) => varIndex(row, col, digit)),
+        model,
+        Array.from({ length: size }, (_, row) => sudokuVar(row, col, digit)),
       );
     }
   }
@@ -191,53 +214,46 @@ function buildSudokuModel(clues: Grid, blockedSolution?: Grid): CpModelProto {
   for (let boxRow = 0; boxRow < 3; ++boxRow) {
     for (let boxCol = 0; boxCol < 3; ++boxCol) {
       for (let digit = 1; digit <= digits; ++digit) {
-        const vars: number[] = [];
+        const vars: MathOptVariable[] = [];
         for (let rowOffset = 0; rowOffset < 3; ++rowOffset) {
           for (let colOffset = 0; colOffset < 3; ++colOffset) {
-            vars.push(varIndex(boxRow * 3 + rowOffset, boxCol * 3 + colOffset, digit));
+            vars.push(sudokuVar(boxRow * 3 + rowOffset, boxCol * 3 + colOffset, digit));
           }
         }
-        addExactlyOneConstraint(constraints, vars);
+        addExactlyOneConstraint(model, vars);
       }
     }
   }
 
   clues.forEach((digit, index) => {
     if (digit === 0) return;
-    constraints.push({
-      linear: {
-        vars: [varIndex(rowOf(index), colOf(index), digit)],
-        coeffs: [1],
-        domain: [1, 1],
-      },
+    model.addLinearConstraint({
+      lowerBound: 1,
+      upperBound: 1,
+      terms: [{ variable: sudokuVar(rowOf(index), colOf(index), digit), coefficient: 1 }],
     });
   });
 
   if (blockedSolution) {
-    constraints.push({
-      linear: {
-        vars: blockedSolution.map((digit, index) => varIndex(rowOf(index), colOf(index), digit)),
-        coeffs: Array(cells).fill(1),
-        domain: [0, cells - 1],
-      },
+    model.addLinearConstraint({
+      upperBound: cells - 1,
+      terms: blockedSolution.map((digit, index) => ({
+        variable: sudokuVar(rowOf(index), colOf(index), digit),
+        coefficient: 1,
+      })),
     });
   }
+  model.minimize([]);
 
-  return {
-    name: 'sudoku_generator',
-    variables,
-    constraints,
-  };
+  return { model, variables };
 }
 
-function parseSolution(response: CpSolverResponse | null): Grid | null {
-  const solution = response?.solution;
-  if (!Array.isArray(solution) || solution.length < cells * digits) return null;
+function parseSolution(result: Awaited<ReturnType<typeof MathOpt.solve>>, variables: MathOptVariable[]): Grid | null {
   const grid = Array(cells).fill(0);
   for (let row = 0; row < size; ++row) {
     for (let col = 0; col < size; ++col) {
       for (let digit = 1; digit <= digits; ++digit) {
-        if (Number(solution[varIndex(row, col, digit)]) === 1) {
+        if (result.variable_values(variables[varIndex(row, col, digit)]) > 0.5) {
           grid[cellIndex(row, col)] = digit;
           break;
         }
@@ -248,50 +264,85 @@ function parseSolution(response: CpSolverResponse | null): Grid | null {
 }
 
 function isFeasibleStatus(status: unknown) {
-  return status === 'OPTIMAL' || status === 'FEASIBLE';
+  return status === 'OPTIMAL'
+    || status === 'FEASIBLE'
+    || status === 'TERMINATION_REASON_OPTIMAL'
+    || status === 'TERMINATION_REASON_FEASIBLE';
 }
 
-async function solveSudoku(clues: Grid, params: SatParameters, blockedSolution?: Grid) {
-  const model = await CpSat.createModel(buildSudokuModel(clues, blockedSolution));
-  const validation = await CpSat.validate(model);
-  if (!validation.ok) {
-    throw new Error(validation.message);
+function isInfeasibleStatus(status: unknown) {
+  return status === 'INFEASIBLE' || status === 'TERMINATION_REASON_INFEASIBLE';
+}
+
+async function solveSudoku(
+  clues: Grid,
+  options: {
+    backend: SudokuBackend;
+    workers: number;
+    timeLimitSeconds: number;
+    seed?: number;
+    randomizeSearch?: boolean;
+  },
+  blockedSolution?: Grid,
+) {
+  await initMathOpt();
+  const { model, variables } = buildSudokuModel(clues, blockedSolution);
+  activeInterrupter = new MathOpt.SolveInterrupter();
+  try {
+    const result = await MathOpt.solve(model, {
+      solverType: MathOpt.SolverType[options.backend],
+      threads: options.backend === 'GLPK' ? 1 : options.workers,
+      timeLimitSeconds: options.timeLimitSeconds,
+      solutionLimit: options.backend === 'GLPK' ? undefined : 1,
+      interrupter: activeInterrupter,
+      cpSat: options.backend === 'CP_SAT'
+        ? {
+          numWorkers: options.workers,
+          maxTimeInSeconds: options.timeLimitSeconds,
+          randomSeed: options.seed,
+          randomizeSearch: options.randomizeSearch,
+          stopAfterFirstSolution: true,
+        }
+        : undefined,
+      gscip: options.backend === 'GSCIP'
+        ? new MathOpt.GScipParameters({
+          silenceOutput: true,
+          presolve: MathOpt.GScipMetaParamValue.FAST,
+        })
+        : undefined,
+      glpk: options.backend === 'GLPK'
+        ? new MathOpt.GlpkParameters({ computeUnboundRaysIfPossible: false })
+        : undefined,
+    });
+    return {
+      status: result.terminationReason,
+      grid: result.has_primal_feasible_solution() ? parseSolution(result, variables) : null,
+    };
+  } finally {
+    activeInterrupter = null;
   }
-  const result = await CpSat.solve(model, params);
-  return {
-    status: result.response?.status,
-    grid: parseSolution(result.response),
-  };
 }
 
-async function hasUniqueSolution(clues: Grid, workers: number) {
-  const first = await solveSudoku(clues, {
-    maxTimeInSeconds: 3,
-    numWorkers: workers,
-    stopAfterFirstSolution: true,
-  });
+async function hasUniqueSolution(clues: Grid, backend: SudokuBackend, workers: number) {
+  const first = await solveSudoku(clues, { backend, timeLimitSeconds: 3, workers });
   if (!isFeasibleStatus(first.status) || !first.grid) {
     return { unique: false, solution: null, status: String(first.status ?? 'NO_RESPONSE') };
   }
-  const second = await solveSudoku(clues, {
-    maxTimeInSeconds: 3,
-    numWorkers: 1,
-    stopAfterFirstSolution: true,
-  }, first.grid);
+  const second = await solveSudoku(clues, { backend, timeLimitSeconds: 3, workers: 1 }, first.grid);
   return {
-    unique: second.status === 'INFEASIBLE',
+    unique: isInfeasibleStatus(second.status),
     solution: first.grid,
     status: String(second.status ?? 'NO_RESPONSE'),
   };
 }
 
-async function generateFullGrid(seed: number, workers: number) {
+async function generateFullGrid(seed: number, backend: SudokuBackend, workers: number) {
   const result = await solveSudoku(Array(cells).fill(0), {
-    maxTimeInSeconds: 5,
-    numWorkers: workers,
-    randomSeed: seed,
+    backend,
+    timeLimitSeconds: 5,
+    workers,
+    seed,
     randomizeSearch: true,
-    stopAfterFirstSolution: true,
   });
   if (!isFeasibleStatus(result.status) || !result.grid) {
     throw new Error(`Unable to generate a complete grid, status=${String(result.status)}`);
@@ -301,17 +352,17 @@ async function generateFullGrid(seed: number, workers: number) {
 
 async function generatePuzzle() {
   cancelled = false;
-  const workers = configureCpSat();
+  const { backend, workers } = configureMathOpt();
   const target = Math.min(81, Math.max(0, Number.parseInt(targetInput?.value ?? '0', 10) || 0));
   const seed = Math.max(1, Number.parseInt(seedInput?.value ?? '1', 10) || 1);
   if (targetInput) targetInput.value = String(target);
   if (seedInput) seedInput.value = String(seed);
 
   setRunning(true);
-  setStatus(`Initializing CP-SAT Sudoku generator (target=${target}, seed=${seed})...`);
+  setStatus(`Initializing MathOpt Sudoku generator with ${backendLabel(backend)} backend (target=${target}, seed=${seed})...`);
   try {
     appendStatus('Solving an empty Sudoku model to get a complete grid.');
-    const full = await generateFullGrid(seed, workers);
+    const full = await generateFullGrid(seed, backend, workers);
     let puzzle = [...full];
     givens = new Set(Array.from({ length: cells }, (_, index) => index));
     renderGrid(puzzle);
@@ -334,7 +385,7 @@ async function generatePuzzle() {
       appendStatus(`Testing removal ${attempted}: r${rowOf(index) + 1}c${colOf(index) + 1} (${clueCount(puzzle)} clues)...`);
       await sleep(20);
 
-      const check = await hasUniqueSolution(puzzle, workers);
+      const check = await hasUniqueSolution(puzzle, backend, workers);
       if (cancelled) break;
       if (check.unique) {
         removed++;
@@ -362,18 +413,14 @@ async function generatePuzzle() {
 
 async function solveBoard() {
   cancelled = false;
-  const workers = configureCpSat();
+  const { backend, workers } = configureMathOpt();
   setRunning(true);
-  setStatus('Solving current board with CP-SAT...');
+  setStatus(`Solving current board with MathOpt ${backendLabel(backend)} backend...`);
   try {
     const clues = readGrid();
     givens = new Set(clues.flatMap((value, index) => (value === 0 ? [] : [index])));
     renderGrid(clues);
-    const result = await solveSudoku(clues, {
-      maxTimeInSeconds: 5,
-      numWorkers: workers,
-      stopAfterFirstSolution: true,
-    });
+    const result = await solveSudoku(clues, { backend, timeLimitSeconds: 5, workers });
     if (!isFeasibleStatus(result.status) || !result.grid) {
       appendStatus(`No solution found, status=${String(result.status)}`);
       return;
@@ -396,6 +443,8 @@ function clearBoard() {
 createBoard();
 clearBoard();
 if (workerInput) workerInput.value = String(Math.min(maxWorkerCount, 4));
+solverSelect?.addEventListener('change', updateBackendControls);
+updateBackendControls();
 if (workerBridgeToggle) {
   workerBridgeToggle.checked = true;
   workerBridgeToggle.addEventListener('change', () => {
@@ -412,8 +461,6 @@ solveButton?.addEventListener('click', () => {
 clearButton?.addEventListener('click', clearBoard);
 stopButton?.addEventListener('click', () => {
   cancelled = true;
-  appendStatus('Stopping after the active CP-SAT solve returns...');
-  void CpSat.cancelSolve().catch((error) => {
-    appendStatus(`Cancel request failed: ${error instanceof Error ? error.message : String(error)}`);
-  });
+  appendStatus('Stopping after the active MathOpt solve returns...');
+  activeInterrupter?.interrupt();
 });

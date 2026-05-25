@@ -29,13 +29,19 @@ type SchedulingBuild = {
 
 const statusEl = document.getElementById('status') as HTMLPreElement | null;
 const scheduleMessage = document.getElementById('schedule-message') as HTMLElement | null;
-const scheduleTable = document.getElementById('schedule-table') as HTMLTableElement | null;
+const dayGrid = document.getElementById('day-grid') as HTMLElement | null;
+const streakPanel = document.getElementById('streak-panel') as HTMLElement | null;
+const streakGrid = document.getElementById('streak-grid') as HTMLElement | null;
+const scheduleLegend = document.getElementById('schedule-legend') as HTMLElement | null;
+const solutionOutput = document.getElementById('solution-output') as HTMLElement | null;
 const teamsInput = document.getElementById('teams') as HTMLInputElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
 const readyIndicator = document.getElementById('ready-indicator') as HTMLElement | null;
+let currentSchedule: ScheduleGrid | null = null;
+let hoveredTeam: number | null = null;
 const maxWorkerCount = getMaxWorkerCount();
 if (workerInput) {
   workerInput.max = String(maxWorkerCount);
@@ -76,52 +82,120 @@ function showScheduleMessage(message: string) {
   if (scheduleMessage) {
     scheduleMessage.textContent = message;
   }
-  if (scheduleTable) {
-    scheduleTable.innerHTML = '';
-    scheduleTable.classList.toggle('hidden', true);
+  currentSchedule = null;
+  hoveredTeam = null;
+  if (dayGrid) {
+    dayGrid.innerHTML = '';
+    dayGrid.classList.toggle('hidden', true);
+  }
+  if (streakGrid) {
+    streakGrid.innerHTML = '';
+  }
+  if (streakPanel) {
+    streakPanel.classList.toggle('hidden', true);
+  }
+  if (scheduleLegend) {
+    scheduleLegend.classList.toggle('hidden', true);
   }
 }
 
-function renderSchedule(schedule: ScheduleGrid, numDays: number) {
-  if (!scheduleTable) return;
-  scheduleTable.innerHTML = '';
-  scheduleTable.classList.remove('hidden');
-
-  const thead = document.createElement('thead');
-  const headRow = document.createElement('tr');
-  const teamHeader = document.createElement('th');
-  teamHeader.textContent = 'Team';
-  headRow.appendChild(teamHeader);
-  for (let day = 0; day < numDays; ++day) {
-    const cell = document.createElement('th');
-    cell.textContent = `Day ${day + 1}`;
-    headRow.appendChild(cell);
-  }
-  thead.appendChild(headRow);
-  scheduleTable.appendChild(thead);
-
-  const tbody = document.createElement('tbody');
-  schedule.forEach((row, team) => {
-    const tr = document.createElement('tr');
-    const teamCell = document.createElement('th');
-    teamCell.textContent = `Team ${team}`;
-    tr.appendChild(teamCell);
-    row.forEach((match) => {
-      const td = document.createElement('td');
-      if (match.opponent >= 0) {
-        td.textContent = match.home ? `vs ${match.opponent}` : `@ ${match.opponent}`;
-        td.dataset.location = match.home ? 'home' : 'away';
-      } else {
-        td.textContent = '—';
+function countBreaks(schedule: ScheduleGrid) {
+  let breaks = 0;
+  for (const row of schedule) {
+    for (let day = 0; day < row.length - 1; ++day) {
+      if (row[day].home === row[day + 1].home) {
+        breaks += 1;
       }
-      tr.appendChild(td);
+    }
+  }
+  return breaks;
+}
+
+function renderSolution(statusName: string, objectiveValue: number | null | undefined, breaks: number, numTeams: number, numDays: number) {
+  if (!solutionOutput) return;
+  solutionOutput.innerHTML = `
+    <div class="summary-value">${breaks} breaks</div>
+    <div><strong>Status:</strong> ${statusName}</div>
+    <div><strong>Teams:</strong> ${numTeams}</div>
+    <div><strong>Days:</strong> ${numDays}</div>
+    <div><strong>Objective:</strong> ${objectiveValue ?? breaks}</div>
+  `;
+}
+
+function renderSchedule(schedule: ScheduleGrid, numDays: number) {
+  if (!dayGrid || !streakGrid) return;
+  currentSchedule = schedule;
+  dayGrid.innerHTML = '';
+  streakGrid.innerHTML = '';
+  dayGrid.classList.remove('hidden');
+  streakPanel?.classList.remove('hidden');
+  scheduleLegend?.classList.remove('hidden');
+  streakGrid.style.setProperty('--days', String(numDays));
+
+  const dayCards: string[] = [];
+  for (let day = 0; day < numDays; ++day) {
+    const seen = new Set<number>();
+    const matches: string[] = [];
+    for (let team = 0; team < schedule.length; ++team) {
+      const match = schedule[team][day];
+      if (!match.home || seen.has(team) || seen.has(match.opponent)) continue;
+      seen.add(team);
+      seen.add(match.opponent);
+      const highlighted = hoveredTeam === team || hoveredTeam === match.opponent;
+      const dimmed = hoveredTeam !== null && !highlighted;
+      matches.push(`
+        <div
+          class="match-line${highlighted ? ' highlighted' : ''}${dimmed ? ' dimmed' : ''}"
+          data-home="${team}"
+          data-away="${match.opponent}"
+        >
+          Team ${team} vs Team ${match.opponent}
+        </div>
+      `);
+    }
+    dayCards.push(`
+      <section class="day-card">
+        <div class="day-title">Day ${day + 1}</div>
+        ${matches.join('')}
+      </section>
+    `);
+  }
+
+  const streakCells: string[] = [
+    '<div class="streak-header">Team</div>',
+    ...Array.from({ length: numDays }, (_, day) => `<div class="streak-header">${day + 1}</div>`),
+  ];
+  schedule.forEach((row, team) => {
+    const rowDimmed = hoveredTeam !== null && hoveredTeam !== team;
+    streakCells.push(`<div class="streak-label${rowDimmed ? ' streak-row-dimmed' : ''}">Team ${team}</div>`);
+    row.forEach((match, day) => {
+      const location = match.home ? 'home' : 'away';
+      const isBreak = day > 0 && row[day - 1].home === match.home;
+      const label = match.home ? 'H' : 'A';
+      streakCells.push(`
+        <div
+          class="streak-cell ${location}${isBreak ? ' break' : ''}${rowDimmed ? ' streak-row-dimmed' : ''}"
+          data-team="${team}"
+          title="${match.home ? 'Home vs' : 'Away at'} Team ${match.opponent}"
+        >
+          ${label}
+        </div>
+      `);
     });
-    tbody.appendChild(tr);
   });
-  scheduleTable.appendChild(tbody);
 
   if (scheduleMessage) {
-    scheduleMessage.textContent = 'Teams play opponents once per half, minimizing total breaks.';
+    scheduleMessage.textContent = 'Fixture cards show each day. Rhythm strips show each team’s home/away pattern; gold underline marks a break.';
+  }
+  dayGrid.innerHTML = dayCards.join('');
+  streakGrid.innerHTML = streakCells.join('');
+}
+
+function setHoveredTeam(team: number | null) {
+  if (hoveredTeam === team) return;
+  hoveredTeam = team;
+  if (currentSchedule) {
+    renderSchedule(currentSchedule, currentSchedule[0]?.length ?? 0);
   }
 }
 
@@ -364,6 +438,7 @@ async function runSportsScheduling() {
   workerInput.value = String(workers);
   append(`Building sports scheduling model (teams=${numTeams})…`);
   showScheduleMessage('Solving…');
+  if (solutionOutput) solutionOutput.textContent = 'Solving...';
 
   setRunning(true);
   try {
@@ -411,14 +486,21 @@ async function runSportsScheduling() {
         showScheduleMessage('Solver returned no response.');
         return;
       }
-      statusEl.textContent = JSON.stringify(response, null, 2);
+      statusEl.textContent = [
+        `Status: ${response.status}`,
+        `Objective: ${response.objectiveValue ?? 'NA'}`,
+        `Best bound: ${response.bestObjectiveBound ?? 'NA'}`,
+        `Wall time: ${response.wallTime ?? 'NA'}`,
+      ].join('\n');
       const values = parseSolution(response.solution);
       if (!values) {
         showScheduleMessage('Unable to parse solver solution.');
         return;
       }
       const schedule = extractSchedule(values, build.fixtures, build.numTeams, build.numDays);
+      const breaks = countBreaks(schedule);
       renderSchedule(schedule, build.numDays);
+      renderSolution(String(response.status ?? 'UNKNOWN'), response.objectiveValue, breaks, build.numTeams, build.numDays);
     } catch (err) {
       append(`Solve failed: ${(err as Error).message}`);
       showScheduleMessage('Solve failed.');
@@ -433,6 +515,31 @@ if (runButton) {
     void runSportsScheduling();
   });
 }
+
+dayGrid?.addEventListener('pointerover', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const match = target.closest<HTMLElement>('[data-home]');
+  if (!match) return;
+  setHoveredTeam(Number(match.dataset.home));
+});
+dayGrid?.addEventListener('pointerout', (event) => {
+  const relatedTarget = event.relatedTarget;
+  if (relatedTarget instanceof Element && dayGrid.contains(relatedTarget)) return;
+  setHoveredTeam(null);
+});
+streakGrid?.addEventListener('pointerover', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const cell = target.closest<HTMLElement>('[data-team]');
+  if (!cell) return;
+  setHoveredTeam(Number(cell.dataset.team));
+});
+streakGrid?.addEventListener('pointerout', (event) => {
+  const relatedTarget = event.relatedTarget;
+  if (relatedTarget instanceof Element && streakGrid.contains(relatedTarget)) return;
+  setHoveredTeam(null);
+});
 
 if (stopButton) {
   stopButton.disabled = true;

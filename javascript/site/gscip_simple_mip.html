@@ -51,6 +51,15 @@ console.log(result.objectiveValue, result.variableValues);</code></pre>
     <p>
       GSCIP is SCIP exposed through the MathOpt frontend.
     </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>The decision variables are binary choices for <code>x</code> and <code>y</code>.</li>
+        <li>The capacity constraint allows at most one selected choice.</li>
+        <li>The objective gives <code>x</code> a higher value than <code>y</code>.</li>
+        <li>MathOpt sends the model to GSCIP and reads back the selected variables.</li>
+      </ul>
+    </div>
     <div class="controls">
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>

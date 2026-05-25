@@ -43,6 +43,7 @@ export default defineConfig({
         mathopt_basic: path.resolve(siteRoot, 'mathopt_basic.html'),
         model_playground: path.resolve(siteRoot, 'model_playground.html'),
         mp_simple_lp: path.resolve(siteRoot, 'mp_simple_lp.html'),
+        mpsolver_network_design: path.resolve(siteRoot, 'mpsolver_network_design.html'),
         network_flow_assignment: path.resolve(siteRoot, 'network_flow_assignment.html'),
         network_flow_max_flow: path.resolve(siteRoot, 'network_flow_max_flow.html'),
         network_flow_min_cost_flow: path.resolve(siteRoot, 'network_flow_min_cost_flow.html'),

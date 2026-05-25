@@ -5,7 +5,34 @@
 		<title>Routing - Vehicle Routing Problem</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
-			#route-output { margin: 0.75rem 0; }
+			.example-notes {
+				max-width: 56rem;
+			}
+			.route-visual-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 960px) minmax(14rem, 22rem);
+				gap: 1rem;
+				align-items: start;
+				margin: 1rem 0;
+			}
+			#route-map {
+				display: block;
+				width: 100%;
+				max-width: 960px;
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				background: #f6f8fa;
+			}
+			.route-panel {
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				padding: 0.75rem;
+				background: #fff;
+			}
+			.route-panel h2 {
+				margin-top: 0;
+			}
+			#route-output { margin: 0.75rem 0 0; }
 			#status { min-height: 10rem; }
 		</style>
 	</head>
@@ -20,7 +47,6 @@
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import {
-  CpSat,
   DefaultRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
@@ -32,26 +58,61 @@
 setWorkerBridgeEnabled(true);
 await initRouting();
 
-const manager = new RoutingIndexManager(distanceMatrix.length, 4, 0);
+const locations = [
+  { x: 480, y: 310 },
+  ...Array.from({ length: 60 }, () =&gt; ({
+    x: 46 + Math.random() * 868,
+    y: 70 + Math.random() * 496,
+  })),
+];
+
+const manager = new RoutingIndexManager(locations.length, 4, 0);
 const routing = new RoutingModel(manager);
 const transit = routing.RegisterTransitCallback((from, to) =&gt; {
-  const fromNode = manager.IndexToNode(from);
-  const toNode = manager.IndexToNode(to);
-  return distanceMatrix[fromNode][toNode];
+  const a = locations[manager.IndexToNode(from)];
+  const b = locations[manager.IndexToNode(to)];
+  return Math.round(Math.hypot(a.x - b.x, a.y - b.y));
 });
 routing.SetArcCostEvaluatorOfAllVehicles(transit);
+
+const demand = routing.RegisterUnaryTransitCallback((from) =&gt;
+  manager.IndexToNode(from) === 0 ? 0 : 1,
+);
+routing.AddDimensionWithVehicleCapacity(
+  demand,
+  0,
+  Array(4).fill(Math.ceil((locations.length - 1) / 4)),
+  true,
+  'load',
+);
 
 const params = DefaultRoutingSearchParameters();
 params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 const assignment = await routing.SolveWithParameters(params);</code></pre>
 			</details>
 		</div>
-		<p>This adapts <code>vrp.py</code>: four vehicles route across a 17-location distance matrix.</p>
+		<ul class="example-notes">
+			<li>Several vehicles start and end at the same depot.</li>
+			<li>Every destination must be assigned to exactly one vehicle route.</li>
+			<li>Each destination has demand 1, and each vehicle has a balanced destination capacity.</li>
+			<li>The travel cost is the straight-line distance between two locations.</li>
+			<li>The solver minimizes total distance across all vehicle routes.</li>
+			<li>Before solving, the map shows unassigned destinations; after solving, each color is one vehicle route.</li>
+		</ul>
 		<div class="controls">
 			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<label>Destinations <input id="destination-count" class="short-number" type="number" min="4" value="60"></label>
+			<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
+			<button id="randomize" type="button">Randomize</button>
 			<button id="run">Solve VRP</button>
 		</div>
-		<div id="route-output">Run the solver to view vehicle routes.</div>
+		<div class="route-visual-layout">
+			<svg id="route-map" viewBox="0 0 960 620" role="img" aria-label="Vehicle routing map"></svg>
+			<section class="route-panel">
+				<h2>Routes</h2>
+				<div id="route-output">Run the solver to view vehicle routes.</div>
+			</section>
+		</div>
 		<p>Status / Response:</p>
 		<pre id="status"></pre>
 

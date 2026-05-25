@@ -28,6 +28,15 @@ console.log(schemas.sat_parameters);</code></pre>
 		<p>This demo calls the WASM exports that expose the embedded <code>cp_model.proto</code>
 			and <code>sat_parameters.proto</code>
 			schemas and prints their contents.</p>
+		<div class="example-explanation">
+			<h2>Model</h2>
+			<ul>
+				<li>The schemas describe the protobuf messages accepted by the low-level CP-SAT APIs.</li>
+				<li><code>CpModelProto</code> defines variables, constraints, objectives, and search hints.</li>
+				<li><code>SatParameters</code> defines solver configuration such as time limits and workers.</li>
+				<li>The viewer helps inspect the raw proto surface used by playground and fixture code.</li>
+			</ul>
+		</div>
 		<button id="load-schemas">Load schemas</button>
 		<div id="status" class="status-line" role="status" aria-live="polite"></div>
 		<h2>CpModelProto</h2>

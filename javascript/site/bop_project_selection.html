@@ -7,34 +7,189 @@
     <style>
       #solution-output { margin: 0.75rem 0; }
       #status { min-height: 8rem; }
+      .portfolio-layout {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+        gap: 1rem;
+        align-items: start;
+      }
+      .portfolio-main {
+        display: grid;
+        gap: 1rem;
+      }
+      .portfolio-board,
+      .portfolio-map,
+      .portfolio-side > div {
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #fff;
+      }
+      .portfolio-board,
+      .portfolio-side > div {
+        padding: 1rem;
+      }
+      .portfolio-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: start;
+        margin-bottom: 1rem;
+      }
+      .portfolio-header h2,
+      .portfolio-side h2 {
+        margin: 0 0 0.25rem;
+        font-size: 1rem;
+      }
+      .portfolio-header p {
+        margin: 0;
+        color: #57606a;
+      }
+      .portfolio-status {
+        border-radius: 999px;
+        padding: 0.25rem 0.6rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .portfolio-status.ok {
+        color: #1a7f37;
+        background: #dafbe1;
+      }
+      .portfolio-status.bad {
+        color: #cf222e;
+        background: #ffebe9;
+      }
       .project-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
         gap: 0.75rem;
-        margin: 0.75rem 0;
       }
-      .project-card {
+      .portfolio-project {
         border: 1px solid #d0d7de;
         border-radius: 6px;
         padding: 0.75rem;
-        background: #fff;
+        background: #f6f8fa;
+        display: grid;
+        gap: 0.65rem;
       }
-      .project-card.selected {
-        border-color: #137333;
+      .portfolio-project.manual {
+        border-color: #1a7f37;
         background: #eef7ee;
       }
-      .budget-meter {
+      .portfolio-project.optimal {
+        border-color: #8250df;
+        background: #f4efff;
+      }
+      .portfolio-project.hovered {
+        outline: 3px solid #fbca04;
+        outline-offset: 2px;
+      }
+      .portfolio-project strong,
+      .portfolio-project span {
+        display: block;
+      }
+      .portfolio-project span,
+      .project-density,
+      .project-state {
+        color: #57606a;
+        font-size: 0.85rem;
+      }
+      .project-select {
+        justify-self: start;
+      }
+      .project-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.45rem;
+      }
+      .project-fields label,
+      .capacity-editor label {
+        display: grid;
+        gap: 0.2rem;
+        color: #57606a;
+        font-size: 0.8rem;
+      }
+      .project-fields input,
+      .capacity-editor input {
         width: 100%;
-        height: 0.75rem;
+        box-sizing: border-box;
+      }
+      .portfolio-side {
+        display: grid;
+        gap: 1rem;
+        position: sticky;
+        top: 1rem;
+      }
+      .capacity-editor {
+        display: grid;
+        gap: 0.7rem;
+      }
+      .portfolio-meters {
+        display: grid;
+        gap: 0.8rem;
+      }
+      .meter-row,
+      .portfolio-value {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .meter-track {
+        height: 0.65rem;
         border-radius: 999px;
-        background: #dfe3e8;
+        background: #d8dee4;
         overflow: hidden;
       }
-      .budget-meter span {
+      .meter-track span {
         display: block;
         height: 100%;
-        width: 0;
-        background: #137333;
+        background: #1a7f37;
+      }
+      .portfolio-meter.over .meter-track span {
+        background: #cf222e;
+      }
+      .portfolio-value {
+        border-top: 1px solid #d8dee4;
+        padding-top: 0.8rem;
+      }
+      .portfolio-map {
+        overflow: hidden;
+      }
+      .portfolio-scatter {
+        display: block;
+        width: 100%;
+        background: #f6f8fa;
+      }
+      .portfolio-scatter line {
+        stroke: #8c959f;
+        stroke-width: 2;
+      }
+      .portfolio-scatter text {
+        fill: #57606a;
+        font-size: 13px;
+      }
+      .scatter-point circle {
+        fill: #d8dee4;
+        stroke: #57606a;
+        stroke-width: 2;
+      }
+      .scatter-point.manual circle {
+        fill: #aceebb;
+        stroke: #1a7f37;
+      }
+      .scatter-point.optimal circle {
+        fill: #d8c5ff;
+        stroke: #8250df;
+        stroke-width: 4;
+      }
+      .scatter-point.hovered circle {
+        stroke: #9a6700;
+        stroke-width: 5;
+      }
+      .scatter-point text {
+        fill: #24292f;
+        font-weight: 700;
+        pointer-events: none;
       }
     </style>
   </head>
@@ -44,7 +199,7 @@
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>BOP - binary project selection</h1>
-    <p><em>Problem: choose the most valuable set of binary projects without exceeding a budget or overloading one shared team.</em></p>
+    <p><em>Problem: choose the most valuable set of binary projects without exceeding budget, engineering, or design capacity.</em></p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
@@ -55,46 +210,45 @@ await initMPSolver();
 
 const solver = MPSolver.CreateSolver('BOP');
 if (!solver) throw new Error('BOP backend is unavailable');
+solver.SetNumThreads(4);
 
-const analytics = solver.BoolVar('analytics');
-const dashboard = solver.BoolVar('dashboard');
-const alerts = solver.BoolVar('alerts');
+const projects = [
+  { name: 'analytics', value: 82, budget: 36, engineering: 28, design: 8 },
+  { name: 'mobile', value: 76, budget: 30, engineering: 18, design: 24 },
+  { name: 'alerts', value: 58, budget: 18, engineering: 16, design: 6 },
+];
 
-const budget = solver.Constraint(-solver.infinity(), 9, 'budget');
-budget.SetCoefficient(analytics, 6);
-budget.SetCoefficient(dashboard, 4);
-budget.SetCoefficient(alerts, 3);
-
-const sharedTeam = solver.Constraint(-solver.infinity(), 1, 'shared_design_team');
-sharedTeam.SetCoefficient(dashboard, 1);
-sharedTeam.SetCoefficient(alerts, 1);
+const x = Object.fromEntries(projects.map((project) =&gt; [project.name, solver.BoolVar(project.name)]));
+const budget = solver.Constraint(-solver.infinity(), 105, 'budget');
+const engineering = solver.Constraint(-solver.infinity(), 92, 'engineering_team');
+const design = solver.Constraint(-solver.infinity(), 48, 'design_team');
 
 const objective = solver.Objective();
-objective.SetCoefficient(analytics, 8);
-objective.SetCoefficient(dashboard, 6);
-objective.SetCoefficient(alerts, 5);
+for (const project of projects) {
+  budget.SetCoefficient(x[project.name], project.budget);
+  engineering.SetCoefficient(x[project.name], project.engineering);
+  design.SetCoefficient(x[project.name], project.design);
+  objective.SetCoefficient(x[project.name], project.value);
+}
 objective.SetMaximization();
 
 const status = await solver.Solve();
-if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
-
-console.log(objective.Value(), {
-  analytics: analytics.solution_value(),
-  dashboard: dashboard.solution_value(),
-  alerts: alerts.solution_value(),
-});</code></pre>
+if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);</code></pre>
       </details>
     </div>
-    <p>
-      BOP solves pure Boolean and integer MPSolver models. This example uses binary variables,
-      a budget constraint, and a shared-team conflict constraint.
-    </p>
+    <ul class="example-notes">
+      <li>Each project is a Boolean decision: pick it or leave it out.</li>
+      <li>The objective maximizes total project value.</li>
+      <li>Budget, engineering, and design are shared resources with upper bounds.</li>
+      <li>The manual draft is interactive; the solver computes the best feasible portfolio from the same editable data.</li>
+    </ul>
     <div class="controls">
-      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve BOP model">Solve BOP model</button>
     </div>
-    <div id="solution-output">Run the solver to view the selected projects.</div>
+    <div id="portfolio-app"></div>
+    <div id="solution-output">Solve the BOP model to view the selected projects.</div>
     <p>Status / Response:</p>
     <pre id="status"></pre>
     <script type="module" src="./code_highlight.ts"></script>

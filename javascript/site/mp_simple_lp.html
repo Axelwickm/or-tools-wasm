@@ -26,6 +26,7 @@ await initMPSolver();
 
 const solver = MPSolver.CreateSolver('GLOP');
 if (!solver) throw new Error('GLOP is unavailable');
+solver.SetNumThreads(4);
 
 const x = solver.NumVar(0, 1, 'x');
 const y = solver.NumVar(0, 1, 'y');
@@ -46,6 +47,15 @@ console.log(x.solution_value(), y.solution_value());</code></pre>
       MPSolver routes one tiny linear model through selectable backends. GLOP, CLP,
       and GLPK_LP solve it as a continuous LP; SAT, GLPK, SCIP, CBC, BOP, and Knapsack solve the same model with integral variables.
     </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>The model has two variables, one capacity constraint, and one linear objective.</li>
+        <li>The solver menu changes which MPSolver backend receives the model.</li>
+        <li>LP backends solve continuous variables; integer backends solve integral variables.</li>
+        <li>The result compares objective value, variable values, iterations, and branch-and-bound nodes.</li>
+      </ul>
+    </div>
     <div class="controls">
       <label>
         Backend
@@ -61,7 +71,7 @@ console.log(x.solution_value(), y.solution_value());</code></pre>
           <option value="SAT">SAT</option>
         </select>
       </label>
-      <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1" disabled></label>
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve model">Solve model</button>
     </div>

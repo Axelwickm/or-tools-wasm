@@ -54,6 +54,15 @@ console.log(result.objectiveValue, result.variableValues);</code></pre>
       The browser demo solves the same two-variable linear model with a selectable MathOpt backend.
       GLPK runs with a single thread.
     </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>The model has two variables, one capacity constraint, and one linear objective.</li>
+        <li>The backend selector sends the same MathOpt model to different solver backends.</li>
+        <li>Integer-capable backends use binary variables; LP backends use continuous variables between 0 and 1.</li>
+        <li>The solution table shows how the selected backend values the same small model.</li>
+      </ul>
+    </div>
     <div class="controls">
       <label>
         Backend

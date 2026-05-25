@@ -5,7 +5,130 @@
     <title>Set Cover - Greedy Heuristic</title>
     <link rel="stylesheet" href="./example.css">
     <style>
-      #solution-output { margin: 0.75rem 0; }
+      .example-notes {
+        margin: 0.75rem 0;
+        padding-left: 1.25rem;
+      }
+      .example-notes li {
+        margin-bottom: 0.25rem;
+      }
+      .coverage-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 900px) 18rem;
+        gap: 0.9rem;
+        align-items: start;
+        margin: 0.75rem 0;
+      }
+      .coverage-map {
+        position: relative;
+        min-height: 30rem;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background:
+          linear-gradient(#f6f8fa 1px, transparent 1px),
+          linear-gradient(90deg, #f6f8fa 1px, transparent 1px);
+        background-size: 2rem 2rem;
+        overflow: hidden;
+      }
+      .coverage-region {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        width: var(--w);
+        height: var(--h);
+        border: 2px solid var(--color);
+        background: color-mix(in srgb, var(--color) 18%, transparent);
+        border-radius: var(--radius, 1.75rem);
+        transform: rotate(var(--rotation, 0deg));
+        opacity: 0.55;
+      }
+      .coverage-region.selected-region {
+        opacity: 0.88;
+        border-width: 3px;
+      }
+      .coverage-region.dimmed-region {
+        opacity: 0.12;
+      }
+      .coverage-region.hovered-region {
+        opacity: 0.95;
+        border-width: 3px;
+        z-index: 1;
+      }
+      .coverage-region-label {
+        position: absolute;
+        left: 0.6rem;
+        top: 0.45rem;
+        color: #24292f;
+        font-weight: 700;
+        transform: rotate(calc(var(--rotation, 0deg) * -1));
+      }
+      .coverage-point {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        transform: translate(-50%, -50%);
+        width: 2.1rem;
+        height: 2.1rem;
+        border: 1px solid #d0d7de;
+        border-radius: 999px;
+        background: #fff;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        z-index: 2;
+      }
+      .coverage-point.covered {
+        border-color: var(--cover-color, #1a7f37);
+        background: color-mix(in srgb, var(--cover-color, #1a7f37) 28%, #fff);
+      }
+      .coverage-point.hovered-point {
+        border-color: var(--hover-color);
+        background: color-mix(in srgb, var(--hover-color) 22%, #fff);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--hover-color) 22%, transparent);
+      }
+      .coverage-point.missing {
+        border-color: #cf222e;
+        background: #ffebe9;
+      }
+      .coverage-legend {
+        display: grid;
+        gap: 0.5rem;
+      }
+      .legend-row {
+        border: 1px solid #d0d7de;
+        border-left: 0.45rem solid var(--color);
+        border-radius: 6px;
+        padding: 0.5rem;
+      }
+      .legend-row.selected-region {
+        background: #f0fff4;
+        border-color: #1a7f37;
+        border-left-color: var(--color);
+      }
+      .legend-row.dimmed-region {
+        opacity: 0.38;
+      }
+      .legend-row.hovered-region {
+        background: #f6f8ff;
+        border-color: #8250df;
+        border-left-color: var(--color);
+      }
+      .legend-title {
+        font-weight: 700;
+      }
+      .legend-elements {
+        color: #57606a;
+        font-size: 0.9rem;
+      }
+      .solution-panel {
+        margin: 0.75rem 0;
+      }
+      .summary-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+      }
       #status { min-height: 7rem; }
     </style>
   </head>
@@ -49,14 +172,25 @@ if (hasFound) {
 }</code></pre>
       </details>
     </div>
-    <p>
-      Direct port of the OR-Tools Set Cover sample through the dedicated Python-like Set Cover API.
-    </p>
+    <ul class="example-notes">
+      <li>Elements are the things that must be covered.</li>
+      <li>Each colored region is a subset with a cost and a fixed list of covered elements.</li>
+      <li>The greedy heuristic chooses subsets until every element is covered, while trying to keep cost low.</li>
+      <li>After solving, chosen subsets and covered elements are highlighted.</li>
+    </ul>
     <div class="controls">
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve Set Cover">Solve Set Cover</button>
+      <button id="clear" type="button">Clear</button>
     </div>
-    <div id="solution-output">Run the solver to view the solution.</div>
+    <div class="coverage-layout">
+      <div id="coverage-map" class="coverage-map" aria-label="Set cover spatial map"></div>
+      <div id="coverage-legend" class="coverage-legend" aria-label="Set cover subset legend"></div>
+    </div>
+    <div class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the solution.</div>
+    </div>
     <p>Status:</p>
     <pre id="status"></pre>
     <script type="module" src="./code_highlight.ts"></script>

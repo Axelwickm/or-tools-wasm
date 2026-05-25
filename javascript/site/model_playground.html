@@ -43,6 +43,15 @@ console.log(result.response);</code></pre>
       </details>
     </div>
     <p>Paste a JSON-shaped <code>CpModelProto</code>, optionally edit SAT parameters, then validate or solve it in the browser.</p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>The model input is raw JSON shaped like a CP-SAT <code>CpModelProto</code>.</li>
+        <li>The parameter input is JSON shaped like <code>SatParameters</code>.</li>
+        <li>Validate checks whether the protobuf model is structurally acceptable before solving.</li>
+        <li>Solve sends the encoded proto directly to the CP-SAT WebAssembly runtime.</li>
+      </ul>
+    </div>
 
     <div class="controls">
       <button id="load-sample">Load sample</button>

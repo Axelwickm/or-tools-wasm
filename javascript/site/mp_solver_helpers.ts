@@ -7,6 +7,7 @@ export type SimpleMpConfig = {
   variableKind: VariableKind;
   expectedObjective: number;
   workerCount?: number;
+  solverThreads?: number;
 };
 
 type SimpleMpResult = {
@@ -21,6 +22,9 @@ type SimpleMpResult = {
   nodes: number;
   usedWorkerBridge: boolean;
   workerCount?: number;
+  solverThreads?: number;
+  solverThreadsAccepted?: boolean;
+  activeSolverThreads?: number;
 };
 
 export function setRunning(button: HTMLButtonElement | null, running: boolean): void {
@@ -41,6 +45,37 @@ export function configureWorkerBridge(toggle: HTMLInputElement | null): void {
   toggle.addEventListener('change', () => {
     setWorkerBridgeEnabled(toggle.checked);
   });
+}
+
+export function configureSolverThreadsInput(input: HTMLInputElement | null, maxThreads = 8): void {
+  if (!input) return;
+  input.min = '1';
+  input.max = String(Math.max(1, maxThreads));
+  if (!input.value || input.disabled) {
+    input.value = String(Math.max(1, Math.min(4, maxThreads)));
+  }
+  input.disabled = false;
+}
+
+export function getSelectedSolverThreads(input: HTMLInputElement | null, maxThreads = 8): number {
+  const requested = Number.parseInt(input?.value ?? '1', 10) || 1;
+  const threads = Math.min(Math.max(1, requested), Math.max(1, maxThreads));
+  if (input) input.value = String(threads);
+  return threads;
+}
+
+export function applySolverThreads(solver: MPSolver, threads: number): {
+  requested: number;
+  accepted: boolean;
+  active: number;
+} {
+  const requested = Math.max(1, Math.trunc(threads));
+  const accepted = solver.SetNumThreads(requested);
+  return {
+    requested,
+    accepted,
+    active: solver.GetNumThreads(),
+  };
 }
 
 export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<SimpleMpResult> {
@@ -69,19 +104,26 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
     objective.SetCoefficient(y, 1);
     objective.SetMaximization();
 
-    const workerCount = config.workerCount && config.workerCount > 1
-      ? Math.floor(config.workerCount)
+    const solverThreads = config.solverThreads ?? config.workerCount;
+    const threadConfig = solverThreads ? applySolverThreads(solver, solverThreads) : undefined;
+    const workerCount = solverThreads && solverThreads > 1
+      ? Math.floor(solverThreads)
       : undefined;
-    const protoResult = await solver.SolveWithProto({
-      solverSpecificParameters: config.solverId === 'SAT' && workerCount
-        ? `num_workers: ${workerCount}`
-        : undefined,
-    });
-    if (!protoResult.loaded) {
-      throw new Error('Solver returned a solution response that could not be loaded.');
+    let status: number | string = MPSolver.OPTIMAL;
+    if (config.solverId === 'SAT') {
+      const protoResult = await solver.SolveWithProto({
+        solverSpecificParameters: workerCount ? `num_workers: ${workerCount}` : undefined,
+      });
+      if (!protoResult.loaded) {
+        throw new Error('Solver returned a solution response that could not be loaded.');
+      }
+      status = protoResult.response.status ?? MPSolver.OPTIMAL;
+    } else {
+      status = await solver.Solve();
+      if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
     }
     const result = {
-      status: protoResult.response.status ?? MPSolver.OPTIMAL,
+      status,
       objective: objective.Value(),
       x: x.solution_value(),
       y: y.solution_value(),
@@ -92,6 +134,9 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       nodes: solver.nodes(),
       usedWorkerBridge: isWorkerBridgeEnabled(),
       workerCount,
+      solverThreads: threadConfig?.requested,
+      solverThreadsAccepted: threadConfig?.accepted,
+      activeSolverThreads: threadConfig?.active,
     };
     assertExpectedObjective(result, config.expectedObjective);
     return result;
@@ -110,7 +155,9 @@ export function renderSimpleMpResult(element: HTMLElement | null, result: Simple
       <tbody>
         <tr><th>Status</th><td>${status}</td></tr>
         <tr><th>Worker bridge</th><td>${result.usedWorkerBridge ? 'enabled' : 'disabled'}</td></tr>
-        ${result.workerCount ? `<tr><th>Solver workers</th><td>${result.workerCount}</td></tr>` : ''}
+        ${result.solverThreads ? `<tr><th>Requested solver threads</th><td>${result.solverThreads}</td></tr>` : ''}
+        ${result.solverThreads ? `<tr><th>Thread request accepted</th><td>${result.solverThreadsAccepted ? 'yes' : 'no'}</td></tr>` : ''}
+        ${result.activeSolverThreads ? `<tr><th>Active solver threads</th><td>${result.activeSolverThreads}</td></tr>` : ''}
         <tr><th>Objective</th><td>${formatNumber(result.objective)}</td></tr>
         <tr><th>x</th><td>${formatNumber(result.x)}</td></tr>
         <tr><th>y</th><td>${formatNumber(result.y)}</td></tr>

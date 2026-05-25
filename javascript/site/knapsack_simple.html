@@ -5,7 +5,85 @@
     <title>Knapsack - Dedicated Solver</title>
     <link rel="stylesheet" href="./example.css">
     <style>
-      #solution-output { margin: 0.75rem 0; }
+      .matrix-scroll {
+        max-width: 100%;
+        overflow-x: auto;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+      }
+      #matrix {
+        min-width: 44rem;
+        margin-bottom: 0;
+      }
+      #matrix th,
+      #matrix td {
+        text-align: center;
+        vertical-align: middle;
+      }
+      #matrix th:first-child,
+      #matrix td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        min-width: 7.5rem;
+        text-align: left;
+        background: #f6f8fa;
+      }
+      #matrix input {
+        width: 4.75rem;
+        box-sizing: border-box;
+        text-align: right;
+      }
+      #matrix .selected-column {
+        background: #dff7df;
+      }
+      #matrix .unselected-column {
+        color: #6e7781;
+      }
+      #matrix .selected-cell {
+        font-weight: 700;
+      }
+      .summary-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+      }
+      .solution-panel {
+        margin: 0.75rem 0;
+      }
+      .usage-output {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+      }
+      .usage-row {
+        margin: 0;
+      }
+      .usage-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+      }
+      .usage-track {
+        height: 0.65rem;
+        background: #eaeef2;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .usage-fill {
+        height: 100%;
+        width: var(--usage, 0%);
+        background: #1a7f37;
+      }
+      .example-notes {
+        margin: 0.75rem 0;
+        padding-left: 1.25rem;
+      }
+      .example-notes li {
+        margin-bottom: 0.25rem;
+      }
       #status { min-height: 7rem; }
     </style>
   </head>
@@ -29,32 +107,55 @@
 setWorkerBridgeEnabled(true);
 await initKnapsack();
 
-const profits = [360, 83, 59, 130, 431, 67, 230, 52, 93, 125, 670, 892, 600];
-const weights = [[7, 0, 30, 22, 80, 94, 11, 81, 70, 64, 59, 18, 0]];
-const capacities = [170];
+const values = [
+  360, 83, 59, 130, 431, 67, 230, 52, 93, 125, 670, 892, 600, 38, 48, 147,
+  78, 256,
+];
+const weights = [[
+  7, 0, 30, 22, 80, 94, 11, 81, 70, 64, 59, 18, 0, 36, 3, 8, 15, 42,
+], [
+  12, 4, 38, 20, 55, 45, 9, 52, 41, 35, 48, 16, 8, 22, 6, 12, 10, 28,
+]];
+const capacities = [240, 150];
 
 const solver = new KnapsackSolver(
   KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER,
   'KnapsackExample',
 );
-solver.init(profits, weights, capacities);
+solver.init(values, weights, capacities);
 
-const profit = await solver.solve();
-const selectedItems = profits
+const computedValue = await solver.solve();
+const packedItems = values
   .map((_, item) => item)
   .filter((item) => solver.best_solution_contains(item));
 
-console.log(profit, selectedItems, solver.is_solution_optimal());</code></pre>
+console.log(computedValue, packedItems);</code></pre>
       </details>
     </div>
-    <p>
-      Direct use of <code>ortools.algorithms.python.knapsack_solver</code>-style data through the dedicated Knapsack API.
-    </p>
+    <ul class="example-notes">
+      <li>Each item is a column; edit the cells to change the model before solving.</li>
+      <li>The value row is what the solver maximizes.</li>
+      <li>Each resource row is something selected items consume, such as weight, volume, time, or budget.</li>
+      <li>The capacity cell at the right is the limit for that resource.</li>
+      <li>Add a resource when the same items must satisfy another limit at the same time.</li>
+      <li>After solving, selected item columns are highlighted and the solution reports total value, packed item ids, and resource usage.</li>
+    </ul>
     <div class="controls">
       <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
       <button id="run" data-idle-label="Solve Knapsack">Solve Knapsack</button>
+      <button id="add-item" type="button">Add item</button>
+      <button id="remove-item" type="button">Remove item</button>
+      <button id="add-resource" type="button">Add resource</button>
+      <button id="remove-resource" type="button">Remove resource</button>
     </div>
-    <div id="solution-output">Run the solver to view the solution.</div>
+    <div class="matrix-scroll">
+      <table id="matrix" aria-label="Knapsack value and weight matrix"></table>
+    </div>
+    <div class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the solution.</div>
+      <div id="usage-output" class="usage-output"></div>
+    </div>
     <p>Status:</p>
     <pre id="status"></pre>
     <script type="module" src="./code_highlight.ts"></script>

@@ -1,5 +1,14 @@
 import { initMPSolver, isWorkerBridgeEnabled, MPSolver } from 'or-tools-wasm/mp-solver';
-import { appendStatus, configureWorkerBridge, formatNumber, renderSimpleMpResult, setRunning } from './mp_solver_helpers.js';
+import {
+  appendStatus,
+  applySolverThreads,
+  configureSolverThreadsInput,
+  configureWorkerBridge,
+  formatNumber,
+  getSelectedSolverThreads,
+  renderSimpleMpResult,
+  setRunning,
+} from './mp_solver_helpers.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 const solutionOutput = document.getElementById('solution-output');
@@ -16,24 +25,9 @@ const solverId = document.body.dataset.solverId === 'GLPK'
       ? 'CBC'
       : 'SAT';
 
-if (workerInput) {
-  workerInput.max = String(maxWorkerCount);
-  workerInput.min = '1';
-  workerInput.value = String(maxWorkerCount);
-}
+configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 configureWorkerBridge(workerBridgeToggle);
-
-if (solverId !== 'SAT') {
-  if (workerInput) workerInput.disabled = true;
-}
-
-function getSelectedWorkerCount() {
-  const requested = Number.parseInt(workerInput?.value ?? '1', 10) || 1;
-  const workers = Math.min(Math.max(1, requested), maxWorkerCount);
-  if (workerInput) workerInput.value = String(workers);
-  return workers;
-}
 
 async function runSimpleMip() {
   setRunning(runButton, true);
@@ -59,13 +53,12 @@ async function runSimpleMip() {
       objective.SetCoefficient(y, 10);
       objective.SetMaximization();
 
-      const workerCount = solverId === 'SAT' ? getSelectedWorkerCount() : undefined;
-      appendStatus(statusEl, workerCount
-        ? `Solving with SAT integer backend, workers=${workerCount}...`
-        : `Solving with ${solverId} integer backend...`);
+      const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
+      const threadConfig = applySolverThreads(solver, solverThreads);
+      appendStatus(statusEl, `Solving with ${solverId} integer backend, requested solver threads=${solverThreads}...`);
       if (solverId === 'SAT') {
         const protoResult = await solver.SolveWithProto({
-          solverSpecificParameters: `num_workers: ${workerCount}`,
+          solverSpecificParameters: `num_workers: ${solverThreads}`,
         });
         if (!protoResult.loaded) throw new Error('Solver returned a solution response that could not be loaded.');
       } else {
@@ -87,7 +80,9 @@ async function runSimpleMip() {
         iterations: solver.Iterations(),
         nodes: solver.nodes(),
         usedWorkerBridge: isWorkerBridgeEnabled(),
-        workerCount,
+        solverThreads: threadConfig.requested,
+        solverThreadsAccepted: threadConfig.accepted,
+        activeSolverThreads: threadConfig.active,
       });
       appendStatus(statusEl, `Objective: ${formatNumber(objective.Value())}`);
       appendStatus(statusEl, `x = ${formatNumber(x.solution_value())}`);

@@ -5,13 +5,109 @@
 		<title>CP-SAT - Sports Scheduling</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
-			#status { min-height: 12rem; }
-			#schedule-output { margin: 0.75rem 0; }
-			#schedule-message { margin-bottom: 0.5rem; color: #555; }
-			th, td { text-align: center; }
-			th { background: #f0f4ff; }
-			td[data-location="home"] { background: #e8f5e9; }
-			td[data-location="away"] { background: #fbe9e7; }
+			#status { min-height: 8rem; }
+			.example-notes {
+				margin: 0.75rem 0;
+				padding-left: 1.25rem;
+			}
+			.example-notes li {
+				margin-bottom: 0.25rem;
+			}
+			.schedule-wrap {
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				padding: 0.75rem;
+				margin: 0.75rem 0;
+			}
+			.day-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+				gap: 0.75rem;
+				margin-top: 0.75rem;
+			}
+			.day-card {
+				border: 1px solid #d0d7de;
+				border-radius: 4px;
+				padding: 0.6rem;
+				background: #fff;
+			}
+			.day-title {
+				font-weight: 700;
+				margin-bottom: 0.4rem;
+			}
+			.match-line {
+				border-radius: 4px;
+				padding: 0.25rem 0.35rem;
+				margin-bottom: 0.25rem;
+				font-variant-numeric: tabular-nums;
+			}
+			.match-line.highlighted {
+				background: #fff8c5;
+			}
+			.streak-panel {
+				margin-top: 1rem;
+				overflow-x: auto;
+			}
+			.streak-grid {
+				display: grid;
+				grid-template-columns: 6rem repeat(var(--days), 2.4rem);
+				gap: 0.25rem;
+				min-width: calc(6rem + var(--days) * 2.4rem);
+			}
+			.streak-label,
+			.streak-header,
+			.streak-cell {
+				border: 1px solid #d0d7de;
+				border-radius: 4px;
+				padding: 0.3rem;
+				text-align: center;
+			}
+			.streak-label,
+			.streak-header {
+				background: #f6f8fa;
+				font-weight: 700;
+			}
+			.streak-cell.home {
+				background: #dff7df;
+				border-color: #1a7f37;
+			}
+			.streak-cell.away {
+				background: #ffebe9;
+				border-color: #cf222e;
+			}
+			.streak-cell.break {
+				box-shadow: inset 0 -4px 0 #bf8700;
+			}
+			.streak-row-dimmed,
+			.match-line.dimmed {
+				opacity: 0.35;
+			}
+			.schedule-legend {
+				display: flex;
+				gap: 0.75rem;
+				flex-wrap: wrap;
+				margin: 0.5rem 0;
+			}
+			.legend-swatch {
+				display: inline-block;
+				width: 1rem;
+				height: 1rem;
+				border: 1px solid #d0d7de;
+				border-radius: 3px;
+				vertical-align: -0.15rem;
+				margin-right: 0.25rem;
+			}
+			.legend-swatch.home { background: #dff7df; border-color: #1a7f37; }
+			.legend-swatch.away { background: #ffebe9; border-color: #cf222e; }
+			.legend-swatch.break { background: linear-gradient(to top, #bf8700 0 30%, #fff 30%); }
+			.solution-panel {
+				margin: 0.75rem 0;
+			}
+			.summary-value {
+				font-size: 1.35rem;
+				font-weight: 700;
+				margin-bottom: 0.35rem;
+			}
 		</style>
 	</head>
 	<body>
@@ -132,23 +228,39 @@ const result = await CpSat.solve(model, params);
 console.log(result.response?.objectiveValue, result.response?.solution);</code></pre>
 			</details>
 		</div>
-		<p>This demo adapts the <code>sports_scheduling_sat</code>
-			sample to the browser using the <code>cp_sat_api</code>
-			WebAssembly module. It builds a double round-robin schedule where teams play each opponent once per half-season
-			while minimizing home/away breaks.</p>
+		<ul class="example-notes">
+			<li>Each team plays exactly one match per day.</li>
+			<li>Every pair of teams plays twice: once home and once away.</li>
+			<li>The season is split into two halves, and each pair meets once per half.</li>
+			<li>A break is two home games in a row or two away games in a row for the same team.</li>
+			<li>The solver minimizes total breaks while satisfying the round-robin constraints.</li>
+		</ul>
 		<div class="controls">
-			<label>Teams <input id="teams" class="medium-number" type="number" value="10" min="2" step="2"></label>
+			<label>Teams <input id="teams" class="medium-number" type="number" value="6" min="2" step="2"></label>
 			<label>Workers <input id="workers" class="short-number" type="number" value="4" min="1"></label>
 			<label><input id="use-worker-bridge" type="checkbox" checked>
 			Use worker bridge</label>
 			<button id="run">Build schedule</button>
 			<button id="stop" disabled>Stop</button>
 		</div>
-		<div id="schedule-output">
+		<div id="schedule-output" class="schedule-wrap">
 			<p id="schedule-message">Provide parameters and run the solver to see a schedule.</p>
-			<table id="schedule-table" class="hidden"></table>
+			<div class="schedule-legend hidden" id="schedule-legend">
+				<span><span class="legend-swatch home"></span>Home</span>
+				<span><span class="legend-swatch away"></span>Away</span>
+				<span><span class="legend-swatch break"></span>Break</span>
+			</div>
+			<div id="day-grid" class="day-grid hidden"></div>
+			<div id="streak-panel" class="streak-panel hidden">
+				<h2>Home/away rhythm</h2>
+				<div id="streak-grid" class="streak-grid"></div>
+			</div>
 		</div>
-		<p>Status / Response:</p>
+		<section class="solution-panel">
+			<h2>Solution</h2>
+			<div id="solution-output">Run the solver to view the solution.</div>
+		</section>
+		<p>Status:</p>
 		<pre id="status"></pre>
 
 		<script type="module" src="./code_highlight.ts"></script>

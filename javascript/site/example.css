@@ -138,6 +138,18 @@ pre,
 	margin-bottom: 0.75rem;
 }
 
+.example-explanation,
+.example-notes {
+	max-width: 900px;
+	margin: 1rem 0;
+}
+
+.example-explanation ul {
+	margin-top: 0.35rem;
+	margin-bottom: 0;
+	padding-left: 1.25rem;
+}
+
 .section-heading {
 	margin-top: 1.25rem;
 }

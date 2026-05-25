@@ -1,7 +1,9 @@
 import {
   appendStatus,
+  configureSolverThreadsInput,
   configureWorkerBridge,
   formatNumber,
+  getSelectedSolverThreads,
   renderSimpleMpResult,
   setRunning,
   solveSimpleMpProgram,
@@ -17,12 +19,7 @@ const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
 configureWorkerBridge(workerBridgeToggle);
-
-if (workerInput) {
-  workerInput.max = String(maxWorkerCount);
-  workerInput.min = '1';
-  workerInput.value = String(maxWorkerCount);
-}
+configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 function selectedSolverId() {
   return solverSelect?.value === 'CLP'
@@ -37,37 +34,20 @@ function selectedSolverId() {
     : 'GLOP';
 }
 
-function getSelectedWorkerCount() {
-  const requested = Number.parseInt(workerInput?.value ?? '1', 10) || 1;
-  const workers = Math.min(Math.max(1, requested), maxWorkerCount);
-  if (workerInput) workerInput.value = String(workers);
-  return workers;
-}
-
-function updateWorkerInput() {
-  if (!workerInput) return;
-  workerInput.disabled = selectedSolverId() !== 'SAT';
-}
-
-solverSelect?.addEventListener('change', updateWorkerInput);
-updateWorkerInput();
-
 async function runSimpleLp() {
   setRunning(runButton, true);
   if (statusEl) statusEl.textContent = '';
   try {
     const solverId = selectedSolverId();
     const variableKind = solverId === 'SAT' || solverId === 'GLPK' || solverId === 'SCIP' || solverId === 'CBC' || solverId === 'BOP' || solverId === 'KNAPSACK' ? 'integer' : 'continuous';
-    const workerCount = solverId === 'SAT' ? getSelectedWorkerCount() : undefined;
+    const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
-    appendStatus(statusEl, workerCount
-      ? `Solving with ${solverId}, workers=${workerCount}...`
-      : `Solving with ${solverId}...`);
+    appendStatus(statusEl, `Solving with ${solverId}, requested solver threads=${solverThreads}...`);
     const result = await solveSimpleMpProgram({
       solverId,
       variableKind,
       expectedObjective: 2,
-      workerCount,
+      solverThreads,
     });
 
     renderSimpleMpResult(solutionOutput, result);

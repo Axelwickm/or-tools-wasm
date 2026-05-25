@@ -25,10 +25,12 @@ as multithreaded WebAssembly.
 
 Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in).
 
-`or-tools-wasm` provides solver-specific WebAssembly runtimes and TypeScript
-APIs for CP-SAT, routing, MPSolver, MathOpt, PDLP, Knapsack, Network Flow, Set
-Cover, and RCPSP. It is published as an ESM package and is verified with Vite 7,
-Webpack 5, Rollup 4, Node 22, Deno 2, and Bun.
+<p>
+  <img src="docs/media/network_design.gif" alt="Network design optimization in PragmaPlanner" width="24%">
+  <img src="docs/media/vrp.gif" alt="Vehicle routing optimization in PragmaPlanner" width="24%">
+  <img src="docs/media/sudoku.gif" alt="Sudoku optimization example in PragmaPlanner" width="24%">
+  <img src="docs/media/steel_mill_slab.png" alt="Steel mill slab optimization in PragmaPlanner" width="24%">
+</p>
 
 ## Usage
 

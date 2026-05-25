@@ -5,24 +5,29 @@
 		<title>Routing - Dispatch Map</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
-			#map {
+			.example-notes {
+				max-width: 56rem;
+			}
+			.route-visual-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 960px) minmax(28rem, 1fr);
+				gap: 1rem;
+				align-items: start;
+				margin: 1rem 0;
+			}
+			#dispatch-map {
 				display: block;
 				width: 100%;
-				max-width: 820px;
-				aspect-ratio: 1 / 1;
+				max-width: 960px;
 				border: 1px solid #d0d7de;
 				border-radius: 6px;
 				background: #f6f8fa;
 			}
-			.scenario-note {
-				max-width: 1120px;
-				color: #57606a;
-			}
 			#dispatch-summary {
 				display: grid;
-				grid-template-columns: repeat(4, minmax(0, 1fr));
+				grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
 				gap: 0.75rem;
-				max-width: 1120px;
+				max-width: 960px;
 				margin: 0.75rem 0;
 			}
 			#dispatch-summary div,
@@ -40,10 +45,15 @@
 			.route-card small {
 				color: #57606a;
 			}
-			#route-output { margin: 0.75rem 0; max-width: 1120px; }
+			.route-card h2 {
+				margin-top: 0;
+			}
+			.route-panel h2 {
+				margin-top: 0;
+			}
 			.route-cards {
 				display: grid;
-				grid-template-columns: repeat(3, minmax(0, 1fr));
+				grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
 				gap: 0.75rem;
 			}
 			.route-card {
@@ -51,21 +61,18 @@
 			}
 			.route-card h2 {
 				font-size: 1rem;
-				margin: 0 0 0.25rem;
+				margin-bottom: 0.25rem;
 			}
 			.route-card p {
 				margin-bottom: 0.35rem;
+			}
+			#route-output {
+				margin: 0.75rem 0 0;
 			}
 			.dropped-stops {
 				color: #b3261e;
 			}
 			#status { min-height: 9rem; }
-			@media (max-width: 760px) {
-				#dispatch-summary,
-				.route-cards {
-					grid-template-columns: 1fr;
-				}
-			}
 		</style>
 	</head>
 	<body>
@@ -74,12 +81,11 @@
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>Routing - Dispatch Map</h1>
-		<p><em>Problem: assign pallet deliveries to trucks from multiple depots while keeping each route within vehicle capacity.</em></p>
+		<p><em>Problem: assign pallet deliveries to trucks from multiple depots while respecting truck capacity and route length.</em></p>
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import {
-  CpSat,
   DefaultRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
@@ -91,9 +97,8 @@
 setWorkerBridgeEnabled(true);
 await initRouting();
 
-const vehicleCapacities = [20, 20, 24];
-const starts = [0, 1, 2];
-const manager = new RoutingIndexManager(stops.length, 3, starts, starts);
+const starts = [0, 1, 2, 3];
+const manager = new RoutingIndexManager(stops.length, starts.length, starts, starts);
 const routing = new RoutingModel(manager);
 const transit = routing.RegisterTransitCallback((from, to) =&gt; {
   const a = stops[manager.IndexToNode(from)];
@@ -101,33 +106,47 @@ const transit = routing.RegisterTransitCallback((from, to) =&gt; {
   return Math.round(Math.hypot(a.x - b.x, a.y - b.y));
 });
 routing.SetArcCostEvaluatorOfAllVehicles(transit);
+
 const demand = routing.RegisterUnaryTransitCallback((from) =&gt;
   stops[manager.IndexToNode(from)].demand,
 );
 routing.AddDimensionWithVehicleCapacity(demand, 0, vehicleCapacities, true, 'load');
-routing.AddDimension(transit, 0, 2200, true, 'distance');
+routing.AddDimension(transit, 0, routeDistanceCap, true, 'distance');
+
+deliveryNodes.forEach((node) =&gt; {
+  routing.AddDisjunction([manager.NodeToIndex(node)], dropPenaltyFor(node));
+});
 
 const params = DefaultRoutingSearchParameters();
 params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 const assignment = await routing.SolveWithParameters(params);</code></pre>
 			</details>
 		</div>
-		<p>A capacitated multi-depot delivery problem: three trucks leave separate depots to deliver pallet orders across a city grid.</p>
-		<p class="scenario-note">
-			Each customer has a pallet demand, each truck has a pallet capacity, and the solver minimizes total travel while keeping every route under the distance limit. Drop penalties are configured as a safety valve, but this default scenario has enough capacity to serve every stop.
-		</p>
+		<ul class="example-notes">
+			<li>Several trucks start and end at separate depots.</li>
+			<li>Each delivery has a random pallet demand and priority.</li>
+			<li>Delivery border color shows priority: gray is standard, amber is express, and red is critical.</li>
+			<li>Each truck has the same pallet capacity and a route distance cap.</li>
+			<li>Drop penalties allow impossible or inefficient deliveries to be left unserved, with critical stops penalized most.</li>
+			<li>Before solving, the map shows generated depots and deliveries; after solving, each color is one truck route.</li>
+		</ul>
 		<div class="controls">
 			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<label>Deliveries <input id="delivery-count" class="short-number" type="number" min="1" value="60"></label>
+			<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
+			<label>Capacity <input id="vehicle-capacity" class="short-number" type="number" min="1" value="100"></label>
+			<label>Distance cap <input id="distance-cap" class="short-number" type="number" min="1" value="1600"></label>
+			<button id="randomize" type="button">Randomize</button>
 			<button id="run">Plan dispatch</button>
 		</div>
-		<div id="dispatch-summary">
-			<div><strong>3</strong><span>available vehicles</span></div>
-			<div><strong>57</strong><span>pallets requested</span></div>
-			<div><strong>64</strong><span>pallet capacity</span></div>
-			<div><strong>2200m</strong><span>route distance cap</span></div>
+		<div id="dispatch-summary"></div>
+		<div class="route-visual-layout">
+			<svg id="dispatch-map" viewBox="0 0 960 620" role="img" aria-label="Dispatch routing map"></svg>
+			<section class="route-panel">
+				<h2>Routes</h2>
+				<div id="route-output">Run the solver to animate dispatch routes.</div>
+			</section>
 		</div>
-		<canvas id="map" width="900" height="900"></canvas>
-		<div id="route-output">Run the solver to animate dispatch routes.</div>
 		<p>Status / Response:</p>
 		<pre id="status"></pre>
 

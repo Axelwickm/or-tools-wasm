@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>MPSolver - Network Design MIP</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      .example-notes {
+        max-width: 58rem;
+      }
+      .network-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 980px) minmax(18rem, 1fr);
+        gap: 1rem;
+        align-items: start;
+      }
+      #network-map {
+        width: 100%;
+        max-width: 980px;
+        aspect-ratio: 16 / 10;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #fbfcfd;
+      }
+      .node circle {
+        fill: #fff;
+        stroke: #24292f;
+        stroke-width: 2;
+      }
+      .node.source circle { fill: #fff7ed; stroke: #bc4c00; }
+      .node.hub circle { fill: #eef5ff; stroke: #0969da; }
+      .node.sink circle { fill: #f0fff4; stroke: #1a7f37; }
+      .node text {
+        font-size: 13px;
+        font-weight: 650;
+        text-anchor: middle;
+        pointer-events: none;
+      }
+      .candidate-lane {
+        fill: none;
+        stroke: #8c959f;
+        stroke-width: 2;
+        stroke-dasharray: 8 7;
+        opacity: 0.44;
+        cursor: pointer;
+      }
+      .candidate-lane.open {
+        stroke: #57606a;
+        stroke-dasharray: none;
+        opacity: 0.92;
+      }
+      .candidate-lane.unused-solved {
+        opacity: 0.08;
+      }
+      .candidate-lane.highlighted {
+        opacity: 1;
+        stroke-width: 7;
+      }
+      .demand-arc {
+        fill: none;
+        stroke-width: 3;
+        stroke-dasharray: 4 6;
+        opacity: 0.42;
+        cursor: pointer;
+      }
+      .flow-dot {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .solved .flow-dot {
+        opacity: 0.9;
+        animation: flow-move 2.4s linear infinite;
+      }
+      @keyframes flow-move {
+        from { offset-distance: 0%; }
+        to { offset-distance: 100%; }
+      }
+      .map-label {
+        font-size: 12px;
+        fill: #24292f;
+        paint-order: stroke;
+        stroke: #fff;
+        stroke-width: 4px;
+        stroke-linejoin: round;
+      }
+      .panel-stack,
+      .summary-grid,
+      .lane-grid {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .summary-grid {
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+      }
+      .metric-card,
+      .demand-card,
+      .lane-card {
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #fff;
+        padding: 0.65rem 0.75rem;
+      }
+      .metric-card strong {
+        display: block;
+        font-size: 1.2rem;
+      }
+      .metric-card span,
+      .demand-card small,
+      .lane-card small {
+        color: #57606a;
+      }
+      .demand-card,
+      .lane-card {
+        border-left: 5px solid var(--card-color, #57606a);
+        cursor: default;
+      }
+      .demand-card.active,
+      .lane-card.active {
+        box-shadow: 0 0 0 2px var(--card-color, #57606a);
+      }
+      .lane-card.dimmed {
+        opacity: 0.32;
+      }
+      .lane-card h3,
+      .demand-card h3 {
+        font-size: 1rem;
+        margin: 0 0 0.25rem;
+      }
+      #solution-output { margin: 0.75rem 0; }
+      #status { min-height: 8rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>MPSolver - network design MIP</h1>
+    <p><em>Problem: decide which shipping lanes to open, then route demand through the opened network at minimum fixed plus variable cost.</em></p>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver } from 'or-tools-wasm/mp-solver';
+
+await initMPSolver();
+const solver = MPSolver.CreateSolver('SCIP');
+solver.SetNumThreads(4);
+
+const open = arcs.map((arc) =&gt; solver.BoolVar(`open_${arc.id}`));
+const flow = arcs.map((arc) =&gt;
+  demands.map((demand) =&gt; solver.NumVar(0, solver.infinity(), `flow_${arc.id}_${demand.id}`)));
+
+for (const [arcIndex, arc] of arcs.entries()) {
+  const capacity = solver.Constraint(-solver.infinity(), 0);
+  capacity.SetCoefficient(open[arcIndex], -arc.capacity);
+  for (const demandIndex of demands.keys()) {
+    capacity.SetCoefficient(flow[arcIndex][demandIndex], 1);
+  }
+}
+
+for (const [demandIndex, demand] of demands.entries()) {
+  for (const node of nodes) {
+    const rhs = node.id === demand.from ? demand.amount : node.id === demand.to ? -demand.amount : 0;
+    const conservation = solver.Constraint(rhs, rhs);
+    for (const [arcIndex, arc] of arcs.entries()) {
+      if (arc.from === node.id) conservation.SetCoefficient(flow[arcIndex][demandIndex], 1);
+      if (arc.to === node.id) conservation.SetCoefficient(flow[arcIndex][demandIndex], -1);
+    }
+  }
+}
+
+const objective = solver.Objective();
+for (const [arcIndex, arc] of arcs.entries()) {
+  objective.SetCoefficient(open[arcIndex], arc.fixedCost);
+  for (const demandIndex of demands.keys()) {
+    objective.SetCoefficient(flow[arcIndex][demandIndex], arc.unitCost);
+  }
+}
+objective.SetMinimization();
+await solver.Solve();</code></pre>
+      </details>
+    </div>
+    <ul class="example-notes">
+      <li>This is a mixed-integer linear program: lane-open decisions are binary, shipment flows are continuous.</li>
+      <li>Opening a lane pays a fixed cost even before any shipment moves on it.</li>
+      <li>Each shipment demand must be conserved through the network from source to destination.</li>
+      <li>A lane can carry flow only if it is opened, and its total flow cannot exceed capacity.</li>
+      <li>Hover a demand or an opened lane after solving to see the related routes.</li>
+    </ul>
+    <div class="controls">
+      <label>Backend
+        <select id="solver-id">
+          <option value="SCIP">SCIP</option>
+          <option value="CBC">CBC</option>
+          <option value="GLPK">GLPK</option>
+        </select>
+      </label>
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <button id="run" data-idle-label="Solve network design">Solve network design</button>
+      <button id="clear-solution" type="button">Clear solution</button>
+    </div>
+    <div class="network-layout">
+      <svg id="network-map" viewBox="0 0 1040 650" role="img" aria-label="Network design map"></svg>
+      <aside class="panel-stack">
+        <div id="summary" class="summary-grid"></div>
+        <section>
+          <h2>Demands</h2>
+          <div id="demand-list" class="lane-grid"></div>
+        </section>
+        <section>
+          <h2>Opened Lanes</h2>
+          <div id="lane-list" class="lane-grid"></div>
+        </section>
+      </aside>
+    </div>
+    <h2>Solution</h2>
+    <div id="solution-output">Run the solver to choose lanes and route shipments.</div>
+    <p>Status / Response:</p>
+    <pre id="status"></pre>
+    <script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./mpsolver_network_design.ts"></script>
+  </body>
+</html>
