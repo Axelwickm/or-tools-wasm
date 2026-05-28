@@ -23,7 +23,7 @@ as multithreaded WebAssembly.
 
 [Try online in your browser](https://axelwickman.com/or-tools-wasm?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=try_online)
 
-Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in).
+Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in)
 
 <p>
   <img src="docs/media/network_design.gif" alt="Network design optimization in PragmaPlanner" width="24%">
@@ -108,6 +108,10 @@ const result = await CpSat.solve(modelBytes, {
 
 console.log(result.response);
 ```
+
+## Benchmarking
+
+See [benchmarking/](benchmarking/).
 
 ## Supported OR-Tools surface
 

@@ -1,0 +1,32 @@
+# Local VCS and dependency caches.
+.git
+.gitmodules
+.npm-cache
+node_modules
+
+# Generated build outputs stay out of the Docker context. The JS benchmark
+# images consume the current build via benchmarking/package/or-tools-wasm-local.tgz.
+build
+build-*
+dist
+coverage
+test-results
+playwright-report
+
+# Large local-only test and documentation assets are not needed for benchmark images.
+tests
+docs
+
+# Keep the emsdk driver scripts, but do not send the installed toolchain.
+emsdk/.git
+emsdk/downloads
+emsdk/node
+emsdk/upstream
+
+# Benchmark outputs are mounted at runtime.
+benchmarking/results/*
+!benchmarking/results/.gitignore
+
+# Editor and OS noise.
+.DS_Store
+*.log

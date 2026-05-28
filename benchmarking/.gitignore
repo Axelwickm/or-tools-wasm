@@ -1,0 +1,9 @@
+/results/*
+!/results/.gitignore
+/package/*
+!/package/.gitignore
+
+*.log
+*.tmp
+__pycache__/
+*.pyc

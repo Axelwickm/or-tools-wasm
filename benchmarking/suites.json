@@ -1,0 +1,52 @@
+{
+  "runs": 3,
+  "warmupRuns": 1,
+  "threads": [1, 8],
+  "problems": [
+    {
+      "suite": "core",
+      "solver": "cp_sat",
+      "problem": "binary_mip_95x10",
+      "variables": 95,
+      "constraints": 10,
+      "timeLimitSeconds": 5
+    },
+    {
+      "suite": "core",
+      "solver": "routing",
+      "problem": "tsp_120",
+      "size": 120,
+      "timeLimitSeconds": 5
+    },
+    {
+      "suite": "core",
+      "solver": "mpsolver_sat",
+      "problem": "binary_mip_120x8",
+      "variables": 120,
+      "constraints": 8,
+      "timeLimitSeconds": 5
+    },
+    {
+      "suite": "core",
+      "solver": "mathopt_glop",
+      "problem": "dense_lp_240x24",
+      "variables": 240,
+      "constraints": 24,
+      "timeLimitSeconds": 5
+    },
+    {
+      "suite": "core",
+      "solver": "knapsack",
+      "problem": "multidim_knapsack_70x3",
+      "items": 70,
+      "dimensions": 3
+    },
+    {
+      "suite": "core",
+      "solver": "max_flow",
+      "problem": "layered_max_flow_160",
+      "layers": 8,
+      "width": 20
+    }
+  ]
+}
