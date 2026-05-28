@@ -115,7 +115,7 @@ function createGraphExports(module: OrToolsWasmModule): GraphExports {
 }
 
 export async function initNetworkFlow(): Promise<void> {
-  if (isBunRuntime) {
+  if (isBunRuntime || shouldUseWorkerBridge()) {
     return;
   }
   graphModulePromise ??= loadGraphRuntime().then((module) => {

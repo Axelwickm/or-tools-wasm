@@ -1,6 +1,6 @@
 # Solver Python Test Parity Audit
 
-Totals: 624 upstream tests; 437 ✅ implemented; 0 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 187 ⚪ not applicable. Open mismatches: 0.
+Totals: 633 upstream tests; 442 ✅ implemented; 0 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 191 ⚪ not applicable. Open mismatches: 0.
 Parity is tracked on two axes:
 
 - Behavioral parity: the TS/WASM fixture builds and solves the same kind of model as upstream and checks the same user-visible result assertions.
@@ -290,11 +290,18 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
 API-surface parity: this section tracks Python parameter/proto mapping tests separately from solve behavior. Backend-specific parameter wrappers are accepted as parity when the TS API encodes the same upstream proto field path or exposes a raw serialized-proto escape hatch for unsupported details.
 
 - GlpkParameters
-  - ✅ 🔎 GlpkParameters.test_to_proto - `compute_unbound_rays_if_possible` true, false, and unset are represented by `MathOpt.GlpkParameters` / `GlpkParameters` and passed into `SolveParametersProto.glpk`
+  - ✅ 🔎 GlpkParameters.test_to_proto_round_trip - `compute_unbound_rays_if_possible` true, false, and unset are represented by `MathOpt.GlpkParameters` / `GlpkParameters` and passed into `SolveParametersProto.glpk`
+- GurobiParameters
+  - ⚪ 🔎 GurobiParameters.test_to_proto_round_trip - outside current TS/WASM contract: Gurobi is not linked or exposed; raw unknown solver-specific proto parsing helpers are not part of the public MathOpt API
+  - ⚪ 🔎 GurobiParameters.test_parse_proto_fails_repeated_key - outside current TS/WASM contract: Gurobi is not linked or exposed; Python parser validation for duplicate Gurobi keys has no exposed TS equivalent
 - ProtoRoundTrip
   - ✅ 🔎 ProtoRoundTrip.test_solver_type_round_trip - `MathOpt.SolverType.GLPK` is exposed and encoded as `SOLVER_TYPE_GLPK`
+  - ✅ 🔎 ProtoRoundTrip.test_lp_algorithm_round_trip - `MathOpt.LPAlgorithm` values are exposed and encoded through `SolveParametersProto.lp_algorithm`; Python-only parse helpers for `None`/UNSPECIFIED are outside the TS contract
+  - ✅ 🔎 ProtoRoundTrip.test_emphasis_round_trip - `MathOpt.Emphasis` values are exposed and encoded through `SolveParametersProto` emphasis fields; Python-only parse helpers for `None`/UNSPECIFIED are outside the TS contract
 - SolveParametersTest
-  - ✅ 🔎 SolveParametersTest common fields - `MathOpt.encodeSolveRequest()` encodes upstream `SolveParametersProto` common fields for time limit, iteration/node/solution/objective/bound/gap limits, output, threads, random seed, LP algorithm, presolve, cuts, heuristics, scaling, and solution pool size
+  - ✅ 🔎 SolveParametersTest.test_common_to_proto - `MathOpt.encodeSolveRequest()` encodes upstream `SolveParametersProto` common fields for time limit, iteration/node/solution/objective/bound/gap limits, output, threads, random seed, LP algorithm, presolve, cuts, heuristics, scaling, and solution pool size
+  - ✅ 🔎 SolveParametersTest.test_to_proto_with_none - empty `SolveParameters` / solve options encode without setting optional solve-parameter fields
+  - ✅ 🔎 SolveParametersTest.test_to_proto_no_specifics - common solve parameters encode without solver-specific parameter submessages when no backend-specific options are supplied
   - ✅ 🔎 SolveParametersTest backend specifics/gscip - `MathOpt.GScipParameters` encodes emphasis, meta parameters, raw SCIP parameter maps, output controls, solution count, and objective limit into `SolveParametersProto.gscip`
   - ✅ 🔎 SolveParametersTest backend specifics/glop - `MathOpt.GlopParameters` encodes representative upstream `glop.GlopParameters` fields into `SolveParametersProto.glop`; raw proto bytes remain available for advanced fields
   - ✅ 🔎 SolveParametersTest backend specifics/cp_sat - `MathOpt.solve(..., { cpSat })` encodes common `SatParameters` fields into `SolveParametersProto.cp_sat`; raw proto bytes remain available for full generated SatParameters coverage
@@ -310,6 +317,7 @@ API-surface parity: this section tracks Python parameter/proto mapping tests sep
   - ⚪ ModelBuilderTest.test_import_from_mps_file - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
   - ⚪ ModelBuilderTest.test_import_from_lp_string - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
   - ⚪ ModelBuilderTest.test_import_from_lp_file - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
+  - ⚪ ModelBuilderTest.test_highs_log_callback_receives_logs_when_enabled - outside current TS contract: Python linear_solver model_builder/helper API and HiGHS backend are not exposed
   - ⚪ ModelBuilderTest.test_class_api - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
   - ⚪ ModelBuilderTest.test_large_iadd - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
   - ⚪ ModelBuilderTest.test_complex_iadd - outside current TS contract: Python linear_solver model_builder/helper API is not exposed
@@ -508,6 +516,7 @@ API-surface parity: this section tracks Python parameter/proto mapping tests sep
   - ⚪ AuxiliaryObjectiveTest.test_add_is_error_if_quad - outside current TS contract: Python objective object API is not exposed directly
   - ⚪ AuxiliaryObjectiveTest.test_set_to_quadratic_expression_error - outside current TS contract: Python objective object API is not exposed directly
   - ⚪ AuxiliaryObjectiveTest.test_set_to_expression_error_when_quadratic - outside current TS contract: Python objective object API is not exposed directly
+  - ⚪ AuxiliaryObjectiveTest.test_clear_auxiliary_objective_preserves_others - outside current TS contract: Python auxiliary objective object API is not exposed directly
 
 ## ortools/math_opt/python/model_element_test.py
 - ModelElementTest

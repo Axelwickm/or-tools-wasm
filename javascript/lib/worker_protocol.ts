@@ -172,6 +172,32 @@ export type MathOptSolveRequest = {
   interruptAtStart?: boolean;
 };
 
+export type MathOptInitRequest = {
+  type: 'mathOptInit';
+  id: number;
+};
+
+export type MathOptIncrementalRequest =
+  | {
+      type: 'mathOptIncrementalCreate';
+      id: number;
+      requestBytes: Uint8Array;
+    }
+  | {
+      type: 'mathOptIncrementalSolve';
+      id: number;
+      handle: number;
+      requestBytes: Uint8Array;
+      updateBytes?: Uint8Array;
+      useInterrupter?: boolean;
+      interruptAtStart?: boolean;
+    }
+  | {
+      type: 'mathOptIncrementalDelete';
+      id: number;
+      handle: number;
+    };
+
 export type PdlpRequest = {
   type: 'pdlp';
   id: number;
@@ -190,7 +216,9 @@ export type WorkerRequest =
   | KnapsackSolveRequest
   | GraphSolveRequest
   | SetCoverRequest
+  | MathOptInitRequest
   | MathOptSolveRequest
+  | MathOptIncrementalRequest
   | PdlpRequest
   | CancelSolve;
 
@@ -207,7 +235,10 @@ export type WorkerResponse =
   | { type: 'knapsackSolveResult'; id: number; result: string }
   | { type: 'graphSolveResult'; id: number; result: string }
   | { type: 'setCoverResult'; id: number; result: string }
+  | { type: 'mathOptInitResult'; id: number }
   | { type: 'mathOptSolveResult'; id: number; bytes: Uint8Array }
+  | { type: 'mathOptIncrementalResult'; id: number; bytes: Uint8Array }
+  | { type: 'mathOptIncrementalDeleted'; id: number }
   | { type: 'pdlpResult'; id: number; bytes: Uint8Array; value?: number }
   | { type: 'solved_cancelled'; id: number }
   | { type: 'error'; id: number; error: string };

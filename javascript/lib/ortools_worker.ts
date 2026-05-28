@@ -328,6 +328,78 @@ async function validateModel(modelBytes: Uint8Array) {
   return { ok: false, message };
 }
 
+function copyResponseBytes(module: OrToolsWasmModule, responsePtr: number, lenPtr: number) {
+  const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
+  return responsePtr && responseLen
+    ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
+    : new Uint8Array();
+}
+
+function freeResponseBuffer(module: OrToolsWasmModule, responsePtr: number) {
+  if (responsePtr) {
+    module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
+  }
+}
+
+async function createMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalCreate' }>) {
+  const module = await loadMathOptRuntime();
+  const lenPtr = module._malloc(4);
+  const requestPtr = copyBytesToHeap(module, message.requestBytes);
+  let responsePtr = 0;
+  try {
+    responsePtr = (await module.ccall(
+      'mathopt_incremental_create',
+      'number',
+      ['number', 'number', 'number'],
+      [requestPtr, message.requestBytes.length, lenPtr],
+      { async: true },
+    )) as number;
+    return copyResponseBytes(module, responsePtr, lenPtr);
+  } finally {
+    freeResponseBuffer(module, responsePtr);
+    if (requestPtr) module._free(requestPtr);
+    module._free(lenPtr);
+  }
+}
+
+async function solveMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalSolve' }>) {
+  const module = await loadMathOptRuntime();
+  const requestPtr = copyBytesToHeap(module, message.requestBytes);
+  const updatePtr = copyBytesToHeap(module, message.updateBytes ?? null);
+  const lenPtr = module._malloc(4);
+  let responsePtr = 0;
+  try {
+    responsePtr = (await module.ccall(
+      'mathopt_incremental_solve',
+      'number',
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [
+        message.handle,
+        requestPtr,
+        message.requestBytes.length,
+        updatePtr,
+        message.updateBytes?.length ?? 0,
+        message.updateBytes ? 1 : 0,
+        message.useInterrupter ? 1 : 0,
+        message.interruptAtStart ? 1 : 0,
+        lenPtr,
+      ],
+      { async: true },
+    )) as number;
+    return copyResponseBytes(module, responsePtr, lenPtr);
+  } finally {
+    freeResponseBuffer(module, responsePtr);
+    if (requestPtr) module._free(requestPtr);
+    if (updatePtr) module._free(updatePtr);
+    module._free(lenPtr);
+  }
+}
+
+async function deleteMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalDelete' }>) {
+  const module = await loadMathOptRuntime();
+  module.ccall('mathopt_incremental_delete', undefined, ['number'], [message.handle]);
+}
+
 workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const message = event.data as WorkerRequest;
   try {
@@ -410,6 +482,13 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         result,
       } satisfies WorkerResponse);
       return;
+    } else if (message.type === 'mathOptInit') {
+      await loadMathOptRuntime();
+      workerScope.postMessage({
+        type: 'mathOptInitResult',
+        id: message.id,
+      } satisfies WorkerResponse);
+      return;
     } else if (message.type === 'mathOptSolve') {
       const module = await loadMathOptRuntime();
       const lenPtr = module._malloc(4);
@@ -445,6 +524,29 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         if (requestPtr) module._free(requestPtr);
         module._free(lenPtr);
       }
+      return;
+    } else if (message.type === 'mathOptIncrementalCreate') {
+      const bytes = await createMathOptIncrementalInWorker(message);
+      workerScope.postMessage({
+        type: 'mathOptIncrementalResult',
+        id: message.id,
+        bytes,
+      } satisfies WorkerResponse);
+      return;
+    } else if (message.type === 'mathOptIncrementalSolve') {
+      const bytes = await solveMathOptIncrementalInWorker(message);
+      workerScope.postMessage({
+        type: 'mathOptIncrementalResult',
+        id: message.id,
+        bytes,
+      } satisfies WorkerResponse);
+      return;
+    } else if (message.type === 'mathOptIncrementalDelete') {
+      await deleteMathOptIncrementalInWorker(message);
+      workerScope.postMessage({
+        type: 'mathOptIncrementalDeleted',
+        id: message.id,
+      } satisfies WorkerResponse);
       return;
     } else if (message.type === 'pdlp') {
       const module = await loadPdlpRuntime();

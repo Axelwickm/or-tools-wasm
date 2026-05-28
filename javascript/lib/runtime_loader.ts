@@ -109,11 +109,8 @@ function isBrowserRuntimeHost(): boolean {
   return typeof window !== 'undefined' || typeof WorkerGlobalScope !== 'undefined';
 }
 
-function selectRuntimeFlavor(runtimeName: RuntimeName): RuntimeFlavor {
-  if (isBrowserRuntimeHost()) {
-    return 'asyncify';
-  }
-  if (isDenoRuntimeHost() || isBunRuntimeHost()) {
+function selectRuntimeFlavor(): RuntimeFlavor {
+  if (isBrowserRuntimeHost() || isDenoRuntimeHost() || isBunRuntimeHost()) {
     return 'asyncify';
   }
   if (selectedFlavor) {
@@ -148,17 +145,34 @@ function locateRuntimeFile(fileName: string) {
   return fileName;
 }
 
-function createRuntime(runtimeName: RuntimeName, flavor = selectRuntimeFlavor(runtimeName)): Promise<OrToolsWasmModule> {
+function isJspiStartupError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === 'SuspendError'
+    || error.message.includes('without WebAssembly.promising')
+    || error.message.includes('WebAssembly.promising');
+}
+
+function createRuntime(runtimeName: RuntimeName, flavor = selectRuntimeFlavor()): Promise<OrToolsWasmModule> {
   const key: RuntimeKey = `${runtimeName}:${flavor}`;
   modulePromises[key] ??= (async () => {
     const asset = runtimeAssets[runtimeName][flavor];
     const createModule = await loadFactory(asset.jsUrl);
     const wasmBinary = new Uint8Array(await (await fetch(asset.wasmUrl)).arrayBuffer());
-    return createModule({
-      locateFile: locateRuntimeFile,
-      wasmBinary,
-      mainScriptUrlOrBlob: asset.jsUrl,
-    });
+    try {
+      return await createModule({
+        locateFile: locateRuntimeFile,
+        wasmBinary,
+        mainScriptUrlOrBlob: asset.jsUrl,
+      });
+    } catch (error) {
+      if (flavor !== 'jspi' || !isJspiStartupError(error)) {
+        throw error;
+      }
+      console.warn(`${runtimeName} JSPI runtime failed during startup; falling back to ASYNCIFY=1.`, error);
+      selectedFlavor = 'asyncify';
+      delete modulePromises[key];
+      return createRuntime(runtimeName, 'asyncify');
+    }
   })();
   return modulePromises[key];
 }

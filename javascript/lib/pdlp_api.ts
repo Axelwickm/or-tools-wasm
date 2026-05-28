@@ -176,6 +176,9 @@ function getPdlpExports(): PdlpExports {
 }
 
 export async function initPdlp(): Promise<void> {
+  if (shouldUseWorkerBridge()) {
+    return;
+  }
   await loadPdlpModule();
 }
 

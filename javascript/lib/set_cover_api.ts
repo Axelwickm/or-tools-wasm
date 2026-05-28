@@ -122,6 +122,9 @@ function createSetCoverExports(module: OrToolsWasmModule): SetCoverExports {
 }
 
 export async function initSetCover(): Promise<void> {
+  if (shouldUseWorkerBridge()) {
+    return;
+  }
   setCoverModulePromise ??= loadSetCoverRuntime().then((module) => {
     setCoverModule = module;
     setCoverExports = createSetCoverExports(module);

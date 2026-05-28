@@ -476,6 +476,9 @@ export async function initMPSolver(): Promise<void> {
 }
 
 export async function initKnapsack(): Promise<void> {
+  if (shouldUseWorkerBridge()) {
+    return;
+  }
   await loadMpSolverModule();
 }
 
