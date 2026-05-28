@@ -41,6 +41,7 @@ export default defineConfig({
         knapsack_simple: path.resolve(siteRoot, 'knapsack_simple.html'),
         magic_square: path.resolve(siteRoot, 'magic_square.html'),
         mathopt_basic: path.resolve(siteRoot, 'mathopt_basic.html'),
+        mathopt_factory_floor: path.resolve(siteRoot, 'mathopt_factory_floor.html'),
         model_playground: path.resolve(siteRoot, 'model_playground.html'),
         mp_simple_lp: path.resolve(siteRoot, 'mp_simple_lp.html'),
         mpsolver_network_design: path.resolve(siteRoot, 'mpsolver_network_design.html'),

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>MathOpt - Bakery Floor Planner with IncrementalSolver</title>
+    <link rel="stylesheet" href="./example.css">
+    <style>
+      :root {
+        --factory-ink: #1f2328;
+        --factory-muted: #59636e;
+        --factory-border: #c8d1da;
+        --factory-panel: #ffffff;
+        --factory-floor: #24292f;
+        --factory-belt: #58606b;
+        --factory-display: #1a7f37;
+        --factory-store: #0a7f8f;
+      }
+
+      body {
+        color: var(--factory-ink);
+        background: #fbfcfd;
+      }
+
+      .factory-shell,
+      .example-notes {
+        max-width: 1260px;
+      }
+
+      .factory-stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 13.5rem;
+        gap: 0.85rem;
+        align-items: start;
+      }
+
+      .factory-board-wrap {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 32 / 18;
+        border: 1px solid var(--factory-border);
+        border-radius: 6px;
+        overflow: hidden;
+        background: var(--factory-floor);
+        box-shadow: 0 1px 2px rgba(31, 35, 40, 0.08);
+      }
+
+      .factory-board,
+      .entity-layer {
+        position: absolute;
+        inset: 0;
+      }
+
+      .factory-board {
+        display: grid;
+        grid-template-columns: repeat(32, minmax(0, 1fr));
+        grid-template-rows: repeat(18, minmax(0, 1fr));
+      }
+
+      .entity-layer {
+        z-index: 5;
+        pointer-events: none;
+      }
+
+      .factory-cell {
+        position: relative;
+        border: 0;
+        padding: 0;
+        min-width: 0;
+        min-height: 0;
+        background: var(--factory-floor);
+        color: var(--factory-ink);
+        cursor: default;
+      }
+
+      .cell-face {
+        position: absolute;
+        inset: 9%;
+        display: grid;
+        place-items: center;
+        border-radius: 4px;
+        font-size: clamp(0.55rem, 0.8vw, 0.9rem);
+        font-weight: 800;
+        line-height: 1;
+        pointer-events: none;
+      }
+
+      .floor .cell-face {
+        display: none;
+      }
+
+      .source .cell-face {
+        background: var(--cell-color, #b54708);
+        color: #fff;
+        font-size: clamp(0.46rem, 0.62vw, 0.72rem);
+        box-shadow: inset 0 -0.24rem rgba(0, 0, 0, 0.16);
+      }
+
+      .shop-clock {
+        position: absolute;
+        z-index: 8;
+        top: 0.45rem;
+        right: 0.5rem;
+        padding: 0.18rem 0.45rem;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 4px;
+        background: rgba(13, 17, 23, 0.72);
+        color: #fff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9rem;
+        font-weight: 800;
+        line-height: 1.2;
+        pointer-events: none;
+      }
+
+      .display .cell-face {
+        background: var(--factory-display);
+        color: #fff;
+        box-shadow: inset 0 -0.24rem rgba(0, 0, 0, 0.18);
+      }
+
+      .storefront .cell-face {
+        background: var(--factory-store);
+        color: #fff;
+        box-shadow: inset 0 -0.24rem rgba(0, 0, 0, 0.18);
+      }
+
+      .machine .cell-face {
+        background: var(--cell-color, #0969da);
+        color: #fff;
+        box-shadow: inset 0 -0.32rem rgba(0, 0, 0, 0.2);
+      }
+
+      .machine.inactive .cell-face {
+        opacity: 0.24;
+        filter: grayscale(0.7);
+      }
+
+      .belt .cell-face {
+        inset: 0;
+        overflow: hidden;
+        border-radius: 0;
+        background: var(--factory-belt);
+        box-shadow:
+          inset 0 0 0 1px #7d8590,
+          inset 0 0.28rem rgba(255, 255, 255, 0.1),
+          inset 0 -0.28rem rgba(0, 0, 0, 0.28);
+      }
+
+      .belt .cell-face::before {
+        content: "";
+        position: absolute;
+        top: 0.36rem;
+        bottom: 0.36rem;
+        left: -40px;
+        right: -40px;
+        background:
+          repeating-linear-gradient(
+            90deg,
+            rgba(36, 41, 47, 0.08) 0 8px,
+            rgba(36, 41, 47, 0.2) 8px 20px,
+            rgba(0, 0, 0, 0.16) 20px 28px,
+            rgba(36, 41, 47, 0.2) 28px 40px
+          );
+      }
+
+      .belt.dir-down .cell-face::before,
+      .belt.dir-up .cell-face::before {
+        top: -40px;
+        bottom: -40px;
+        left: 0.36rem;
+        right: 0.36rem;
+        background:
+          repeating-linear-gradient(
+            180deg,
+            rgba(36, 41, 47, 0.08) 0 8px,
+            rgba(36, 41, 47, 0.2) 8px 20px,
+            rgba(0, 0, 0, 0.16) 20px 28px,
+            rgba(36, 41, 47, 0.2) 28px 40px
+          );
+      }
+
+      .factory-board.running .belt .cell-face::before {
+        animation: belt-scroll-x 1.35s linear infinite;
+      }
+
+      .factory-board.running .belt.dir-down .cell-face::before,
+      .factory-board.running .belt.dir-up .cell-face::before {
+        animation-name: belt-scroll-y;
+      }
+
+      @keyframes belt-scroll-x {
+        from { transform: translateX(0); }
+        to { transform: translateX(40px); }
+      }
+
+      @keyframes belt-scroll-y {
+        from { transform: translateY(0); }
+        to { transform: translateY(40px); }
+      }
+
+      .batch-token {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: clamp(1rem, 1.6vw, 1.45rem);
+        aspect-ratio: 1;
+        border: 1px solid rgba(31, 35, 40, 0.58);
+        border-radius: 4px;
+        background: var(--batch-color, #fff);
+        color: #111;
+        font-size: clamp(0.56rem, 0.85vw, 0.78rem);
+        font-weight: 900;
+        line-height: 1;
+        text-align: center;
+        transform: translate(-50%, -50%);
+        transition: left 90ms linear, top 90ms linear;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.36);
+      }
+
+      .batch-token::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 0.18rem);
+        transform: translateX(-50%);
+        color: #fff;
+        font-size: clamp(0.52rem, 0.72vw, 0.72rem);
+        font-weight: 900;
+        line-height: 1;
+        text-align: center;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      .batch-token.waiting {
+        outline: 2px solid rgba(255, 255, 255, 0.58);
+      }
+
+      .batch-token.processing {
+        outline: 2px solid rgba(255, 255, 255, 0.65);
+      }
+
+      .batch-token.processing::after {
+        content: "";
+        position: absolute;
+        inset: -4px;
+        border: 2px solid rgba(255, 255, 255, 0.75);
+        border-radius: 6px;
+        opacity: var(--process-progress, 0);
+      }
+
+      .machine-status {
+        position: absolute;
+        display: grid;
+        gap: 0.12rem;
+        justify-items: center;
+        transform: translate(-50%, -100%);
+        color: #fff;
+        font-size: clamp(0.5rem, 0.68vw, 0.68rem);
+        font-weight: 900;
+        line-height: 1;
+        text-align: center;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+        white-space: nowrap;
+      }
+
+      .machine-progress {
+        display: block;
+        width: clamp(1.15rem, 2vw, 1.75rem);
+        height: 0.18rem;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.24);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      }
+
+      .machine-progress-under {
+        position: absolute;
+        transform: translate(-50%, 4px);
+      }
+
+      .machine-progress span {
+        display: block;
+        width: calc(var(--machine-progress, 0) * 100%);
+        height: 100%;
+        border-radius: inherit;
+        background: #2da44e;
+      }
+
+      .storefront-panel {
+        min-height: 22rem;
+      }
+
+      .storefront-title {
+        margin: 0 0 0.55rem;
+        font-size: 0.9rem;
+      }
+
+      .customer {
+        display: grid;
+        grid-template-columns: 1.25rem minmax(0, 10.5rem);
+        grid-template-rows: auto auto;
+        gap: 0.18rem 0.4rem;
+        align-items: end;
+        margin-bottom: 0.75rem;
+        opacity: var(--served-opacity, 1);
+        transform: translateY(var(--served-offset, 0));
+      }
+
+      .person {
+        position: relative;
+        grid-row: 1 / span 2;
+        display: block;
+        width: 1.15rem;
+        height: 1.85rem;
+      }
+
+      .person .head,
+      .person .body {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        display: block;
+        background: var(--customer-color, #0969da);
+      }
+
+      .person .head {
+        top: 0;
+        width: 0.75rem;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        box-shadow: inset 0 -0.12rem rgba(0, 0, 0, 0.18);
+      }
+
+      .person .body {
+        bottom: 0;
+        width: 0.95rem;
+        height: 1rem;
+        border-radius: 0.45rem 0.45rem 0.12rem 0.12rem;
+        box-shadow: inset 0 -0.18rem rgba(0, 0, 0, 0.2);
+      }
+
+      .speech {
+        max-width: 10.25rem;
+        padding: 0.25rem 0.4rem;
+        border: 1px solid #d8dee4;
+        border-radius: 6px;
+        background: #fff;
+        color: var(--factory-ink);
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.15;
+        box-shadow: 0 1px 1px rgba(31, 35, 40, 0.08);
+      }
+
+      .wait-time {
+        color: var(--factory-muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .customer.served .speech {
+        border-color: #2da44e;
+        color: #1a7f37;
+      }
+
+      .served-check {
+        display: inline-grid;
+        place-items: center;
+        width: 0.9rem;
+        aspect-ratio: 1;
+        margin-right: 0.18rem;
+        border-radius: 50%;
+        background: #2da44e;
+        color: #fff;
+        font-size: 0.65rem;
+        line-height: 1;
+      }
+
+      .runtime-controls {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: center;
+        margin: 0.75rem 0;
+      }
+
+      .runtime-controls button {
+        min-width: 5.5rem;
+      }
+
+      .factory-status {
+        border: 1px solid var(--factory-border);
+        border-radius: 6px;
+        background: var(--factory-panel);
+        padding: 0.75rem;
+        margin-top: 0.75rem;
+      }
+
+      .factory-status-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .planning-badge {
+        display: inline-grid;
+        place-items: center;
+        min-height: 1.35rem;
+        padding: 0.08rem 0.45rem;
+        border-radius: 999px;
+        background: #d8dee4;
+        color: #24292f;
+        font-size: 0.72rem;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .planning-badge.planning {
+        background: #fff8c5;
+        color: #7d4e00;
+      }
+
+      .planning-badge.ready {
+        background: #dafbe1;
+        color: #116329;
+      }
+
+      .planning-badge.error {
+        background: #ffebe9;
+        color: #cf222e;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+        gap: 0.5rem;
+      }
+
+      .metric {
+        border: 1px solid #d8dee4;
+        border-radius: 6px;
+        padding: 0.5rem;
+        background: #f6f8fa;
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 1.08rem;
+      }
+
+      .metric span {
+        color: var(--factory-muted);
+      }
+
+      .order-panel {
+        margin-top: 0.75rem;
+      }
+
+      .order-panel table {
+        width: 100%;
+        font-size: 0.9rem;
+      }
+
+      .order-panel th,
+      .order-panel td {
+        padding: 0.3rem 0.4rem;
+      }
+
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="./index.html">← All examples</a>
+      <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
+    </nav>
+    <h1>MathOpt - bakery floor planner with IncrementalSolver</h1>
+    <p><em>A rolling MathOpt CP-SAT planner runs a persistent bakery simulation with shared ingredients, shared processors, display-shelf buffers, and live customer orders.</em></p>
+    <ul class="example-notes">
+      <li>Customer orders and per-product shelf targets create demand; finished goods wait on the display shelf until customers can be served.</li>
+      <li>The pantry, fridge, sink, and packaging shelf emit separate raw-material tokens such as flour, water, yeast, butter, cream, fruit, and boxes.</li>
+      <li>Mixers combine raw ingredients into dough or batter; proofers, ovens, decorators, laminators, and packers transform WIP through the recipe stages.</li>
+      <li>A processor starts only after all inputs for the current job step have reached that processor cell.</li>
+      <li>The production planner keeps one MathOpt IncrementalSolver alive, mutating bounds and objective terms as orders, WIP, stock, ingredients, and processor reservations change.</li>
+      <li>A second short-horizon CP-SAT solve schedules conveyor dispatch timing so raw materials do not collide on shared directed lanes.</li>
+    </ul>
+    <div class="code-toggle">
+      <details>
+        <summary>Show code</summary>
+        <pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
+
+await initMathOpt();
+
+// Build the rolling production model once.
+const model = MathOpt.Model('bakery_production');
+const startBreadNow = model.addIntegerVariable({ lowerBound: 0, upperBound: 0, name: 'start_bread_now' });
+const demand = model.addLinearConstraint({
+  upperBound: 0,
+  terms: [{ variable: startBreadNow, coefficient: 1 }],
+});
+model.maximize([{ variable: startBreadNow, coefficient: 100 }]);
+
+// Keep this solver object alive between replans.
+const solver = new MathOpt.IncrementalSolver(model, MathOpt.SolverType.CP_SAT, {
+  cpSat: { maxTimeInSeconds: 1, numWorkers: 4 },
+});
+
+async function replanAfterFactoryStateChanges(openBreadOrders: number, freeMixers: number) {
+  // Only mutate the existing model: the incremental solver receives a model update.
+  startBreadNow.upperBound = freeMixers;
+  demand.upperBound = openBreadOrders;
+
+  const result = await solver.solve();
+
+  if ((result.variableValues.start_bread_now ?? 0) > 0.5) {
+    startBreadJob();
+  }
+
+  ...
+
+  // The example also solves a short conveyor traffic model for safe dispatch timing.
+  await planTrafficDispatches();
+}</code></pre>
+      </details>
+    </div>
+
+    <div class="runtime-controls">
+      <button id="toggle-running" type="button">Start</button>
+      <button id="reset-floor" type="button">Reset</button>
+      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Threads <input id="worker-threads" class="short-number" type="number" value="4" min="1"></label>
+    </div>
+
+    <div class="factory-shell">
+      <section class="factory-stage">
+        <div id="factory-board-wrap" class="factory-board-wrap">
+          <div id="factory-board" class="factory-board" role="grid" aria-label="Bakery factory floor"></div>
+          <div id="entity-layer" class="entity-layer" aria-hidden="true"></div>
+          <div id="shop-clock" class="shop-clock" aria-label="Bakery clock">06:00</div>
+        </div>
+        <aside class="storefront-panel" aria-label="Storefront customers">
+          <h2 class="storefront-title">Storefront</h2>
+          <div id="storefront"></div>
+        </aside>
+      </section>
+
+      <section class="factory-status">
+        <h2 class="factory-status-title">Factory state <span id="factory-planning-status" class="planning-badge ready">Ready</span></h2>
+        <div id="metrics" class="metric-grid"></div>
+        <div id="order-panel" class="order-panel"></div>
+      </section>
+    </div>
+
+    <script type="module" src="./mathopt_factory_floor.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
+  </body>
+</html>

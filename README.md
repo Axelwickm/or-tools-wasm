@@ -28,8 +28,11 @@ Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_
 <p>
   <img src="docs/media/network_design.gif" alt="Network design optimization in PragmaPlanner" width="24%">
   <img src="docs/media/vrp.gif" alt="Vehicle routing optimization in PragmaPlanner" width="24%">
-  <img src="docs/media/sudoku.gif" alt="Sudoku optimization example in PragmaPlanner" width="24%">
   <img src="docs/media/steel_mill_slab.png" alt="Steel mill slab optimization in PragmaPlanner" width="24%">
+</p>
+<p>
+  <img src="docs/media/factory_floor.gif" alt="Factory floor optimization in PragmaPlanner" width="48%">
+  <img src="docs/media/sudoku.gif" alt="Sudoku optimization example in PragmaPlanner" width="24%">
 </p>
 
 ## Usage
@@ -128,20 +131,11 @@ console.log(result.response);
 | Set cover | ✅ | Dedicated weighted set cover model, invariant, and heuristic search API. |
 | RCPSP | ✅ | CP-SAT-backed resource-constrained project scheduling model, parser, and visual scheduling surface. |
 | Linear Solver ModelBuilder |  | Python-like `linear_solver.model_builder` API for ergonomic LP/MIP modeling, import/export helpers, and backend solve helpers. |
-| MathOpt incremental/callback APIs |  | Incremental solving is exposed for MathOpt models with tracked updates for common LP/MIP model edits, rejected-update fallback, repeated LP updates, and GSCIP incremental message logging. Remaining gaps are Python-only incremental lifecycle conveniences and richer result parser/ray/basis helpers. Indicator constraints, message callbacks, solve interrupters, common solve parameters, typed model solve parameters with solve filters, Python-style solve-result accessors, `removeNames` duplicate-name solving, and typed backend parameters for GSCIP, GLOP, CP-SAT, PDLP, and GLPK are exposed. |
+| MathOpt incremental/callback APIs | ✅ | Incremental solving is exposed for MathOpt models with tracked updates for common LP/MIP model edits, rejected-update fallback, repeated LP updates, and GSCIP incremental message logging. Indicator constraints, message callbacks, solve interrupters, common solve parameters, typed model solve parameters with solve filters, Python-style solve-result accessors including ray/basis helpers for real solve results, `removeNames` duplicate-name solving, and typed backend parameters for GSCIP, GLOP, CP-SAT, PDLP, and GLPK are exposed. Python-only context managers and constructed result parser/proto-object helpers are outside the current TypeScript contract. |
 
 Unchecked rows are planned OR-Tools targets that are not exposed by this package
 yet. Commercial and large third-party native backends such as Gurobi, CPLEX,
 XPRESS, HiGHS, OSQP, ECOS, and SCS are not planned.
-
-## TODO
-
-Near-term parity work:
-
-- Add Linear Solver ModelBuilder if continuing Python API parity beyond solver
-  runtimes.
-- Close the remaining MathOpt API gaps around Python-only incremental
-  lifecycle conveniences and richer result parser/ray/basis helper objects.
 
 The TypeScript API mirrors the public OR-Tools API shape where it maps cleanly
 to WebAssembly. CP-SAT exposes both a Python-like high-level builder and the

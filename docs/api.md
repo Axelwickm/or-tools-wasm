@@ -1412,6 +1412,7 @@ Solving:
 - `MathOpt.encodeSolveRequest(model, options?): Uint8Array`
 - `new MathOpt.IncrementalSolver(model, solverType?, options?)`
 - `incrementalSolver.solve(options?): Promise<MathOptSolveResult>`
+- `incrementalSolver.Solve(options?): Promise<MathOptSolveResult>`
 - `incrementalSolver.close(): Promise<void>`
 
 `MathOptSolveOptions`:
@@ -1465,16 +1466,76 @@ also stores the captured lines on `MathOptSolveResult.messages`.
 MathOpt solves. Call `interrupt()` before passing it as `interrupter` to request
 early termination; the result exposes the corresponding termination limit.
 
+#### Full, Incremental, And Filtered Solves
+
+`MathOpt.solve(model, options?)` is the stateless/full solve path. It encodes
+the current model into a `SolveRequest`, solves it, and does not keep a native
+solver handle for later reuse. Use `MathOpt.encodeSolveRequest(model, options?)`
+when you need the raw proto-oriented request bytes.
+
 `MathOpt.IncrementalSolver` keeps a native MathOpt solver handle alive across
-solves and sends tracked model updates for variable bounds, linear constraint
-bounds, objective changes, new/deleted variables and linear constraints, matrix
-coefficient changes, and new/deleted indicator constraints. `solve()` accepts
-the same solve options as `MathOpt.solve()`, including message callbacks and
-pre-interrupted solve interrupters. `close()` releases the native handle and is
-safe to call more than once. If a backend rejects an update but can solve the
-full updated model, the wrapper recreates the native solver and solves from the
-current full model. The non-incremental `MathOpt.solve()` and
-`encodeSolveRequest()` proto path remain available.
+solves. Construct it with the `MathOptModel` instance you intend to mutate, then
+call `solve()` after each model edit:
+
+```ts
+const model = MathOpt.Model('rolling_lp');
+const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
+model.maximize([{ variable: x, coefficient: 2 }]);
+
+const solver = new MathOpt.IncrementalSolver(model, MathOpt.SolverType.GLOP, {
+  presolve: MathOpt.Emphasis.OFF,
+});
+
+let result = await solver.solve();
+
+x.upperBound = 3;
+result = await solver.solve(); // sends the bound update to the native solver
+
+await solver.close();
+```
+
+Tracked incremental updates include variable bounds/integrality, linear
+constraint bounds, objective changes, new/deleted variables and linear
+constraints, matrix coefficient changes, and new/deleted indicator constraints.
+Constructor options are used as defaults for every solve; per-call `solve()`
+options override those defaults except for the solver type, which is fixed by
+the incremental solver. `Solve()` is an alias for `solve()`. `close()` releases
+the native handle and is safe to call more than once.
+
+`solve()` accepts the same solve options as `MathOpt.solve()`, including
+message callbacks, `SolveParameters`, `ModelSolveParameters`, backend-specific
+parameters, and pre-interrupted solve interrupters. If a backend rejects an
+incremental model update but can solve the current full model, the wrapper
+recreates the native solver and solves from that current full model. This keeps
+callers on one API for backends with limited update support, while still
+surfacing errors from invalid full models. Duplicate names are rejected for
+incremental solvers unless `removeNames` / `remove_names` is set.
+
+`ModelSolveParameters` can request a filtered result. This is a result-size
+filter, not a separate partial optimization model: the solver still optimizes
+the full model, but only selected vectors are returned.
+
+```ts
+const result = await MathOpt.solve(model, {
+  solverType: MathOpt.SolverType.GLOP,
+  modelParameters: MathOpt.ModelSolveParameters.onlySomePrimalVariables([x]),
+});
+```
+
+For finer control, pass filters directly:
+
+```ts
+const result = await solver.solve({
+  modelParameters: new MathOpt.ModelSolveParameters({
+    variableValuesFilter: { elements: [x, y], filterByIds: true },
+    dualValuesFilter: { elements: [demand], filterByIds: true },
+    reducedCostsFilter: { skipZeroValues: true },
+  }),
+});
+```
+
+The non-incremental `MathOpt.solve()` and proto-oriented `encodeSolveRequest()`
+paths remain available alongside `MathOpt.IncrementalSolver`.
 
 Backend-specific parameter wrappers encode the corresponding upstream MathOpt
 solver-specific proto fields:
@@ -1507,6 +1568,9 @@ explicit parameter object.
 - `solutionHints` / `solution_hints`
 - `branchingPriorities` / `branching_priorities`
 - `lazyLinearConstraints`, `lazyLinearConstraintIds`, and snake-case aliases
+- `onlySomePrimalVariables(variables)` /
+  `only_some_primal_variables(variables)` as convenience constructors for
+  filtering returned primal variable values
 
 `MathOpt.SparseVectorFilter` accepts `skipZeroValues`, `filterByIds`, and
 either numeric ids or model elements with an `id`. `MathOpt.SolutionHint`
