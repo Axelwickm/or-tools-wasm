@@ -1,5 +1,5 @@
 import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
+import { fixtureModesFor, passedCase, withWorkerBridgeMode } from './shared_case.ts';
 
 export type KnapsackCaseResult = {
   id: string;
@@ -38,6 +38,7 @@ export type KnapsackApi = {
   };
   setWorkerBridgeEnabled: (enabled: boolean) => void;
   isWorkerBridgeEnabled: () => boolean;
+  isWorkerBridgeAvailable?: () => boolean;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -266,7 +267,7 @@ export const knapsackCases: KnapsackCase[] = [
 export async function runKnapsackCases(api: KnapsackApi): Promise<KnapsackCaseResult[]> {
   await api.initKnapsack();
   const results: KnapsackCaseResult[] = [];
-  for (const mode of fixtureModes) {
+  for (const mode of fixtureModesFor(api)) {
     await withWorkerBridgeMode(api, mode, 'Knapsack', async () => {
       for (const testCase of knapsackCases) {
         const result = await testCase.run(api, { mode });

@@ -49,7 +49,8 @@ export function isWorkerBridgeAvailable() {
 export function setWorkerBridgeEnabled(enabled: boolean) {
   workerBridgePreferred = Boolean(enabled);
   if (workerBridgePreferred && !workerBridgeAvailable) {
-    console.warn('Worker bridge requested but no worker is initialized in this environment.');
+    workerBridgePreferred = false;
+    throw new Error('Worker bridge requested but no worker is available in this environment.');
   } else if (!workerBridgePreferred) {
     terminateWorkerBridge('OR-Tools worker bridge disabled.');
   }
@@ -75,7 +76,7 @@ async function createBridgeWorker(): Promise<BridgeWorker> {
   if (!isPackagedBrowserBuild && (isNode || isDeno)) {
     const workerThreadsSpecifier = 'node:worker_threads';
     const { Worker: NodeWorker } = await import(workerThreadsSpecifier);
-    return new NodeWorker(new URL('./node_worker_bridge.js', import.meta.url)) as BridgeWorker;
+    return new NodeWorker(new URL('./node_worker_bridge.js', import.meta.url), { execArgv: [] }) as BridgeWorker;
   }
   return new Worker(new URL('./ortools_worker.js', import.meta.url), { type: 'module' }) as BridgeWorker;
 }

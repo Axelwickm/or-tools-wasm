@@ -68,6 +68,8 @@ for (const nodeRuntimePath of nodeRuntimePaths) {
   for (const [from, to] of replacements) {
     runtime = runtime.replaceAll(from, to);
   }
+  runtime = patchJspiAsyncCtors(runtime);
+  runtime = patchJspiInvokeTableEntries(runtime);
 
   if (runtime !== original) {
     await writeFile(nodeRuntimePath, runtime);
@@ -139,11 +141,46 @@ for (const webRuntimePath of webRuntimePaths) {
     runtime = runtime.replaceAll(from, to);
   }
   runtime = runtime.replace(/(?:worker\.unref\?\.\(\);)+worker\.workerID/g, 'worker.unref?.();worker.workerID');
+  runtime = patchJspiAsyncCtors(runtime);
+  runtime = patchJspiInvokeTableEntries(runtime);
 
   if (runtime !== original) {
     await writeFile(webRuntimePath, runtime);
     console.log(`Patched ${path.basename(webRuntimePath)}: deno-bun-web-worker-runtime`);
   }
+}
+
+function patchJspiAsyncCtors(runtime) {
+  if (!runtime.includes('WebAssembly.promising')) return runtime;
+
+  const initRuntime =
+    'function initRuntime(){assert(!runtimeInitialized);runtimeInitialized=true;if(ENVIRONMENT_IS_PTHREAD)return startWorker();checkStackCookie();if(!Module["noFSInit"]&&!FS.initialized)FS.init();TTY.init();wasmExports["__wasm_call_ctors"]();FS.ignorePermissions=false}';
+  const asyncInitRuntime =
+    'async function initRuntime(){assert(!runtimeInitialized);runtimeInitialized=true;if(ENVIRONMENT_IS_PTHREAD)return startWorker();checkStackCookie();if(!Module["noFSInit"]&&!FS.initialized)FS.init();TTY.init();await wasmExports["__wasm_call_ctors"]();FS.ignorePermissions=false}';
+
+  return runtime
+    .replace(initRuntime, asyncInitRuntime)
+    .replaceAll('initRuntime();readyPromiseResolve?.(Module);', 'await initRuntime();readyPromiseResolve?.(Module);');
+}
+
+function patchJspiInvokeTableEntries(runtime) {
+  if (!runtime.includes('WebAssembly.promising')) return runtime;
+
+  const tableEntryHelper =
+    'var wasmTableMirror=[];var getWasmTableEntry=funcPtr=>{var func=wasmTableMirror[funcPtr];if(!func){wasmTableMirror[funcPtr]=func=wasmTable.get(funcPtr);if(Asyncify.isAsyncExport(func)){wasmTableMirror[funcPtr]=func=Asyncify.makeAsyncFunction(func)}}return func};';
+  const patchedTableEntryHelper =
+    `${tableEntryHelper}var wasmTablePromisingMirror=[];var getWasmTableEntryPromising=funcPtr=>{var func=wasmTablePromisingMirror[funcPtr];if(!func){wasmTablePromisingMirror[funcPtr]=func=Asyncify.makeAsyncFunction(wasmTable.get(funcPtr))}return func};`;
+
+  if (!runtime.includes(tableEntryHelper)) return runtime;
+  return runtime
+    .replace(tableEntryHelper, patchedTableEntryHelper)
+    .replaceAll('function invoke_', 'async function invoke_')
+    .replaceAll('return getWasmTableEntry(index)', 'return await getWasmTableEntryPromising(index)')
+    .replaceAll('try{getWasmTableEntry(index)', 'try{await getWasmTableEntryPromising(index)')
+    .replaceAll('return getWasmTableEntryPromising(index)', 'return await getWasmTableEntryPromising(index)')
+    .replaceAll('try{getWasmTableEntryPromising(index)', 'try{await getWasmTableEntryPromising(index)')
+    .replaceAll('async async function invoke_', 'async function invoke_')
+    .replaceAll('await await getWasmTableEntryPromising(index)', 'await getWasmTableEntryPromising(index)');
 }
 
 async function exists(filePath) {

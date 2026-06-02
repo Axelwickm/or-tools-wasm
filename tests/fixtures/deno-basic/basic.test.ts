@@ -3,6 +3,7 @@ import {
 } from 'or-tools-wasm/cp-sat';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import {
+  isWorkerBridgeAvailable,
   isWorkerBridgeEnabled,
   setWorkerBridgeEnabled,
 } from 'or-tools-wasm/mp-solver';
@@ -13,6 +14,7 @@ import {
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
+  isWorkerBridgeAvailable as isKnapsackWorkerBridgeAvailable,
   isWorkerBridgeEnabled as isKnapsackWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
@@ -122,6 +124,7 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     MPSolverParameters,
     setWorkerBridgeEnabled,
     isWorkerBridgeEnabled,
+    isWorkerBridgeAvailable,
   });
   await assertCaseSteps(t, 'deno MPSolver', mpSolverResults);
 
@@ -131,6 +134,7 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     KnapsackSolverType,
     setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
     isWorkerBridgeEnabled: isKnapsackWorkerBridgeEnabled,
+    isWorkerBridgeAvailable: isKnapsackWorkerBridgeAvailable,
   });
   await assertCaseSteps(t, 'deno Knapsack', knapsackResults);
 

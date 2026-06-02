@@ -1,9 +1,8 @@
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadRoutingRuntime, loadRoutingRuntimeAsyncify } from './runtime_loader.js';
+import { loadRoutingRuntime } from './runtime_loader.js';
 import type { RoutingSolveRequest, RoutingSolveResult } from './worker_protocol.js';
 
 let modulePromise: Promise<OrToolsWasmModule> | null = null;
-let asyncifyModulePromise: Promise<OrToolsWasmModule> | null = null;
 
 function toNumber(value: unknown): number {
   return typeof value === 'number' ? value : Number(value);
@@ -16,11 +15,6 @@ function toInt64(value: number): bigint {
 function loadModule() {
   modulePromise ??= loadRoutingRuntime();
   return modulePromise;
-}
-
-function loadAsyncifyModule() {
-  asyncifyModulePromise ??= loadRoutingRuntimeAsyncify();
-  return asyncifyModulePromise;
 }
 
 function copyInt32Array(module: OrToolsWasmModule, values: number[]): number {
@@ -46,28 +40,46 @@ function copyString(module: OrToolsWasmModule, value: string): number {
   return ptr;
 }
 
-function withString<T>(module: OrToolsWasmModule, value: string, fn: (ptr: number) => T): T {
+async function withStringAsync<T>(module: OrToolsWasmModule, value: string, fn: (ptr: number) => T | Promise<T>): Promise<T> {
   const ptr = copyString(module, value);
   try {
-    return fn(ptr);
+    return await fn(ptr);
   } finally {
     module._free(ptr);
   }
 }
 
-function registerTransitMatrix(
+async function ccallNumber(
+  module: OrToolsWasmModule,
+  name: string,
+  argTypes: string[],
+  args: unknown[],
+): Promise<number> {
+  return await module.ccall(name, 'number', argTypes, args, { async: true }) as number;
+}
+
+async function ccallBigInt(
+  module: OrToolsWasmModule,
+  name: string,
+  argTypes: string[],
+  args: unknown[],
+): Promise<bigint> {
+  return await module.ccall(name, 'bigint', argTypes, args, { async: true }) as bigint;
+}
+
+async function registerTransitMatrix(
   module: OrToolsWasmModule,
   modelHandle: number,
   matrix: BigInt64Array,
   dimension: number,
-): number {
+): Promise<number> {
   const { ptr, length } = copyInt64Array(module, matrix);
   try {
-    const evaluatorIndex = module._routing_register_matrix_transit_callback(
-      modelHandle,
-      ptr,
-      length,
-      dimension,
+    const evaluatorIndex = await ccallNumber(
+      module,
+      'routing_register_matrix_transit_callback',
+      ['number', 'number', 'number', 'number'],
+      [modelHandle, ptr, length, dimension],
     );
     if (evaluatorIndex < 0) {
       throw new Error('Routing worker failed to register transit matrix.');
@@ -76,14 +88,6 @@ function registerTransitMatrix(
   } finally {
     module._free(ptr);
   }
-}
-
-function isJspiSuspendError(error: unknown) {
-  return error instanceof Error && error.name === 'SuspendError';
-}
-
-function isDenoRuntime() {
-  return 'Deno' in globalThis;
 }
 
 async function solveRoutingWithModule(
@@ -97,88 +101,83 @@ async function solveRoutingWithModule(
   try {
     startsPtr = copyInt32Array(module, message.starts);
     endsPtr = copyInt32Array(module, message.ends);
-    managerHandle = module._routing_create_index_manager_starts_ends(
-      message.numLocations,
-      message.numVehicles,
-      startsPtr,
-      endsPtr,
+    managerHandle = await ccallNumber(
+      module,
+      'routing_create_index_manager_starts_ends',
+      ['number', 'number', 'number', 'number'],
+      [message.numLocations, message.numVehicles, startsPtr, endsPtr],
     );
-    modelHandle = module._routing_create_model(managerHandle);
-    const evaluatorIndex = registerTransitMatrix(module, modelHandle, message.transitMatrix, message.transitMatrixDimension);
-    module._routing_set_arc_cost_evaluator_of_all_vehicles(modelHandle, evaluatorIndex);
+    modelHandle = await ccallNumber(module, 'routing_create_model', ['number'], [managerHandle]);
+    const evaluatorIndex = await registerTransitMatrix(module, modelHandle, message.transitMatrix, message.transitMatrixDimension);
+    await ccallNumber(
+      module,
+      'routing_set_arc_cost_evaluator_of_all_vehicles',
+      ['number', 'number'],
+      [modelHandle, evaluatorIndex],
+    );
 
     for (const operation of message.operations) {
       if (operation.type === 'addDimension') {
-        const index = registerTransitMatrix(module, modelHandle, operation.transitMatrix, message.transitMatrixDimension);
-        withString(module, operation.name, (namePtr) => {
-          module._routing_add_dimension(
-            modelHandle,
-            index,
-            BigInt(operation.slackMax),
-            BigInt(operation.capacity),
-            operation.fixStartCumulToZero ? 1 : 0,
-            namePtr,
+        const index = await registerTransitMatrix(module, modelHandle, operation.transitMatrix, message.transitMatrixDimension);
+        await withStringAsync(module, operation.name, async (namePtr) => {
+          await ccallNumber(
+            module,
+            'routing_add_dimension',
+            ['number', 'number', 'bigint', 'bigint', 'number', 'number'],
+            [modelHandle, index, BigInt(operation.slackMax), BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
           );
         });
       } else if (operation.type === 'addDimensionWithVehicleCapacity') {
-        const index = registerTransitMatrix(module, modelHandle, operation.transitMatrix, message.transitMatrixDimension);
+        const index = await registerTransitMatrix(module, modelHandle, operation.transitMatrix, message.transitMatrixDimension);
         const capacities = copyInt64Array(module, operation.capacities);
         try {
-          withString(module, operation.name, (namePtr) => {
-            module._routing_add_dimension_with_vehicle_capacity(
-              modelHandle,
-              index,
-              BigInt(operation.slackMax),
-              capacities.ptr,
-              capacities.length,
-              operation.fixStartCumulToZero ? 1 : 0,
-              namePtr,
+          await withStringAsync(module, operation.name, async (namePtr) => {
+            await ccallNumber(
+              module,
+              'routing_add_dimension_with_vehicle_capacity',
+              ['number', 'number', 'bigint', 'number', 'number', 'number', 'number'],
+              [modelHandle, index, BigInt(operation.slackMax), capacities.ptr, capacities.length, operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
           module._free(capacities.ptr);
         }
       } else if (operation.type === 'addDimensionWithVehicleTransits') {
-        const evaluatorIndices = operation.transitMatrices.map((matrix) => {
-          return registerTransitMatrix(module, modelHandle, matrix, message.transitMatrixDimension);
-        });
+        const evaluatorIndices: number[] = [];
+        for (const matrix of operation.transitMatrices) {
+          evaluatorIndices.push(await registerTransitMatrix(module, modelHandle, matrix, message.transitMatrixDimension));
+        }
         const evaluatorsPtr = copyInt32Array(module, evaluatorIndices);
         try {
-          withString(module, operation.name, (namePtr) => {
-            module._routing_add_dimension_with_vehicle_transits(
-              modelHandle,
-              evaluatorsPtr,
-              evaluatorIndices.length,
-              BigInt(operation.slackMax),
-              BigInt(operation.capacity),
-              operation.fixStartCumulToZero ? 1 : 0,
-              namePtr,
+          await withStringAsync(module, operation.name, async (namePtr) => {
+            await ccallNumber(
+              module,
+              'routing_add_dimension_with_vehicle_transits',
+              ['number', 'number', 'number', 'bigint', 'bigint', 'number', 'number'],
+              [modelHandle, evaluatorsPtr, evaluatorIndices.length, BigInt(operation.slackMax), BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
           module._free(evaluatorsPtr);
         }
       } else if (operation.type === 'addConstantDimension') {
-        withString(module, operation.name, (namePtr) => {
-          module._routing_add_constant_dimension(
-            modelHandle,
-            BigInt(operation.value),
-            BigInt(operation.capacity),
-            operation.fixStartCumulToZero ? 1 : 0,
-            namePtr,
+        await withStringAsync(module, operation.name, async (namePtr) => {
+          await ccallNumber(
+            module,
+            'routing_add_constant_dimension',
+            ['number', 'bigint', 'bigint', 'number', 'number'],
+            [modelHandle, BigInt(operation.value), BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
           );
         });
       } else if (operation.type === 'addVectorDimension') {
         const values = copyInt64Array(module, operation.values);
         try {
-          withString(module, operation.name, (namePtr) => {
-            module._routing_add_vector_dimension(
-              modelHandle,
-              values.ptr,
-              values.length,
-              BigInt(operation.capacity),
-              operation.fixStartCumulToZero ? 1 : 0,
-              namePtr,
+          await withStringAsync(module, operation.name, async (namePtr) => {
+            await ccallNumber(
+              module,
+              'routing_add_vector_dimension',
+              ['number', 'number', 'number', 'bigint', 'number', 'number'],
+              [modelHandle, values.ptr, values.length, BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
@@ -188,15 +187,12 @@ async function solveRoutingWithModule(
         const flat = operation.matrix.flat();
         const matrix = copyInt64Array(module, flat);
         try {
-          withString(module, operation.name, (namePtr) => {
-            module._routing_add_matrix_dimension(
-              modelHandle,
-              matrix.ptr,
-              matrix.length,
-              operation.matrix.length,
-              BigInt(operation.capacity),
-              operation.fixStartCumulToZero ? 1 : 0,
-              namePtr,
+          await withStringAsync(module, operation.name, async (namePtr) => {
+            await ccallNumber(
+              module,
+              'routing_add_matrix_dimension',
+              ['number', 'number', 'number', 'number', 'bigint', 'number', 'number'],
+              [modelHandle, matrix.ptr, matrix.length, operation.matrix.length, BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
@@ -205,32 +201,30 @@ async function solveRoutingWithModule(
       } else if (operation.type === 'addDisjunction') {
         const indices = copyInt64Array(module, operation.indices);
         try {
-          module._routing_add_disjunction(
-            modelHandle,
-            indices.ptr,
-            indices.length,
-            BigInt(operation.penalty ?? 0),
-            operation.penalty === undefined ? 0 : 1,
+          await ccallNumber(
+            module,
+            'routing_add_disjunction',
+            ['number', 'number', 'number', 'bigint', 'number'],
+            [modelHandle, indices.ptr, indices.length, BigInt(operation.penalty ?? 0), operation.penalty === undefined ? 0 : 1],
           );
         } finally {
           module._free(indices.ptr);
         }
       } else if (operation.type === 'addPickupAndDelivery') {
-        module._routing_add_pickup_and_delivery(
-          modelHandle,
-          toInt64(operation.pickup),
-          toInt64(operation.delivery),
+        await ccallNumber(
+          module,
+          'routing_add_pickup_and_delivery',
+          ['number', 'bigint', 'bigint'],
+          [modelHandle, toInt64(operation.pickup), toInt64(operation.delivery)],
         );
       }
     }
-    const solveResult = module._routing_solve_with_parameters_ext(
-      modelHandle,
-      message.firstSolutionStrategy,
-      message.solutionLimit,
-    ) as unknown;
-    const ok = solveResult && typeof solveResult === 'object' && typeof (solveResult as Promise<number>).then === 'function'
-      ? await solveResult
-      : solveResult;
+    const ok = await ccallNumber(
+      module,
+      'routing_solve_with_parameters_ext',
+      ['number', 'number', 'number'],
+      [modelHandle, message.firstSolutionStrategy, message.solutionLimit],
+    );
     if (ok !== 1) {
       return null;
     }
@@ -241,10 +235,10 @@ async function solveRoutingWithModule(
     const dimensionCumulValues: Record<string, number[]> = {};
 
     for (let vehicle = 0; vehicle < message.numVehicles; vehicle++) {
-      let index = toNumber(module._routing_start(modelHandle, vehicle));
+      let index = toNumber(await ccallBigInt(module, 'routing_start', ['number', 'number'], [modelHandle, vehicle]));
       starts.push(index);
-      while (module._routing_is_end(modelHandle, toInt64(index)) !== 1) {
-        const next = toNumber(module._routing_next_value(modelHandle, toInt64(index)));
+      while (await ccallNumber(module, 'routing_is_end', ['number', 'bigint'], [modelHandle, toInt64(index)]) !== 1) {
+        const next = toNumber(await ccallBigInt(module, 'routing_next_value', ['number', 'bigint'], [modelHandle, toInt64(index)]));
         nextValues[index] = next;
         index = next;
       }
@@ -253,42 +247,35 @@ async function solveRoutingWithModule(
 
     for (const dimensionName of message.dimensionNames) {
       dimensionCumulValues[dimensionName] = [];
-      withString(module, dimensionName, (namePtr) => {
+      await withStringAsync(module, dimensionName, async (namePtr) => {
         for (let index = 0; index < message.transitMatrixDimension; index++) {
           dimensionCumulValues[dimensionName][index] = toNumber(
-            module._routing_assignment_dimension_cumul_value(modelHandle, namePtr, toInt64(index)),
+            await ccallBigInt(
+              module,
+              'routing_assignment_dimension_cumul_value',
+              ['number', 'number', 'bigint'],
+              [modelHandle, namePtr, toInt64(index)],
+            ),
           );
         }
       });
     }
 
     return {
-      status: module._routing_status(modelHandle),
-      objectiveValue: toNumber(module._routing_assignment_objective_value(modelHandle)),
+      status: await ccallNumber(module, 'routing_status', ['number'], [modelHandle]),
+      objectiveValue: toNumber(await ccallBigInt(module, 'routing_assignment_objective_value', ['number'], [modelHandle])),
       nextValues,
       starts,
       ends,
       dimensionCumulValues,
     };
   } finally {
-    if (startsPtr !== 0) module._free(startsPtr);
-    if (endsPtr !== 0) module._free(endsPtr);
     // OR-Tools currently aborts when deleting solved routing models in this
-    // wasm worker path, so native routing handles are intentionally retained.
+    // wasm worker path. Chromium can also abort on post-solve heap frees, so
+    // the bridge keeps these small buffers with the retained native handles.
   }
 }
 
 export async function solveRoutingInWorker(message: RoutingSolveRequest): Promise<RoutingSolveResult | null> {
-  if (isDenoRuntime()) {
-    return await solveRoutingWithModule(await loadAsyncifyModule(), message);
-  }
-
-  try {
-    return await solveRoutingWithModule(await loadModule(), message);
-  } catch (error) {
-    if (!isJspiSuspendError(error)) {
-      throw error;
-    }
-    return await solveRoutingWithModule(await loadAsyncifyModule(), message);
-  }
+  return await solveRoutingWithModule(await loadModule(), message);
 }

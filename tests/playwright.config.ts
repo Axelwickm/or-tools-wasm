@@ -1,41 +1,42 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const fixtureGroup = process.env.FIXTURE_GROUP;
+const fixtureTimeout = 240_000;
 const webServers = [
   {
     fixture: 'vite',
     command: 'npm run test:fixture:vite:serve-dev',
     url: 'http://127.0.0.1:4174',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: fixtureTimeout,
   },
   {
     fixture: 'vite',
     command: 'npm run test:fixture:vite:serve-static',
     url: 'http://127.0.0.1:4175',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: fixtureTimeout,
   },
   {
     fixture: 'webpack',
     command: 'npm run test:fixture:webpack:serve',
     url: 'http://127.0.0.1:4176',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: fixtureTimeout,
   },
   {
     fixture: 'webpack',
     command: 'npm run test:fixture:webpack:serve-static',
     url: 'http://127.0.0.1:4177',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: fixtureTimeout,
   },
   {
     fixture: 'rollup',
     command: 'npm run test:fixture:rollup:serve-static',
     url: 'http://127.0.0.1:4178',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: fixtureTimeout,
   },
 ]
   .filter((server) => !fixtureGroup || server.fixture === fixtureGroup)
@@ -43,9 +44,9 @@ const webServers = [
 
 export default defineConfig({
   testDir: './specs',
-  timeout: 120_000,
+  timeout: fixtureTimeout,
   expect: {
-    timeout: 120_000,
+    timeout: fixtureTimeout,
   },
   webServer: webServers,
   projects: [

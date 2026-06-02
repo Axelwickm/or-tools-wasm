@@ -13,10 +13,15 @@ on:
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: 24.12.0
+  DENO_VERSION: 2.8.1
+  BUN_VERSION: 1.3.14
+
 jobs:
   package:
     name: Build npm package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
 
     steps:
@@ -28,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Cache Emscripten and CMake build
@@ -69,7 +74,7 @@ jobs:
   vite-fixture:
     name: Vite 7 / ${{ matrix.mode }} / ${{ matrix.browser }}
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -95,7 +100,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install dependencies
@@ -120,7 +125,7 @@ jobs:
   webpack-fixture:
     name: Webpack 5 / ${{ matrix.mode }} / ${{ matrix.browser }}
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -146,7 +151,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install dependencies
@@ -171,7 +176,7 @@ jobs:
   rollup-fixture:
     name: Rollup 4 / static / ${{ matrix.browser }}
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -189,7 +194,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install dependencies
@@ -212,9 +217,9 @@ jobs:
         run: FIXTURE_GROUP=rollup npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
 
   deno-fixture:
-    name: Deno / solve
+    name: Deno 2.8.1 / solve
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -224,13 +229,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: ${{ env.DENO_VERSION }}
 
       - name: Install dependencies
         run: npm ci
@@ -246,9 +251,9 @@ jobs:
         run: npm run test:fixture:deno
 
   node-fixture:
-    name: Node 22 / solve
+    name: Node 24.12.0 / solve
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -258,7 +263,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install dependencies
@@ -275,9 +280,9 @@ jobs:
         run: npm run test:fixture:node
 
   bun-fixture:
-    name: Bun / solve
+    name: Bun 1.3.14 / solve
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -287,13 +292,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
         run: npm ci
@@ -318,7 +323,7 @@ jobs:
       - deno-fixture
       - node-fixture
       - bun-fixture
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     if: ${{ startsWith(github.ref, 'refs/tags/v') && github.actor != 'nektos/act' }}
     permissions:
@@ -332,7 +337,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
 
       - name: Download package artifact

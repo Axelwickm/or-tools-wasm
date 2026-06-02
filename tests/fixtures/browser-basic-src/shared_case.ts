@@ -5,7 +5,12 @@ export const fixtureModes: readonly FixtureMode[] = ['direct', 'worker'];
 export type WorkerBridgeApi = {
   setWorkerBridgeEnabled(enabled: boolean): void;
   isWorkerBridgeEnabled(): boolean;
+  isWorkerBridgeAvailable?(): boolean;
 };
+
+export function fixtureModesFor(api: WorkerBridgeApi): readonly FixtureMode[] {
+  return api.isWorkerBridgeAvailable?.() === false ? ['direct'] : fixtureModes;
+}
 
 export function setWorkerBridgeMode(api: WorkerBridgeApi, mode: FixtureMode, label: string) {
   api.setWorkerBridgeEnabled(mode === 'worker');

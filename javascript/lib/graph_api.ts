@@ -9,23 +9,6 @@ import {
   shouldUseWorkerBridge,
 } from './worker_bridge.js';
 
-type CReturn = 'number' | 'string' | undefined;
-
-type GraphExports = {
-  maxFlowSolveSerialized(tailsPtr: number, headsPtr: number, capacitiesPtr: number, numArcs: number, source: number, sink: number): string;
-  minCostFlowSolveSerialized(
-    tailsPtr: number,
-    headsPtr: number,
-    capacitiesPtr: number,
-    unitCostsPtr: number,
-    numArcs: number,
-    suppliesPtr: number,
-    numSupplies: number,
-    solveMaxFlowWithMinCost: number,
-  ): string;
-  linearSumAssignmentSolveSerialized(leftNodesPtr: number, rightNodesPtr: number, costsPtr: number, numArcs: number): string;
-};
-
 type NativeResult = { ok: false; error: string } | NativeSuccess;
 
 type NativeSuccess = {
@@ -73,54 +56,13 @@ export type GraphSolvePayload = MaxFlowSolvePayload | MinCostFlowSolvePayload | 
 
 let graphModulePromise: Promise<OrToolsWasmModule> | null = null;
 let graphModule: OrToolsWasmModule | null = null;
-let graphExports: GraphExports | null = null;
-const isBunRuntime = 'Bun' in globalThis;
-
-function wrap<T extends (...args: never[]) => unknown>(
-  module: OrToolsWasmModule,
-  name: string,
-  returnType: CReturn,
-  argTypes: string[],
-): T {
-  return module.cwrap(name, returnType, argTypes) as unknown as T;
-}
-
-function createGraphExports(module: OrToolsWasmModule): GraphExports {
-  return {
-    maxFlowSolveSerialized: wrap(module, 'graph_max_flow_solve_serialized', 'string', [
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-    ]),
-    minCostFlowSolveSerialized: wrap(module, 'graph_min_cost_flow_solve_serialized', 'string', [
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-    ]),
-    linearSumAssignmentSolveSerialized: wrap(module, 'graph_linear_sum_assignment_solve_serialized', 'string', [
-      'number',
-      'number',
-      'number',
-      'number',
-    ]),
-  };
-}
 
 export async function initNetworkFlow(): Promise<void> {
-  if (isBunRuntime || shouldUseWorkerBridge()) {
+  if (shouldUseWorkerBridge()) {
     return;
   }
   graphModulePromise ??= loadGraphRuntime().then((module) => {
     graphModule = module;
-    graphExports = createGraphExports(module);
     return module;
   });
   await graphModulePromise;
@@ -131,13 +73,6 @@ function currentModule() {
     throw new Error('Network Flow runtime has not been initialized. Call initNetworkFlow() first.');
   }
   return graphModule;
-}
-
-function currentExports() {
-  if (!graphExports) {
-    throw new Error('Network Flow runtime has not been initialized. Call initNetworkFlow() first.');
-  }
-  return graphExports;
 }
 
 function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
@@ -179,21 +114,19 @@ function assertIndex(index: number, length: number, label: string) {
   }
 }
 
-function solveMaxFlowDirect(payload: MaxFlowSolvePayload): NativeSuccess {
+async function solveMaxFlowDirect(payload: MaxFlowSolvePayload): Promise<NativeSuccess> {
   const module = currentModule();
-  const exports = currentExports();
   const tailsPtr = copyFloat64ToHeap(module, payload.tails);
   const headsPtr = copyFloat64ToHeap(module, payload.heads);
   const capacitiesPtr = copyFloat64ToHeap(module, payload.capacities);
   try {
-    return parseResult(exports.maxFlowSolveSerialized(
-      tailsPtr,
-      headsPtr,
-      capacitiesPtr,
-      payload.tails.length,
-      payload.source,
-      payload.sink,
-    ));
+    return parseResult(await module.ccall(
+      'graph_max_flow_solve_serialized',
+      'string',
+      ['number', 'number', 'number', 'number', 'number', 'number'],
+      [tailsPtr, headsPtr, capacitiesPtr, payload.tails.length, payload.source, payload.sink],
+      { async: true },
+    ) as string);
   } finally {
     if (tailsPtr) module._free(tailsPtr);
     if (headsPtr) module._free(headsPtr);
@@ -201,25 +134,30 @@ function solveMaxFlowDirect(payload: MaxFlowSolvePayload): NativeSuccess {
   }
 }
 
-function solveMinCostFlowDirect(payload: MinCostFlowSolvePayload): NativeSuccess {
+async function solveMinCostFlowDirect(payload: MinCostFlowSolvePayload): Promise<NativeSuccess> {
   const module = currentModule();
-  const exports = currentExports();
   const tailsPtr = copyFloat64ToHeap(module, payload.tails);
   const headsPtr = copyFloat64ToHeap(module, payload.heads);
   const capacitiesPtr = copyFloat64ToHeap(module, payload.capacities);
   const unitCostsPtr = copyFloat64ToHeap(module, payload.unitCosts);
   const suppliesPtr = copyFloat64ToHeap(module, payload.supplies);
   try {
-    return parseResult(exports.minCostFlowSolveSerialized(
-      tailsPtr,
-      headsPtr,
-      capacitiesPtr,
-      unitCostsPtr,
-      payload.tails.length,
-      suppliesPtr,
-      payload.supplies.length,
-      payload.solveMaxFlowWithMinCost ? 1 : 0,
-    ));
+    return parseResult(await module.ccall(
+      'graph_min_cost_flow_solve_serialized',
+      'string',
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [
+        tailsPtr,
+        headsPtr,
+        capacitiesPtr,
+        unitCostsPtr,
+        payload.tails.length,
+        suppliesPtr,
+        payload.supplies.length,
+        payload.solveMaxFlowWithMinCost ? 1 : 0,
+      ],
+      { async: true },
+    ) as string);
   } finally {
     if (tailsPtr) module._free(tailsPtr);
     if (headsPtr) module._free(headsPtr);
@@ -229,19 +167,19 @@ function solveMinCostFlowDirect(payload: MinCostFlowSolvePayload): NativeSuccess
   }
 }
 
-function solveLinearSumAssignmentDirect(payload: LinearSumAssignmentSolvePayload): NativeSuccess {
+async function solveLinearSumAssignmentDirect(payload: LinearSumAssignmentSolvePayload): Promise<NativeSuccess> {
   const module = currentModule();
-  const exports = currentExports();
   const leftNodesPtr = copyFloat64ToHeap(module, payload.leftNodes);
   const rightNodesPtr = copyFloat64ToHeap(module, payload.rightNodes);
   const costsPtr = copyFloat64ToHeap(module, payload.costs);
   try {
-    return parseResult(exports.linearSumAssignmentSolveSerialized(
-      leftNodesPtr,
-      rightNodesPtr,
-      costsPtr,
-      payload.leftNodes.length,
-    ));
+    return parseResult(await module.ccall(
+      'graph_linear_sum_assignment_solve_serialized',
+      'string',
+      ['number', 'number', 'number', 'number'],
+      [leftNodesPtr, rightNodesPtr, costsPtr, payload.leftNodes.length],
+      { async: true },
+    ) as string);
   } finally {
     if (leftNodesPtr) module._free(leftNodesPtr);
     if (rightNodesPtr) module._free(rightNodesPtr);
@@ -250,7 +188,7 @@ function solveLinearSumAssignmentDirect(payload: LinearSumAssignmentSolvePayload
 }
 
 export async function solveGraphPayload(payload: GraphSolvePayload): Promise<NativeSuccess> {
-  if (isBunRuntime || shouldUseWorkerBridge()) {
+  if (shouldUseWorkerBridge()) {
     const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'graphSolveResult' }>>({
       type: 'graphSolve',
       id: nextWorkerBridgeRequestId(),
@@ -259,9 +197,9 @@ export async function solveGraphPayload(payload: GraphSolvePayload): Promise<Nat
     return parseResult(response.result);
   }
   await initNetworkFlow();
-  if (payload.algorithm === 'maxFlow') return solveMaxFlowDirect(payload);
-  if (payload.algorithm === 'minCostFlow') return solveMinCostFlowDirect(payload);
-  return solveLinearSumAssignmentDirect(payload);
+  if (payload.algorithm === 'maxFlow') return await solveMaxFlowDirect(payload);
+  if (payload.algorithm === 'minCostFlow') return await solveMinCostFlowDirect(payload);
+  return await solveLinearSumAssignmentDirect(payload);
 }
 
 export enum SimpleMaxFlowStatus {

@@ -173,7 +173,14 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     }) as Promise<RunResult[]>
   );
   setStatus({ ok: false, phase: 'routing' });
-  const routing = await runWithWorkerStats(workerSpy, () => runRoutingCases(routingApi as never));
+  const routing = await runWithWorkerStats(workerSpy, () => runRoutingCases(routingApi as never, {
+    onProgress: (caseName, mode) => setStatus({
+      ok: false,
+      phase: 'routing',
+      caseName,
+      mode,
+    }),
+  }));
   setStatus({ ok: false, phase: 'mp-solver' });
   const mpSolver = await runWithWorkerStats(workerSpy, () => runMPSolverCases({
     initMPSolver: MPSolverApi.initMPSolver,
@@ -181,6 +188,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     MPSolverParameters: MPSolverApi.MPSolverParameters,
     setWorkerBridgeEnabled: MPSolverApi.setWorkerBridgeEnabled,
     isWorkerBridgeEnabled: MPSolverApi.isWorkerBridgeEnabled,
+    isWorkerBridgeAvailable: MPSolverApi.isWorkerBridgeAvailable,
   }, {
     onProgress: (caseName, context) => setStatus({
       ok: false,
@@ -196,6 +204,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     KnapsackSolverType: KnapsackApi.KnapsackSolverType,
     setWorkerBridgeEnabled: KnapsackApi.setWorkerBridgeEnabled,
     isWorkerBridgeEnabled: KnapsackApi.isWorkerBridgeEnabled,
+    isWorkerBridgeAvailable: KnapsackApi.isWorkerBridgeAvailable,
   }));
   setStatus({ ok: false, phase: 'network-flow' });
   const networkFlow = await runWithWorkerStats(workerSpy, () => runNetworkFlowCases({

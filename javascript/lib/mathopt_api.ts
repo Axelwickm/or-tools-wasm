@@ -12,6 +12,10 @@ import type { SatParameters } from './generated/sat_parameters.js';
 
 type WireValue = Uint8Array;
 
+function shouldUseMathOptBridge(): boolean {
+  return shouldUseWorkerBridge();
+}
+
 export type MathOptLinearTerm = {
   variable: MathOptVariable;
   coefficient: number;
@@ -2484,7 +2488,7 @@ export function completeLowerBound<TExpression>(
 }
 
 export async function initMathOpt(): Promise<void> {
-  if (shouldUseWorkerBridge()) {
+  if (shouldUseMathOptBridge()) {
     await initMathOptViaWorker();
     return;
   }
@@ -2496,7 +2500,7 @@ export class MathOptIncrementalSolver {
   private checkpoint: MathOptModelSnapshot;
   private handle: number | null = null;
   private closed = false;
-  private readonly useWorkerBridge = shouldUseWorkerBridge();
+  private readonly useWorkerBridge = shouldUseMathOptBridge();
 
   constructor(
     readonly model: MathOptModel,
@@ -2624,7 +2628,7 @@ export class MathOpt {
   static async solve(model: MathOptModel, options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
     const requestBytes = MathOpt.encodeSolveRequest(model, options);
     const interrupterState = solveInterrupterState(options);
-    const responseBytes = shouldUseWorkerBridge()
+    const responseBytes = shouldUseMathOptBridge()
       ? await solveViaWorker(requestBytes, interrupterState)
       : await solveDirect(requestBytes, interrupterState);
     const result = decodeSolveResponse(responseBytes, model);
@@ -2897,7 +2901,7 @@ async function incrementalSolveDirect(
 
 async function incrementalDeleteDirect(handle: number): Promise<void> {
   const module = await loadMathOptModule();
-  module.ccall('mathopt_incremental_delete', undefined, ['number'], [handle]);
+  await module.ccall('mathopt_incremental_delete', undefined, ['number'], [handle], { async: true });
 }
 
 function copyBytesToHeap(module: OrToolsWasmModule, bytes: Uint8Array): number {

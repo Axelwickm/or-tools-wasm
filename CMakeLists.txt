@@ -323,7 +323,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-sWASM_BIGINT=1"
     "--bind"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
-    "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8"
+    "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8,PThread"
     "-sNODEJS_CATCH_REJECTION=0"
     "-sNODEJS_CATCH_EXIT=0"
     "--no-entry"
@@ -338,15 +338,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_BROWSER_LINK_OPTIONS
     "-sENVIRONMENT=web,worker"
-    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
+    "-sPTHREAD_POOL_SIZE=4")
 
   set(CP_SAT_NODE_LINK_OPTIONS
     "-sENVIRONMENT=node"
-    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
+    "-sPTHREAD_POOL_SIZE=4")
 
   set(CP_SAT_JSPI_LINK_OPTIONS
     "-sJSPI=2"
-    "-sJSPI_EXPORTS=['solve_model','solve_model_with_callback_events','validate_model','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mathopt_solve_request','pdlp_primal_dual_hybrid_gradient','graph_max_flow_solve_serialized','graph_min_cost_flow_solve_serialized','graph_linear_sum_assignment_solve_serialized','set_cover_next_solution_serialized']")
+    "-sJSPI_EXPORTS=['__wasm_call_ctors','solve_model','solve_model_with_callback_events','validate_model','routing_create_index_manager','routing_create_index_manager_starts_ends','routing_create_model','routing_register_matrix_transit_callback','routing_set_arc_cost_evaluator_of_all_vehicles','routing_add_dimension','routing_add_dimension_with_vehicle_capacity','routing_add_dimension_with_vehicle_transits','routing_add_constant_dimension','routing_add_vector_dimension','routing_add_matrix_dimension','routing_add_disjunction','routing_add_pickup_and_delivery','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','routing_status','routing_assignment_objective_value','routing_start','routing_end','routing_is_end','routing_next_value','routing_assignment_dimension_cumul_value','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mp_solver_solve_model_request_with_threads','knapsack_solve_serialized','mathopt_solve_request','mathopt_incremental_create','mathopt_incremental_solve','mathopt_incremental_delete','pdlp_validate_quadratic_program','pdlp_is_linear_program','pdlp_qp_from_mpmodel_proto','pdlp_qp_to_mpmodel_proto','pdlp_primal_dual_hybrid_gradient','graph_max_flow_solve_serialized','graph_min_cost_flow_solve_serialized','graph_linear_sum_assignment_solve_serialized','set_cover_next_solution_serialized']")
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")

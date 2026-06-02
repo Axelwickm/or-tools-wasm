@@ -15,6 +15,7 @@ export type ValidateRequest = {
 export type SchemaRequest = {
   type: 'getSchemas';
   id: number;
+  schema: 'cp_sat' | 'mp_solver';
 };
 
 export type RoutingSolveRequest = {
@@ -92,6 +93,7 @@ export type RoutingModelOperation =
 export type CancelSolve = {
   type: 'cancel_solve';
   id: number;
+  targetId?: number;
 };
 
 export type RoutingSolveResult = {
@@ -107,6 +109,7 @@ export type MPSolverSolveRequest = {
   type: 'mpSolverSolve';
   id: number;
   requestBytes: Uint8Array;
+  numThreads?: number;
 };
 
 export type KnapsackSolveRequest = {
@@ -229,7 +232,8 @@ export type WorkerResponse =
   | { type: 'solveCallback'; id: number; eventType: 'bestBound'; bound: number }
   | { type: 'solveCallback'; id: number; eventType: 'log'; message: string }
   | { type: 'validateResult'; id: number; ok: boolean; message: string }
-  | { type: 'schemaResult'; id: number; schemas: { cp_model: string; sat_parameters: string; linear_solver: string; optional_boolean: string } }
+  | { type: 'schemaResult'; id: number; schema: 'cp_sat'; schemas: { cp_model: string; sat_parameters: string } }
+  | { type: 'schemaResult'; id: number; schema: 'mp_solver'; schemas: { linear_solver: string; optional_boolean: string } }
   | { type: 'routingSolveResult'; id: number; result: RoutingSolveResult | null }
   | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
   | { type: 'knapsackSolveResult'; id: number; result: string }

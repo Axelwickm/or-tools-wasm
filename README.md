@@ -17,9 +17,9 @@ as multithreaded WebAssembly.
 [![Webpack 5 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Firefox&nameFilter=Webpack%205%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Rollup 4 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Chromium&nameFilter=Rollup%204%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Rollup 4 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Firefox&nameFilter=Rollup%204%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Node 22](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Node%2022&nameFilter=Node%2022%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Deno](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno&nameFilter=Deno%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Bun](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Bun&nameFilter=Bun%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Node 24.12.0](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Node%2024.12.0&nameFilter=Node%2024.12.0%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Deno 2.8.1](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno%202.8.1&nameFilter=Deno%202.8.1%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Bun 1.3.14](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Bun%201.3.14&nameFilter=Bun%201.3.14%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 
 [Try online in your browser](https://axelwickman.com/or-tools-wasm?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=try_online)
 
@@ -240,8 +240,8 @@ Deno needs permissions to read package assets and inspect CPU count:
 deno run --allow-read --allow-sys=cpus your-script.ts
 ```
 
-Deno and Bun use the Asyncify runtime path. Node uses JSPI when available and
-falls back to Asyncify otherwise.
+Node, Deno, and Bun use the JSPI runtime when `WebAssembly.promising` is
+available and fall back to the Asyncify runtime otherwise.
 
 ## Development
 

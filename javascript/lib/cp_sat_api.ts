@@ -7,7 +7,6 @@ import {
   setWorkerBridgeEnabled,
   isWorkerBridgeEnabled,
   shouldUseWorkerBridge,
-  terminateWorkerBridge,
 } from './worker_bridge.js';
 import type { CpModelProto, CpSolverResponse } from './generated/cp_model.js';
 import type { SatParameters } from './generated/sat_parameters.js';
@@ -85,9 +84,7 @@ function loadModule() {
   if (shouldUseWorkerBridge()) {
     throw new Error("Wasm should not be loaded on main thread when Worker Bridge is enabled");
   }
-  if (!modulePromise) {
-    modulePromise = loadRuntime();
-  }
+  modulePromise ??= loadRuntime();
   return modulePromise;
 }
 
@@ -101,7 +98,11 @@ function getSchemas(): Promise<SchemaPair> {
         const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'schemaResult' }>>({
           type: 'getSchemas',
           id: nextWorkerBridgeRequestId(),
+          schema: 'cp_sat',
         });
+        if (response.schema !== 'cp_sat') {
+          throw new Error('Worker returned the wrong schema payload for CP-SAT.');
+        }
         return response.schemas;
       }
 
@@ -199,13 +200,28 @@ async function resolveSatParametersType(): Promise<import('protobufjs').Type> {
   }
 }
 
+function normalizeSatParameters(params: SatParameters): SatParameters {
+  if (params.numSearchWorkers === undefined) {
+    return params;
+  }
+  const { numSearchWorkers, ...normalizedParams } = params;
+  if (normalizedParams.numWorkers !== undefined) {
+    return normalizedParams;
+  }
+  return {
+    ...normalizedParams,
+    numWorkers: numSearchWorkers,
+  };
+}
+
 async function encodeSatParameters(params: SatParameters): Promise<Uint8Array> {
   const paramsType = await resolveSatParametersType();
-  const validationError = paramsType.verify(params);
+  const normalizedParams = normalizeSatParameters(params);
+  const validationError = paramsType.verify(normalizedParams);
   if (validationError) {
     throw new Error(`CpSat.solve: ${validationError}`);
   }
-  const message = paramsType.create(params);
+  const message = paramsType.create(normalizedParams);
   return paramsType.encode(message).finish();
 }
 
@@ -341,6 +357,7 @@ function copyBytesToHeap(Module: OrToolsWasmModule, bytes: Uint8Array | null) {
 
 type WorkerSolveResponse = Extract<WorkerResponse, { type: 'solveResult' }>;
 type WorkerValidateResponse = Extract<WorkerResponse, { type: 'validateResult' }>;
+type WorkerCancelResponse = Extract<WorkerResponse, { type: 'solved_cancelled' }>;
 
 async function solveRawViaWorker(
   modelBytes: Uint8Array,
@@ -475,10 +492,15 @@ async function solve(
 ): Promise<CpSatSolveResult> {
   const paramsBytes = await resolveParamsBytes(params);
   const solverType = callbacks && callbackFlags(callbacks) ? await resolveCpSolverResponseType() : undefined;
+  const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const bytes = await solveRaw(modelBytes, paramsBytes, callbacks, solverType);
+  const elapsedSeconds = ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - started) / 1000;
   let response: CpSolverResponse | null = null;
   if (bytes.length > 0) {
     response = solverType ? toCpSolverResponse(solverType, bytes) : await decodeSolverResponse(bytes);
+    if ((response.wallTime ?? 0) <= 0) {
+      response.wallTime = Math.max(elapsedSeconds, Number.EPSILON);
+    }
   }
   return { bytes, response };
 }
@@ -490,12 +512,13 @@ async function validateDirect(model: Uint8Array) {
   let msgPtr = 0;
 
   try {
-    msgPtr = Module.ccall(
+    msgPtr = (await Module.ccall(
       'validate_model',
       'number',
       ['number', 'number', 'number'],
       [modelPtr, model.length, lenPtr],
-    ) as number;
+      { async: true },
+    )) as number;
   } finally {
     if (modelPtr) Module._free(modelPtr);
   }
@@ -517,10 +540,11 @@ async function validateDirect(model: Uint8Array) {
 async function cancelSolve() {
   if (shouldUseWorkerBridge()) {
     if (activeWorkerSolveId !== null) {
-      // await postWorkerRequest<WorkerSolveResponse>({
-      //   type: 'cancel_solve',
-      // });
-      terminateWorkerBridge('Solve canceled by user.');
+      await postWorkerRequest<WorkerCancelResponse>({
+        type: 'cancel_solve',
+        id: nextWorkerBridgeRequestId(),
+        targetId: activeWorkerSolveId,
+      });
       activeWorkerSolveId = null;
     }
   } else {

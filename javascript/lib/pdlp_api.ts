@@ -11,18 +11,6 @@ import {
 
 let pdlpModulePromise: Promise<OrToolsWasmModule> | null = null;
 let pdlpModule: OrToolsWasmModule | null = null;
-let pdlpExports: PdlpExports | null = null;
-
-type CReturn = 'number' | undefined;
-type CArg = 'number';
-
-type PdlpExports = {
-  validateQuadraticProgram(qpPtr: number, qpLength: number, lenPtr: number): number;
-  isLinearProgram(qpPtr: number, qpLength: number): number;
-  qpFromMpModelProto(protoPtr: number, protoLength: number, relaxIntegerVariables: number, includeNames: number, lenPtr: number): number;
-  qpToMpModelProto(qpPtr: number, qpLength: number, lenPtr: number): number;
-  primalDualHybridGradient(requestPtr: number, requestLength: number, lenPtr: number): number;
-};
 
 export type SparseMatrixEntry = {
   row: number;
@@ -131,30 +119,10 @@ const terminationReasonNames: Record<number, string> = {
   13: 'TERMINATION_REASON_INVALID_INITIAL_SOLUTION',
 };
 
-function wrap<T extends (...args: never[]) => unknown>(
-  module: OrToolsWasmModule,
-  name: string,
-  returnType: CReturn,
-  argTypes: CArg[],
-): T {
-  return module.cwrap(name, returnType, argTypes) as unknown as T;
-}
-
-function createPdlpExports(module: OrToolsWasmModule): PdlpExports {
-  return {
-    validateQuadraticProgram: wrap(module, 'pdlp_validate_quadratic_program', 'number', ['number', 'number', 'number']),
-    isLinearProgram: wrap(module, 'pdlp_is_linear_program', 'number', ['number', 'number']),
-    qpFromMpModelProto: wrap(module, 'pdlp_qp_from_mpmodel_proto', 'number', ['number', 'number', 'number', 'number', 'number']),
-    qpToMpModelProto: wrap(module, 'pdlp_qp_to_mpmodel_proto', 'number', ['number', 'number', 'number']),
-    primalDualHybridGradient: wrap(module, 'pdlp_primal_dual_hybrid_gradient', 'number', ['number', 'number', 'number']),
-  };
-}
-
 async function loadPdlpModule(): Promise<OrToolsWasmModule> {
   if (!pdlpModulePromise) {
     pdlpModulePromise = loadPdlpRuntime().then((module) => {
       pdlpModule = module;
-      pdlpExports = createPdlpExports(module);
       return module;
     });
   }
@@ -166,13 +134,6 @@ function getPdlpModule(): OrToolsWasmModule {
     throw new Error('initPdlp() must be awaited before using the synchronous PDLP API.');
   }
   return pdlpModule;
-}
-
-function getPdlpExports(): PdlpExports {
-  if (!pdlpExports) {
-    throw new Error('initPdlp() must be awaited before using the synchronous PDLP API.');
-  }
-  return pdlpExports;
 }
 
 export async function initPdlp(): Promise<void> {
@@ -193,11 +154,11 @@ function readUint32LE(buffer: ArrayBufferLike, ptr: number): number {
   return new DataView(buffer, ptr, 4).getUint32(0, true);
 }
 
-function readNativeBytes(module: OrToolsWasmModule, fn: (lenPtr: number) => number): Uint8Array {
+async function readNativeBytes(module: OrToolsWasmModule, fn: (lenPtr: number) => number | Promise<number>): Promise<Uint8Array> {
   const lenPtr = module._malloc(4);
   let responsePtr = 0;
   try {
-    responsePtr = fn(lenPtr);
+    responsePtr = await fn(lenPtr);
     const len = readUint32LE(module.HEAPU8.buffer, lenPtr);
     return responsePtr && len ? module.HEAPU8.slice(responsePtr, responsePtr + len) : new Uint8Array();
   } finally {
@@ -208,11 +169,11 @@ function readNativeBytes(module: OrToolsWasmModule, fn: (lenPtr: number) => numb
   }
 }
 
-function runWithBytes(bytes: Uint8Array, fn: (module: OrToolsWasmModule, ptr: number, len: number) => Uint8Array): Uint8Array {
+async function runWithBytes<T>(bytes: Uint8Array, fn: (module: OrToolsWasmModule, ptr: number, len: number) => T | Promise<T>): Promise<T> {
   const module = getPdlpModule();
   const ptr = copyBytesToHeap(module, bytes);
   try {
-    return fn(module, ptr, bytes.length);
+    return await fn(module, ptr, bytes.length);
   } finally {
     if (ptr) module._free(ptr);
   }
@@ -553,12 +514,41 @@ async function pdlpBytes(operation: 'validate' | 'fromMpModel' | 'toMpModel' | '
     return (await runPdlpWorker(operation, bytes, options)).bytes;
   }
   await initPdlp();
-  const exports = getPdlpExports();
-  return runWithBytes(bytes, (module, ptr, len) => readNativeBytes(module, (lenPtr) => {
-    if (operation === 'validate') return exports.validateQuadraticProgram(ptr, len, lenPtr);
-    if (operation === 'fromMpModel') return exports.qpFromMpModelProto(ptr, len, options.relaxIntegerVariables ? 1 : 0, options.includeNames ? 1 : 0, lenPtr);
-    if (operation === 'toMpModel') return exports.qpToMpModelProto(ptr, len, lenPtr);
-    return exports.primalDualHybridGradient(ptr, len, lenPtr);
+  return runWithBytes(bytes, (module, ptr, len) => readNativeBytes(module, async (lenPtr) => {
+    if (operation === 'validate') {
+      return await module.ccall(
+        'pdlp_validate_quadratic_program',
+        'number',
+        ['number', 'number', 'number'],
+        [ptr, len, lenPtr],
+        { async: true },
+      ) as number;
+    }
+    if (operation === 'fromMpModel') {
+      return await module.ccall(
+        'pdlp_qp_from_mpmodel_proto',
+        'number',
+        ['number', 'number', 'number', 'number', 'number'],
+        [ptr, len, options.relaxIntegerVariables ? 1 : 0, options.includeNames ? 1 : 0, lenPtr],
+        { async: true },
+      ) as number;
+    }
+    if (operation === 'toMpModel') {
+      return await module.ccall(
+        'pdlp_qp_to_mpmodel_proto',
+        'number',
+        ['number', 'number', 'number'],
+        [ptr, len, lenPtr],
+        { async: true },
+      ) as number;
+    }
+    return await module.ccall(
+      'pdlp_primal_dual_hybrid_gradient',
+      'number',
+      ['number', 'number', 'number'],
+      [ptr, len, lenPtr],
+      { async: true },
+    ) as number;
   }));
 }
 
@@ -567,8 +557,13 @@ async function pdlpIsLinearProgram(bytes: Uint8Array): Promise<boolean> {
     return (await runPdlpWorker('isLinear', bytes)).value === 1;
   }
   await initPdlp();
-  const exports = getPdlpExports();
-  return runWithBytes(bytes, (_module, ptr, len) => Uint8Array.of(exports.isLinearProgram(ptr, len))).at(0) === 1;
+  return (await runWithBytes(bytes, async (module, ptr, len) => await module.ccall(
+    'pdlp_is_linear_program',
+    'number',
+    ['number', 'number'],
+    [ptr, len],
+    { async: true },
+  ) as number)) === 1;
 }
 
 export class QuadraticProgram {

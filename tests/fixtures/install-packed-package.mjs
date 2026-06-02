@@ -50,8 +50,9 @@ if (!tarballs.length) {
   tarballs = await findPackedTarballs();
 }
 
-const tarball = tarballs[0].path;
-await copyFile(tarball, stableTarballPath);
+const tarball = tarballs[0];
+const tarballPath = tarball.path;
+await copyFile(tarballPath, stableTarballPath);
 console.log(`Installing ${stableTarballPath} into ${fixtureDir}`);
 
 const install = spawn('npm', ['install', stableTarballPath, '--force', '--no-audit', '--no-fund', '--no-package-lock'], {

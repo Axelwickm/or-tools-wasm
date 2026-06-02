@@ -9,22 +9,6 @@ import {
   shouldUseWorkerBridge,
 } from './worker_bridge.js';
 
-type CReturn = 'number' | 'string' | undefined;
-
-type SetCoverExports = {
-  nextSolutionSerialized(
-    costsPtr: number,
-    startsPtr: number,
-    elementsPtr: number,
-    numSubsets: number,
-    numElementsData: number,
-    selectedPtr: number,
-    focusPtr: number,
-    operation: number,
-    maxIterations: number,
-  ): string;
-};
-
 export enum ConsistencyLevel {
   COST_AND_COVERAGE = 1,
   FREE_AND_UNCOVERED = 2,
@@ -94,32 +78,6 @@ const operationCode: Record<NativeSetCoverOperation, number> = {
 
 let setCoverModulePromise: Promise<OrToolsWasmModule> | null = null;
 let setCoverModule: OrToolsWasmModule | null = null;
-let setCoverExports: SetCoverExports | null = null;
-
-function wrap<T extends (...args: never[]) => unknown>(
-  module: OrToolsWasmModule,
-  name: string,
-  returnType: CReturn,
-  argTypes: string[],
-): T {
-  return module.cwrap(name, returnType, argTypes) as unknown as T;
-}
-
-function createSetCoverExports(module: OrToolsWasmModule): SetCoverExports {
-  return {
-    nextSolutionSerialized: wrap(module, 'set_cover_next_solution_serialized', 'string', [
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-      'number',
-    ]),
-  };
-}
 
 export async function initSetCover(): Promise<void> {
   if (shouldUseWorkerBridge()) {
@@ -127,7 +85,6 @@ export async function initSetCover(): Promise<void> {
   }
   setCoverModulePromise ??= loadSetCoverRuntime().then((module) => {
     setCoverModule = module;
-    setCoverExports = createSetCoverExports(module);
     return module;
   });
   await setCoverModulePromise;
@@ -138,13 +95,6 @@ function currentModule() {
     throw new Error('Set Cover runtime has not been initialized. Call initSetCover() first.');
   }
   return setCoverModule;
-}
-
-function currentExports() {
-  if (!setCoverExports) {
-    throw new Error('Set Cover runtime has not been initialized. Call initSetCover() first.');
-  }
-  return setCoverExports;
 }
 
 function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
@@ -224,24 +174,29 @@ async function runNativeSetCover(payload: SetCoverSolvePayload) {
 
   await initSetCover();
   const module = currentModule();
-  const exports = currentExports();
   const costsPtr = copyFloat64ToHeap(module, payload.costs);
   const startsPtr = copyFloat64ToHeap(module, payload.starts);
   const elementsPtr = copyFloat64ToHeap(module, payload.elements);
   const selectedPtr = copyFloat64ToHeap(module, boolsToNumbers(payload.selected));
   const focusPtr = payload.focus ? copyFloat64ToHeap(module, boolsToNumbers(payload.focus)) : 0;
   try {
-    return parseNativeResult(exports.nextSolutionSerialized(
-      costsPtr,
-      startsPtr,
-      elementsPtr,
-      payload.costs.length,
-      payload.elements.length,
-      selectedPtr,
-      focusPtr,
-      operationCode[payload.operation],
-      payload.maxIterations,
-    ));
+    return parseNativeResult(await module.ccall(
+      'set_cover_next_solution_serialized',
+      'string',
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [
+        costsPtr,
+        startsPtr,
+        elementsPtr,
+        payload.costs.length,
+        payload.elements.length,
+        selectedPtr,
+        focusPtr,
+        operationCode[payload.operation],
+        payload.maxIterations,
+      ],
+      { async: true },
+    ) as string);
   } finally {
     if (costsPtr) module._free(costsPtr);
     if (startsPtr) module._free(startsPtr);

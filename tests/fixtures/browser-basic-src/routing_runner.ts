@@ -119,14 +119,17 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-export async function runRoutingCases(routingApi: RoutingApi): Promise<RoutingCaseResult[]> {
-  await routingApi.initRouting();
-
+export async function runRoutingCases(
+  routingApi: RoutingApi,
+  options: { onProgress?: (caseName: string, mode: string) => void } = {},
+): Promise<RoutingCaseResult[]> {
   const results: RoutingCaseResult[] = [];
 
   for (const mode of fixtureModes) {
     await withWorkerBridgeMode(routingApi, mode, 'Routing', async () => {
+      await routingApi.initRouting();
       for (const routingCase of routingContractCases) {
+        options.onProgress?.(routingCase.name, mode);
         const message = await routingCase.run(routingApi as never);
         assert(!message.startsWith('TODO:'), message);
         assert(message.endsWith('PASS'), `${routingCase.name} (${mode}) failed: ${message}`);

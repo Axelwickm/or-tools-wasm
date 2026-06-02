@@ -1,7 +1,14 @@
 /// <reference lib="webworker" />
 
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadGraphRuntime, loadMathOptRuntime, loadMPSolverRuntime, loadPdlpRuntime, loadRuntime, loadSetCoverRuntime } from './runtime_loader.js';
+import {
+  loadGraphRuntime,
+  loadMathOptRuntime,
+  loadMPSolverRuntime,
+  loadPdlpRuntime,
+  loadRuntime,
+  loadSetCoverRuntime,
+} from './runtime_loader.js';
 import { solveRoutingInWorker } from './worker_routing.js';
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
 
@@ -102,7 +109,7 @@ async function solveKnapsackInWorker(message: Extract<WorkerRequest, { type: 'kn
   const capacitiesPtr = copyFloat64ToHeap(module, message.capacities);
   const namePtr = module.allocateUTF8(message.name);
   try {
-    return module.ccall(
+    return await module.ccall(
       'knapsack_solve_serialized',
       'string',
       ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
@@ -117,6 +124,7 @@ async function solveKnapsackInWorker(message: Extract<WorkerRequest, { type: 'kn
         message.weights.length,
         capacitiesPtr,
       ],
+      { async: true },
     ) as string;
   } finally {
     if (profitsPtr) module._free(profitsPtr);
@@ -133,11 +141,12 @@ async function solveGraphInWorker(message: Extract<WorkerRequest, { type: 'graph
     const headsPtr = copyFloat64ToHeap(module, message.heads);
     const capacitiesPtr = copyFloat64ToHeap(module, message.capacities);
     try {
-      return module.ccall(
+      return await module.ccall(
         'graph_max_flow_solve_serialized',
         'string',
         ['number', 'number', 'number', 'number', 'number', 'number'],
         [tailsPtr, headsPtr, capacitiesPtr, message.tails.length, message.source, message.sink],
+        { async: true },
       ) as string;
     } finally {
       if (tailsPtr) module._free(tailsPtr);
@@ -152,7 +161,7 @@ async function solveGraphInWorker(message: Extract<WorkerRequest, { type: 'graph
     const unitCostsPtr = copyFloat64ToHeap(module, message.unitCosts);
     const suppliesPtr = copyFloat64ToHeap(module, message.supplies);
     try {
-      return module.ccall(
+      return await module.ccall(
         'graph_min_cost_flow_solve_serialized',
         'string',
         ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
@@ -166,6 +175,7 @@ async function solveGraphInWorker(message: Extract<WorkerRequest, { type: 'graph
           message.supplies.length,
           message.solveMaxFlowWithMinCost ? 1 : 0,
         ],
+        { async: true },
       ) as string;
     } finally {
       if (tailsPtr) module._free(tailsPtr);
@@ -179,11 +189,12 @@ async function solveGraphInWorker(message: Extract<WorkerRequest, { type: 'graph
   const rightNodesPtr = copyFloat64ToHeap(module, message.rightNodes);
   const costsPtr = copyFloat64ToHeap(module, message.costs);
   try {
-    return module.ccall(
+    return await module.ccall(
       'graph_linear_sum_assignment_solve_serialized',
       'string',
       ['number', 'number', 'number', 'number'],
       [leftNodesPtr, rightNodesPtr, costsPtr, message.leftNodes.length],
+      { async: true },
     ) as string;
   } finally {
     if (leftNodesPtr) module._free(leftNodesPtr);
@@ -213,7 +224,7 @@ async function solveSetCoverInWorker(message: Extract<WorkerRequest, { type: 'se
   const selectedPtr = copyFloat64ToHeap(module, message.selected.map((value) => value ? 1 : 0));
   const focusPtr = message.focus ? copyFloat64ToHeap(module, message.focus.map((value) => value ? 1 : 0)) : 0;
   try {
-    return module.ccall(
+    return await module.ccall(
       'set_cover_next_solution_serialized',
       'string',
       ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
@@ -228,6 +239,7 @@ async function solveSetCoverInWorker(message: Extract<WorkerRequest, { type: 'se
         setCoverOperationCode(message.operation),
         message.maxIterations,
       ],
+      { async: true },
     ) as string;
   } finally {
     if (costsPtr) module._free(costsPtr);
@@ -304,12 +316,13 @@ async function validateModel(modelBytes: Uint8Array) {
   let msgPtr = 0;
 
   try {
-    msgPtr = module.ccall(
+    msgPtr = (await module.ccall(
       'validate_model',
       'number',
       ['number', 'number', 'number'],
       [modelPtr, modelBytes.length, lenPtr],
-    ) as number;
+      { async: true },
+    )) as number;
   } finally {
     if (modelPtr) module._free(modelPtr);
   }
@@ -341,19 +354,16 @@ function freeResponseBuffer(module: OrToolsWasmModule, responsePtr: number) {
   }
 }
 
-async function createMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalCreate' }>) {
-  const module = await loadMathOptRuntime();
+async function callSerializedBytesFunction(
+  module: OrToolsWasmModule,
+  requestBytes: Uint8Array,
+  call: (requestPtr: number, requestLength: number, lenPtr: number) => Promise<number>,
+) {
   const lenPtr = module._malloc(4);
-  const requestPtr = copyBytesToHeap(module, message.requestBytes);
+  const requestPtr = copyBytesToHeap(module, requestBytes);
   let responsePtr = 0;
   try {
-    responsePtr = (await module.ccall(
-      'mathopt_incremental_create',
-      'number',
-      ['number', 'number', 'number'],
-      [requestPtr, message.requestBytes.length, lenPtr],
-      { async: true },
-    )) as number;
+    responsePtr = await call(requestPtr, requestBytes.length, lenPtr);
     return copyResponseBytes(module, responsePtr, lenPtr);
   } finally {
     freeResponseBuffer(module, responsePtr);
@@ -362,279 +372,306 @@ async function createMathOptIncrementalInWorker(message: Extract<WorkerRequest, 
   }
 }
 
-async function solveMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalSolve' }>) {
-  const module = await loadMathOptRuntime();
-  const requestPtr = copyBytesToHeap(module, message.requestBytes);
-  const updatePtr = copyBytesToHeap(module, message.updateBytes ?? null);
-  const lenPtr = module._malloc(4);
-  let responsePtr = 0;
+async function withHeapBytes<T>(
+  module: OrToolsWasmModule,
+  bytes: Uint8Array | null,
+  callback: (ptr: number, length: number) => Promise<T>,
+) {
+  const ptr = copyBytesToHeap(module, bytes);
   try {
-    responsePtr = (await module.ccall(
-      'mathopt_incremental_solve',
+    return await callback(ptr, bytes?.length ?? 0);
+  } finally {
+    if (ptr) module._free(ptr);
+  }
+}
+
+async function solveMPSolverInWorker(message: Extract<WorkerRequest, { type: 'mpSolverSolve' }>) {
+  const module = await loadMPSolverRuntime();
+  const numThreads = typeof message.numThreads === 'number'
+    && Number.isInteger(message.numThreads)
+    && message.numThreads > 1
+    ? message.numThreads
+    : undefined;
+  if (numThreads === undefined) {
+    return callSerializedBytesFunction(module, message.requestBytes, async (requestPtr, requestLength, lenPtr) => (
+      await module.ccall(
+        'mp_solver_solve_model_request',
+        'number',
+        ['number', 'number', 'number'],
+        [requestPtr, requestLength, lenPtr],
+        { async: true },
+      ) as number
+    ));
+  }
+  return callSerializedBytesFunction(module, message.requestBytes, async (requestPtr, requestLength, lenPtr) => (
+    await module.ccall(
+      'mp_solver_solve_model_request_with_threads',
       'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      ['number', 'number', 'number', 'number'],
+      [requestPtr, requestLength, numThreads, lenPtr],
+      { async: true },
+    ) as number
+  ));
+}
+
+async function solveMathOptInWorker(message: Extract<WorkerRequest, { type: 'mathOptSolve' }>) {
+  const module = await loadMathOptRuntime();
+  return callSerializedBytesFunction(module, message.requestBytes, async (requestPtr, requestLength, lenPtr) => (
+    await module.ccall(
+      'mathopt_solve_request',
+      'number',
+      ['number', 'number', 'number', 'number', 'number'],
       [
-        message.handle,
         requestPtr,
-        message.requestBytes.length,
-        updatePtr,
-        message.updateBytes?.length ?? 0,
-        message.updateBytes ? 1 : 0,
+        requestLength,
         message.useInterrupter ? 1 : 0,
         message.interruptAtStart ? 1 : 0,
         lenPtr,
       ],
       { async: true },
-    )) as number;
-    return copyResponseBytes(module, responsePtr, lenPtr);
-  } finally {
-    freeResponseBuffer(module, responsePtr);
-    if (requestPtr) module._free(requestPtr);
-    if (updatePtr) module._free(updatePtr);
-    module._free(lenPtr);
-  }
+    ) as number
+  ));
+}
+
+async function createMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalCreate' }>) {
+  const module = await loadMathOptRuntime();
+  return callSerializedBytesFunction(module, message.requestBytes, async (requestPtr, requestLength, lenPtr) => (
+    await module.ccall(
+      'mathopt_incremental_create',
+      'number',
+      ['number', 'number', 'number'],
+      [requestPtr, requestLength, lenPtr],
+      { async: true },
+    ) as number
+  ));
+}
+
+async function solveMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalSolve' }>) {
+  const module = await loadMathOptRuntime();
+  return withHeapBytes(module, message.updateBytes ?? null, async (updatePtr, updateLength) => (
+    callSerializedBytesFunction(module, message.requestBytes, async (requestPtr, requestLength, lenPtr) => (
+      await module.ccall(
+        'mathopt_incremental_solve',
+        'number',
+        ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+        [
+          message.handle,
+          requestPtr,
+          requestLength,
+          updatePtr,
+          updateLength,
+          message.updateBytes ? 1 : 0,
+          message.useInterrupter ? 1 : 0,
+          message.interruptAtStart ? 1 : 0,
+          lenPtr,
+        ],
+        { async: true },
+      ) as number
+    ))
+  ));
 }
 
 async function deleteMathOptIncrementalInWorker(message: Extract<WorkerRequest, { type: 'mathOptIncrementalDelete' }>) {
   const module = await loadMathOptRuntime();
-  module.ccall('mathopt_incremental_delete', undefined, ['number'], [message.handle]);
+  await module.ccall('mathopt_incremental_delete', undefined, ['number'], [message.handle], { async: true });
 }
+
+async function solvePdlpInWorker(message: Extract<WorkerRequest, { type: 'pdlp' }>) {
+  const module = await loadPdlpRuntime();
+  if (message.operation === 'isLinear') {
+    const value = await withHeapBytes(module, message.bytes, async (requestPtr, requestLength) => (
+      await module.ccall(
+        'pdlp_is_linear_program',
+        'number',
+        ['number', 'number'],
+        [requestPtr, requestLength],
+        { async: true },
+      ) as number
+    ));
+    return { bytes: new Uint8Array(), value };
+  }
+
+  const bytes = await callSerializedBytesFunction(module, message.bytes, async (requestPtr, requestLength, lenPtr) => {
+    if (message.operation === 'validate') {
+      return await module.ccall(
+        'pdlp_validate_quadratic_program',
+        'number',
+        ['number', 'number', 'number'],
+        [requestPtr, requestLength, lenPtr],
+        { async: true },
+      ) as number;
+    }
+    if (message.operation === 'fromMpModel') {
+      return await module.ccall(
+        'pdlp_qp_from_mpmodel_proto',
+        'number',
+        ['number', 'number', 'number', 'number', 'number'],
+        [
+          requestPtr,
+          requestLength,
+          message.relaxIntegerVariables ? 1 : 0,
+          message.includeNames ? 1 : 0,
+          lenPtr,
+        ],
+        { async: true },
+      ) as number;
+    }
+    if (message.operation === 'toMpModel') {
+      return await module.ccall(
+        'pdlp_qp_to_mpmodel_proto',
+        'number',
+        ['number', 'number', 'number'],
+        [requestPtr, requestLength, lenPtr],
+        { async: true },
+      ) as number;
+    }
+    return await module.ccall(
+      'pdlp_primal_dual_hybrid_gradient',
+      'number',
+      ['number', 'number', 'number'],
+      [requestPtr, requestLength, lenPtr],
+      { async: true },
+    ) as number;
+  });
+  return { bytes };
+}
+
+type WorkerHandler<Type extends WorkerRequest['type']> = (
+  message: Extract<WorkerRequest, { type: Type }>,
+) => Promise<WorkerResponse | void>;
+
+type WorkerHandlerMap = {
+  [Type in WorkerRequest['type']]: WorkerHandler<Type>;
+};
+
+const handlers = {
+  validate: async (message) => {
+    const validation = await validateModel(message.modelBytes);
+    return {
+      type: 'validateResult',
+      id: message.id,
+      ok: validation.ok,
+      message: validation.message,
+    };
+  },
+  solve: async (message) => {
+    const bytes = await solveModel(message.modelBytes, message.paramsBytes, message.id, message.callbackFlags ?? 0);
+    return {
+      type: 'solveResult',
+      id: message.id,
+      bytes,
+    };
+  },
+  routingSolve: async (message) => {
+    const result = await solveRoutingInWorker(message);
+    return {
+      type: 'routingSolveResult',
+      id: message.id,
+      result,
+    };
+  },
+  mpSolverSolve: async (message) => ({
+    type: 'mpSolverSolveResult',
+    id: message.id,
+    bytes: await solveMPSolverInWorker(message),
+  }),
+  knapsackSolve: async (message) => ({
+    type: 'knapsackSolveResult',
+    id: message.id,
+    result: await solveKnapsackInWorker(message),
+  }),
+  graphSolve: async (message) => ({
+    type: 'graphSolveResult',
+    id: message.id,
+    result: await solveGraphInWorker(message),
+  }),
+  setCover: async (message) => ({
+    type: 'setCoverResult',
+    id: message.id,
+    result: await solveSetCoverInWorker(message),
+  }),
+  mathOptInit: async (message) => {
+    await loadMathOptRuntime();
+    return {
+      type: 'mathOptInitResult',
+      id: message.id,
+    };
+  },
+  mathOptSolve: async (message) => ({
+    type: 'mathOptSolveResult',
+    id: message.id,
+    bytes: await solveMathOptInWorker(message),
+  }),
+  mathOptIncrementalCreate: async (message) => ({
+    type: 'mathOptIncrementalResult',
+    id: message.id,
+    bytes: await createMathOptIncrementalInWorker(message),
+  }),
+  mathOptIncrementalSolve: async (message) => ({
+    type: 'mathOptIncrementalResult',
+    id: message.id,
+    bytes: await solveMathOptIncrementalInWorker(message),
+  }),
+  mathOptIncrementalDelete: async (message) => {
+    await deleteMathOptIncrementalInWorker(message);
+    return {
+      type: 'mathOptIncrementalDeleted',
+      id: message.id,
+    };
+  },
+  pdlp: async (message) => {
+    const result = await solvePdlpInWorker(message);
+    return {
+      type: 'pdlpResult',
+      id: message.id,
+      bytes: result.bytes,
+      value: result.value,
+    };
+  },
+  getSchemas: async (message) => {
+    if (message.schema === 'cp_sat') {
+      const module = await loadCpSatModule();
+      return {
+        type: 'schemaResult',
+        id: message.id,
+        schema: 'cp_sat',
+        schemas: {
+          cp_model: module.ccall('get_cp_model_schema', 'string', [], []),
+          sat_parameters: module.ccall('get_sat_parameters_schema', 'string', [], []),
+        },
+      };
+    }
+    if (message.schema === 'mp_solver') {
+      const mpModule = await loadMPSolverRuntime();
+      return {
+        type: 'schemaResult',
+        id: message.id,
+        schema: 'mp_solver',
+        schemas: {
+          linear_solver: mpModule.ccall('get_linear_solver_schema', 'string', [], []),
+          optional_boolean: mpModule.ccall('get_optional_boolean_schema', 'string', [], []),
+        },
+      };
+    }
+    throw new Error('Unsupported schema request.');
+  },
+  cancel_solve: async (message) => {
+    const module = await loadCpSatModule();
+    module.ccall('interrupt_solve', 'void', [], []);
+    return {
+      type: 'solved_cancelled',
+      id: message.id,
+    };
+  },
+} satisfies WorkerHandlerMap;
 
 workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const message = event.data as WorkerRequest;
   try {
-    if (message.type === 'validate') {
-      const validation = await validateModel(message.modelBytes);
-      workerScope.postMessage({
-        type: 'validateResult',
-        id: message.id,
-        ok: validation.ok,
-        message: validation.message,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'solve') {
-      const bytes = await solveModel(message.modelBytes, message.paramsBytes, message.id, message.callbackFlags ?? 0);
-      workerScope.postMessage({
-        type: 'solveResult',
-        id: message.id,
-        bytes,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'routingSolve') {
-      const result = await solveRoutingInWorker(message);
-      workerScope.postMessage({
-        type: 'routingSolveResult',
-        id: message.id,
-        result,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'mpSolverSolve') {
-      const module = await loadMPSolverRuntime();
-      const lenPtr = module._malloc(4);
-      const requestPtr = copyBytesToHeap(module, message.requestBytes);
-      let responsePtr = 0;
-      try {
-        responsePtr = (await module.ccall(
-          'mp_solver_solve_model_request',
-          'number',
-          ['number', 'number', 'number'],
-          [requestPtr, message.requestBytes.length, lenPtr],
-          { async: true },
-        )) as number;
-        const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
-        const bytes = responsePtr && responseLen
-          ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
-          : new Uint8Array();
-        workerScope.postMessage({
-          type: 'mpSolverSolveResult',
-          id: message.id,
-          bytes,
-        } satisfies WorkerResponse);
-      } finally {
-        if (responsePtr) {
-          module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
-        }
-        if (requestPtr) module._free(requestPtr);
-        module._free(lenPtr);
-      }
-      return;
-    } else if (message.type === 'knapsackSolve') {
-      const result = await solveKnapsackInWorker(message);
-      workerScope.postMessage({
-        type: 'knapsackSolveResult',
-        id: message.id,
-        result,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'graphSolve') {
-      const result = await solveGraphInWorker(message);
-      workerScope.postMessage({
-        type: 'graphSolveResult',
-        id: message.id,
-        result,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'setCover') {
-      const result = await solveSetCoverInWorker(message);
-      workerScope.postMessage({
-        type: 'setCoverResult',
-        id: message.id,
-        result,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'mathOptInit') {
-      await loadMathOptRuntime();
-      workerScope.postMessage({
-        type: 'mathOptInitResult',
-        id: message.id,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'mathOptSolve') {
-      const module = await loadMathOptRuntime();
-      const lenPtr = module._malloc(4);
-      const requestPtr = copyBytesToHeap(module, message.requestBytes);
-      let responsePtr = 0;
-      try {
-        responsePtr = (await module.ccall(
-          'mathopt_solve_request',
-          'number',
-          ['number', 'number', 'number', 'number', 'number'],
-          [
-            requestPtr,
-            message.requestBytes.length,
-            message.useInterrupter ? 1 : 0,
-            message.interruptAtStart ? 1 : 0,
-            lenPtr,
-          ],
-          { async: true },
-        )) as number;
-        const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
-        const bytes = responsePtr && responseLen
-          ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
-          : new Uint8Array();
-        workerScope.postMessage({
-          type: 'mathOptSolveResult',
-          id: message.id,
-          bytes,
-        } satisfies WorkerResponse);
-      } finally {
-        if (responsePtr) {
-          module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
-        }
-        if (requestPtr) module._free(requestPtr);
-        module._free(lenPtr);
-      }
-      return;
-    } else if (message.type === 'mathOptIncrementalCreate') {
-      const bytes = await createMathOptIncrementalInWorker(message);
-      workerScope.postMessage({
-        type: 'mathOptIncrementalResult',
-        id: message.id,
-        bytes,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'mathOptIncrementalSolve') {
-      const bytes = await solveMathOptIncrementalInWorker(message);
-      workerScope.postMessage({
-        type: 'mathOptIncrementalResult',
-        id: message.id,
-        bytes,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'mathOptIncrementalDelete') {
-      await deleteMathOptIncrementalInWorker(message);
-      workerScope.postMessage({
-        type: 'mathOptIncrementalDeleted',
-        id: message.id,
-      } satisfies WorkerResponse);
-      return;
-    } else if (message.type === 'pdlp') {
-      const module = await loadPdlpRuntime();
-      const requestPtr = copyBytesToHeap(module, message.bytes);
-      const lenPtr = module._malloc(4);
-      let responsePtr = 0;
-      try {
-        let bytes = new Uint8Array();
-        let value: number | undefined;
-        if (message.operation === 'isLinear') {
-          value = module.ccall(
-            'pdlp_is_linear_program',
-            'number',
-            ['number', 'number'],
-            [requestPtr, message.bytes.length],
-          ) as number;
-        } else {
-          if (message.operation === 'validate') {
-            responsePtr = module.ccall(
-              'pdlp_validate_quadratic_program',
-              'number',
-              ['number', 'number', 'number'],
-              [requestPtr, message.bytes.length, lenPtr],
-            ) as number;
-          } else if (message.operation === 'fromMpModel') {
-            responsePtr = module.ccall(
-              'pdlp_qp_from_mpmodel_proto',
-              'number',
-              ['number', 'number', 'number', 'number', 'number'],
-              [
-                requestPtr,
-                message.bytes.length,
-                message.relaxIntegerVariables ? 1 : 0,
-                message.includeNames ? 1 : 0,
-                lenPtr,
-              ],
-            ) as number;
-          } else if (message.operation === 'toMpModel') {
-            responsePtr = module.ccall(
-              'pdlp_qp_to_mpmodel_proto',
-              'number',
-              ['number', 'number', 'number'],
-              [requestPtr, message.bytes.length, lenPtr],
-            ) as number;
-          } else {
-            responsePtr = await module.ccall(
-              'pdlp_primal_dual_hybrid_gradient',
-              'number',
-              ['number', 'number', 'number'],
-              [requestPtr, message.bytes.length, lenPtr],
-              { async: true },
-            ) as number;
-          }
-          const responseLen = readUint32LE(module.HEAPU8.buffer, lenPtr);
-          bytes = responsePtr && responseLen
-            ? module.HEAPU8.slice(responsePtr, responsePtr + responseLen)
-            : new Uint8Array();
-        }
-        workerScope.postMessage({
-          type: 'pdlpResult',
-          id: message.id,
-          bytes,
-          value,
-        } satisfies WorkerResponse);
-      } finally {
-        if (responsePtr) {
-          module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
-        }
-        if (requestPtr) module._free(requestPtr);
-        module._free(lenPtr);
-      }
-      return;
-    } else if (message.type === "getSchemas") {
-      const module = await loadCpSatModule();
-      const mpModule = await loadMPSolverRuntime();
-      const schemas = {
-        cp_model: module.ccall('get_cp_model_schema', 'string', [], []),
-        sat_parameters: module.ccall('get_sat_parameters_schema', 'string', [], []),
-        linear_solver: mpModule.ccall('get_linear_solver_schema', 'string', [], []),
-        optional_boolean: mpModule.ccall('get_optional_boolean_schema', 'string', [], []),
-      };
-      self.postMessage({ type: 'schemaResult', id: message.id, schemas });
-      return
-    } else if (message.type === "cancel_solve") {
-      const module = await loadCpSatModule();
-      module.ccall('interrupt_solve', 'void', [], []);
-      self.postMessage({ type: 'solved_cancelled', id: message.id });
-      return
+    const handler = handlers[message.type] as (request: WorkerRequest) => Promise<WorkerResponse | void>;
+    const response = await handler(message);
+    if (response) {
+      workerScope.postMessage(response);
     }
   } catch (error) {
     console.error('[ortools_worker] request failed', message?.type, error);

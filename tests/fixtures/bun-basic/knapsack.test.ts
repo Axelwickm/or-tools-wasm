@@ -1,5 +1,6 @@
 import {
   initKnapsack,
+  isWorkerBridgeAvailable,
   isWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
@@ -16,6 +17,7 @@ await runBunFixture(async () => {
     KnapsackSolverType,
     setWorkerBridgeEnabled,
     isWorkerBridgeEnabled,
+    isWorkerBridgeAvailable,
   });
   assertAllCases('bun Knapsack', knapsackResults);
   console.log(`bun ran ${knapsackResults.length} Knapsack cases`);

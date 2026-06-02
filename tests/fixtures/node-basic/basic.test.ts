@@ -3,6 +3,7 @@ import {
 } from 'or-tools-wasm/cp-sat';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import {
+  isWorkerBridgeAvailable,
   isWorkerBridgeEnabled,
   setWorkerBridgeEnabled,
 } from 'or-tools-wasm/mp-solver';
@@ -13,6 +14,7 @@ import {
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
+  isWorkerBridgeAvailable as isKnapsackWorkerBridgeAvailable,
   isWorkerBridgeEnabled as isKnapsackWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
@@ -137,6 +139,7 @@ test('runs the shared MPSolver cases in Node', async (t) => {
     MPSolverParameters,
     setWorkerBridgeEnabled,
     isWorkerBridgeEnabled,
+    isWorkerBridgeAvailable,
   });
   await assertCaseResults(t, 'node MPSolver', mpSolverResults);
 });
@@ -148,6 +151,7 @@ test('runs the shared Knapsack cases in Node', async (t) => {
     KnapsackSolverType,
     setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
     isWorkerBridgeEnabled: isKnapsackWorkerBridgeEnabled,
+    isWorkerBridgeAvailable: isKnapsackWorkerBridgeAvailable,
   });
   await assertCaseResults(t, 'node Knapsack', knapsackResults);
 });

@@ -1,5 +1,6 @@
 import {
   initMPSolver,
+  isWorkerBridgeAvailable,
   isWorkerBridgeEnabled,
   MPSolver,
   MPSolverParameters,
@@ -16,6 +17,7 @@ await runBunFixture(async () => {
     MPSolverParameters,
     setWorkerBridgeEnabled,
     isWorkerBridgeEnabled,
+    isWorkerBridgeAvailable,
   });
   assertAllCases('bun MPSolver', mpSolverResults);
   console.log(`bun ran ${mpSolverResults.length} MPSolver cases`);

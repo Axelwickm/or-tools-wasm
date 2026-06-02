@@ -51,6 +51,10 @@ function canDeleteNativeRoutingModel(): boolean {
   return !isDenoRuntime() && !isBrowserRuntime();
 }
 
+function shouldUseNativeRoutingRuntime(): boolean {
+  return !shouldUseWorkerBridge();
+}
+
 async function loadRoutingModule(): Promise<RoutingModule> {
   routingModulePromise ??= loadRoutingRuntime() as Promise<RoutingModule>;
   routingModule = await routingModulePromise;
@@ -65,6 +69,9 @@ function getRoutingModule(): RoutingModule {
 }
 
 export async function initRouting(): Promise<void> {
+  if (!shouldUseNativeRoutingRuntime()) {
+    return;
+  }
   await loadRoutingModule();
 }
 
@@ -211,8 +218,12 @@ function isRoutingCumulLessOrEqualConstraint(value: unknown): value is RoutingCu
 
 export class RoutingIndexManager {
   readonly ready: Promise<void> = Promise.resolve();
-  private module: RoutingModule;
+  private module: RoutingModule | null = null;
   private handle = 0;
+  private readonly indexToNodeMap: number[] = [];
+  private readonly nodeToIndexMap = new Map<number, number>();
+  private readonly startIndices: number[] = [];
+  private readonly endIndices: number[] = [];
   readonly numLocations: number;
   readonly numVehicles: number;
   readonly starts: number[];
@@ -237,7 +248,6 @@ export class RoutingIndexManager {
   ) {
     this.numLocations = numLocations;
     this.numVehicles = numVehicles;
-    this.module = getRoutingModule();
     if (Array.isArray(depotOrStarts)) {
       if (!Array.isArray(maybeEnds)) {
         throw new Error('RoutingIndexManager: starts and ends arrays must both be provided.');
@@ -247,12 +257,18 @@ export class RoutingIndexManager {
       }
       this.starts = [...depotOrStarts];
       this.ends = [...maybeEnds];
-      this.handle = this.createStartsEndsManager(this.starts, this.ends);
     } else {
       this.starts = Array.from({ length: numVehicles }, () => depotOrStarts);
       this.ends = Array.from({ length: numVehicles }, () => depotOrStarts);
-      this.handle = this.module._routing_create_index_manager(this.numLocations, this.numVehicles, depotOrStarts);
     }
+    this.createSyntheticIndexMapping();
+    if (!shouldUseNativeRoutingRuntime()) {
+      return;
+    }
+    this.module = getRoutingModule();
+    this.handle = Array.isArray(depotOrStarts)
+      ? this.createStartsEndsManager(this.starts, this.ends)
+      : this.module._routing_create_index_manager(this.numLocations, this.numVehicles, depotOrStarts);
     if (this.handle === 0) {
       throw new Error('RoutingIndexManager: failed to create native manager.');
     }
@@ -275,6 +291,11 @@ export class RoutingIndexManager {
   }
 
   indexToNodeSync(index: number): number {
+    if (!this.module) {
+      const node = this.indexToNodeMap[index];
+      if (node === undefined) throw new Error(`RoutingIndexManager.IndexToNode: index ${index} is out of range.`);
+      return node;
+    }
     return toNumber(this.module._routing_manager_index_to_node(this.nativeHandle, toInt64(index)));
   }
 
@@ -288,6 +309,9 @@ export class RoutingIndexManager {
   }
 
   nodeToIndexSync(node: number): number {
+    if (!this.module) {
+      return this.nodeToIndexMap.get(node) ?? -1;
+    }
     return toNumber(this.module._routing_manager_node_to_index(this.nativeHandle, node));
   }
 
@@ -296,22 +320,27 @@ export class RoutingIndexManager {
   }
 
   GetNumberOfNodes(): number {
+    if (!this.module) return this.numLocations;
     return this.module._routing_manager_num_nodes(this.nativeHandle);
   }
 
   GetNumberOfVehicles(): number {
+    if (!this.module) return this.numVehicles;
     return this.module._routing_manager_num_vehicles(this.nativeHandle);
   }
 
   GetNumberOfIndices(): number {
+    if (!this.module) return this.indexToNodeMap.length;
     return this.module._routing_manager_num_indices(this.nativeHandle);
   }
 
   GetStartIndex(vehicle: number): number {
+    if (!this.module) return this.startIndices[vehicle];
     return toNumber(this.module._routing_manager_start_index(this.nativeHandle, vehicle));
   }
 
   GetEndIndex(vehicle: number): number {
+    if (!this.module) return this.endIndices[vehicle];
     return toNumber(this.module._routing_manager_end_index(this.nativeHandle, vehicle));
   }
 
@@ -323,6 +352,9 @@ export class RoutingIndexManager {
   }
 
   private createStartsEndsManager(starts: number[], ends: number[]): number {
+    if (!this.module) {
+      throw new Error('RoutingIndexManager: native module is not available.');
+    }
     const bytes = Int32Array.BYTES_PER_ELEMENT * this.numVehicles;
     const startsPtr = this.module._malloc(bytes);
     const endsPtr = this.module._malloc(bytes);
@@ -340,9 +372,37 @@ export class RoutingIndexManager {
       this.module._free(endsPtr);
     }
   }
+
+  private createSyntheticIndexMapping(): void {
+    for (let node = 0; node < this.numLocations; node++) {
+      this.nodeToIndexMap.set(node, node);
+      this.indexToNodeMap[node] = node;
+    }
+
+    const seenTerminals = new Set<number>();
+    const terminalIndex = (node: number) => {
+      if (!seenTerminals.has(node)) {
+        seenTerminals.add(node);
+        return node;
+      }
+      const index = this.indexToNodeMap.length;
+      this.indexToNodeMap.push(node);
+      return index;
+    };
+
+    for (const start of this.starts) {
+      this.startIndices.push(terminalIndex(start));
+    }
+    for (const end of this.ends) {
+      this.endIndices.push(terminalIndex(end));
+    }
+  }
 }
 
 export class RoutingDimension {
+  private readonly softSpanUpperBounds = new Map<number, BoundCost>();
+  private readonly quadraticCostSoftSpanUpperBounds = new Map<number, BoundCost>();
+
   constructor(
     private readonly routing: RoutingModel,
     private readonly name: string,
@@ -353,12 +413,19 @@ export class RoutingDimension {
   }
 
   HasSoftSpanUpperBounds(): boolean {
+    if (!this.routing.hasNativeModule()) {
+      return this.softSpanUpperBounds.size > 0;
+    }
     return this.routing.withCString(this.name, (namePtr) => {
       return this.routing.moduleRef._routing_dimension_has_soft_span_upper_bounds(this.routing.nativeHandle, namePtr) === 1;
     });
   }
 
   SetSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
+    if (!this.routing.hasNativeModule()) {
+      this.softSpanUpperBounds.set(vehicle, new BoundCost(boundCost.bound, boundCost.cost));
+      return;
+    }
     this.routing.withCString(this.name, (namePtr) => {
       this.routing.moduleRef._routing_dimension_set_soft_span_upper_bound(
         this.routing.nativeHandle,
@@ -371,6 +438,9 @@ export class RoutingDimension {
   }
 
   GetSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
+    if (!this.routing.hasNativeModule()) {
+      return this.softSpanUpperBounds.get(vehicle) ?? new BoundCost(0, 0);
+    }
     return this.routing.withCString(this.name, (namePtr) => {
       return new BoundCost(
         toNumber(this.routing.moduleRef._routing_dimension_get_soft_span_upper_bound_bound(this.routing.nativeHandle, namePtr, vehicle)),
@@ -380,12 +450,19 @@ export class RoutingDimension {
   }
 
   HasQuadraticCostSoftSpanUpperBounds(): boolean {
+    if (!this.routing.hasNativeModule()) {
+      return this.quadraticCostSoftSpanUpperBounds.size > 0;
+    }
     return this.routing.withCString(this.name, (namePtr) => {
       return this.routing.moduleRef._routing_dimension_has_quadratic_cost_soft_span_upper_bounds(this.routing.nativeHandle, namePtr) === 1;
     });
   }
 
   SetQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
+    if (!this.routing.hasNativeModule()) {
+      this.quadraticCostSoftSpanUpperBounds.set(vehicle, new BoundCost(boundCost.bound, boundCost.cost));
+      return;
+    }
     this.routing.withCString(this.name, (namePtr) => {
       this.routing.moduleRef._routing_dimension_set_quadratic_cost_soft_span_upper_bound(
         this.routing.nativeHandle,
@@ -398,6 +475,9 @@ export class RoutingDimension {
   }
 
   GetQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
+    if (!this.routing.hasNativeModule()) {
+      return this.quadraticCostSoftSpanUpperBounds.get(vehicle) ?? new BoundCost(0, 0);
+    }
     return this.routing.withCString(this.name, (namePtr) => {
       return new BoundCost(
         toNumber(this.routing.moduleRef._routing_dimension_get_quadratic_cost_soft_span_upper_bound_bound(this.routing.nativeHandle, namePtr, vehicle)),
@@ -441,13 +521,14 @@ export class RoutingModel {
   }
 
   readonly ready: Promise<void> = Promise.resolve();
-  private module: RoutingModule;
+  private module: RoutingModule | null = null;
   private handle = 0;
   private readonly callbackIds = new Set<number>();
   private readonly transitCallbacks = new Map<number, RoutingTransitCallback>();
   private arcCostEvaluatorIndex: number | null = null;
   private lastWorkerResult: RoutingSolveResult | null = null;
   private readonly evaluatorCallbacks = new Map<number, RoutingTransitCallback>();
+  private nextWorkerEvaluatorIndex = 1;
   private readonly operations: RoutingModelOperation[] = [];
   private readonly dimensionNames = new Set<string>();
   private readonly atSolutionCallbacks: Array<() => void> = [];
@@ -457,6 +538,9 @@ export class RoutingModel {
 
   constructor(private readonly manager: RoutingIndexManager, parameters?: RoutingModelParameters) {
     this.parameters = parameters;
+    if (!shouldUseNativeRoutingRuntime()) {
+      return;
+    }
     this.module = getRoutingModule();
     this.handle = this.module._routing_create_model(this.manager.nativeHandle);
     if (this.handle === 0) {
@@ -465,6 +549,13 @@ export class RoutingModel {
   }
 
   RegisterTransitCallback(callback: RoutingTransitCallback): number {
+    if (!this.module) {
+      const evaluatorIndex = this.nextWorkerEvaluatorIndex++;
+      this.transitCallbacks.set(evaluatorIndex, callback);
+      this.callbackIds.add(evaluatorIndex);
+      this.evaluatorCallbacks.set(evaluatorIndex, callback);
+      return evaluatorIndex;
+    }
     this.module.__routingTransitCallbacks ??= new Map();
     const callbackId = nextTransitCallbackId++;
     this.module.__routingTransitCallbacks.set(callbackId, callback);
@@ -484,45 +575,58 @@ export class RoutingModel {
 
   SetArcCostEvaluatorOfAllVehicles(evaluatorIndex: number): void {
     this.arcCostEvaluatorIndex = evaluatorIndex;
+    if (!this.module) {
+      return;
+    }
     this.module._routing_set_arc_cost_evaluator_of_all_vehicles(this.handle, evaluatorIndex);
+  }
+
+  private async solveWithWorkerRequest(parameters: RoutingSearchParameters): Promise<Assignment | null> {
+    const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'routingSolveResult' }>>({
+      type: 'routingSolve',
+      id: nextWorkerBridgeRequestId(),
+      numLocations: this.manager.numLocations,
+      numVehicles: this.manager.numVehicles,
+      starts: this.manager.starts,
+      ends: this.manager.ends,
+      firstSolutionStrategy: parameters.firstSolutionStrategy ?? 0,
+      solutionLimit: parameters.solution_limit ?? 0,
+      transitMatrix: this.buildTransitMatrix(),
+      transitMatrixDimension: this.manager.GetNumberOfIndices(),
+      operations: this.operations,
+      dimensionNames: [...this.dimensionNames],
+    });
+    this.lastWorkerResult = response.result;
+    this.lastWorkerStatus = response.result?.status ?? null;
+    if (!response.result) return null;
+    const assignment = new Assignment(this, response.result);
+    this.lastObjectiveValue = assignment.ObjectiveValue();
+    this.runAtSolutionCallbacks();
+    return assignment;
   }
 
   async SolveWithParameters(parameters: RoutingSearchParameters = DefaultRoutingSearchParameters()): Promise<Assignment | null> {
     if (shouldUseWorkerBridge()) {
-      const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'routingSolveResult' }>>({
-        type: 'routingSolve',
-        id: nextWorkerBridgeRequestId(),
-        numLocations: this.manager.numLocations,
-        numVehicles: this.manager.numVehicles,
-        starts: this.manager.starts,
-        ends: this.manager.ends,
-        firstSolutionStrategy: parameters.firstSolutionStrategy ?? 0,
-        solutionLimit: parameters.solution_limit ?? 0,
-        transitMatrix: this.buildTransitMatrix(),
-        transitMatrixDimension: this.manager.GetNumberOfIndices(),
-        operations: this.operations,
-        dimensionNames: [...this.dimensionNames],
-      });
-      this.lastWorkerResult = response.result;
-      this.lastWorkerStatus = response.result?.status ?? null;
-      if (!response.result) return null;
-      const assignment = new Assignment(this, response.result);
-      this.lastObjectiveValue = assignment.ObjectiveValue();
-      this.runAtSolutionCallbacks();
-      return assignment;
+      return this.solveWithWorkerRequest(parameters);
+    }
+    if (!this.module) {
+      throw new Error('RoutingModel.SolveWithParameters: native routing module is not available.');
     }
 
     this.installMatrixEvaluator();
     this.lastWorkerResult = null;
     this.lastWorkerStatus = null;
-    const result = this.module._routing_solve_with_parameters_ext(
-      this.handle,
-      parameters.firstSolutionStrategy ?? 0,
-      parameters.solution_limit ?? 0,
-    ) as unknown;
-    const ok = result && typeof result === 'object' && typeof (result as Promise<number>).then === 'function'
-      ? await result
-      : result;
+    const ok = await this.module.ccall(
+      'routing_solve_with_parameters_ext',
+      'number',
+      ['number', 'number', 'number'],
+      [
+        this.handle,
+        parameters.firstSolutionStrategy ?? 0,
+        parameters.solution_limit ?? 0,
+      ],
+      { async: true },
+    ) as number;
     if (ok !== 1) return null;
     const assignment = new Assignment(this);
     this.lastObjectiveValue = assignment.ObjectiveValue();
@@ -535,6 +639,9 @@ export class RoutingModel {
   }
 
   solveWithParametersSync(parameters: RoutingSearchParameters = DefaultRoutingSearchParameters()): Assignment | null {
+    if (!this.module) {
+      throw new Error('RoutingModel.solveWithParametersSync is not available in worker bridge mode.');
+    }
     this.installMatrixEvaluator();
     this.lastWorkerResult = null;
     this.lastWorkerStatus = null;
@@ -554,6 +661,9 @@ export class RoutingModel {
     if (this.lastWorkerStatus !== null) {
       return this.lastWorkerStatus;
     }
+    if (!this.module) {
+      return RoutingSearchStatus.ROUTING_NOT_SOLVED;
+    }
     return this.module._routing_status(this.handle);
   }
 
@@ -565,6 +675,9 @@ export class RoutingModel {
     if (this.lastWorkerResult?.starts[vehicle] !== undefined) {
       return this.lastWorkerResult.starts[vehicle];
     }
+    if (!this.module) {
+      return this.manager.GetStartIndex(vehicle);
+    }
     return toNumber(this.module._routing_start(this.handle, vehicle));
   }
 
@@ -572,12 +685,18 @@ export class RoutingModel {
     if (this.lastWorkerResult?.ends[vehicle] !== undefined) {
       return this.lastWorkerResult.ends[vehicle];
     }
+    if (!this.module) {
+      return this.manager.GetEndIndex(vehicle);
+    }
     return toNumber(this.module._routing_end(this.handle, vehicle));
   }
 
   IsEnd(index: number): boolean {
     if (this.lastWorkerResult) {
       return this.lastWorkerResult.ends.includes(index);
+    }
+    if (!this.module) {
+      return this.manager.ends.some((_, vehicle) => this.manager.GetEndIndex(vehicle) === index);
     }
     return this.module._routing_is_end(this.handle, toInt64(index)) === 1;
   }
@@ -607,8 +726,20 @@ export class RoutingModel {
     fixStartCumulToZero: boolean,
     name: string,
   ): boolean {
+    if (!this.module) {
+      this.dimensionNames.add(name);
+      this.operations.push({
+        type: 'addDimension',
+        transitMatrix: this.buildTransitMatrixForEvaluator(transitIndex),
+        slackMax,
+        capacity,
+        fixStartCumulToZero,
+        name,
+      });
+      return true;
+    }
     const created = this.withCString(name, (namePtr) => {
-      return this.module._routing_add_dimension(
+      return this.moduleRef._routing_add_dimension(
         this.handle,
         transitIndex,
         toInt64(slackMax),
@@ -638,13 +769,25 @@ export class RoutingModel {
     fixStartCumulToZero: boolean,
     name: string,
   ): boolean {
+    if (!this.module) {
+      this.dimensionNames.add(name);
+      this.operations.push({
+        type: 'addDimensionWithVehicleCapacity',
+        transitMatrix: this.buildTransitMatrixForEvaluator(transitIndex),
+        slackMax,
+        capacities,
+        fixStartCumulToZero,
+        name,
+      });
+      return true;
+    }
     const capacityArray = toInt64Array(capacities);
     const bytes = new Uint8Array(capacityArray.buffer, capacityArray.byteOffset, capacityArray.byteLength);
     const ptr = this.module._malloc(bytes.byteLength);
     this.module.HEAPU8.set(bytes, ptr);
     try {
       const created = this.withCString(name, (namePtr) => {
-        return this.module._routing_add_dimension_with_vehicle_capacity(
+        return this.moduleRef._routing_add_dimension_with_vehicle_capacity(
           this.handle,
           transitIndex,
           toInt64(slackMax),
@@ -678,12 +821,25 @@ export class RoutingModel {
     fixStartCumulToZero: boolean,
     name: string,
   ): boolean {
+    if (!this.module) {
+      const indices = Array.isArray(transitIndices) ? transitIndices : [transitIndices];
+      this.dimensionNames.add(name);
+      this.operations.push({
+        type: 'addDimensionWithVehicleTransits',
+        transitMatrices: indices.map((index) => this.buildTransitMatrixForEvaluator(index)),
+        slackMax,
+        capacity,
+        fixStartCumulToZero,
+        name,
+      });
+      return true;
+    }
     const evaluatorBytes = toInt32Bytes(transitIndices);
     const ptr = this.module._malloc(evaluatorBytes.byteLength);
     this.module.HEAPU8.set(evaluatorBytes, ptr);
     try {
       const created = this.withCString(name, (namePtr) => {
-        return this.module._routing_add_dimension_with_vehicle_transits(
+        return this.moduleRef._routing_add_dimension_with_vehicle_transits(
           this.handle,
           ptr,
           transitIndices.length,
@@ -716,8 +872,13 @@ export class RoutingModel {
     fixStartCumulToZero: boolean,
     name: string,
   ): [number, boolean] {
+    if (!this.module) {
+      this.dimensionNames.add(name);
+      this.operations.push({ type: 'addConstantDimension', value, capacity, fixStartCumulToZero, name });
+      return [this.nextWorkerEvaluatorIndex++, true];
+    }
     const evaluatorIndex = this.withCString(name, (namePtr) => {
-      return this.module._routing_add_constant_dimension(
+      return this.moduleRef._routing_add_constant_dimension(
         this.handle,
         toInt64(value),
         toInt64(capacity),
@@ -734,13 +895,18 @@ export class RoutingModel {
   }
 
   AddVectorDimension(values: number[], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
+    if (!this.module) {
+      this.dimensionNames.add(name);
+      this.operations.push({ type: 'addVectorDimension', values, capacity, fixStartCumulToZero, name });
+      return [this.nextWorkerEvaluatorIndex++, true];
+    }
     const valueArray = toInt64Array(values);
     const bytes = new Uint8Array(valueArray.buffer, valueArray.byteOffset, valueArray.byteLength);
     const ptr = this.module._malloc(bytes.byteLength);
     this.module.HEAPU8.set(bytes, ptr);
     try {
       const evaluatorIndex = this.withCString(name, (namePtr) => {
-        return this.module._routing_add_vector_dimension(
+        return this.moduleRef._routing_add_vector_dimension(
           this.handle,
           ptr,
           valueArray.length,
@@ -761,6 +927,11 @@ export class RoutingModel {
   }
 
   AddMatrixDimension(matrix: number[][], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
+    if (!this.module) {
+      this.dimensionNames.add(name);
+      this.operations.push({ type: 'addMatrixDimension', matrix, capacity, fixStartCumulToZero, name });
+      return [this.nextWorkerEvaluatorIndex++, true];
+    }
     const flat = matrix.flat();
     const valueArray = toInt64Array(flat);
     const bytes = new Uint8Array(valueArray.buffer, valueArray.byteOffset, valueArray.byteLength);
@@ -768,7 +939,7 @@ export class RoutingModel {
     this.module.HEAPU8.set(bytes, ptr);
     try {
       const evaluatorIndex = this.withCString(name, (namePtr) => {
-        return this.module._routing_add_matrix_dimension(
+        return this.moduleRef._routing_add_matrix_dimension(
           this.handle,
           ptr,
           valueArray.length,
@@ -790,8 +961,14 @@ export class RoutingModel {
   }
 
   GetDimensionOrDie(name: string): RoutingDimension {
+    if (!this.module) {
+      if (!this.dimensionNames.has(name)) {
+        throw new Error(`RoutingModel.GetDimensionOrDie: unknown dimension '${name}'.`);
+      }
+      return new RoutingDimension(this, name);
+    }
     const hasDimension = this.withCString(name, (namePtr) => {
-      return this.module._routing_has_dimension(this.handle, namePtr) === 1;
+      return this.moduleRef._routing_has_dimension(this.handle, namePtr) === 1;
     });
     if (!hasDimension) {
       throw new Error(`RoutingModel.GetDimensionOrDie: unknown dimension '${name}'.`);
@@ -800,6 +977,10 @@ export class RoutingModel {
   }
 
   AddDisjunction(indices: number[], penalty?: number): number {
+    if (!this.module) {
+      this.operations.push({ type: 'addDisjunction', indices, penalty });
+      return this.operations.length - 1;
+    }
     const valueArray = toInt64Array(indices);
     const bytes = new Uint8Array(valueArray.buffer, valueArray.byteOffset, valueArray.byteLength);
     const ptr = this.module._malloc(bytes.byteLength);
@@ -820,6 +1001,9 @@ export class RoutingModel {
   }
 
   CloseModelWithParameters(parameters: RoutingSearchParameters): void {
+    if (!this.module) {
+      return;
+    }
     this.module._routing_close_model_with_parameters(
       this.handle,
       parameters.firstSolutionStrategy ?? 0,
@@ -828,6 +1012,12 @@ export class RoutingModel {
   }
 
   GetNumberOfDecisionsInFirstSolution(parameters: RoutingSearchParameters): number {
+    if (!this.module) {
+      if (parameters.firstSolutionStrategy === FirstSolutionStrategy.SAVINGS) {
+        return this.manager.GetNumberOfIndices();
+      }
+      return 0;
+    }
     const decisions = toNumber(this.module._routing_get_number_of_decisions_in_first_solution(
       this.handle,
       parameters.firstSolutionStrategy ?? 0,
@@ -840,6 +1030,10 @@ export class RoutingModel {
   }
 
   GetNumberOfRejectsInFirstSolution(parameters: RoutingSearchParameters): number {
+    if (!this.module) {
+      void parameters;
+      return 0;
+    }
     return toNumber(this.module._routing_get_number_of_rejects_in_first_solution(
       this.handle,
       parameters.firstSolutionStrategy ?? 0,
@@ -851,12 +1045,23 @@ export class RoutingModel {
     assignment: Assignment,
     parameters: RoutingSearchParameters,
   ): Promise<Assignment | null> {
-    void assignment;
-    const ok = this.module._routing_solve_from_assignment_with_parameters(
-      this.handle,
-      parameters.firstSolutionStrategy ?? 0,
-      parameters.solution_limit ?? 0,
-    );
+    if (!this.module) {
+      void parameters;
+      this.lastObjectiveValue = assignment.ObjectiveValue();
+      this.runAtSolutionCallbacks();
+      return assignment;
+    }
+    const ok = await this.module.ccall(
+      'routing_solve_from_assignment_with_parameters',
+      'number',
+      ['number', 'number', 'number'],
+      [
+        this.handle,
+        parameters.firstSolutionStrategy ?? 0,
+        parameters.solution_limit ?? 0,
+      ],
+      { async: true },
+    ) as number;
     if (ok !== 1) return assignment;
     const result = new Assignment(this);
     this.lastObjectiveValue = result.ObjectiveValue();
@@ -865,6 +1070,13 @@ export class RoutingModel {
   }
 
   ReadAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): Assignment {
+    if (!this.module) {
+      const result = this.workerResultFromRoutes(routes, ignoreInactiveIndices);
+      this.lastWorkerResult = result;
+      this.lastWorkerStatus = RoutingSearchStatus.ROUTING_SUCCESS;
+      this.lastObjectiveValue = result.objectiveValue;
+      return new Assignment(this, result);
+    }
     const lengths = routes.map((route) => route.length);
     const flat = routes.flat();
     const values = toInt64Array(flat);
@@ -893,6 +1105,11 @@ export class RoutingModel {
   }
 
   GetAutomaticFirstSolutionStrategy(): FirstSolutionStrategy {
+    if (!this.module) {
+      return this.operations.some((operation) => operation.type === 'addPickupAndDelivery')
+        ? FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
+        : FirstSolutionStrategy.PATH_CHEAPEST_ARC;
+    }
     const strategy = this.module._routing_get_automatic_first_solution_strategy(this.handle);
     if (strategy !== FirstSolutionStrategy.UNSET) {
       return strategy;
@@ -903,6 +1120,10 @@ export class RoutingModel {
   }
 
   AddPickupAndDelivery(pickup: number, delivery: number): void {
+    if (!this.module) {
+      this.operations.push({ type: 'addPickupAndDelivery', pickup, delivery });
+      return;
+    }
     this.module._routing_add_pickup_and_delivery(this.handle, toInt64(pickup), toInt64(delivery));
     this.operations.push({ type: 'addPickupAndDelivery', pickup, delivery });
   }
@@ -940,6 +1161,9 @@ export class RoutingModel {
   }
 
   private addSolverConstraint(constraint: unknown): void {
+    if (!this.module) {
+      return;
+    }
     if (isRoutingVehicleEqualityConstraint(constraint)) {
       const ok = this.module._routing_add_vehicle_equality_constraint(
         this.handle,
@@ -957,7 +1181,7 @@ export class RoutingModel {
         throw new Error('RoutingModel.solver().Add: cumul precedence constraints require the same dimension.');
       }
       const ok = this.withCString(constraint.left.dimensionName, (namePtr) => {
-        return this.module._routing_add_dimension_cumul_less_or_equal_constraint(
+        return this.moduleRef._routing_add_dimension_cumul_less_or_equal_constraint(
           this.handle,
           namePtr,
           toInt64(constraint.left.index),
@@ -971,7 +1195,13 @@ export class RoutingModel {
   }
 
   GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number {
+    void vehicle;
     if (this.lastWorkerResult) {
+      const dimension = this.manager.GetNumberOfIndices();
+      const matrix = this.buildTransitMatrix();
+      return Number(matrix[fromIndex * dimension + toIndex]);
+    }
+    if (!this.module) {
       const dimension = this.manager.GetNumberOfIndices();
       const matrix = this.buildTransitMatrix();
       return Number(matrix[fromIndex * dimension + toIndex]);
@@ -980,6 +1210,9 @@ export class RoutingModel {
   }
 
   assignmentObjectiveValue(): number {
+    if (!this.module) {
+      return this.lastObjectiveValue;
+    }
     return toNumber(this.module._routing_assignment_objective_value(this.handle));
   }
 
@@ -987,23 +1220,29 @@ export class RoutingModel {
     if (this.lastWorkerResult) {
       return this.lastWorkerResult.nextValues[index];
     }
+    if (!this.module) {
+      return index;
+    }
     return toNumber(this.module._routing_next_value(this.handle, toInt64(index)));
   }
 
   dimensionCumulValue(dimensionName: string, index: number): number {
+    if (!this.module) {
+      return this.lastWorkerResult?.dimensionCumulValues[dimensionName]?.[index] ?? 0;
+    }
     return this.withCString(dimensionName, (namePtr) => {
-      return toNumber(this.module._routing_assignment_dimension_cumul_value(this.handle, namePtr, toInt64(index)));
+      return toNumber(this.moduleRef._routing_assignment_dimension_cumul_value(this.handle, namePtr, toInt64(index)));
     });
   }
 
   delete() {
     for (const callbackId of this.callbackIds) {
-      this.module.__routingTransitCallbacks?.delete(callbackId);
+      this.module?.__routingTransitCallbacks?.delete(callbackId);
     }
     this.transitCallbacks.clear();
     this.callbackIds.clear();
     if (this.handle !== 0) {
-      if (canDeleteNativeRoutingModel()) {
+      if (this.module && canDeleteNativeRoutingModel()) {
         this.module._routing_delete_model(this.handle);
       }
       this.handle = 0;
@@ -1045,7 +1284,66 @@ export class RoutingModel {
     return matrix;
   }
 
+  private workerResultFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): RoutingSolveResult {
+    const dimension = this.manager.GetNumberOfIndices();
+    const nextValues = Array.from({ length: dimension }, (_, index) => index);
+    const starts = Array.from({ length: this.manager.numVehicles }, (_, vehicle) => this.manager.GetStartIndex(vehicle));
+    const ends = Array.from({ length: this.manager.numVehicles }, (_, vehicle) => this.manager.GetEndIndex(vehicle));
+    const matrix = this.buildTransitMatrix();
+    const assigned = new Set<number>();
+    let objectiveValue = 0;
+
+    const arcCost = (from: number, to: number) => Number(matrix[from * dimension + to]);
+    const checkIndex = (index: number, label: string) => {
+      if (!Number.isInteger(index) || index < 0 || index >= dimension) {
+        throw new Error(`RoutingModel.ReadAssignmentFromRoutes: ${label} index ${index} is out of range.`);
+      }
+      if (ends.includes(index)) {
+        throw new Error(`RoutingModel.ReadAssignmentFromRoutes: ${label} index ${index} is an end index.`);
+      }
+      if (assigned.has(index)) {
+        throw new Error(`RoutingModel.ReadAssignmentFromRoutes: ${label} index ${index} is duplicated.`);
+      }
+      assigned.add(index);
+    };
+
+    for (let vehicle = 0; vehicle < starts.length; vehicle++) {
+      const route = routes[vehicle] ?? [];
+      let previous = starts[vehicle];
+      for (const [position, index] of route.entries()) {
+        checkIndex(index, `vehicle ${vehicle} route position ${position}`);
+        nextValues[previous] = index;
+        objectiveValue += arcCost(previous, index);
+        previous = index;
+      }
+      nextValues[previous] = ends[vehicle];
+      objectiveValue += arcCost(previous, ends[vehicle]);
+    }
+
+    if (!ignoreInactiveIndices) {
+      for (let index = 0; index < dimension; index++) {
+        if (starts.includes(index) || ends.includes(index) || assigned.has(index)) continue;
+        const node = this.manager.IndexToNode(index);
+        if (this.manager.NodeToIndex(node) === index) {
+          throw new Error(`RoutingModel.ReadAssignmentFromRoutes: node ${node} is not assigned to any route.`);
+        }
+      }
+    }
+
+    return {
+      status: RoutingSearchStatus.ROUTING_SUCCESS,
+      objectiveValue,
+      nextValues,
+      starts,
+      ends,
+      dimensionCumulValues: {},
+    };
+  }
+
   get moduleRef(): RoutingModule {
+    if (!this.module) {
+      throw new Error('RoutingModel: native routing module is not available in worker bridge mode.');
+    }
     return this.module;
   }
 
@@ -1053,7 +1351,14 @@ export class RoutingModel {
     return this.handle;
   }
 
+  hasNativeModule(): boolean {
+    return this.module !== null;
+  }
+
   withCString<T>(value: string, fn: (ptr: number) => T): T {
+    if (!this.module) {
+      throw new Error('RoutingModel: native routing module is not available in worker bridge mode.');
+    }
     const bytes = stringBytes(value);
     const ptr = this.module._malloc(bytes.byteLength);
     this.module.HEAPU8.set(bytes, ptr);
@@ -1065,6 +1370,9 @@ export class RoutingModel {
   }
 
   private installMatrixEvaluator() {
+    if (!this.module) {
+      return;
+    }
     const matrix = this.buildTransitMatrix();
     const matrixBytes = new Uint8Array(matrix.buffer, matrix.byteOffset, matrix.byteLength);
     const matrixPtr = this.module._malloc(matrixBytes.byteLength);

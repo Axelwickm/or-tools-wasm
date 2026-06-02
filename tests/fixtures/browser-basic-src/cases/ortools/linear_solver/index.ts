@@ -1,4 +1,4 @@
-import { fixtureModes, setWorkerBridgeMode, withWorkerBridgeMode } from '../../../shared_case.ts';
+import { fixtureModesFor, setWorkerBridgeMode, withWorkerBridgeMode, type FixtureMode } from '../../../shared_case.ts';
 
 export type MpSolverCaseResult = {
   id?: string;
@@ -204,6 +204,7 @@ export type MPSolverApi = {
   };
   setWorkerBridgeEnabled: (enabled: boolean) => void;
   isWorkerBridgeEnabled: () => boolean;
+  isWorkerBridgeAvailable?: () => boolean;
 };
 
 export type MPSolverRunOptions = {
@@ -320,7 +321,7 @@ async function runSimpleProgramBridgeMatrix(
   expected: { objective: number; x: number; y: number },
 ): Promise<MpSolverCaseResult[]> {
   const results: MpSolverCaseResult[] = [];
-  for (const mode of fixtureModes) {
+  for (const mode of fixtureModesFor(api)) {
     await withWorkerBridgeMode(api, mode, `MPSolver: ${name}`, async () => {
       results.push(await runSimpleProgram(
         api,
@@ -409,7 +410,7 @@ async function runCbcMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseRes
 
 async function runCbcWorkerBridgeMatrix(api: MPSolverApi): Promise<MpSolverCaseResult[]> {
   const results: MpSolverCaseResult[] = [];
-  for (const mode of fixtureModes) {
+  for (const mode of fixtureModesFor(api)) {
     await withWorkerBridgeMode(api, mode, 'MPSolver: CBC', async () => {
       results.push(await runSimpleProgram(
         api,
@@ -1215,13 +1216,27 @@ async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string)
 
 async function runProtoSolveMatrix(api: MPSolverApi, options: MPSolverRunOptions): Promise<MpSolverCaseResult[]> {
   const results: MpSolverCaseResult[] = [];
-  for (const mode of fixtureModes) {
+  for (const mode of fixtureModesFor(api)) {
     await withWorkerBridgeMode(api, mode, 'MPSolver', async () => {
       for (const numWorkers of [1, 4]) {
         options.onProgress?.('MPSolver: MPModelRequest solve', { mode, numWorkers });
         results.push(await runProtoSolveCase(api, mode, numWorkers));
       }
     });
+  }
+  return results;
+}
+
+async function runMPSolverModeMatrix(
+  api: MPSolverApi,
+  options: MPSolverRunOptions,
+  label: string,
+  run: (mode: FixtureMode) => Promise<MpSolverCaseResult>,
+): Promise<MpSolverCaseResult[]> {
+  const results: MpSolverCaseResult[] = [];
+  for (const mode of fixtureModesFor(api)) {
+    options.onProgress?.(label, { mode });
+    results.push(await run(mode));
   }
   return results;
 }
@@ -1257,18 +1272,24 @@ export async function runMPSolverContractCases(api: MPSolverApi, options: MPSolv
   const scipMixedInteger = await runScipMixedIntegerCase(api);
   options.onProgress?.('MPSolver: CBC simple_mip_program.py');
   const cbcMixedInteger = await runCbcMixedIntegerCase(api);
-  options.onProgress?.('MPSolver: BOP binary project selection', { mode: 'direct' });
-  const bopBinaryDirect = await runBopBinaryCase(api, 'direct');
-  options.onProgress?.('MPSolver: BOP binary project selection', { mode: 'worker' });
-  const bopBinaryWorker = await runBopBinaryCase(api, 'worker');
-  options.onProgress?.('MPSolver: BOP integer production', { mode: 'direct' });
-  const bopIntegerDirect = await runBopIntegerCase(api, 'direct');
-  options.onProgress?.('MPSolver: BOP integer production', { mode: 'worker' });
-  const bopIntegerWorker = await runBopIntegerCase(api, 'worker');
-  options.onProgress?.('MPSolver: Knapsack backend', { mode: 'direct' });
-  const knapsackBackendDirect = await runKnapsackBackendCase(api, 'direct');
-  options.onProgress?.('MPSolver: Knapsack backend', { mode: 'worker' });
-  const knapsackBackendWorker = await runKnapsackBackendCase(api, 'worker');
+  const bopBinaryResults = await runMPSolverModeMatrix(
+    api,
+    options,
+    'MPSolver: BOP binary project selection',
+    (mode) => runBopBinaryCase(api, mode),
+  );
+  const bopIntegerResults = await runMPSolverModeMatrix(
+    api,
+    options,
+    'MPSolver: BOP integer production',
+    (mode) => runBopIntegerCase(api, mode),
+  );
+  const knapsackBackendResults = await runMPSolverModeMatrix(
+    api,
+    options,
+    'MPSolver: Knapsack backend',
+    (mode) => runKnapsackBackendCase(api, mode),
+  );
   options.onProgress?.('MPSolver: lp_test.py/RunBooleanExampleCppStyleAPI');
   const booleanCppStyle = await runBooleanCppStyleCase(api);
   const results = [
@@ -1290,12 +1311,9 @@ export async function runMPSolverContractCases(api: MPSolverApi, options: MPSolv
     glpkMixedInteger,
     scipMixedInteger,
     cbcMixedInteger,
-    bopBinaryDirect,
-    bopBinaryWorker,
-    bopIntegerDirect,
-    bopIntegerWorker,
-    knapsackBackendDirect,
-    knapsackBackendWorker,
+    ...bopBinaryResults,
+    ...bopIntegerResults,
+    ...knapsackBackendResults,
     booleanCppStyle,
     skipped(
       'MPSolver: lp_test.py testApi',

@@ -23,7 +23,12 @@ async function* listTypeScriptFiles(directory) {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
       yield* listTypeScriptFiles(entryPath);
-    } else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
+    } else if (
+      entry.isFile()
+      && entry.name.endsWith('.ts')
+      && !entry.name.endsWith('.d.ts')
+      && entry.name !== 'runtime_loader_node.ts'
+    ) {
       yield entryPath;
     }
   }

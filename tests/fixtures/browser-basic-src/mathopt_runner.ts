@@ -700,10 +700,10 @@ async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<Ma
 }
 
 export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
-  await api.initMathOpt();
   const results: MathOptCaseResult[] = [];
   for (const mode of fixtureModes) {
     await withWorkerBridgeMode(api.MathOpt, mode, 'MathOpt', async () => {
+      await api.initMathOpt();
       for (const threads of [1, 4]) {
         options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
         results.push(await runGlopLp(api, mode, threads));

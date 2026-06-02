@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/time/time.h"
 #include <emscripten/emscripten.h>
 
 #include "generated_proto_schemas.h"
@@ -131,6 +133,62 @@ uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
   std::memcpy(buffer, data.data(), data.size());
   *out_len = data.size();
   return buffer;
+}
+
+uint8_t* SolveModelRequestWithThreads(const MPModelRequest& request,
+                                      int num_threads, size_t* out_len) {
+  MPSolutionResponse response;
+  if (!request.has_model()) {
+    response.set_status(operations_research::MPSOLVER_MODEL_INVALID);
+    response.set_status_str(
+        "MPSolver: threaded model-request solve requires a model field.");
+    return CopyProtoToBuffer(response, out_len);
+  }
+
+  MPSolver solver(
+      request.model().name(),
+      static_cast<MPSolver::OptimizationProblemType>(request.solver_type()));
+  if (request.enable_internal_solver_output()) {
+    solver.EnableOutput();
+  }
+
+  if (num_threads > 1) {
+    const absl::Status status = solver.SetNumThreads(num_threads);
+    if (!status.ok()) {
+      response.set_status(operations_research::MPSOLVER_INCOMPATIBLE_OPTIONS);
+      response.set_status_str(std::string(status.message()));
+      return CopyProtoToBuffer(response, out_len);
+    }
+  }
+
+  std::string error_message;
+  const auto load_status =
+      solver.LoadModelFromProto(request.model(), &error_message);
+  if (load_status != operations_research::MPSOLVER_MODEL_IS_VALID) {
+    response.set_status(load_status);
+    response.set_status_str(error_message);
+    return CopyProtoToBuffer(response, out_len);
+  }
+
+  if (request.has_solver_time_limit_seconds()) {
+    solver.SetTimeLimit(absl::Seconds(request.solver_time_limit_seconds()));
+  }
+  if (request.has_solver_specific_parameters() &&
+      !request.solver_specific_parameters().empty() &&
+      !solver.SetSolverSpecificParametersAsString(
+          request.solver_specific_parameters())) {
+    if (!request.ignore_solver_specific_parameters_failure()) {
+      response.set_status(
+          operations_research::MPSOLVER_MODEL_INVALID_SOLVER_PARAMETERS);
+      response.set_status_str(
+          "MPSolver: solver_specific_parameters could not be applied.");
+      return CopyProtoToBuffer(response, out_len);
+    }
+  }
+
+  solver.Solve();
+  solver.FillSolutionResponseProto(&response);
+  return CopyProtoToBuffer(response, out_len);
 }
 
 }  // namespace
@@ -608,6 +666,25 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request(
   }
   MPSolver::SolveWithProto(request, &response);
   return CopyProtoToBuffer(response, out_len);
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request_with_threads(
+    const uint8_t* request_data, size_t request_len, int num_threads,
+    size_t* out_len) {
+  if (out_len == nullptr) return nullptr;
+  MPModelRequest request;
+  MPSolutionResponse response;
+  if (request_data == nullptr ||
+      !request.ParseFromArray(request_data, static_cast<int>(request_len))) {
+    response.set_status(operations_research::MPSOLVER_MODEL_INVALID);
+    response.set_status_str("MPSolver: failed to parse MPModelRequest bytes.");
+    return CopyProtoToBuffer(response, out_len);
+  }
+  if (num_threads <= 1) {
+    MPSolver::SolveWithProto(request, &response);
+    return CopyProtoToBuffer(response, out_len);
+  }
+  return SolveModelRequestWithThreads(request, num_threads, out_len);
 }
 
 EMSCRIPTEN_KEEPALIVE int mp_solver_load_solution_proto(
