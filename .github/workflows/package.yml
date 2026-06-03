@@ -125,7 +125,7 @@ jobs:
 
       - name: Run Vite fixture
         working-directory: package
-        run: FIXTURE_GROUP=vite npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=vite npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
 
   webpack-fixture:
     name: Webpack 5 / ${{ matrix.mode }} / ${{ matrix.browser }}
@@ -179,7 +179,7 @@ jobs:
 
       - name: Run Webpack fixture
         working-directory: package
-        run: FIXTURE_GROUP=webpack npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=webpack npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
 
   rollup-fixture:
     name: Rollup 4 / static / ${{ matrix.browser }}
@@ -225,7 +225,7 @@ jobs:
 
       - name: Run Rollup fixture
         working-directory: package
-        run: FIXTURE_GROUP=rollup npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=rollup npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
 
   deno-fixture:
     name: Deno 2.8.1 / solve

@@ -1,7 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
 
 const fixtureGroup = process.env.FIXTURE_GROUP;
 const fixtureTimeout = 240_000;
+const packageDir = path.resolve(__dirname, '../package');
 const webServers = [
   {
     fixture: 'vite',
@@ -40,7 +42,7 @@ const webServers = [
   },
 ]
   .filter((server) => !fixtureGroup || server.fixture === fixtureGroup)
-  .map(({ fixture: _fixture, ...server }) => server);
+  .map(({ fixture: _fixture, ...server }) => ({ ...server, cwd: packageDir }));
 
 export default defineConfig({
   testDir: './specs',
