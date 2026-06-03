@@ -1,4 +1,4 @@
-# or-tools-wasm - Google OR-Tools for WebAssembly
+# Google OR-Tools for Web
 
 Solve complex optimization models from TypeScript with Google OR-Tools running
 as multithreaded WebAssembly.
