@@ -12,8 +12,10 @@ if (!fixtureName) {
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const fixtureDir = path.join(repoRoot, 'tests/fixtures', fixtureName);
-const packageDir = path.join(repoRoot, 'build/javascript/lib');
+const packageRoot = path.join(repoRoot, 'package');
+const packageDir = path.join(packageRoot, 'build/javascript/lib');
 const stableTarballPath = path.join(packageDir, 'or-tools-wasm-local.tgz');
+const npmCacheDir = path.join(repoRoot, '.npm-cache');
 
 async function findPackedTarballs() {
   const entries = await readdir(packageDir).catch(() => {
@@ -41,8 +43,12 @@ let tarballs = await findPackedTarballs();
 if (!tarballs.length) {
   console.log(`No packed package found in ${packageDir}. Packing current build.`);
   const pack = spawnSync('npm', ['pack', '--pack-destination', packageDir], {
-    cwd: repoRoot,
+    cwd: packageRoot,
     stdio: 'inherit',
+    env: {
+      ...process.env,
+      NPM_CONFIG_CACHE: process.env.NPM_CONFIG_CACHE ?? npmCacheDir,
+    },
   });
   if (pack.status !== 0) {
     process.exit(pack.status ?? 1);
@@ -58,6 +64,10 @@ console.log(`Installing ${stableTarballPath} into ${fixtureDir}`);
 const install = spawn('npm', ['install', stableTarballPath, '--force', '--no-audit', '--no-fund', '--no-package-lock'], {
   cwd: fixtureDir,
   stdio: 'inherit',
+  env: {
+    ...process.env,
+    NPM_CONFIG_CACHE: process.env.NPM_CONFIG_CACHE ?? npmCacheDir,
+  },
 });
 
 install.on('exit', (code) => {

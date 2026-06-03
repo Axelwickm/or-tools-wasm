@@ -1,30 +1,35 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 
-const releaseRef = process.argv[2];
+const repoRoot = path.resolve(import.meta.dirname, '..');
+const packageDir = path.join(repoRoot, 'package');
+const releaseRef = process.argv[2]
+  ?? (process.env.GITHUB_REF?.startsWith('refs/tags/v') ? process.env.GITHUB_REF_NAME : undefined);
 
-if (!releaseRef) {
-  throw new Error('Usage: node scripts/prepare_package_readme.mjs <release-ref>');
-}
-
-const encodedReleaseRef = encodeURIComponent(releaseRef);
-const workflowUrl = `https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml?query=ref%3A${encodedReleaseRef}`;
-const readmePath = 'README.md';
+const readmePath = path.join(repoRoot, 'README.md');
 
 let readme = readFileSync(readmePath, 'utf8');
 
-readme = readme.replace(
-  'https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg',
-  `https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg?branch=${encodedReleaseRef}`
-);
+if (releaseRef) {
+  const encodedReleaseRef = encodeURIComponent(releaseRef);
+  const workflowUrl = `https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml?query=ref%3A${encodedReleaseRef}`;
 
-readme = readme.replaceAll(
-  'https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?',
-  `https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/${encodedReleaseRef}?`
-);
+  readme = readme.replace(
+    'https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg',
+    `https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg?branch=${encodedReleaseRef}`
+  );
 
-readme = readme.replaceAll(
-  'https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)',
-  `${workflowUrl})`
-);
+  readme = readme.replaceAll(
+    'https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?',
+    `https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/${encodedReleaseRef}?`
+  );
 
-writeFileSync(readmePath, readme);
+  readme = readme.replaceAll(
+    'https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)',
+    `${workflowUrl})`
+  );
+}
+
+mkdirSync(packageDir, { recursive: true });
+writeFileSync(path.join(packageDir, 'README.md'), readme);
+copyFileSync(path.join(repoRoot, 'LICENSE'), path.join(packageDir, 'LICENSE'));

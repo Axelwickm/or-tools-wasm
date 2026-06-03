@@ -1,0 +1,5 @@
+{
+  "name": "or-tools-wasm-source",
+  "private": true,
+  "type": "module"
+}

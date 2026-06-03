@@ -5,10 +5,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import dts from 'vite-plugin-dts';
 
-const rootDir = __dirname;
-const libRoot = path.resolve(__dirname, 'javascript/lib');
-const wasmBuildDir = path.resolve(__dirname, 'build/javascript/wasm');
-const outDir = path.resolve(__dirname, 'build/javascript/lib');
+const rootDir = path.resolve(__dirname, '..');
+const packageDir = __dirname;
+const libRoot = path.resolve(rootDir, 'javascript/lib');
+const wasmBuildDir = path.resolve(packageDir, 'build/javascript/wasm');
+const outDir = path.resolve(packageDir, 'build/javascript/lib');
 const libEntries = {
   index: path.join(libRoot, 'index.ts'),
   'cp-sat': path.join(libRoot, 'cp-sat.ts'),
@@ -122,9 +123,9 @@ export default defineConfig({
     patchEmscriptenWasmPlugin(),
     emitWasmSourceMapsPlugin(),
     dts({
-      tsconfigPath: path.resolve(__dirname, 'tsconfig.json'),
+      tsconfigPath: path.resolve(packageDir, 'tsconfig.json'),
       rollupTypes: true,
-      entryRoot: 'javascript/lib',
+      entryRoot: path.resolve(rootDir, 'javascript/lib'),
     }),
   ],
   worker: {

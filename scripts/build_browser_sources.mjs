@@ -4,7 +4,8 @@ import { build, transform } from 'esbuild';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
 const sourceDir = path.join(rootDir, 'javascript/lib');
-const outDir = path.join(rootDir, 'build/javascript/browser');
+const packageBuildDir = path.join(rootDir, 'package/build/javascript');
+const outDir = path.join(packageBuildDir, 'browser');
 const publicEntryNames = [
   'index',
   'cp-sat',
@@ -96,7 +97,7 @@ for await (const sourcePath of listTypeScriptFiles(sourceDir)) {
 
 await bundleBrowserEntry();
 
-const declarationPath = path.join(rootDir, 'build/javascript/lib/index.d.ts');
+const declarationPath = path.join(packageBuildDir, 'lib/index.d.ts');
 try {
   const declaration = await readFile(declarationPath, 'utf8');
   await writeFile(

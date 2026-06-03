@@ -2,6 +2,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
+const packageBuildRoot = path.join(repoRoot, 'package/build/javascript');
 const runtimeNames = [
   'cp_sat_runtime',
   'cp_sat_runtime_asyncify',
@@ -19,23 +20,23 @@ const runtimeNames = [
   'set_cover_runtime_asyncify',
 ];
 const nodeRuntimePaths = [
-  path.join(repoRoot, 'build/javascript/node-wasm/cp_sat_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/cp_sat_runtime_node_asyncify.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/routing_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/routing_runtime_node_asyncify.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/mp_solver_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/mp_solver_runtime_node_asyncify.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/mathopt_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/mathopt_runtime_node_asyncify.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/pdlp_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/pdlp_runtime_node_asyncify.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/graph_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/graph_runtime_node_asyncify.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/set_cover_runtime_node.js'),
-  path.join(repoRoot, 'build/javascript/node-wasm/set_cover_runtime_node_asyncify.js'),
+  path.join(packageBuildRoot, 'node-wasm/cp_sat_runtime_node.js'),
+  path.join(packageBuildRoot, 'node-wasm/cp_sat_runtime_node_asyncify.js'),
+  path.join(packageBuildRoot, 'node-wasm/routing_runtime_node.js'),
+  path.join(packageBuildRoot, 'node-wasm/routing_runtime_node_asyncify.js'),
+  path.join(packageBuildRoot, 'node-wasm/mp_solver_runtime_node.js'),
+  path.join(packageBuildRoot, 'node-wasm/mp_solver_runtime_node_asyncify.js'),
+  path.join(packageBuildRoot, 'node-wasm/mathopt_runtime_node.js'),
+  path.join(packageBuildRoot, 'node-wasm/mathopt_runtime_node_asyncify.js'),
+  path.join(packageBuildRoot, 'node-wasm/pdlp_runtime_node.js'),
+  path.join(packageBuildRoot, 'node-wasm/pdlp_runtime_node_asyncify.js'),
+  path.join(packageBuildRoot, 'node-wasm/graph_runtime_node.js'),
+  path.join(packageBuildRoot, 'node-wasm/graph_runtime_node_asyncify.js'),
+  path.join(packageBuildRoot, 'node-wasm/set_cover_runtime_node.js'),
+  path.join(packageBuildRoot, 'node-wasm/set_cover_runtime_node_asyncify.js'),
 ];
 const webRuntimePaths = runtimeNames.map((runtimeName) =>
-  path.join(repoRoot, `build/javascript/wasm/${runtimeName}.js`)
+  path.join(packageBuildRoot, `wasm/${runtimeName}.js`)
 );
 
 const replacements = [

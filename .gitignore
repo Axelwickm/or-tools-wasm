@@ -120,3 +120,5 @@ MODULE.bazel.lock
 
 # NPM stuff
 **/.npm-cache/
+/package/README.md
+/package/LICENSE

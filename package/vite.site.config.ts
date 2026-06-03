@@ -1,7 +1,8 @@
 import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import path from 'node:path';
 
-const siteRoot = path.resolve(__dirname, 'javascript/site');
+const rootDir = path.resolve(__dirname, '..');
+const siteRoot = path.resolve(rootDir, 'javascript/site');
 const distDir = path.resolve(__dirname, 'build/javascript/site');
 
 export default defineConfig({

@@ -1,8 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
 
-const ROOT = path.resolve(process.cwd());
+const ROOT = path.resolve(import.meta.dirname, '..');
 const SPECS = [
   {
     inputPath: path.join(ROOT, 'ortools/sat/sat_parameters.proto'),

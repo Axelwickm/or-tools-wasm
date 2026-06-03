@@ -40,8 +40,8 @@ Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_
 Run the local test site:
 
 ```sh
-npm install
-npm run dev
+npm --prefix package install
+npm --prefix package run dev
 ```
 
 Install from npm:
@@ -152,15 +152,15 @@ imports, with no manual copying into `public/` or `static/` required.
 
 ## Fixture test matrix
 
-`npm run test:fixtures` is the full fixture matrix. It runs the shared solver
+`npm --prefix package run test:fixtures` is the full fixture matrix. It runs the shared solver
 cases through Vite, Webpack, Rollup, Deno, Node, and Bun. Browser fixtures cover
 dev and static serving where the bundler supports both, Chromium and Firefox,
 direct runtime execution, the browser worker bridge, and solver thread settings
 where the solver supports them.
 
-For focused iteration, use `npm run test:fixtures:browser`,
-`npm run test:fixtures:runtime`, or an individual fixture script such as
-`npm run test:fixture:node`. The full matrix is the comprehensive check before
+For focused iteration, use `npm --prefix package run test:fixtures:browser`,
+`npm --prefix package run test:fixtures:runtime`, or an individual fixture script such as
+`npm --prefix package run test:fixture:node`. The full matrix is the comprehensive check before
 landing solver API, worker bridge, threading, or packaging changes.
 
 ## API reference
@@ -246,18 +246,18 @@ available and fall back to the Asyncify runtime otherwise.
 ## Development
 
 ```sh
-npm install
-npm run dev
-npm run build
-npm run preview
+npm --prefix package install
+npm --prefix package run dev
+npm --prefix package run build
+npm --prefix package run preview
 ```
 
-`npm run dev` / `npm run start` builds the library and launches the demo site.
-`npm run build` runs the full WebAssembly, package, and static site build.
+`npm --prefix package run dev` / `npm --prefix package run start` builds the library and launches the demo site.
+`npm --prefix package run build` runs the full WebAssembly, package, and static site build.
 
 The Emscripten SDK is tracked as a pinned `emsdk` git submodule. The build
 script initializes that submodule automatically if needed, so a normal clone can
-run `npm run build` directly after `npm install`. If you prefer to fetch
+run `npm --prefix package run build` directly after `npm --prefix package install`. If you prefer to fetch
 submodules up front, clone with `--recurse-submodules` or run
 `git submodule update --init --recursive`.
 

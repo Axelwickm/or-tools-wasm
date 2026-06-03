@@ -75,19 +75,19 @@ trap 'exit 143' TERM
 cleanup_containers
 
 for required_dir in \
-  "${ROOT}/build/javascript/node" \
-  "${ROOT}/build/javascript/node-wasm" \
-  "${ROOT}/build/javascript/browser" \
-  "${ROOT}/build/javascript/wasm"
+  "${ROOT}/package/build/javascript/node" \
+  "${ROOT}/package/build/javascript/node-wasm" \
+  "${ROOT}/package/build/javascript/browser" \
+  "${ROOT}/package/build/javascript/wasm"
 do
   if [[ ! -d "${required_dir}" ]]; then
-    fail "Missing ${required_dir}. Run npm run build:lib before benchmarking."
+    fail "Missing ${required_dir}. Run npm --prefix package run build:lib before benchmarking."
   fi
 done
 
 printf 'Packing local npm package into %s\n' "${PACKAGE_DIR}"
 rm -f "${PACKAGE_DIR}"/or-tools-wasm-*.tgz "${PACKAGE_TARBALL}"
-npm pack --pack-destination "${PACKAGE_DIR}"
+(cd "${ROOT}/package" && npm pack --pack-destination "${PACKAGE_DIR}")
 packed_tarballs=("${PACKAGE_DIR}"/or-tools-wasm-*.tgz)
 if [[ ${#packed_tarballs[@]} -ne 1 ]]; then
   fail "Expected exactly one packed tarball in ${PACKAGE_DIR}, found ${#packed_tarballs[@]}."

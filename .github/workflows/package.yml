@@ -35,6 +35,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: package/package-lock.json
 
       - name: Cache Emscripten and CMake build
         uses: actions/cache@v4
@@ -45,12 +46,13 @@ jobs:
             emsdk/upstream
             emsdk/.emscripten
             build
-          key: wasm-build-${{ runner.os }}-${{ hashFiles('package-lock.json', 'CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/**/*.txt', 'patches/**', 'scripts/ensure-emsdk.sh', 'scripts/embed_proto.cmake', 'javascript/cp_sat_api.cc') }}
+            package/build
+          key: wasm-build-${{ runner.os }}-${{ hashFiles('package/package-lock.json', 'CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/**/*.txt', 'patches/**', 'scripts/ensure-emsdk.sh', 'scripts/embed_proto.cmake', 'javascript/cp_sat_api.cc') }}
           restore-keys: |
             wasm-build-${{ runner.os }}-
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix package
 
       - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
@@ -60,14 +62,14 @@ jobs:
         run: node scripts/prepare_package_readme.mjs "$GITHUB_REF_NAME"
 
       - name: Build and pack library
-        run: npm run pack:lib
+        run: npm --prefix package run pack:lib
 
       - name: Upload package artifact
         if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v7
         with:
           name: npm-package
-          path: build/javascript/lib/*.tgz
+          path: package/build/javascript/lib/*.tgz
           if-no-files-found: error
           retention-days: 7
 
@@ -102,25 +104,28 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: package/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix package
 
       - name: Download package artifact
         if: ${{ !env.ACT }}
         uses: actions/download-artifact@v8
         with:
           name: npm-package
-          path: build/javascript/lib
+          path: package/build/javascript/lib
 
       - name: Build Vite fixture
-        run: npm run test:fixture:vite:build
+        run: npm --prefix package run test:fixture:vite:build
 
       - name: Install browser
+        working-directory: package
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run Vite fixture
-        run: FIXTURE_GROUP=vite npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
+        working-directory: package
+        run: FIXTURE_GROUP=vite npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
 
   webpack-fixture:
     name: Webpack 5 / ${{ matrix.mode }} / ${{ matrix.browser }}
@@ -153,25 +158,28 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: package/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix package
 
       - name: Download package artifact
         if: ${{ !env.ACT }}
         uses: actions/download-artifact@v8
         with:
           name: npm-package
-          path: build/javascript/lib
+          path: package/build/javascript/lib
 
       - name: Build Webpack fixture
-        run: npm run test:fixture:webpack:build
+        run: npm --prefix package run test:fixture:webpack:build
 
       - name: Install browser
+        working-directory: package
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run Webpack fixture
-        run: FIXTURE_GROUP=webpack npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
+        working-directory: package
+        run: FIXTURE_GROUP=webpack npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
 
   rollup-fixture:
     name: Rollup 4 / static / ${{ matrix.browser }}
@@ -196,25 +204,28 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: package/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix package
 
       - name: Download package artifact
         if: ${{ !env.ACT }}
         uses: actions/download-artifact@v8
         with:
           name: npm-package
-          path: build/javascript/lib
+          path: package/build/javascript/lib
 
       - name: Build Rollup fixture
-        run: npm run test:fixture:rollup:build
+        run: npm --prefix package run test:fixture:rollup:build
 
       - name: Install browser
+        working-directory: package
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run Rollup fixture
-        run: FIXTURE_GROUP=rollup npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
+        working-directory: package
+        run: FIXTURE_GROUP=rollup npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
 
   deno-fixture:
     name: Deno 2.8.1 / solve
@@ -231,6 +242,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: package/package-lock.json
 
       - name: Setup Deno
         uses: denoland/setup-deno@v2
@@ -238,17 +250,17 @@ jobs:
           deno-version: ${{ env.DENO_VERSION }}
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix package
 
       - name: Download package artifact
         if: ${{ !env.ACT }}
         uses: actions/download-artifact@v8
         with:
           name: npm-package
-          path: build/javascript/lib
+          path: package/build/javascript/lib
 
       - name: Run Deno fixture
-        run: npm run test:fixture:deno
+        run: npm --prefix package run test:fixture:deno
 
   node-fixture:
     name: Node 24.12.0 / solve
@@ -265,19 +277,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: package/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix package
 
       - name: Download package artifact
         if: ${{ !env.ACT }}
         uses: actions/download-artifact@v8
         with:
           name: npm-package
-          path: build/javascript/lib
+          path: package/build/javascript/lib
 
       - name: Run Node fixture
-        run: npm run test:fixture:node
+        run: npm --prefix package run test:fixture:node
 
   bun-fixture:
     name: Bun 1.3.14 / solve
@@ -294,6 +307,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: package/package-lock.json
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -301,17 +315,17 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix package
 
       - name: Download package artifact
         if: ${{ !env.ACT }}
         uses: actions/download-artifact@v8
         with:
           name: npm-package
-          path: build/javascript/lib
+          path: package/build/javascript/lib
 
       - name: Run Bun fixture
-        run: npm run test:fixture:bun
+        run: npm --prefix package run test:fixture:bun
 
   publish:
     name: Publish release
@@ -344,12 +358,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: npm-package
-          path: build/javascript/lib
+          path: package/build/javascript/lib
 
       - name: Publish to npm
-        run: npm publish build/javascript/lib/*.tgz --access public --provenance
+        run: npm publish package/build/javascript/lib/*.tgz --access public --provenance
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" build/javascript/lib/*.tgz --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" package/build/javascript/lib/*.tgz --generate-notes --verify-tag

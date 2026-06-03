@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "../../../node_modules/.bin/tsc --noEmit && node --experimental-strip-types --test basic.test.ts"
+    "test": "../../../package/node_modules/.bin/tsc --noEmit && node --experimental-strip-types --test basic.test.ts"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../build/javascript/lib/or-tools-wasm-local.tgz"
+    "or-tools-wasm": "file:../../../package/build/javascript/lib/or-tools-wasm-local.tgz"
   }
 }

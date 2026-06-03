@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
 const sourceDir = path.join(rootDir, 'javascript/lib');
-const outDir = path.join(rootDir, 'build/javascript/node');
+const outDir = path.join(rootDir, 'package/build/javascript/node');
 const publicEntryNames = [
   'index',
   'cp-sat',
