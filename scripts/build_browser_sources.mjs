@@ -1,8 +1,10 @@
 import { mkdir, readdir, rm, writeFile, readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { build, transform } from 'esbuild';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
+const require = createRequire(new URL('../package/package.json', import.meta.url));
+const { build, transform } = require('esbuild');
 const sourceDir = path.join(rootDir, 'javascript/lib');
 const packageBuildDir = path.join(rootDir, 'package/build/javascript');
 const outDir = path.join(packageBuildDir, 'browser');
@@ -62,6 +64,9 @@ async function transpileSource(sourcePath) {
 const externalRuntimeLoaderPlugin = {
   name: 'external-runtime-loader',
   setup(buildContext) {
+    buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
+      path: require.resolve('protobufjs'),
+    }));
     buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader|worker_bridge)\.js$/ }, (args) => ({
       path: args.path,
       external: true,

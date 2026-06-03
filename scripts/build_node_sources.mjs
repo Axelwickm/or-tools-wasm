@@ -1,8 +1,10 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { build } from 'esbuild';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
+const require = createRequire(new URL('../package/package.json', import.meta.url));
+const { build } = require('esbuild');
 const sourceDir = path.join(rootDir, 'javascript/lib');
 const outDir = path.join(rootDir, 'package/build/javascript/node');
 const publicEntryNames = [
@@ -21,6 +23,9 @@ const publicEntryNames = [
 const externalLoaderPlugin = {
   name: 'external-runtime-node-loader',
   setup(buildContext) {
+    buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
+      path: require.resolve('protobufjs'),
+    }));
     buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader|worker_bridge)\.js$/ }, (args) => ({
       path: args.path,
       external: true,

@@ -19,6 +19,8 @@
       "or-tools-wasm/network-flow": ["../javascript/lib/network-flow.ts"],
       "or-tools-wasm/set-cover": ["../javascript/lib/set-cover.ts"],
       "or-tools-wasm/rcpsp": ["../javascript/lib/rcpsp.ts"],
+      "protobufjs": ["./node_modules/protobufjs/index.d.ts"],
+      "protobufjs/*": ["./node_modules/protobufjs/*"],
       "@internal-wasm/*": ["build/javascript/wasm/*"],
       "#internal-wasm/*": ["build/javascript/wasm/*"]
     }

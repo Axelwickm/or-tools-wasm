@@ -4,11 +4,30 @@ import path from 'node:path';
 const rootDir = path.resolve(__dirname, '..');
 const siteRoot = path.resolve(rootDir, 'javascript/site');
 const distDir = path.resolve(__dirname, 'build/javascript/site');
+const browserBuildDir = path.resolve(__dirname, 'build/javascript/browser');
+const packageBrowserAliases = [
+  ['or-tools-wasm', 'index'],
+  ['or-tools-wasm/cp-sat', 'cp-sat'],
+  ['or-tools-wasm/routing', 'routing'],
+  ['or-tools-wasm/mathopt', 'mathopt'],
+  ['or-tools-wasm/mp-solver', 'mp-solver'],
+  ['or-tools-wasm/pdlp', 'pdlp'],
+  ['or-tools-wasm/knapsack', 'knapsack'],
+  ['or-tools-wasm/network-flow', 'network-flow'],
+  ['or-tools-wasm/set-cover', 'set-cover'],
+  ['or-tools-wasm/rcpsp', 'rcpsp'],
+].map(([specifier, entry]) => ({
+  find: new RegExp(`^${specifier.replace('/', '\\/')}$`),
+  replacement: path.join(browserBuildDir, `${entry}.js`),
+}));
 
 export default defineConfig({
   root: siteRoot,
   base: './',
   publicDir: false,
+  resolve: {
+    alias: packageBrowserAliases,
+  },
   worker: {
     format: 'es',
   },

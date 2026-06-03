@@ -114,6 +114,7 @@ export default defineConfig({
     alias: {
       './runtime_loader.js': path.join(libRoot, 'runtime_loader.ts'),
       './cp_sat_module_loader.js': path.join(libRoot, 'cp_sat_module_loader.ts'),
+      protobufjs: path.join(packageDir, 'node_modules/protobufjs/index.js'),
       '#internal-wasm': wasmBuildDir,
       '@internal-wasm': wasmBuildDir
     }
