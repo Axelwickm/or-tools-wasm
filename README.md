@@ -26,13 +26,13 @@ as multithreaded WebAssembly.
 Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in)
 
 <p>
-  <img src="docs/media/network_design.gif" alt="Network design optimization in PragmaPlanner" width="24%">
-  <img src="docs/media/vrp.gif" alt="Vehicle routing optimization in PragmaPlanner" width="24%">
-  <img src="docs/media/steel_mill_slab.png" alt="Steel mill slab optimization in PragmaPlanner" width="24%">
+  <img src="docs/media/factory_floor.gif" alt="Factory floor optimization in PragmaPlanner" height="180">
+  <img src="docs/media/sudoku.gif" alt="Sudoku optimization example in PragmaPlanner" height="180">
 </p>
 <p>
-  <img src="docs/media/factory_floor.gif" alt="Factory floor optimization in PragmaPlanner" width="48%">
-  <img src="docs/media/sudoku.gif" alt="Sudoku optimization example in PragmaPlanner" width="24%">
+  <img src="docs/media/network_design.gif" alt="Network design optimization in PragmaPlanner" height="160">
+  <img src="docs/media/vrp.gif" alt="Vehicle routing optimization in PragmaPlanner" height="160">
+  <img src="docs/media/steel_mill_slab.png" alt="Steel mill slab optimization in PragmaPlanner" height="160">
 </p>
 
 ## Usage
@@ -50,11 +50,9 @@ Install from npm:
 npm install or-tools-wasm
 ```
 
-Import the solver API you need from its subpath:
-
-```ts
-import { CpSat } from 'or-tools-wasm/cp-sat';
-```
+> [!WARNING]
+> Browser builds require cross-origin isolation headers for WebAssembly threads.
+> See [Browser requirements](#browser-requirements) below.
 
 Public solver APIs live under solver-scoped subpaths:
 
@@ -70,44 +68,31 @@ import { SetCoverModel } from 'or-tools-wasm/set-cover';
 import { RcpspModelBuilder } from 'or-tools-wasm/rcpsp';
 ```
 
-Create or serialize an OR-Tools proto model, validate it, then solve it:
+Build a CP-SAT model and solve it:
 
 ```ts
-const model = {
-  name: 'choose_one',
-  variables: [
-    { name: 'x', domain: [0, 1] },
-    { name: 'y', domain: [0, 1] },
-  ],
-  constraints: [
-    {
-      name: 'exactly_one',
-      linear: {
-        vars: [0, 1],
-        coeffs: [1, 1],
-        domain: [1, 1],
-      },
-    },
-  ],
-  objective: {
-    vars: [0, 1],
-    coeffs: [1, 2],
-  },
-};
+const model = new CpModel();
 
-const modelBytes = await CpSat.createModel(model);
-const validation = await CpSat.validate(modelBytes);
+const desks = model.newIntVar(0, 4, 'desks');
+const tables = model.newIntVar(0, 3, 'tables');
 
-if (!validation.ok) {
-  throw new Error(validation.message);
-}
+model.addLinearConstraint(desks.times(3).plus(tables.times(4)), 0, 12);
+model.maximize(desks.times(20).plus(tables.times(30)));
 
-const result = await CpSat.solve(modelBytes, {
-  numSearchWorkers: 1,
+const solver = new CpSolver();
+const status = await solver.solve(model, { numSearchWorkers: 1 });
+
+console.log(solver.statusName(status));
+console.log({
+  desks: solver.value(desks),
+  tables: solver.value(tables),
+  profit: solver.objectiveValue(),
 });
-
-console.log(result.response);
 ```
+
+## API reference
+
+See [docs/api.md](docs/api.md) for the full TypeScript API reference.
 
 ## Benchmarking
 
@@ -118,9 +103,9 @@ See [benchmarking/](benchmarking/).
 | OR-Tools surface | or-tools-wasm | Description |
 | --- | --- | --- |
 | CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
-| Routing | ✅ | Vehicle routing, TSP, pickup-delivery, capacity, dimension, and time-window search. |
+| Routing | ✅ | Vehicle routing (VRP), TSP, pickup-delivery, capacity, dimension, and time-window search. |
 | MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, BOP MIP, Knapsack MIP, and SAT MIP backends. |
-| MathOpt API | ✅ | Unified modeling and solve API; this package includes GLOP, GLPK, GSCIP, CP-SAT, and PDLP backends. |
+| MathOpt API | ✅ | Unified modeling and solve API with incremental solving and callback support; this package includes GLOP, GLPK, GSCIP, CP-SAT, and PDLP backends. |
 | GLOP | ✅ | Google's simplex linear programming solver. |
 | PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
 | SAT integer programming | ✅ | CP-SAT-backed integer programming backend for pure integer linear models. |
@@ -134,15 +119,15 @@ See [benchmarking/](benchmarking/).
 | Assignment algorithms | ✅ | Linear-sum assignment through the dedicated Network Flow API. |
 | Set cover | ✅ | Dedicated weighted set cover model, invariant, and heuristic search API. |
 | RCPSP | ✅ | CP-SAT-backed resource-constrained project scheduling model, parser, and visual scheduling surface. |
-| Linear Solver ModelBuilder |  | Python-like `linear_solver.model_builder` API for ergonomic LP/MIP modeling, import/export helpers, and backend solve helpers. |
-| MathOpt incremental/callback APIs | ✅ | Incremental solving is exposed for MathOpt models with tracked updates for common LP/MIP model edits, rejected-update fallback, repeated LP updates, and GSCIP incremental message logging. Indicator constraints, message callbacks, solve interrupters, common solve parameters, typed model solve parameters with solve filters, Python-style solve-result accessors including ray/basis helpers for real solve results, `removeNames` duplicate-name solving, and typed backend parameters for GSCIP, GLOP, CP-SAT, PDLP, and GLPK are exposed. Python-only context managers and constructed result parser/proto-object helpers are outside the current TypeScript contract. |
+| Linear Solver ModelBuilder |  | Ergonomic LP/MIP modeling API with import/export helpers and backend solve helpers. |
 
 Unchecked rows are planned OR-Tools targets that are not exposed by this package
 yet. Commercial and large third-party native backends such as Gurobi, CPLEX,
 XPRESS, HiGHS, OSQP, ECOS, and SCS are not planned.
 
-The TypeScript API mirrors the public OR-Tools API shape where it maps cleanly
-to WebAssembly. CP-SAT exposes both a Python-like high-level builder and the
+The TypeScript API mirrors the public OR-Tools Python API shape where it maps
+cleanly to WebAssembly, and the fixture suite tracks Python API behavior for
+the exposed solver surfaces. CP-SAT exposes both a high-level builder and the
 proto-first `CpSat` API, routing exposes the familiar `RoutingIndexManager` and
 `RoutingModel` APIs, MPSolver exposes the `pywraplp`-style solver API, and
 MathOpt exposes a TypeScript model builder.
@@ -152,78 +137,43 @@ imports, with no manual copying into `public/` or `static/` required.
 
 ## Fixture test matrix
 
-`npm --prefix package run test:fixtures` is the full fixture matrix. It runs the shared solver
-cases through Vite, Webpack, Rollup, Deno, Node, and Bun. Browser fixtures cover
-dev and static serving where the bundler supports both, Chromium and Firefox,
-direct runtime execution, the browser worker bridge, and solver thread settings
-where the solver supports them.
+Run the full fixture matrix:
 
-For focused iteration, use `npm --prefix package run test:fixtures:browser`,
-`npm --prefix package run test:fixtures:runtime`, or an individual fixture script such as
-`npm --prefix package run test:fixture:node`. The full matrix is the comprehensive check before
-landing solver API, worker bridge, threading, or packaging changes.
+```sh
+npm --prefix package run test:fixtures
+```
 
-## API reference
+This runs the shared solver cases through Vite, Webpack, Rollup, Deno, Node,
+and Bun. Browser fixtures cover dev and static serving where the bundler
+supports both, Chromium and Firefox, direct runtime execution, the browser
+worker bridge, and solver thread settings where supported.
 
-See [docs/api.md](docs/api.md) for the full TypeScript API reference covering
-CP-SAT, routing, MPSolver, MathOpt, PDLP, RCPSP, worker behavior, generated
-protobuf types, and native object cleanup.
+For focused iteration:
+
+```sh
+npm --prefix package run test:fixtures:browser
+npm --prefix package run test:fixtures:runtime
+npm --prefix package run test:fixture:node
+```
+
+Run the full matrix before landing solver API, worker bridge, threading, or
+packaging changes.
 
 ## Browser requirements
 
-Browser builds use WebAssembly threads, SIMD, and `SharedArrayBuffer`. Pages
-must be served with cross-origin isolation enabled:
+Browser builds use WebAssembly threads, so pages must be served with
+cross-origin isolation enabled:
 
 ```http
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Without these headers, browsers may block `SharedArrayBuffer`, and solving can
-fail during WebAssembly runtime or worker startup.
+Without these headers, solving can fail during WebAssembly runtime or worker
+startup.
 
-Browser solves can run through a hidden worker bridge, so the main thread stays
-available for rendering, input, progress UI, and cancellation. The shared worker
-bridge controls apply across CP-SAT, routing, MPSolver, Knapsack, Network Flow,
-Set Cover, RCPSP, MathOpt, and PDLP:
-
-```ts
-import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm/cp-sat';
-
-setWorkerBridgeEnabled(true);
-console.log(isWorkerBridgeEnabled());
-```
-
-Worker bridge support is separate from solver threading. For example, GLPK and
-BOP are single-threaded in this package but can still run through the browser
-worker bridge, while CP-SAT, SAT, SCIP/GSCIP, CBC, RCPSP, and other
-threaded-capable paths may also accept solver thread settings. Knapsack and
-Network Flow can run through the worker bridge but do not expose solver thread
-settings. Set Cover is also single-threaded and worker-bridge capable. The package loads solver
-runtimes on demand; application code does not need to choose between JSPI and
-Asyncify manually.
-
-For Vite dev and preview servers, set the headers in `vite.config.ts`:
-
-```ts
-// vite.config.ts
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-  server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
-  preview: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
-});
-```
+See [Bundler configuration](#bundler-configuration) for Vite, Webpack, and
+Rollup setup.
 
 ## Bundler configuration
 
@@ -240,26 +190,9 @@ Deno needs permissions to read package assets and inspect CPU count:
 deno run --allow-read --allow-sys=cpus your-script.ts
 ```
 
-Node, Deno, and Bun use the JSPI runtime when `WebAssembly.promising` is
-available and fall back to the Asyncify runtime otherwise.
-
-## Development
-
-```sh
-npm --prefix package install
-npm --prefix package run dev
-npm --prefix package run build
-npm --prefix package run preview
-```
-
-`npm --prefix package run dev` / `npm --prefix package run start` builds the library and launches the demo site.
-`npm --prefix package run build` runs the full WebAssembly, package, and static site build.
-
-The Emscripten SDK is tracked as a pinned `emsdk` git submodule. The build
-script initializes that submodule automatically if needed, so a normal clone can
-run `npm --prefix package run build` directly after `npm --prefix package install`. If you prefer to fetch
-submodules up front, clone with `--recurse-submodules` or run
-`git submodule update --init --recursive`.
+Node uses the JSPI runtime when `WebAssembly.promising` is available and falls
+back to Asyncify otherwise. Deno and Bun use the package's Asyncify runtime
+path.
 
 ## Upstream OR-Tools
 
