@@ -1,6 +1,9 @@
 # Solver Python Test Parity Audit
 
-Totals: 633 upstream tests; 442 ✅ implemented; 0 🟨 placeholders/API gaps; 0 ➖ backend-blocked; 0 🔴 relevant missing or checked mismatch; 191 ⚪ not applicable. Open mismatches: 0.
+Status summary: the detailed audit below currently lists no 🟨
+placeholders/API gaps, no ➖ backend-blocked tests, no 🔴 relevant missing
+tests, and no ⚠️ checked mismatches. The section entries are the source of
+truth for ✅ implemented and ⚪ not applicable classifications.
 Parity is tracked on two axes:
 
 - Behavioral parity: the TS/WASM fixture builds and solves the same kind of model as upstream and checks the same user-visible result assertions.

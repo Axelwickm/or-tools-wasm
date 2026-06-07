@@ -5,7 +5,8 @@
 For Vite apps, keep `or-tools-wasm` out of dependency optimization so Vite
 handles the worker and WebAssembly URLs through its normal asset pipeline.
 `protobufjs` is CommonJS, so include it in dependency optimization. The worker
-runtime also needs ES module worker output:
+runtime also needs ES module worker output. Browser solves require
+cross-origin-isolation headers for WebAssembly threads:
 
 ```ts
 // vite.config.ts
@@ -18,6 +19,18 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+  },
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
 });
 ```
@@ -60,7 +73,8 @@ module.exports = {
 
 Rollup core does not bundle module workers or emit `new URL(...,
 import.meta.url)` assets by itself. The verified fixture uses Rollup's standard
-plugin surface for those features:
+plugin surface for those features. Static Rollup output must still be served
+with the same cross-origin-isolation headers shown above:
 
 ```js
 // rollup.config.mjs

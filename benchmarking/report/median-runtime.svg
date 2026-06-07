@@ -21,7 +21,7 @@
 <text x="968.8" y="1640" text-anchor="middle" font-size="11" fill="#57606a">75%</text>
 <text x="1185.0" y="1640" text-anchor="middle" font-size="11" fill="#57606a">slowest</text>
 <text x="24" y="115" font-size="13" font-weight="700" fill="#24292f">cp_sat / binary_mip_95x10</text>
-<text x="1185" y="115" text-anchor="end" font-size="11" fill="#57606a">max 5004.6 ms</text>
+<text x="1185" y="115" text-anchor="end" font-size="11" fill="#57606a">max 5004.9 ms</text>
 <line x1="320.0" y1="124" x2="320.0" y2="348" stroke="#d0d7de" stroke-width="1" />
 <line x1="536.2" y1="124" x2="536.2" y2="348" stroke="#d0d7de" stroke-width="1" />
 <line x1="752.5" y1="124" x2="752.5" y2="348" stroke="#d0d7de" stroke-width="1" />
@@ -29,36 +29,36 @@
 <line x1="1185.0" y1="124" x2="1185.0" y2="348" stroke="#d0d7de" stroke-width="1" />
 <text x="302" y="145" text-anchor="end" font-size="12" fill="#57606a">req 1</text>
 <line x1="320" y1="234" x2="1185" y2="234" stroke="#f6f8fa" />
-<rect x="320" y="133" width="132.6" height="12" rx="2" fill="#0969da" />
-<text x="458.6" y="143" font-size="11" fill="#57606a">767.2</text>
-<rect x="320" y="149" width="208.7" height="12" rx="2" fill="#1a7f37" />
-<text x="534.7" y="159" font-size="11" fill="#57606a">1207.3</text>
-<rect x="320" y="165" width="237.6" height="12" rx="2" fill="#24292f" />
-<text x="563.6" y="175" font-size="11" fill="#57606a">1374.7</text>
-<rect x="320" y="181" width="272.5" height="12" rx="2" fill="#bf3989" />
-<text x="598.5" y="191" font-size="11" fill="#57606a">1576.6</text>
-<rect x="320" y="197" width="207.0" height="12" rx="2" fill="#8250df" />
-<text x="533.0" y="207" font-size="11" fill="#57606a">1197.5</text>
-<rect x="320" y="213" width="865.0" height="12" rx="2" fill="#d1242f" />
-<text x="1191.0" y="223" font-size="11" fill="#57606a">5004.6</text>
+<rect x="320" y="133" width="132.4" height="12" rx="2" fill="#0969da" />
+<text x="458.4" y="143" font-size="11" fill="#57606a">766.2</text>
+<rect x="320" y="149" width="209.2" height="12" rx="2" fill="#1a7f37" />
+<text x="535.2" y="159" font-size="11" fill="#57606a">1210.6</text>
+<rect x="320" y="165" width="238.4" height="12" rx="2" fill="#24292f" />
+<text x="564.4" y="175" font-size="11" fill="#57606a">1379.2</text>
+<rect x="320" y="181" width="288.0" height="12" rx="2" fill="#bf3989" />
+<text x="614.0" y="191" font-size="11" fill="#57606a">1666.4</text>
+<rect x="320" y="197" width="208.9" height="12" rx="2" fill="#8250df" />
+<text x="534.9" y="207" font-size="11" fill="#57606a">1208.9</text>
+<rect x="320" y="213" width="864.8" height="12" rx="2" fill="#d1242f" />
+<text x="1190.8" y="223" font-size="11" fill="#57606a">5003.9</text>
 <text x="302" y="253" text-anchor="end" font-size="12" fill="#57606a">req 8</text>
 <line x1="320" y1="342" x2="1185" y2="342" stroke="#f6f8fa" />
-<rect x="320" y="241" width="86.9" height="12" rx="2" fill="#0969da" />
-<text x="412.9" y="251" font-size="11" fill="#57606a">502.7</text>
-<rect x="320" y="257" width="209.3" height="12" rx="2" fill="#1a7f37" />
-<text x="535.3" y="267" font-size="11" fill="#57606a">1211.2</text>
-<rect x="320" y="273" width="237.2" height="12" rx="2" fill="#24292f" />
-<text x="563.2" y="283" font-size="11" fill="#57606a">1372.6</text>
-<rect x="320" y="289" width="279.2" height="12" rx="2" fill="#bf3989" />
-<text x="605.2" y="299" font-size="11" fill="#57606a">1615.4</text>
-<rect x="320" y="305" width="202.3" height="12" rx="2" fill="#8250df" />
-<text x="528.3" y="315" font-size="11" fill="#57606a">1170.5</text>
+<rect x="320" y="241" width="84.5" height="12" rx="2" fill="#0969da" />
+<text x="410.5" y="251" font-size="11" fill="#57606a">489.1</text>
+<rect x="320" y="257" width="209.1" height="12" rx="2" fill="#1a7f37" />
+<text x="535.1" y="267" font-size="11" fill="#57606a">1209.8</text>
+<rect x="320" y="273" width="239.5" height="12" rx="2" fill="#24292f" />
+<text x="565.5" y="283" font-size="11" fill="#57606a">1385.7</text>
+<rect x="320" y="289" width="280.0" height="12" rx="2" fill="#bf3989" />
+<text x="606.0" y="299" font-size="11" fill="#57606a">1620.0</text>
+<rect x="320" y="305" width="202.7" height="12" rx="2" fill="#8250df" />
+<text x="528.7" y="315" font-size="11" fill="#57606a">1172.6</text>
 <rect x="320" y="321" width="865.0" height="12" rx="2" fill="#d1242f" />
-<text x="1191.0" y="331" font-size="11" fill="#57606a">5004.5</text>
+<text x="1191.0" y="331" font-size="11" fill="#57606a">5004.9</text>
 <line x1="24" y1="348" x2="1185" y2="348" stroke="#d8dee4" />
 <rect x="16" y="346" width="1248" height="252" fill="#f6f8fa" fill-opacity="0.45" />
 <text x="24" y="367" font-size="13" font-weight="700" fill="#24292f">routing / tsp_120</text>
-<text x="1185" y="367" text-anchor="end" font-size="11" fill="#57606a">max 2491.1 ms</text>
+<text x="1185" y="367" text-anchor="end" font-size="11" fill="#57606a">max 2460.4 ms</text>
 <line x1="320.0" y1="376" x2="320.0" y2="600" stroke="#d0d7de" stroke-width="1" />
 <line x1="536.2" y1="376" x2="536.2" y2="600" stroke="#d0d7de" stroke-width="1" />
 <line x1="752.5" y1="376" x2="752.5" y2="600" stroke="#d0d7de" stroke-width="1" />
@@ -66,35 +66,35 @@
 <line x1="1185.0" y1="376" x2="1185.0" y2="600" stroke="#d0d7de" stroke-width="1" />
 <text x="302" y="397" text-anchor="end" font-size="12" fill="#57606a">req 1</text>
 <line x1="320" y1="486" x2="1185" y2="486" stroke="#f6f8fa" />
-<rect x="320" y="385" width="313.8" height="12" rx="2" fill="#0969da" />
-<text x="639.8" y="395" font-size="11" fill="#57606a">903.6</text>
-<rect x="320" y="401" width="147.4" height="12" rx="2" fill="#1a7f37" />
-<text x="473.4" y="411" font-size="11" fill="#57606a">424.5</text>
-<rect x="320" y="417" width="179.5" height="12" rx="2" fill="#24292f" />
-<text x="505.5" y="427" font-size="11" fill="#57606a">516.8</text>
-<rect x="320" y="433" width="239.9" height="12" rx="2" fill="#bf3989" />
-<text x="565.9" y="443" font-size="11" fill="#57606a">690.8</text>
-<rect x="320" y="449" width="147.5" height="12" rx="2" fill="#8250df" />
-<text x="473.5" y="459" font-size="11" fill="#57606a">424.9</text>
-<rect x="320" y="465" width="865.0" height="12" rx="2" fill="#d1242f" />
-<text x="1191.0" y="475" font-size="11" fill="#57606a">2491.1</text>
+<rect x="320" y="385" width="319.7" height="12" rx="2" fill="#0969da" />
+<text x="645.7" y="395" font-size="11" fill="#57606a">909.5</text>
+<rect x="320" y="401" width="150.2" height="12" rx="2" fill="#1a7f37" />
+<text x="476.2" y="411" font-size="11" fill="#57606a">427.4</text>
+<rect x="320" y="417" width="180.8" height="12" rx="2" fill="#24292f" />
+<text x="506.8" y="427" font-size="11" fill="#57606a">514.3</text>
+<rect x="320" y="433" width="241.0" height="12" rx="2" fill="#bf3989" />
+<text x="567.0" y="443" font-size="11" fill="#57606a">685.4</text>
+<rect x="320" y="449" width="149.6" height="12" rx="2" fill="#8250df" />
+<text x="475.6" y="459" font-size="11" fill="#57606a">425.6</text>
+<rect x="320" y="465" width="864.5" height="12" rx="2" fill="#d1242f" />
+<text x="1190.5" y="475" font-size="11" fill="#57606a">2458.9</text>
 <text x="302" y="505" text-anchor="end" font-size="12" fill="#57606a">req 8</text>
 <line x1="320" y1="594" x2="1185" y2="594" stroke="#f6f8fa" />
-<rect x="320" y="493" width="313.7" height="12" rx="2" fill="#0969da" />
-<text x="639.7" y="503" font-size="11" fill="#57606a">903.4</text>
-<rect x="320" y="509" width="146.7" height="12" rx="2" fill="#1a7f37" />
-<text x="472.7" y="519" font-size="11" fill="#57606a">422.5</text>
-<rect x="320" y="525" width="177.2" height="12" rx="2" fill="#24292f" />
-<text x="503.2" y="535" font-size="11" fill="#57606a">510.3</text>
-<rect x="320" y="541" width="237.1" height="12" rx="2" fill="#bf3989" />
-<text x="563.1" y="551" font-size="11" fill="#57606a">682.7</text>
-<rect x="320" y="557" width="146.2" height="12" rx="2" fill="#8250df" />
-<text x="472.2" y="567" font-size="11" fill="#57606a">421.2</text>
-<rect x="320" y="573" width="860.8" height="12" rx="2" fill="#d1242f" />
-<text x="1186.8" y="583" font-size="11" fill="#57606a">2478.9</text>
+<rect x="320" y="493" width="319.7" height="12" rx="2" fill="#0969da" />
+<text x="645.7" y="503" font-size="11" fill="#57606a">909.5</text>
+<rect x="320" y="509" width="151.3" height="12" rx="2" fill="#1a7f37" />
+<text x="477.3" y="519" font-size="11" fill="#57606a">430.4</text>
+<rect x="320" y="525" width="179.4" height="12" rx="2" fill="#24292f" />
+<text x="505.4" y="535" font-size="11" fill="#57606a">510.3</text>
+<rect x="320" y="541" width="240.9" height="12" rx="2" fill="#bf3989" />
+<text x="566.9" y="551" font-size="11" fill="#57606a">685.3</text>
+<rect x="320" y="557" width="149.4" height="12" rx="2" fill="#8250df" />
+<text x="475.4" y="567" font-size="11" fill="#57606a">425.0</text>
+<rect x="320" y="573" width="865.0" height="12" rx="2" fill="#d1242f" />
+<text x="1191.0" y="583" font-size="11" fill="#57606a">2460.4</text>
 <line x1="24" y1="600" x2="1185" y2="600" stroke="#d8dee4" />
 <text x="24" y="619" font-size="13" font-weight="700" fill="#24292f">mpsolver_sat / binary_mip_120x8</text>
-<text x="1185" y="619" text-anchor="end" font-size="11" fill="#57606a">max 5008.5 ms</text>
+<text x="1185" y="619" text-anchor="end" font-size="11" fill="#57606a">max 5009.2 ms</text>
 <line x1="320.0" y1="628" x2="320.0" y2="852" stroke="#d0d7de" stroke-width="1" />
 <line x1="536.2" y1="628" x2="536.2" y2="852" stroke="#d0d7de" stroke-width="1" />
 <line x1="752.5" y1="628" x2="752.5" y2="852" stroke="#d0d7de" stroke-width="1" />
@@ -102,36 +102,36 @@
 <line x1="1185.0" y1="628" x2="1185.0" y2="852" stroke="#d0d7de" stroke-width="1" />
 <text x="302" y="649" text-anchor="end" font-size="12" fill="#57606a">req 1</text>
 <line x1="320" y1="738" x2="1185" y2="738" stroke="#f6f8fa" />
-<rect x="320" y="637" width="122.1" height="12" rx="2" fill="#0969da" />
-<text x="448.1" y="647" font-size="11" fill="#57606a">707.1</text>
-<rect x="320" y="653" width="216.4" height="12" rx="2" fill="#1a7f37" />
-<text x="542.4" y="663" font-size="11" fill="#57606a">1253.0</text>
-<rect x="320" y="669" width="246.3" height="12" rx="2" fill="#24292f" />
-<text x="572.3" y="679" font-size="11" fill="#57606a">1426.4</text>
-<rect x="320" y="685" width="282.4" height="12" rx="2" fill="#bf3989" />
-<text x="608.4" y="695" font-size="11" fill="#57606a">1635.1</text>
-<rect x="320" y="701" width="217.3" height="12" rx="2" fill="#8250df" />
-<text x="543.3" y="711" font-size="11" fill="#57606a">1258.4</text>
+<rect x="320" y="637" width="122.2" height="12" rx="2" fill="#0969da" />
+<text x="448.2" y="647" font-size="11" fill="#57606a">707.9</text>
+<rect x="320" y="653" width="217.0" height="12" rx="2" fill="#1a7f37" />
+<text x="543.0" y="663" font-size="11" fill="#57606a">1256.6</text>
+<rect x="320" y="669" width="247.6" height="12" rx="2" fill="#24292f" />
+<text x="573.6" y="679" font-size="11" fill="#57606a">1433.8</text>
+<rect x="320" y="685" width="316.8" height="12" rx="2" fill="#bf3989" />
+<text x="642.8" y="695" font-size="11" fill="#57606a">1834.6</text>
+<rect x="320" y="701" width="213.6" height="12" rx="2" fill="#8250df" />
+<text x="539.6" y="711" font-size="11" fill="#57606a">1236.9</text>
 <rect x="320" y="717" width="865.0" height="12" rx="2" fill="#d1242f" />
-<text x="1191.0" y="727" font-size="11" fill="#57606a">5008.5</text>
+<text x="1191.0" y="727" font-size="11" fill="#57606a">5009.2</text>
 <text x="302" y="757" text-anchor="end" font-size="12" fill="#57606a">req 8</text>
 <line x1="320" y1="846" x2="1185" y2="846" stroke="#f6f8fa" />
-<rect x="320" y="745" width="86.0" height="12" rx="2" fill="#0969da" />
-<text x="412.0" y="755" font-size="11" fill="#57606a">498.0</text>
-<rect x="320" y="761" width="216.1" height="12" rx="2" fill="#1a7f37" />
-<text x="542.1" y="771" font-size="11" fill="#57606a">1251.3</text>
+<rect x="320" y="745" width="83.5" height="12" rx="2" fill="#0969da" />
+<text x="409.5" y="755" font-size="11" fill="#57606a">483.5</text>
+<rect x="320" y="761" width="216.2" height="12" rx="2" fill="#1a7f37" />
+<text x="542.2" y="771" font-size="11" fill="#57606a">1251.7</text>
 <rect x="320" y="777" width="247.1" height="12" rx="2" fill="#24292f" />
-<text x="573.1" y="787" font-size="11" fill="#57606a">1430.7</text>
-<rect x="320" y="793" width="297.6" height="12" rx="2" fill="#bf3989" />
-<text x="623.6" y="803" font-size="11" fill="#57606a">1723.1</text>
-<rect x="320" y="809" width="212.7" height="12" rx="2" fill="#8250df" />
-<text x="538.7" y="819" font-size="11" fill="#57606a">1231.8</text>
-<rect x="320" y="825" width="864.8" height="12" rx="2" fill="#d1242f" />
-<text x="1190.8" y="835" font-size="11" fill="#57606a">5007.1</text>
+<text x="573.1" y="787" font-size="11" fill="#57606a">1431.2</text>
+<rect x="320" y="793" width="302.1" height="12" rx="2" fill="#bf3989" />
+<text x="628.1" y="803" font-size="11" fill="#57606a">1749.3</text>
+<rect x="320" y="809" width="211.6" height="12" rx="2" fill="#8250df" />
+<text x="537.6" y="819" font-size="11" fill="#57606a">1225.6</text>
+<rect x="320" y="825" width="865.0" height="12" rx="2" fill="#d1242f" />
+<text x="1191.0" y="835" font-size="11" fill="#57606a">5009.0</text>
 <line x1="24" y1="852" x2="1185" y2="852" stroke="#d8dee4" />
 <rect x="16" y="850" width="1248" height="252" fill="#f6f8fa" fill-opacity="0.45" />
 <text x="24" y="871" font-size="13" font-weight="700" fill="#24292f">mathopt_glop / dense_lp_240x24</text>
-<text x="1185" y="871" text-anchor="end" font-size="11" fill="#57606a">max 50.72 ms</text>
+<text x="1185" y="871" text-anchor="end" font-size="11" fill="#57606a">max 47.04 ms</text>
 <line x1="320.0" y1="880" x2="320.0" y2="1104" stroke="#d0d7de" stroke-width="1" />
 <line x1="536.2" y1="880" x2="536.2" y2="1104" stroke="#d0d7de" stroke-width="1" />
 <line x1="752.5" y1="880" x2="752.5" y2="1104" stroke="#d0d7de" stroke-width="1" />
@@ -139,35 +139,35 @@
 <line x1="1185.0" y1="880" x2="1185.0" y2="1104" stroke="#d0d7de" stroke-width="1" />
 <text x="302" y="901" text-anchor="end" font-size="12" fill="#57606a">req 1</text>
 <line x1="320" y1="990" x2="1185" y2="990" stroke="#f6f8fa" />
-<rect x="320" y="889" width="717.6" height="12" rx="2" fill="#0969da" />
-<text x="1043.6" y="899" font-size="11" fill="#57606a">42.08</text>
-<rect x="320" y="905" width="373.2" height="12" rx="2" fill="#1a7f37" />
-<text x="699.2" y="915" font-size="11" fill="#57606a">21.88</text>
-<rect x="320" y="921" width="486.4" height="12" rx="2" fill="#24292f" />
-<text x="812.4" y="931" font-size="11" fill="#57606a">28.52</text>
-<rect x="320" y="937" width="493.2" height="12" rx="2" fill="#bf3989" />
-<text x="819.2" y="947" font-size="11" fill="#57606a">28.92</text>
-<rect x="320" y="953" width="406.9" height="12" rx="2" fill="#8250df" />
-<text x="732.9" y="963" font-size="11" fill="#57606a">23.86</text>
+<rect x="320" y="889" width="775.1" height="12" rx="2" fill="#0969da" />
+<text x="1101.1" y="899" font-size="11" fill="#57606a">42.15</text>
+<rect x="320" y="905" width="406.7" height="12" rx="2" fill="#1a7f37" />
+<text x="732.7" y="915" font-size="11" fill="#57606a">22.12</text>
+<rect x="320" y="921" width="521.8" height="12" rx="2" fill="#24292f" />
+<text x="847.8" y="931" font-size="11" fill="#57606a">28.38</text>
+<rect x="320" y="937" width="504.6" height="12" rx="2" fill="#bf3989" />
+<text x="830.6" y="947" font-size="11" fill="#57606a">27.44</text>
+<rect x="320" y="953" width="345.7" height="12" rx="2" fill="#8250df" />
+<text x="671.7" y="963" font-size="11" fill="#57606a">18.80</text>
 <rect x="320" y="969" width="865.0" height="12" rx="2" fill="#d1242f" />
-<text x="1191.0" y="979" font-size="11" fill="#57606a">50.72</text>
+<text x="1191.0" y="979" font-size="11" fill="#57606a">47.04</text>
 <text x="302" y="1009" text-anchor="end" font-size="12" fill="#57606a">req 8</text>
 <line x1="320" y1="1098" x2="1185" y2="1098" stroke="#f6f8fa" />
-<rect x="320" y="997" width="712.4" height="12" rx="2" fill="#0969da" />
-<text x="1038.4" y="1007" font-size="11" fill="#57606a">41.77</text>
-<rect x="320" y="1013" width="264.7" height="12" rx="2" fill="#1a7f37" />
-<text x="590.7" y="1023" font-size="11" fill="#57606a">15.52</text>
-<rect x="320" y="1029" width="386.0" height="12" rx="2" fill="#24292f" />
-<text x="712.0" y="1039" font-size="11" fill="#57606a">22.63</text>
-<rect x="320" y="1045" width="338.0" height="12" rx="2" fill="#bf3989" />
-<text x="664.0" y="1055" font-size="11" fill="#57606a">19.82</text>
-<rect x="320" y="1061" width="275.2" height="12" rx="2" fill="#8250df" />
-<text x="601.2" y="1071" font-size="11" fill="#57606a">16.14</text>
-<rect x="320" y="1077" width="784.5" height="12" rx="2" fill="#d1242f" />
-<text x="1110.5" y="1087" font-size="11" fill="#57606a">46.00</text>
+<rect x="320" y="997" width="772.8" height="12" rx="2" fill="#0969da" />
+<text x="1098.8" y="1007" font-size="11" fill="#57606a">42.02</text>
+<rect x="320" y="1013" width="300.8" height="12" rx="2" fill="#1a7f37" />
+<text x="626.8" y="1023" font-size="11" fill="#57606a">16.36</text>
+<rect x="320" y="1029" width="374.0" height="12" rx="2" fill="#24292f" />
+<text x="700.0" y="1039" font-size="11" fill="#57606a">20.34</text>
+<rect x="320" y="1045" width="452.5" height="12" rx="2" fill="#bf3989" />
+<text x="778.5" y="1055" font-size="11" fill="#57606a">24.61</text>
+<rect x="320" y="1061" width="295.2" height="12" rx="2" fill="#8250df" />
+<text x="621.2" y="1071" font-size="11" fill="#57606a">16.05</text>
+<rect x="320" y="1077" width="833.4" height="12" rx="2" fill="#d1242f" />
+<text x="1159.4" y="1087" font-size="11" fill="#57606a">45.32</text>
 <line x1="24" y1="1104" x2="1185" y2="1104" stroke="#d8dee4" />
 <text x="24" y="1123" font-size="13" font-weight="700" fill="#24292f">knapsack / multidim_knapsack_70x3</text>
-<text x="1185" y="1123" text-anchor="end" font-size="11" fill="#57606a">max 5914.9 ms</text>
+<text x="1185" y="1123" text-anchor="end" font-size="11" fill="#57606a">max 6045.6 ms</text>
 <line x1="320.0" y1="1132" x2="320.0" y2="1356" stroke="#d0d7de" stroke-width="1" />
 <line x1="536.2" y1="1132" x2="536.2" y2="1356" stroke="#d0d7de" stroke-width="1" />
 <line x1="752.5" y1="1132" x2="752.5" y2="1356" stroke="#d0d7de" stroke-width="1" />
@@ -175,36 +175,36 @@
 <line x1="1185.0" y1="1132" x2="1185.0" y2="1356" stroke="#d0d7de" stroke-width="1" />
 <text x="302" y="1153" text-anchor="end" font-size="12" fill="#57606a">req 1</text>
 <line x1="320" y1="1242" x2="1185" y2="1242" stroke="#f6f8fa" />
-<rect x="320" y="1141" width="127.6" height="12" rx="2" fill="#0969da" />
-<text x="453.6" y="1151" font-size="11" fill="#57606a">872.5</text>
-<rect x="320" y="1157" width="178.6" height="12" rx="2" fill="#1a7f37" />
-<text x="504.6" y="1167" font-size="11" fill="#57606a">1221.3</text>
-<rect x="320" y="1173" width="206.4" height="12" rx="2" fill="#24292f" />
-<text x="532.4" y="1183" font-size="11" fill="#57606a">1411.2</text>
-<rect x="320" y="1189" width="177.0" height="12" rx="2" fill="#bf3989" />
-<text x="503.0" y="1199" font-size="11" fill="#57606a">1210.2</text>
-<rect x="320" y="1205" width="180.8" height="12" rx="2" fill="#8250df" />
-<text x="506.8" y="1215" font-size="11" fill="#57606a">1236.5</text>
-<rect x="320" y="1221" width="860.5" height="12" rx="2" fill="#d1242f" />
-<text x="1186.5" y="1231" font-size="11" fill="#57606a">5884.1</text>
+<rect x="320" y="1141" width="130.7" height="12" rx="2" fill="#0969da" />
+<text x="456.7" y="1151" font-size="11" fill="#57606a">913.2</text>
+<rect x="320" y="1157" width="181.2" height="12" rx="2" fill="#1a7f37" />
+<text x="507.2" y="1167" font-size="11" fill="#57606a">1266.6</text>
+<rect x="320" y="1173" width="222.0" height="12" rx="2" fill="#24292f" />
+<text x="548.0" y="1183" font-size="11" fill="#57606a">1551.8</text>
+<rect x="320" y="1189" width="179.5" height="12" rx="2" fill="#bf3989" />
+<text x="505.5" y="1199" font-size="11" fill="#57606a">1254.7</text>
+<rect x="320" y="1205" width="177.1" height="12" rx="2" fill="#8250df" />
+<text x="503.1" y="1215" font-size="11" fill="#57606a">1238.0</text>
+<rect x="320" y="1221" width="864.7" height="12" rx="2" fill="#d1242f" />
+<text x="1190.7" y="1231" font-size="11" fill="#57606a">6043.4</text>
 <text x="302" y="1261" text-anchor="end" font-size="12" fill="#57606a">req 8</text>
 <line x1="320" y1="1350" x2="1185" y2="1350" stroke="#f6f8fa" />
-<rect x="320" y="1249" width="126.9" height="12" rx="2" fill="#0969da" />
-<text x="452.9" y="1259" font-size="11" fill="#57606a">867.7</text>
-<rect x="320" y="1265" width="178.2" height="12" rx="2" fill="#1a7f37" />
-<text x="504.2" y="1275" font-size="11" fill="#57606a">1218.5</text>
-<rect x="320" y="1281" width="206.9" height="12" rx="2" fill="#24292f" />
-<text x="532.9" y="1291" font-size="11" fill="#57606a">1414.7</text>
-<rect x="320" y="1297" width="176.0" height="12" rx="2" fill="#bf3989" />
-<text x="502.0" y="1307" font-size="11" fill="#57606a">1203.4</text>
-<rect x="320" y="1313" width="180.4" height="12" rx="2" fill="#8250df" />
-<text x="506.4" y="1323" font-size="11" fill="#57606a">1233.7</text>
+<rect x="320" y="1249" width="130.2" height="12" rx="2" fill="#0969da" />
+<text x="456.2" y="1259" font-size="11" fill="#57606a">909.7</text>
+<rect x="320" y="1265" width="181.4" height="12" rx="2" fill="#1a7f37" />
+<text x="507.4" y="1275" font-size="11" fill="#57606a">1267.6</text>
+<rect x="320" y="1281" width="222.3" height="12" rx="2" fill="#24292f" />
+<text x="548.3" y="1291" font-size="11" fill="#57606a">1553.7</text>
+<rect x="320" y="1297" width="176.3" height="12" rx="2" fill="#bf3989" />
+<text x="502.3" y="1307" font-size="11" fill="#57606a">1232.5</text>
+<rect x="320" y="1313" width="175.4" height="12" rx="2" fill="#8250df" />
+<text x="501.4" y="1323" font-size="11" fill="#57606a">1225.9</text>
 <rect x="320" y="1329" width="865.0" height="12" rx="2" fill="#d1242f" />
-<text x="1191.0" y="1339" font-size="11" fill="#57606a">5914.9</text>
+<text x="1191.0" y="1339" font-size="11" fill="#57606a">6045.6</text>
 <line x1="24" y1="1356" x2="1185" y2="1356" stroke="#d8dee4" />
 <rect x="16" y="1354" width="1248" height="252" fill="#f6f8fa" fill-opacity="0.45" />
 <text x="24" y="1375" font-size="13" font-weight="700" fill="#24292f">max_flow / layered_max_flow_160</text>
-<text x="1185" y="1375" text-anchor="end" font-size="11" fill="#57606a">max 17.82 ms</text>
+<text x="1185" y="1375" text-anchor="end" font-size="11" fill="#57606a">max 24.48 ms</text>
 <line x1="320.0" y1="1384" x2="320.0" y2="1608" stroke="#d0d7de" stroke-width="1" />
 <line x1="536.2" y1="1384" x2="536.2" y2="1608" stroke="#d0d7de" stroke-width="1" />
 <line x1="752.5" y1="1384" x2="752.5" y2="1608" stroke="#d0d7de" stroke-width="1" />
@@ -212,31 +212,31 @@
 <line x1="1185.0" y1="1384" x2="1185.0" y2="1608" stroke="#d0d7de" stroke-width="1" />
 <text x="302" y="1405" text-anchor="end" font-size="12" fill="#57606a">req 1</text>
 <line x1="320" y1="1494" x2="1185" y2="1494" stroke="#f6f8fa" />
-<rect x="320" y="1393" width="18.4" height="12" rx="2" fill="#0969da" />
-<text x="344.4" y="1403" font-size="11" fill="#57606a">0.379</text>
-<rect x="320" y="1409" width="290.1" height="12" rx="2" fill="#1a7f37" />
-<text x="616.1" y="1419" font-size="11" fill="#57606a">5.975</text>
-<rect x="320" y="1425" width="487.7" height="12" rx="2" fill="#24292f" />
-<text x="813.7" y="1435" font-size="11" fill="#57606a">10.05</text>
+<rect x="320" y="1393" width="12.3" height="12" rx="2" fill="#0969da" />
+<text x="338.3" y="1403" font-size="11" fill="#57606a">0.349</text>
+<rect x="320" y="1409" width="211.5" height="12" rx="2" fill="#1a7f37" />
+<text x="537.5" y="1419" font-size="11" fill="#57606a">5.985</text>
+<rect x="320" y="1425" width="229.1" height="12" rx="2" fill="#24292f" />
+<text x="555.1" y="1435" font-size="11" fill="#57606a">6.485</text>
 <rect x="320" y="1441" width="865.0" height="12" rx="2" fill="#bf3989" />
-<text x="1191.0" y="1451" font-size="11" fill="#57606a">17.82</text>
-<rect x="320" y="1457" width="378.7" height="12" rx="2" fill="#8250df" />
-<text x="704.7" y="1467" font-size="11" fill="#57606a">7.800</text>
-<rect x="320" y="1473" width="327.2" height="12" rx="2" fill="#d1242f" />
-<text x="653.2" y="1483" font-size="11" fill="#57606a">6.740</text>
+<text x="1191.0" y="1451" font-size="11" fill="#57606a">24.48</text>
+<rect x="320" y="1457" width="276.3" height="12" rx="2" fill="#8250df" />
+<text x="602.3" y="1467" font-size="11" fill="#57606a">7.820</text>
+<rect x="320" y="1473" width="247.3" height="12" rx="2" fill="#d1242f" />
+<text x="573.3" y="1483" font-size="11" fill="#57606a">7.000</text>
 <text x="302" y="1513" text-anchor="end" font-size="12" fill="#57606a">req 8</text>
 <line x1="320" y1="1602" x2="1185" y2="1602" stroke="#f6f8fa" />
-<rect x="320" y="1501" width="15.0" height="12" rx="2" fill="#0969da" />
-<text x="341.0" y="1511" font-size="11" fill="#57606a">0.308</text>
-<rect x="320" y="1517" width="186.0" height="12" rx="2" fill="#1a7f37" />
-<text x="512.0" y="1527" font-size="11" fill="#57606a">3.831</text>
-<rect x="320" y="1533" width="174.8" height="12" rx="2" fill="#24292f" />
-<text x="500.8" y="1543" font-size="11" fill="#57606a">3.600</text>
-<rect x="320" y="1549" width="356.8" height="12" rx="2" fill="#bf3989" />
-<text x="682.8" y="1559" font-size="11" fill="#57606a">7.350</text>
-<rect x="320" y="1565" width="180.8" height="12" rx="2" fill="#8250df" />
-<text x="506.8" y="1575" font-size="11" fill="#57606a">3.725</text>
-<rect x="320" y="1581" width="307.8" height="12" rx="2" fill="#d1242f" />
-<text x="633.8" y="1591" font-size="11" fill="#57606a">6.340</text>
+<rect x="320" y="1501" width="10.9" height="12" rx="2" fill="#0969da" />
+<text x="336.9" y="1511" font-size="11" fill="#57606a">0.309</text>
+<rect x="320" y="1517" width="140.4" height="12" rx="2" fill="#1a7f37" />
+<text x="466.4" y="1527" font-size="11" fill="#57606a">3.974</text>
+<rect x="320" y="1533" width="128.6" height="12" rx="2" fill="#24292f" />
+<text x="454.6" y="1543" font-size="11" fill="#57606a">3.639</text>
+<rect x="320" y="1549" width="242.1" height="12" rx="2" fill="#bf3989" />
+<text x="568.1" y="1559" font-size="11" fill="#57606a">6.851</text>
+<rect x="320" y="1565" width="135.9" height="12" rx="2" fill="#8250df" />
+<text x="461.9" y="1575" font-size="11" fill="#57606a">3.845</text>
+<rect x="320" y="1581" width="230.4" height="12" rx="2" fill="#d1242f" />
+<text x="556.4" y="1591" font-size="11" fill="#57606a">6.520</text>
 <line x1="24" y1="1608" x2="1185" y2="1608" stroke="#d8dee4" />
 </svg>

@@ -21,7 +21,7 @@
 - **Expected result**
   - Optimal objective: `2200/3 ≈ 733.3333333333`
   - One optimum point: `x0 = 100/3`, `x1 = 200/3`, `x2 = 0`
-- **API gaps to close**
+- **Porting notes**
   - This is the baseline for parity; confirms the current browser LP path can reproduce a known optimum.
   - No extra high-level MathOpt features required beyond current fixture-level LP solve surface.
 
@@ -36,7 +36,7 @@
 - **Expected result**
   - Optimal/feasible objective around `2.5`
   - Solution used in docs: `x = 1`, `y = 0.5`
-- **API gaps to close**
+- **Porting notes**
   - GSCIP is now linked/exposed and covered by the shared fixture runner in direct and worker modes.
   - Sample uses `add_binary_variable(...)`; the high-level TS MathOpt API now also exposes binary/integer variable helpers, so this can be ported directly.
 
@@ -53,7 +53,7 @@
 - **Expected result**
   - Optimal/feasible objective: `23`
   - Integer optimum: `x = 3`, `y = 2`
-- **API gaps to close**
+- **Porting notes**
   - GSCIP is now available in the browser solver set and has a direct shared fixture smoke test for this model shape.
   - Sample accepts `TerminationReason.OPTIMAL` or `FEASIBLE`; browser harness should preserve this tolerance pattern when rendering expected outcomes.
   - Integer variable support is required (already represented via integer flags), but parity checks and result interpretation should align with integer semantics.
@@ -77,10 +77,10 @@
   - With `_USE_TEST_DATA=True`, the sample states an optimal schedule:
     - Job 1 at time `1`, job 2 at time `2`, job 0 at time `7`
     - Objective `sum completion times = 26`
-- **API gaps to close**
+- **Porting notes**
   - GSCIP is now available in the browser fixture.
-  - The sample writes `variable.upper_bound = 0` after creation; browser API currently captures bounds at construction time, so it needs mutable bound updates or equivalent API.
-  - Larger, two-dimensional binary variable matrices plus time-indexed overlap constraints stress performance and input-scaling behavior, useful as a real complexity step after small MIP examples.
+  - The TypeScript MathOpt API now supports mutable variable bounds through `upperBound` / `upper_bound`, so the release-time restrictions can be represented directly.
+  - Larger, two-dimensional binary variable matrices plus time-indexed overlap constraints remain useful as a real complexity step after small MIP examples.
 
 ## Rationale
 
@@ -88,5 +88,5 @@
 - It gives a practical roadmap for browser parity work:
   1. verify core LP path,
   2. close integer/binary semantics,
-  3) establish solver-coverage parity,
-  4) validate larger structured IP models.
+  3. establish solver-coverage parity,
+  4. validate larger structured IP models.

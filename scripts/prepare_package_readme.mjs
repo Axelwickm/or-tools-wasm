@@ -9,6 +9,10 @@ const releaseRef = process.argv[2]
 const readmePath = path.join(repoRoot, 'README.md');
 
 let readme = readFileSync(readmePath, 'utf8');
+const docsRef = releaseRef ?? 'stable';
+const repoBlobBase = `https://github.com/Axelwickm/or-tools-wasm/blob/${docsRef}`;
+const repoTreeBase = `https://github.com/Axelwickm/or-tools-wasm/tree/${docsRef}`;
+const rawBase = `https://raw.githubusercontent.com/Axelwickm/or-tools-wasm/${docsRef}`;
 
 if (releaseRef) {
   const encodedReleaseRef = encodeURIComponent(releaseRef);
@@ -29,6 +33,12 @@ if (releaseRef) {
     `${workflowUrl})`
   );
 }
+
+readme = readme
+  .replaceAll('src="docs/media/', `src="${rawBase}/docs/media/`)
+  .replaceAll('(docs/api.md)', `(${repoBlobBase}/docs/api.md)`)
+  .replaceAll('(docs/bundlers.md)', `(${repoBlobBase}/docs/bundlers.md)`)
+  .replaceAll('(benchmarking/)', `(${repoTreeBase}/benchmarking)`);
 
 mkdirSync(packageDir, { recursive: true });
 writeFileSync(path.join(packageDir, 'README.md'), readme);

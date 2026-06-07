@@ -28,7 +28,7 @@ import {
   weightedSum,
   type CpModelProto,
   type SatParameters,
-} from 'or-tools-wasm/routing';
+} from 'or-tools-wasm/cp-sat';
 ```
 
 CP-SAT exposes two public API layers:
@@ -495,7 +495,9 @@ import {
 } from 'or-tools-wasm/routing';
 ```
 
-Always initialize the routing runtime before constructing routing objects:
+Initialize the routing runtime before constructing routing objects when using
+the direct runtime path. In browser worker-bridge mode this is a no-op, but
+awaiting it keeps the same code portable across runtimes:
 
 ```ts
 await initRouting();
@@ -520,8 +522,9 @@ and tests.
 
 `initRouting(): Promise<void>`
 
-Loads the routing WebAssembly runtime. Construction of `RoutingIndexManager` or
-`RoutingModel` before this resolves will throw.
+Loads the routing WebAssembly runtime for direct solves. Construction of
+`RoutingIndexManager` or `RoutingModel` before this resolves will throw on
+direct runtime paths.
 
 ### `RoutingIndexManager`
 
@@ -779,7 +782,9 @@ const status = await solver.Solve();
 
 `initMPSolver(): Promise<void>`
 
-Loads the MPSolver WebAssembly runtime.
+Loads the MPSolver WebAssembly runtime for direct solves. When the browser
+worker bridge is enabled, model objects use bridge-backed handles and
+`initMPSolver()` is a no-op.
 
 ### Solver Types And Status
 
@@ -903,8 +908,8 @@ Options and output:
 - `Lb(): number`
 - `Ub(): number`
 - `SetBounds(lb, ub): void`
-- `SetLb()` / `SetLB(lb): void`
-- `SetUb()` / `SetUB(ub): void`
+- `SetLb(lb)` / `SetLB(lb): void`
+- `SetUb(ub)` / `SetUB(ub): void`
 - `Integer(): boolean`
 - `SetInteger(integer): void`
 - `branching_priority(): number`
@@ -920,8 +925,8 @@ Options and output:
 - `Lb(): number`
 - `Ub(): number`
 - `SetBounds(lb, ub): void`
-- `SetLb()` / `SetLB(lb): void`
-- `SetUb()` / `SetUB(ub): void`
+- `SetLb(lb)` / `SetLB(lb): void`
+- `SetUb(ub)` / `SetUB(ub): void`
 - `DualValue()` / `dual_value(): number`
 - `basis_status(): number`
 - `is_lazy(): boolean`
@@ -997,7 +1002,9 @@ const selected = [0, 1, 2, 3].filter((item) => solver.best_solution_contains(ite
 console.log(profit, selected, solver.is_solution_optimal());
 ```
 
-`initKnapsack(): Promise<void>` loads the shared MPSolver/Knapsack runtime.
+`initKnapsack(): Promise<void>` loads the shared MPSolver/Knapsack runtime for
+direct solves. When the browser worker bridge is enabled, it is a no-op and the
+solve path runs through the worker bridge.
 
 `KnapsackSolverType` exposes the upstream solver ids:
 
@@ -1056,7 +1063,9 @@ if (await greedy.next_solution()) {
 }
 ```
 
-`initSetCover(): Promise<void>` loads the Set Cover runtime.
+`initSetCover(): Promise<void>` loads the Set Cover runtime for direct solves.
+When the browser worker bridge is enabled, it is a no-op and heuristic search
+calls run through the worker bridge.
 
 `SetCoverModel` exposes Python-style methods and properties:
 
@@ -1166,9 +1175,9 @@ const result = await project.solve({ numWorkers: 4, maxTimeInSeconds: 5 });
 console.log(result.statusName, result.makespan, result.tasks);
 ```
 
-`initRcpsp(): Promise<void>` is available for consistency with other solver
-subpaths. RCPSP currently reuses the CP-SAT runtime instead of loading a
-separate native runtime.
+`initRcpsp(): Promise<void>` is a compatibility no-op. RCPSP currently reuses
+the CP-SAT solve path instead of loading a separate native runtime; calling
+`solve()` loads or uses the CP-SAT runtime as needed.
 
 `RcpspModelBuilder` exposes:
 
@@ -1230,7 +1239,9 @@ if (status === SimpleMaxFlow.OPTIMAL) {
 }
 ```
 
-`initNetworkFlow(): Promise<void>` loads the graph WebAssembly runtime.
+`initNetworkFlow(): Promise<void>` loads the graph WebAssembly runtime for
+direct solves. When the browser worker bridge is enabled, it is a no-op and
+graph solves run through the worker bridge.
 
 `SimpleMaxFlow` exposes Python-style snake_case methods and camelCase aliases:
 
@@ -1317,6 +1328,8 @@ const result = await MathOpt.solve(model, { solverType: MathOpt.SolverType.GLOP 
 `initMathOpt(): Promise<void>`
 
 Loads the MathOpt WebAssembly runtime.
+When the browser worker bridge is enabled, it initializes the MathOpt worker
+runtime instead.
 
 ### `MathOpt`
 
@@ -1362,27 +1375,35 @@ Static constructors and aliases:
 
 Top-level value exports:
 
+- `initMathOpt`
+- `MathOpt`
 - `setWorkerBridgeEnabled`
 - `isWorkerBridgeEnabled`
 - `isWorkerBridgeAvailable`
 - `terminateWorkerBridge`
+- `terminateLoadedRuntimeThreads`
 - `MathOptModel`
 - `MathOptObjective`
 - `MathOptIndicatorConstraint`
 - `MathOptSolveInterrupter`
 - `MathOptIncrementalSolver`
+- `MathOptSolveParameters`
+- `MathOptModelSolveParameters`
+- `MathOptSparseVectorFilter`
+- `MathOptSolutionHint`
+- `MathOptSolverType`
+- `MathOptLPAlgorithm`
+- `MathOptEmphasis`
+- `GScipEmphasis`
+- `GScipMetaParamValue`
+- `PdlpOptimalityNorm`
+- `PdlpSchedulerType`
+- `PdlpRestartStrategy`
+- `PdlpLinesearchRule`
 - `GScipParameters`
 - `GlopParameters`
 - `PdlpParameters`
 - `GlpkParameters`
-- `initNetworkFlow`
-- `NetworkFlow`
-- `SimpleMaxFlow`
-- `SimpleMaxFlowStatus`
-- `SimpleMinCostFlow`
-- `SimpleMinCostFlowStatus`
-- `SimpleLinearSumAssignment`
-- `SimpleLinearSumAssignmentStatus`
 
 Top-level type exports:
 
@@ -1393,12 +1414,17 @@ Top-level type exports:
 - `MathOptLinearConstraint`
 - `MathOptLinearConstraintMatrixEntry`
 - `MathOptLinearTerm`
+- `MathOptModelSolveParametersOptions`
 - `MathOptPrimalSolutionResult`
 - `MathOptPrimalRayResult`
 - `MathOptSolutionResult`
+- `MathOptSolutionHintOptions`
 - `MathOptSolveInterrupterLike`
 - `MathOptSolveOptions`
+- `MathOptSolveParametersOptions`
 - `MathOptSolveResult`
+- `MathOptSparseVectorFilterInput`
+- `MathOptSparseVectorFilterOptions`
 - `MathOptVariable`
 - `MathOptVariableOptions`
 - `GScipParametersOptions`
@@ -1970,9 +1996,11 @@ const result = await Pdlp.primalDualHybridGradient(qp, {
 
 `initPdlp(): Promise<void>`
 
-Loads the PDLP WebAssembly runtime. The `Pdlp` async helpers will initialize the
-runtime automatically if needed, but `initPdlp()` is available for explicit
-warmup.
+Loads the PDLP WebAssembly runtime for direct solves. The `Pdlp` async helpers
+will initialize the runtime automatically if needed, but `initPdlp()` is
+available for explicit direct-runtime warmup. When the browser worker bridge is
+enabled, `initPdlp()` is a no-op and PDLP helper calls run through the worker
+bridge.
 
 ### `QuadraticProgram`
 
@@ -2059,14 +2087,14 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 `solveLog` contains `terminationReason` / `termination_reason` and
 `iterationCount` / `iteration_count`.
 
-## Browser Worker Bridge
+## Worker Bridge
 
-The CP-SAT, MathOpt, Routing, MPSolver proto-solve, Knapsack, Network Flow, Set
-Cover, RCPSP, and PDLP paths can use the browser worker bridge. Worker bridge
+The CP-SAT, MathOpt, Routing, MPSolver, Knapsack, Network Flow, Set
+Cover, RCPSP, and PDLP paths can use the shared worker bridge. Worker bridge
 availability is independent of solver threading support; for example GLPK, BOP,
 Knapsack, Set Cover, and Network Flow are single-threaded but can still run
-through the worker bridge in browser UI code, while RCPSP uses CP-SAT and can
-also accept CP-SAT thread settings. CP-SAT, SAT, SCIP/GSCIP, CBC, and other
+through the worker bridge for UI responsiveness, while RCPSP uses CP-SAT and
+can also accept CP-SAT thread settings. CP-SAT, SAT, SCIP/GSCIP, CBC, and other
 threaded-capable paths can also accept solver thread settings.
 Prefer the shared package controls:
 
@@ -2088,8 +2116,9 @@ Pdlp.setWorkerBridgeEnabled(true);
 RoutingModel.setWorkerBridgeEnabled(true);
 ```
 
-The worker bridge is intended for browser UI responsiveness. In non-browser
-runtimes, direct runtime paths are used.
+The worker bridge defaults on in browser main-thread builds and defaults off in
+non-browser runtimes. Non-browser callers normally use direct runtime paths
+unless they explicitly enable the bridge.
 
 ## Generated Protobuf Types
 

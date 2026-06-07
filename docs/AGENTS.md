@@ -39,7 +39,7 @@ Prefer targeted verification while iterating, such as `tsc --noEmit` or one focu
 
 ## Example Site
 
-Every solver exposed by the package should have its own example on the example site. Treat each solver as its own product surface: CP-SAT, Routing, MPSolver, MathOpt, and PDLP should each have tests and a dedicated example-site path.
+Every solver exposed by the package should have its own example on the example site. Treat each solver as its own product surface. Current dedicated example-site coverage includes CP-SAT, Routing, MPSolver, MathOpt, Knapsack, Network Flow, Set Cover, and RCPSP; PDLP is covered by fixtures and should get a dedicated example-site path when its app-oriented example is added.
 
 When adding or materially expanding a solver API, add or update a site example that demonstrates that solver directly rather than relying only on tests. Examples should show model construction, solve invocation, status handling, and reading results.
 
