@@ -28,6 +28,7 @@ or-tools*.zip
 *.swo
 *.tgz
 tests/fixtures/*/package-lock.json
+server/.env
 
 build*.log
 test.log

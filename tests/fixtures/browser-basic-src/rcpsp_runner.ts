@@ -1,5 +1,5 @@
 import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
+import { fixtureModes, passedCase, setWorkerBridgeMode } from './shared_case.ts';
 
 export type RcpspCaseResult = {
   id: string;
@@ -51,6 +51,7 @@ export type RcpspApi = {
   RcpspModelBuilder: { new(name?: string): RcpspModelBuilderLike };
   setWorkerBridgeEnabled(enabled: boolean): void;
   isWorkerBridgeEnabled(): boolean;
+  setExecutor(configuration: { type: 'auto' | FixtureMode }): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -211,7 +212,9 @@ export async function runRcpspCases(api: RcpspApi): Promise<RcpspCaseResult[]> {
   await api.initRcpsp();
   const results: RcpspCaseResult[] = [];
   for (const mode of fixtureModes) {
-    await withWorkerBridgeMode(api, mode, 'RCPSP', async () => {
+    setWorkerBridgeMode(api, mode, 'RCPSP');
+    api.setExecutor({ type: mode });
+    try {
       for (const testCase of rcpspCases) {
         const threadsToRun = testCase.tags?.includes('threading') ? [1, 4] : [undefined];
         for (const threads of threadsToRun) {
@@ -223,7 +226,10 @@ export async function runRcpspCases(api: RcpspApi): Promise<RcpspCaseResult[]> {
           results.push(passedCase({ ...testCase, name }, context, result));
         }
       }
-    });
+    } finally {
+      api.setExecutor({ type: 'auto' });
+      api.setWorkerBridgeEnabled(false);
+    }
   }
   return results;
 }

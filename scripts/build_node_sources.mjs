@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
@@ -20,18 +20,35 @@ const publicEntryNames = [
   'rcpsp',
 ];
 
-const externalLoaderPlugin = {
-  name: 'external-runtime-node-loader',
-  setup(buildContext) {
-    buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
-      path: require.resolve('protobufjs'),
-    }));
-    buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader|worker_bridge)\.js$/ }, (args) => ({
-      path: args.path,
-      external: true,
-    }));
-  },
-};
+function externalSharedRuntimePlugin(name, sharedImportPrefix) {
+  return {
+    name,
+    setup(buildContext) {
+      buildContext.onResolve({ filter: /^@bufbuild\/protobuf(?:\/.*)?$/ }, (args) => ({
+        path: require.resolve(args.path),
+      }));
+      buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
+        path: require.resolve('protobufjs'),
+      }));
+      buildContext.onResolve({ filter: /^(?:\.\.?\/)+(?:runtime_loader|worker_bridge)\.js$/ }, (args) => {
+        const moduleName = path.basename(args.path);
+        return {
+          path: `${sharedImportPrefix}/${moduleName}`,
+          external: true,
+        };
+      });
+    },
+  };
+}
+
+const rootExternalLoaderPlugin = externalSharedRuntimePlugin(
+  'external-root-runtime-node-loader',
+  '.',
+);
+const nestedExternalLoaderPlugin = externalSharedRuntimePlugin(
+  'external-nested-runtime-node-loader',
+  '..',
+);
 
 const commonNodeBuildOptions = {
   bundle: true,
@@ -41,6 +58,25 @@ const commonNodeBuildOptions = {
   sourcemap: false,
 };
 
+async function patchBundledCpSatWorkerUrls() {
+  for (const entryName of ['cp-sat', 'rcpsp']) {
+    const entryPath = path.join(outDir, `${entryName}.js`);
+    const source = await readFile(entryPath, 'utf8');
+    const patchedSource = source
+      .replaceAll(
+        'new URL("./cp_sat_node_worker_bridge.js", import.meta.url)',
+        'new URL("./cp_sat/cp_sat_node_worker_bridge.js", import.meta.url)',
+      )
+      .replaceAll(
+        'new URL("./worker.js", import.meta.url)',
+        'new URL("./cp_sat/worker.js", import.meta.url)',
+      );
+    if (patchedSource !== source) {
+      await writeFile(entryPath, patchedSource);
+    }
+  }
+}
+
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
 
@@ -49,7 +85,7 @@ for (const entryName of publicEntryNames) {
     ...commonNodeBuildOptions,
     entryPoints: [path.join(sourceDir, `${entryName}.ts`)],
     outfile: path.join(outDir, `${entryName}.js`),
-    plugins: [externalLoaderPlugin],
+    plugins: [rootExternalLoaderPlugin],
   });
 }
 
@@ -57,7 +93,14 @@ await build({
   ...commonNodeBuildOptions,
   entryPoints: [path.join(sourceDir, 'ortools_worker.ts')],
   outfile: path.join(outDir, 'ortools_worker.js'),
-  plugins: [externalLoaderPlugin],
+  plugins: [rootExternalLoaderPlugin],
+});
+
+await build({
+  ...commonNodeBuildOptions,
+  entryPoints: [path.join(sourceDir, 'cp_sat/worker.ts')],
+  outfile: path.join(outDir, 'cp_sat/worker.js'),
+  plugins: [nestedExternalLoaderPlugin],
 });
 
 await build({
@@ -100,6 +143,30 @@ await import('./ortools_worker.js');
 );
 
 await writeFile(
-  path.join(outDir, 'cp_sat_module_loader.js'),
-  `export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify } from './runtime_loader.js';\n`,
+  path.join(outDir, 'cp_sat/cp_sat_node_worker_bridge.js'),
+  `import { parentPort } from 'node:worker_threads';
+
+if (!parentPort) {
+  throw new Error('CP-SAT worker bridge must run inside a Node worker thread.');
+}
+
+const postToParent = parentPort.postMessage.bind(parentPort);
+const hasWorkerGlobalMessaging = typeof globalThis.postMessage === 'function' && 'onmessage' in globalThis;
+
+Object.assign(globalThis, { self: globalThis });
+
+if (!hasWorkerGlobalMessaging) {
+  Object.assign(globalThis, {
+    postMessage: (message, transfer) => postToParent(message, transfer),
+  });
+
+  parentPort.on('message', (message) => {
+    globalThis.onmessage?.({ data: message });
+  });
+}
+
+await import('./worker.js');
+`,
 );
+
+await patchBundledCpSatWorkerUrls();

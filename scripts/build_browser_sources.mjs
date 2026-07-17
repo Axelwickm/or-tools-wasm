@@ -31,7 +31,19 @@ async function* listTypeScriptFiles(directory) {
       && entry.name.endsWith('.ts')
       && !entry.name.endsWith('.d.ts')
       && entry.name !== 'runtime_loader_node.ts'
+      && entry.name !== 'server.ts'
     ) {
+      yield entryPath;
+    }
+  }
+}
+
+async function* listDeclarationFiles(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      yield* listDeclarationFiles(entryPath);
+    } else if (entry.isFile() && entry.name.endsWith('.d.ts')) {
       yield entryPath;
     }
   }
@@ -64,10 +76,28 @@ async function transpileSource(sourcePath) {
 const externalRuntimeLoaderPlugin = {
   name: 'external-runtime-loader',
   setup(buildContext) {
+    buildContext.onResolve({ filter: /^node:/ }, (args) => ({
+      path: args.path,
+      external: true,
+    }));
+    buildContext.onResolve({ filter: /^@bufbuild\/protobuf(?:\/.*)?$/ }, (args) => ({
+      path: require.resolve(args.path),
+    }));
     buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
       path: require.resolve('protobufjs'),
     }));
-    buildContext.onResolve({ filter: /^\.\/(?:cp_sat_module_loader|runtime_loader|worker_bridge)\.js$/ }, (args) => ({
+    buildContext.onResolve({ filter: /^\.\/(?:runtime_loader|worker_bridge)\.js$/ }, (args) => ({
+      path: args.path,
+      external: true,
+    }));
+  },
+};
+
+const externalWorkerRuntimeLoaderPlugin = {
+  name: 'external-worker-runtime-loader',
+  setup(buildContext) {
+    externalRuntimeLoaderPlugin.setup(buildContext);
+    buildContext.onResolve({ filter: /^(?:\.\.?\/)+(?:runtime_loader|worker_bridge)\.js$/ }, (args) => ({
       path: args.path,
       external: true,
     }));
@@ -93,6 +123,40 @@ async function bundleBrowserEntry() {
   }
 }
 
+async function bundleCpSatWorker() {
+  await build({
+    entryPoints: [path.join(sourceDir, 'cp_sat/worker.ts')],
+    outfile: path.join(outDir, 'cp_sat/worker.js'),
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    target: 'es2020',
+    define: {
+      __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
+    },
+    minifySyntax: true,
+    sourcemap: false,
+    plugins: [externalWorkerRuntimeLoaderPlugin],
+  });
+}
+
+async function patchBundledCpSatWorkerUrls() {
+  for (const entryName of publicEntryNames) {
+    const entryPath = path.join(outDir, `${entryName}.js`);
+    const source = await readFile(entryPath, 'utf8');
+    const patchedSource = source
+      .replaceAll(
+        'new URL("./worker.js", import.meta.url)',
+        'new URL("./cp_sat/worker.js", import.meta.url)',
+      )
+      .replaceAll('#internal-wasm/', '../wasm/')
+      .replaceAll('?no-inline', '');
+    if (patchedSource !== source) {
+      await writeFile(entryPath, patchedSource);
+    }
+  }
+}
+
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
 
@@ -101,14 +165,20 @@ for await (const sourcePath of listTypeScriptFiles(sourceDir)) {
 }
 
 await bundleBrowserEntry();
+await bundleCpSatWorker();
+await patchBundledCpSatWorkerUrls();
 
-const declarationPath = path.join(packageBuildDir, 'lib/index.d.ts');
 try {
-  const declaration = await readFile(declarationPath, 'utf8');
-  await writeFile(
-    declarationPath,
-    declaration.replaceAll('../../build/javascript/wasm/', '../wasm/'),
-  );
+  for await (const declarationPath of listDeclarationFiles(path.join(packageBuildDir, 'lib'))) {
+    const declaration = await readFile(declarationPath, 'utf8');
+    const patchedDeclaration = declaration
+      .replaceAll('../../build/javascript/wasm/', '../wasm/')
+      .replaceAll('../../../../package/node_modules/@bufbuild/protobuf/dist/esm/index.js', '@bufbuild/protobuf')
+      .replaceAll('../../../../package/node_modules/@bufbuild/protobuf/dist/esm/codegenv2/index.js', '@bufbuild/protobuf/codegenv2');
+    if (patchedDeclaration !== declaration) {
+      await writeFile(declarationPath, patchedDeclaration);
+    }
+  }
 } catch (error) {
   if (error.code !== 'ENOENT') {
     throw error;

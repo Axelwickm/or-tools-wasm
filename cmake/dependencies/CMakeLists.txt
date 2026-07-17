@@ -128,7 +128,6 @@ if(BUILD_absl)
     PATCH_COMMAND git apply --ignore-whitespace
     "${CMAKE_CURRENT_LIST_DIR}/../../patches/abseil-cpp-20250814.1.patch"
     OVERRIDE_FIND_PACKAGE
-    SYSTEM
   )
   set(ABSL_USE_SYSTEM_INCLUDES ON)
   # We want Abseil to declare what C++ standard it was compiled with.
@@ -165,7 +164,6 @@ if(BUILD_Protobuf)
     PATCH_COMMAND git apply --ignore-whitespace
     "${CMAKE_CURRENT_LIST_DIR}/../../patches/protobuf-v33.1.patch"
     OVERRIDE_FIND_PACKAGE # Make package visible for "protobuf-matchers" below
-    SYSTEM
   )
   set(protobuf_BUILD_TESTS OFF)
   set(protobuf_BUILD_SHARED_LIBS ON)
@@ -191,7 +189,6 @@ if(BUILD_re2)
     UPDATE_COMMAND git reset --hard
     PATCH_COMMAND git apply --ignore-whitespace
     "${CMAKE_CURRENT_LIST_DIR}/../../patches/re2-2025-08-12.patch"
-    SYSTEM
   )
   set(RE2_BUILD_TESTING OFF)
   FetchContent_MakeAvailable(re2)
@@ -320,7 +317,6 @@ if(BUILD_HIGHS)
     GIT_TAG        "v1.12.0"
     GIT_SHALLOW TRUE
     UPDATE_COMMAND git reset --hard
-    SYSTEM
   )
   set(CI OFF) # disable CI tests
   set(BUILD_EXAMPLES OFF)
@@ -366,7 +362,6 @@ if(BUILD_soplex)
     GIT_SHALLOW TRUE
     PATCH_COMMAND git apply --ignore-whitespace
     "${CMAKE_CURRENT_LIST_DIR}/../../patches/soplex-v8.0.0.patch"
-    SYSTEM
   )
   set(SHARED ON CACHE BOOL "Soplex param" FORCE)
   set(ZLIB ON CACHE BOOL "Soplex param" FORCE)
@@ -396,7 +391,6 @@ if(BUILD_SCIP)
     GIT_SHALLOW TRUE
     PATCH_COMMAND git apply --ignore-whitespace
     "${CMAKE_CURRENT_LIST_DIR}/../../patches/scip-v10.0.0.patch"
-    SYSTEM
   )
   set(SHARED ON CACHE BOOL "Scip param" FORCE)
   set(ZLIB ON CACHE BOOL "Scip param" FORCE)

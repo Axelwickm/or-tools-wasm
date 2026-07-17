@@ -51,9 +51,15 @@ export type {
   PdlpParametersOptions,
 } from './mathopt_api.js';
 export {
+  configureServerBridge,
+  getServerBridgeUrl,
+  isServerBridgeEnabled,
   isWorkerBridgeAvailable,
   isWorkerBridgeEnabled,
+  setServerBridgeEnabled,
+  setServerBridgeUrl,
   setWorkerBridgeEnabled,
   terminateWorkerBridge,
+  type ServerBridgeOptions,
 } from './worker_bridge.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

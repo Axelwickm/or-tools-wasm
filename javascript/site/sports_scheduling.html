@@ -120,7 +120,7 @@
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { CpSat, setWorkerBridgeEnabled, type SatParameters } from 'or-tools-wasm/cp-sat';
+				<pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm/cp-sat';
 
 type CpModelInput = {
   name: string;
@@ -217,14 +217,14 @@ function buildSportsScheduleModel(numTeams: number): CpModelInput {
   };
 }
 
-setWorkerBridgeEnabled(true);
+CpSat.setExecutor({ type: 'worker' });
 const numTeams = 4;
 const model = await CpSat.createModel(buildSportsScheduleModel(numTeams));
 const validation = await CpSat.validate(model);
 if (!validation.ok) throw new Error(validation.message);
 
 const params: SatParameters = { numWorkers: 4, logSearchProgress: true };
-const result = await CpSat.solve(model, params);
+const result = await CpSat.solve(model, { solverParameters: params });
 console.log(result.response?.objectiveValue, result.response?.solution);</code></pre>
 			</details>
 		</div>

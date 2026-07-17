@@ -1,4 +1,17 @@
 import type { WorkerRequest, WorkerResponse } from './worker_protocol.js';
+import {
+  isServerBridgeEnabled,
+  postServerRequest,
+} from './server_bridge.js';
+
+export {
+  configureServerBridge,
+  getServerBridgeUrl,
+  isServerBridgeEnabled,
+  setServerBridgeEnabled,
+  setServerBridgeUrl,
+  type ServerBridgeOptions,
+} from './server_bridge.js';
 
 declare const __ORTOOLS_WASM_BROWSER_BUILD__: boolean | undefined;
 
@@ -35,7 +48,7 @@ const pendingWorkerRequests = new Map<
 >();
 
 export function shouldUseWorkerBridge() {
-  return workerBridgePreferred && workerBridgeAvailable;
+  return isServerBridgeEnabled() || (workerBridgePreferred && workerBridgeAvailable);
 }
 
 export function isWorkerBridgeEnabled() {
@@ -43,7 +56,7 @@ export function isWorkerBridgeEnabled() {
 }
 
 export function isWorkerBridgeAvailable() {
-  return workerBridgeAvailable;
+  return isServerBridgeEnabled() || workerBridgeAvailable;
 }
 
 export function setWorkerBridgeEnabled(enabled: boolean) {
@@ -76,7 +89,8 @@ async function createBridgeWorker(): Promise<BridgeWorker> {
   if (!isPackagedBrowserBuild && (isNode || isDeno)) {
     const workerThreadsSpecifier = 'node:worker_threads';
     const { Worker: NodeWorker } = await import(workerThreadsSpecifier);
-    return new NodeWorker(new URL('./node_worker_bridge.js', import.meta.url), { execArgv: [] }) as BridgeWorker;
+    const nodeWorkerBridge = './node_worker_bridge.js';
+    return new NodeWorker(new URL(nodeWorkerBridge, import.meta.url), { execArgv: [] }) as BridgeWorker;
   }
   return new Worker(new URL('./ortools_worker.js', import.meta.url), { type: 'module' }) as BridgeWorker;
 }
@@ -160,6 +174,9 @@ export async function postWorkerRequest<T extends WorkerResponse>(
   request: WorkerRequest,
   onEvent?: (value: WorkerResponse) => void,
 ): Promise<T> {
+  if (isServerBridgeEnabled()) {
+    return postServerRequest<T>(request, onEvent);
+  }
   if (!workerBridgeAvailable) {
     throw new Error('Worker bridge is not available.');
   }

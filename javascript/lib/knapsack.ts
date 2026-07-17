@@ -6,5 +6,13 @@ export {
   KnapsackSolverType,
   setMPSolverWorkerBridgeEnabled as setWorkerBridgeEnabled,
 } from './mp_solver_api.js';
-export { terminateWorkerBridge } from './worker_bridge.js';
+export {
+  configureServerBridge,
+  getServerBridgeUrl,
+  isServerBridgeEnabled,
+  setServerBridgeEnabled,
+  setServerBridgeUrl,
+  terminateWorkerBridge,
+  type ServerBridgeOptions,
+} from './worker_bridge.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

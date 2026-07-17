@@ -74,6 +74,23 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
         cpSatSolve?: number;
       };
     }>;
+    cpSatSolverStructureResults?: Array<{
+      id?: string;
+      name?: string;
+      ok?: boolean;
+      executor?: string;
+      publicMethods?: string[];
+      statusStates?: number[];
+      responseBytesLength?: number;
+    }>;
+    cpSatSolverStructureWorkerStatsBefore?: {
+      cpSatSolve?: number;
+    };
+    cpSatSolverStructureWorkerStatsAfter?: {
+      cpSatSolve?: number;
+      activeBridge?: number;
+      bridgeTerminated?: number;
+    };
     highLevelCpSatResults?: Array<{
       id?: string;
       name?: string;
@@ -219,12 +236,82 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
     expect(results?.every((result) => typeof result.id === 'string' && result.id.length > 0), `${label} stable case IDs`).toBe(true);
     expect(results?.every((result) => result.ok === true), `${label} ok results`).toBe(true);
   };
-  expect(parsedStatus.results).toHaveLength(4);
+  const expectedHighLevelCpSatProfiles = [
+    'direct/1 worker/1',
+    'direct/4 workers/4',
+    'worker/1 worker/1',
+    'worker/4 workers/4',
+    'server/1 worker/1',
+    'server/4 workers/4',
+  ].sort();
+  const highLevelCpSatProfileKey = (result: {
+    mode?: string;
+    workerProfile?: string;
+    params?: Record<string, unknown>;
+  }) => `${result.mode}/${result.workerProfile}/${String(result.params?.numWorkers)}`;
+  expectStableCaseIds(parsedStatus.cpSatSolverStructureResults, 'CP-SAT solver structure');
+  expect(parsedStatus.cpSatSolverStructureResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      id: 'cp_sat.solver_structure.package_contract',
+      publicMethods: expect.arrayContaining([
+        'createModel',
+        'getSchemas',
+        'loadModule',
+        'modelStats',
+        'setExecutor',
+        'solve',
+        'solveRaw',
+        'validate',
+      ]),
+      ok: true,
+    }),
+    expect.objectContaining({
+      id: 'cp_sat.solver_structure.solve_auto',
+      executor: 'auto',
+      responseBytesLength: expect.any(Number),
+      statusStates: expect.arrayContaining([2, 3, 6]),
+      ok: true,
+    }),
+    expect.objectContaining({
+      id: 'cp_sat.solver_structure.solve_direct',
+      executor: 'direct',
+      responseBytesLength: expect.any(Number),
+      statusStates: expect.arrayContaining([2, 3, 6]),
+      ok: true,
+    }),
+    expect.objectContaining({
+      id: 'cp_sat.solver_structure.solve_worker',
+      executor: 'worker',
+      responseBytesLength: expect.any(Number),
+      statusStates: expect.arrayContaining([2, 3, 6]),
+      ok: true,
+    }),
+    expect.objectContaining({
+      id: 'cp_sat.solver_structure.solve_server',
+      executor: 'server',
+      responseBytesLength: expect.any(Number),
+      statusStates: expect.arrayContaining([2, 3, 6]),
+      ok: true,
+    }),
+  ]));
+  for (const result of parsedStatus.cpSatSolverStructureResults ?? []) {
+    if (result.responseBytesLength !== undefined) {
+      expect(result.responseBytesLength).toBeGreaterThan(0);
+    }
+  }
+  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.cpSatSolve).toBeGreaterThan(
+    parsedStatus.cpSatSolverStructureWorkerStatsBefore?.cpSatSolve ?? -1,
+  );
+  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.activeBridge).toBe(0);
+  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.results).toHaveLength(6);
   expect(parsedStatus.results).toEqual([
     expect.objectContaining({ mode: 'direct', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
     expect.objectContaining({ mode: 'direct', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
     expect.objectContaining({ mode: 'worker', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
     expect.objectContaining({ mode: 'worker', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
+    expect.objectContaining({ mode: 'server', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
+    expect.objectContaining({ mode: 'server', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
   ]);
   const [directResult] = parsedStatus.results ?? [];
   expect(directResult?.cases?.length).toBeGreaterThan(0);
@@ -248,6 +335,16 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
   expect(parsedStatus.results?.[0].workerStats?.total).toBeGreaterThanOrEqual(4);
   expect(parsedStatus.results?.[2].workerStats?.total).toBeGreaterThanOrEqual(5);
   expect(parsedStatus.highLevelCpSatWorkerStatsBefore?.cpSatSolve).toBe(0);
+  const highLevelCpSatProfilesByCase = new Map<string, Set<string>>();
+  for (const result of parsedStatus.highLevelCpSatResults ?? []) {
+    if (!result.id) continue;
+    const profiles = highLevelCpSatProfilesByCase.get(result.id) ?? new Set<string>();
+    profiles.add(highLevelCpSatProfileKey(result));
+    highLevelCpSatProfilesByCase.set(result.id, profiles);
+  }
+  for (const [caseId, profiles] of highLevelCpSatProfilesByCase) {
+    expect([...profiles].sort(), `high-level CP-SAT executor matrix for ${caseId}`).toEqual(expectedHighLevelCpSatProfiles);
+  }
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.cpSatSolve).toBeGreaterThan(0);
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.activeBridge).toBe(0);
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);

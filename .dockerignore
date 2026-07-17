@@ -27,6 +27,10 @@ emsdk/upstream
 benchmarking/results/*
 !benchmarking/results/.gitignore
 
+# Local server deployment settings are supplied by docker compose, not baked
+# into the image.
+server/.env
+
 # Editor and OS noise.
 .DS_Store
 *.log

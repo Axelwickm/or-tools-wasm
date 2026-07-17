@@ -1,8 +1,13 @@
 import { cpSatCases } from './cpsat_cases.ts';
 import type { CpSatLike, CpSatSolveParams } from './cpsat_types.ts';
-import { withWorkerBridgeMode } from './shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  executorFixtureModes,
+  serverExecutorConfiguration,
+  type ExecutorFixtureMode,
+} from './shared_case.ts';
 
-type RunMode = 'direct' | 'worker';
+type RunMode = ExecutorFixtureMode;
 
 type WorkerProfile = {
   label: string;
@@ -36,20 +41,37 @@ type CpSatRunResult = {
   workerStats: unknown;
 };
 
-const DEFAULT_MODES: RunMode[] = ['direct', 'worker'];
 const DEFAULT_WORKER_PROFILES: WorkerProfile[] = [
   { label: '1 worker', params: { numSearchWorkers: 1 } },
   { label: '4 workers', params: { numSearchWorkers: 4 } },
 ];
 
+async function withCpSatExecutorMode<T>(
+  CpSat: CpSatLike,
+  mode: RunMode,
+  run: () => Promise<T>,
+): Promise<T> {
+  if (mode === 'server') {
+    await assertServerExecutorIsRunning();
+    CpSat.setExecutor(serverExecutorConfiguration());
+  } else {
+    CpSat.setExecutor({ type: mode });
+  }
+  try {
+    return await run();
+  } finally {
+    CpSat.setExecutor({ type: 'auto' });
+  }
+}
+
 export async function runCpSatCases(CpSat: CpSatLike, options: RunOptions = {}) {
-  const modes = options.modes ?? DEFAULT_MODES;
+  const modes = options.modes ?? executorFixtureModes;
   const workerProfiles = options.workerProfiles ?? DEFAULT_WORKER_PROFILES;
   const getWorkerStats = options.getWorkerStats ?? (() => undefined);
   const results: CpSatRunResult[] = [];
 
   for (const mode of modes) {
-    await withWorkerBridgeMode(CpSat, mode, 'CP-SAT', async () => {
+    await withCpSatExecutorMode(CpSat, mode, async () => {
       for (const profile of workerProfiles) {
         const cases: CpSatCaseRunResult[] = [];
         for (const testCase of cpSatCases) {

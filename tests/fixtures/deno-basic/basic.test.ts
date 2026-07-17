@@ -57,6 +57,7 @@ import {
 } from 'or-tools-wasm/routing';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
+import { runCpSatSolverStructureCases } from '../browser-basic-src/cpsat_solver_structure_runner.ts';
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
@@ -90,6 +91,9 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   if (isWorkerBridgeEnabled()) {
     throw new Error('Deno should use the direct runtime by default');
   }
+  const structureResults = await runCpSatSolverStructureCases(CpSatApi as never);
+  await assertCaseSteps(t, 'deno CP-SAT solver structure', structureResults);
+
   const highLevelResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
   await assertCaseSteps(t, 'deno high-level CP-SAT', highLevelResults);
 

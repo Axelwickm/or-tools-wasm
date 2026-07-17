@@ -1,5 +1,9 @@
 /// <reference lib="webworker" />
 
+// Legacy shared worker entrypoint. New solver-specific worker executors should
+// own their own worker entrypoints; remove this once no solver path depends on
+// the shared WorkerRequest dispatcher below.
+
 import type { OrToolsWasmModule } from './wasm_module_types.js';
 import {
   loadGraphRuntime,
@@ -24,7 +28,7 @@ let moduleInstance: OrToolsWasmModule | null = null;
 
 workerScope.postMessage({ type: 'ready' } satisfies WorkerResponse);
 
-async function loadCpSatModule() {
+async function loadCpSatRuntime() {
   moduleInstance ??= await loadRuntime();
   return moduleInstance;
 }
@@ -251,7 +255,7 @@ async function solveSetCoverInWorker(message: Extract<WorkerRequest, { type: 'se
 }
 
 async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requestId = 0, callbackFlags = 0) {
-  const module = await loadCpSatModule();
+  const module = await loadCpSatRuntime();
   const lenPtr = module._malloc(4);
   const modelPtr = copyBytesToHeap(module, modelBytes);
   const paramsPtr = copyBytesToHeap(module, paramsBytes ?? null);
@@ -310,7 +314,7 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
 }
 
 async function validateModel(modelBytes: Uint8Array) {
-  const module = await loadCpSatModule();
+  const module = await loadCpSatRuntime();
   const lenPtr = module._malloc(4);
   const modelPtr = copyBytesToHeap(module, modelBytes);
   let msgPtr = 0;
@@ -630,7 +634,7 @@ const handlers = {
   },
   getSchemas: async (message) => {
     if (message.schema === 'cp_sat') {
-      const module = await loadCpSatModule();
+      const module = await loadCpSatRuntime();
       return {
         type: 'schemaResult',
         id: message.id,
@@ -656,7 +660,7 @@ const handlers = {
     throw new Error('Unsupported schema request.');
   },
   cancel_solve: async (message) => {
-    const module = await loadCpSatModule();
+    const module = await loadCpSatRuntime();
     module.ccall('interrupt_solve', 'void', [], []);
     return {
       type: 'solved_cancelled',

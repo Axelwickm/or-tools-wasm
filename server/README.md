@@ -1,0 +1,68 @@
+# Native OR-Tools Server Sandbox
+
+This folder builds a small native C++ CP-SAT executable against the checked-in
+Google OR-Tools source.
+
+Build and run it with Docker Compose:
+
+```sh
+docker compose -f server/docker-compose.yml up --build
+```
+
+Run the native server tests in the same Docker Compose build:
+
+```sh
+docker compose -f server/docker-compose.yml run --rm ortools-native-test
+```
+
+The compose file is the source of deployment defaults. It reads overrides from
+the environment or a local `.env` file. `server/.env.sample` shows the current
+settings:
+
+```sh
+ORTOOLS_SERVER_HOST=0.0.0.0
+ORTOOLS_SERVER_PORT=17827
+ORTOOLS_SERVER_TOTAL_THREADS=auto
+ORTOOLS_SERVER_MAX_QUEUE_SIZE=100000
+# ORTOOLS_SERVER_BEARER_TOKEN=
+```
+
+`ORTOOLS_SERVER_HOST` and `ORTOOLS_SERVER_PORT` select the HTTP bind address.
+`ORTOOLS_SERVER_TOTAL_THREADS=auto` uses the container's reported hardware
+concurrency. A numeric value sets the scheduler's total thread-token budget.
+`ORTOOLS_SERVER_MAX_QUEUE_SIZE` must be a positive integer.
+`ORTOOLS_SERVER_BEARER_TOKEN` enables bearer-token auth when set. If it is
+unset, the server warns loudly and accepts unauthenticated requests.
+
+The default executable is `server_cp_sat_hello`, built from
+`server/src/main.cc`. It starts the native HTTP server and exposes:
+
+```text
+GET  /healthz
+POST /jobs
+GET  /jobs/:id
+GET  /jobs/:id/result
+POST /jobs/:id/cancel
+```
+
+The job API carries generic `SolverBridgeRequest` / `SolverBridgeResponse`
+protobuf bytes. Solver-specific payloads, events, and results are nested as
+opaque bytes inside that generic envelope. Polling responses use this contract:
+
+```text
+200 + SolverBridgeResponse  returned status, event, failure, or final result
+202 + SolverBridgeResponse  job accepted or still running, usually status/event
+204 + empty body            no new status/result available yet
+```
+
+The native server currently registers CP-SAT and supports schema, validate,
+and solve requests. Cancellation works for queued jobs; interrupting an active
+native CP-SAT solve is still pending.
+
+The server path is native C++. JavaScript remains only on the client/package
+side for selecting a server executor and sending bridge protobuf bytes.
+
+The next server transport should stay protocol-thin: HTTP carrying the existing
+bridge protobuf bytes. gRPC can be added later if we need service discovery,
+load-balancer-native streaming, or generated multi-language clients, but the
+first native server should not introduce a second RPC schema.

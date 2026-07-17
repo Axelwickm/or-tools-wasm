@@ -1,4 +1,4 @@
-import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
+import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type MagicSquareExpr = {
@@ -29,7 +29,7 @@ const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
 
 function applyWorkerBridgePreference(enabled: boolean) {
-  setWorkerBridgeEnabled(enabled);
+  CpSat.setExecutor({ type: enabled ? 'worker' : 'direct' });
 }
 
 if (workerInput) {
@@ -208,7 +208,7 @@ async function runMagicSquare() {
 
     append('Solving…');
     try {
-      const result = await CpSat.solve(model, params);
+      const result = await CpSat.solve(model, { solverParameters: params });
       const response = result.response;
       if (!response || !statusEl) {
         append('Solver returned no response.');

@@ -7,6 +7,7 @@ as multithreaded WebAssembly.
 [![npm](https://img.shields.io/npm/v/or-tools-wasm?logo=npm&label=npm)](https://www.npmjs.com/package/or-tools-wasm)
 
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Native Server](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml)
 [![Vite 7 dev Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Chromium&nameFilter=Vite%207%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Vite 7 dev Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Firefox&nameFilter=Vite%207%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Vite 7 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20static%20Chromium&nameFilter=Vite%207%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
@@ -71,6 +72,8 @@ import { RcpspModelBuilder } from 'or-tools-wasm/rcpsp';
 Build a CP-SAT model and solve it:
 
 ```ts
+import { CpModel, CpSolver } from 'or-tools-wasm/cp-sat';
+
 const model = new CpModel();
 
 const desks = model.newIntVar(0, 4, 'desks');
@@ -88,6 +91,26 @@ console.log({
   tables: solver.value(tables),
   profit: solver.objectiveValue(),
 });
+```
+
+Force CP-SAT to solve through its worker bridge when you want to keep solver
+work off the main thread:
+
+```ts
+import { CpSat, CpModel, CpSolver } from 'or-tools-wasm/cp-sat';
+
+CpSat.setExecutor({ type: 'worker' });
+
+const model = new CpModel();
+const x = model.newIntVar(0, 10, 'x');
+
+model.add(x.ge(3));
+model.minimize(x);
+
+const solver = new CpSolver();
+await solver.solve(model, { numWorkers: 1 });
+
+console.log(solver.value(x));
 ```
 
 ## API reference

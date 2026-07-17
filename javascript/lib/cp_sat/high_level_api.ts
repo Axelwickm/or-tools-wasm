@@ -1,4 +1,4 @@
-import { CpSat } from './cp_sat_api.js';
+import { CpSat } from './api.js';
 import {
   CpSolverStatus,
   type ConstraintProto,
@@ -8,15 +8,16 @@ import {
   type DecisionStrategyProto_VariableSelectionStrategy,
   type LinearExpressionProto,
   type ProtoInt64,
-} from './generated/cp_model.js';
-import type { SatParameters } from './generated/sat_parameters.js';
-import type { CpSatSolveCallbacks } from './cp_sat_api.js';
+} from '../generated/cp_model.js';
+import type { SatParameters } from '../generated/sat_parameters.js';
+import type { CpSatSolveOptions } from './api.js';
 
 const INT64_MIN: ProtoInt64 = { low: 0, high: -2147483648 };
 const INT64_MAX: ProtoInt64 = { low: -1, high: 2147483647 };
 
 export type LinearExprLike = number | IntVar | NotBoolVar | LinearExpr;
 export type LiteralLike = number | boolean | BoolVar | NotBoolVar;
+type CpSolverSolveOptions = Omit<CpSatSolveOptions, 'solverParameters'>;
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -2579,29 +2580,25 @@ export class CpSolver {
   bestBoundCallback: ((bound: number) => void) | null = null;
   logCallback: ((message: string) => void) | null = null;
 
-  async solve(model: CpModel, params: SatParameters | Uint8Array | CpSolverSolutionCallback | null = null, callbacks: CpSatSolveCallbacks = {}) {
+  async solve(model: CpModel, params: SatParameters | Uint8Array | CpSolverSolutionCallback | null = null, options: CpSolverSolveOptions = {}) {
     const solutionCallback = params instanceof CpSolverSolutionCallback ? params : null;
     const solveParams = solutionCallback ? this.parameters : params;
     const mergedParams = solveParams instanceof Uint8Array ? solveParams : { ...this.parameters, ...(solveParams ?? {}) };
     const modelBytes = await CpSat.createModel(model.proto());
-    const result = await CpSat.solve(modelBytes, mergedParams, {
-      ...callbacks,
-      onSolution: solutionCallback || callbacks.onSolution
-        ? (response, bytes) => {
-            solutionCallback?._run(response);
-            callbacks.onSolution?.(response, bytes);
-          }
-        : undefined,
-      onBestBound: this.bestBoundCallback || callbacks.onBestBound
-        ? (bound) => {
-            this.bestBoundCallback?.(bound);
-            callbacks.onBestBound?.(bound);
-          }
-        : undefined,
-      onLog: this.logCallback || callbacks.onLog
-        ? (message) => {
-            this.logCallback?.(message);
-            callbacks.onLog?.(message);
+    const hasInternalEvents = Boolean(solutionCallback || this.bestBoundCallback || this.logCallback);
+    const result = await CpSat.solve(modelBytes, {
+      solverParameters: mergedParams,
+      signal: options.signal,
+      onEvent: hasInternalEvents || options.onEvent
+        ? async (event) => {
+            if (event.type === 'solution') {
+              solutionCallback?._run(event.response);
+            } else if (event.type === 'bestBound') {
+              this.bestBoundCallback?.(event.bound);
+            } else if (event.type === 'log') {
+              this.logCallback?.(event.message);
+            }
+            await options.onEvent?.(event);
           }
         : undefined,
     });

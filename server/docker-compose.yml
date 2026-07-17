@@ -1,0 +1,22 @@
+services:
+  ortools-native: &ortools-native
+    image: ${ORTOOLS_SERVER_IMAGE:-ortools-wasm-native-server:local}
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    ports:
+      - "${ORTOOLS_SERVER_PORT:-17827}:${ORTOOLS_SERVER_PORT:-17827}"
+    environment:
+      ORTOOLS_SERVER_HOST: ${ORTOOLS_SERVER_HOST:-0.0.0.0}
+      ORTOOLS_SERVER_PORT: ${ORTOOLS_SERVER_PORT:-17827}
+      ORTOOLS_SERVER_TOTAL_THREADS: ${ORTOOLS_SERVER_TOTAL_THREADS:-auto}
+      ORTOOLS_SERVER_MAX_QUEUE_SIZE: ${ORTOOLS_SERVER_MAX_QUEUE_SIZE:-100000}
+      ORTOOLS_SERVER_BEARER_TOKEN: ${ORTOOLS_SERVER_BEARER_TOKEN:-}
+
+  ortools-native-test:
+    <<: *ortools-native
+    ports: []
+    command:
+      - /bin/sh
+      - -c
+      - /build/server/server_job_scheduler_test && /build/server/server_config_test

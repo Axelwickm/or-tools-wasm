@@ -1,5 +1,10 @@
 import type { SharedCaseMetadata } from '../../../shared_case.ts';
-import { fixtureModes, withWorkerBridgeMode } from '../../../shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  executorFixtureModes,
+  serverExecutorConfiguration,
+  type ExecutorFixtureMode,
+} from '../../../shared_case.ts';
 
 type HighLevelApi = {
   CpModel: new () => any;
@@ -45,8 +50,10 @@ type HighLevelApi = {
   weightedSum(values: Iterable<unknown>, coeffs: Iterable<number>): any;
   rebuild_from_linear_expression_proto: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
   rebuildFromLinearExpressionProto?: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
-  setWorkerBridgeEnabled(enabled: boolean): void;
-  isWorkerBridgeEnabled(): boolean;
+  setExecutor(configuration:
+    | { type: 'auto' | 'direct' | 'worker' }
+    | { type: 'server'; host: string | URL; authToken?: string; statusIntervalMs?: number }
+  ): void;
   DecisionStrategyProto_VariableSelectionStrategy: {
     CHOOSE_MIN_DOMAIN_SIZE: unknown;
   };
@@ -326,7 +333,7 @@ type CpSatHighLevelParityResult = {
   source: string;
   upstream: string;
   tags: string[];
-  mode: 'direct' | 'worker';
+  mode: ExecutorFixtureMode;
   workerProfile: string;
   params: { numWorkers: number };
   ok: true;
@@ -337,6 +344,24 @@ function cpSatHighLevelCaseId(name: string) {
     .replaceAll('.', '.')
     .replaceAll(/[^a-zA-Z0-9_.]+/g, '_')
     .toLowerCase()}`;
+}
+
+async function withCpSatExecutorMode<T>(
+  api: HighLevelApi,
+  mode: ExecutorFixtureMode,
+  run: () => Promise<T>,
+): Promise<T> {
+  if (mode === 'server') {
+    await assertServerExecutorIsRunning();
+    api.setExecutor(serverExecutorConfiguration());
+  } else {
+    api.setExecutor({ type: mode });
+  }
+  try {
+    return await run();
+  } finally {
+    api.setExecutor({ type: 'auto' });
+  }
 }
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
@@ -3308,8 +3333,8 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
 
 export async function runCpSatHighLevelParityCases(api: HighLevelApi) {
   const results: CpSatHighLevelParityResult[] = [];
-  for (const mode of fixtureModes) {
-    await withWorkerBridgeMode(api, mode, 'high-level CP-SAT', async () => {
+  for (const mode of executorFixtureModes) {
+    await withCpSatExecutorMode(api, mode, async () => {
       for (const profile of [
         { label: '1 worker', numWorkers: 1 },
         { label: '4 workers', numWorkers: 4 },

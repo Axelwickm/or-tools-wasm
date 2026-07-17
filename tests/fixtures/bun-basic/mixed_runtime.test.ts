@@ -1,7 +1,7 @@
 import {
+  CpSat,
   CpModel,
   CpSolver,
-  setWorkerBridgeEnabled as setCpSatWorkerBridgeEnabled,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/cp-sat';
 import {
@@ -28,7 +28,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 async function runCpSatSmoke() {
-  setCpSatWorkerBridgeEnabled(true);
+  CpSat.setExecutor({ type: 'worker' });
   const model = new CpModel();
   const x = model.newIntVar(0, 5, 'x');
   model.add(x.ge(3));
@@ -90,7 +90,7 @@ await runBunFixture(async () => {
   await terminateLoadedRuntimeThreads();
   console.log('bun mixed runtime smoke passed');
 }, async () => {
-  setCpSatWorkerBridgeEnabled(false);
+  CpSat.setExecutor({ type: 'auto' });
   setMPSolverWorkerBridgeEnabled(false);
   setNetworkFlowWorkerBridgeEnabled(false);
   setMathOptWorkerBridgeEnabled(false);

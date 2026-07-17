@@ -1,4 +1,5 @@
 import {
+  CpSat,
   CpModel,
   CpSolver,
   CpSolverStatus,
@@ -8,12 +9,19 @@ import {
   type IntervalVar,
   type SatParameters,
 } from './cp-sat.js';
+import type { ExecutorConfiguration } from './executor_configuration.js';
 import {
+  configureServerBridge,
+  getServerBridgeUrl,
+  isServerBridgeEnabled,
   isWorkerBridgeAvailable,
   isWorkerBridgeEnabled,
+  setServerBridgeEnabled,
+  setServerBridgeUrl,
   setWorkerBridgeEnabled,
   terminateWorkerBridge,
 } from './worker_bridge.js';
+import type { ServerBridgeOptions } from './worker_bridge.js';
 import { terminateLoadedRuntimeThreads } from './runtime_loader.js';
 
 export type RcpspResourceProto = {
@@ -469,6 +477,10 @@ export class RcpspParser {
 
 export async function initRcpsp(): Promise<void> {}
 
+export function setExecutor(configuration: ExecutorConfiguration): void {
+  CpSat.setExecutor(configuration);
+}
+
 export function importRcpspProblemFromProto(proto: RcpspProblemProto) {
   return RcpspProblem.fromProto(proto);
 }
@@ -563,9 +575,15 @@ function extractSchedule(problemProto: RcpspProblemProto, solver: CpSolver, buil
 }
 
 export {
+  configureServerBridge,
+  getServerBridgeUrl,
+  isServerBridgeEnabled,
   isWorkerBridgeAvailable,
   isWorkerBridgeEnabled,
+  setServerBridgeEnabled,
+  setServerBridgeUrl,
   setWorkerBridgeEnabled,
+  type ServerBridgeOptions,
   terminateLoadedRuntimeThreads,
   terminateWorkerBridge,
 };

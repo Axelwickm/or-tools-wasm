@@ -1,13 +1,25 @@
-export { CpSat } from './cp_sat_api.js';
-export { default } from './cp_sat_api.js';
-export type { CpSatApi, CpSatModelInstance, CpSatSolveCallbacks, CpSatSolveResult } from './cp_sat_api.js';
-export {
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
-  terminateWorkerBridge,
-} from './worker_bridge.js';
+export { CpSat } from './cp_sat/api.js';
+export { default } from './cp_sat/api.js';
+export type {
+  CpSatApi,
+  CpSatEvent,
+  CpSatEventHandler,
+  CpSatModelInstance,
+  CpSatRawSolveOptions,
+  CpSatSchemas,
+  CpSatSolveOptions,
+  CpSatSolveResult,
+  CpSatSolverParameters,
+} from './cp_sat/api.js';
+export type { SolverJobEvent } from './solver_executor.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';
+export type {
+  AutoExecutorConfiguration,
+  DirectExecutorConfiguration,
+  ExecutorConfiguration,
+  ServerExecutorConfiguration,
+  WorkerExecutorConfiguration,
+} from './executor_configuration.js';
 export {
   ArithmeticError,
   BoolVar,
@@ -36,8 +48,8 @@ export {
   sum,
   term,
   weightedSum,
-} from './cp_sat_high_level.js';
-export type { LinearExprLike, LiteralLike } from './cp_sat_high_level.js';
+} from './cp_sat/high_level_api.js';
+export type { LinearExprLike, LiteralLike } from './cp_sat/high_level_api.js';
 export {
   CpSolverStatus,
   DecisionStrategyProto_DomainReductionStrategy,

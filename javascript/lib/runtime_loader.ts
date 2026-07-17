@@ -135,5 +135,3 @@ export const loadGraphRuntime = loader.loadGraphRuntime;
 export const loadGraphRuntimeAsyncify = loader.loadGraphRuntimeAsyncify;
 export const loadSetCoverRuntime = loader.loadSetCoverRuntime;
 export const loadSetCoverRuntimeAsyncify = loader.loadSetCoverRuntimeAsyncify;
-
-export { loadRuntime as loadCpSat, loadRuntimeAsyncify as loadCpSatAsyncify };

@@ -21,6 +21,8 @@
       "or-tools-wasm/rcpsp": ["../javascript/lib/rcpsp.ts"],
       "protobufjs": ["./node_modules/protobufjs/index.d.ts"],
       "protobufjs/*": ["./node_modules/protobufjs/*"],
+      "@bufbuild/protobuf": ["./node_modules/@bufbuild/protobuf/dist/esm/index.d.ts"],
+      "@bufbuild/protobuf/*": ["./node_modules/@bufbuild/protobuf/dist/esm/*/index.d.ts"],
       "@internal-wasm/*": ["build/javascript/wasm/*"],
       "#internal-wasm/*": ["build/javascript/wasm/*"]
     }

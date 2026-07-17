@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+message SolverBridgeRequest {
+  uint32 request_id = 1;
+  string solver = 2;
+  bytes payload = 3;
+  // 0 means unknown/default. Server schedulers may use this as an admission
+  // hint when the solver request can estimate its thread use up front.
+  uint32 requested_threads = 4;
+}
+
+message SolverBridgeResponse {
+  uint32 request_id = 1;
+  string solver = 2;
+  // 0 means the response is not associated with a server-side queued job.
+  uint64 job_id = 3;
+
+  oneof payload {
+    SolverJobStatus status = 10;
+    SolverJobFailure failure = 11;
+    bytes event_payload = 12;
+    bytes result_payload = 13;
+  }
+}
+
+message SolverJobStatus {
+  uint32 request_id = 1;
+  string solver = 2;
+  SolverJobState state = 3;
+  uint64 created_at_ms = 4;
+  uint64 started_at_ms = 5;
+  uint32 allocated_threads = 6;
+  uint32 queue_position = 7;
+}
+
+enum SolverJobState {
+  SOLVER_JOB_STATE_UNSPECIFIED = 0;
+  SOLVER_JOB_STATE_QUEUED = 1;
+  SOLVER_JOB_STATE_STARTING = 2;
+  SOLVER_JOB_STATE_RUNNING = 3;
+  SOLVER_JOB_STATE_CANCELLING = 4;
+  SOLVER_JOB_STATE_CANCELLED = 5;
+  SOLVER_JOB_STATE_SUCCEEDED = 6;
+  SOLVER_JOB_STATE_FAILED = 7;
+}
+
+message SolverJobFailure {
+  uint32 request_id = 1;
+  string solver = 2;
+  SolverFailureKind kind = 3;
+  string message = 4;
+  string trace = 5;
+  bool retryable = 6;
+}
+
+enum SolverFailureKind {
+  SOLVER_FAILURE_KIND_UNSPECIFIED = 0;
+  SOLVER_FAILURE_KIND_EXECUTOR_ERROR = 1;
+  SOLVER_FAILURE_KIND_RUNTIME_LOAD_ERROR = 2;
+  SOLVER_FAILURE_KIND_WORKER_CRASH = 3;
+  SOLVER_FAILURE_KIND_SERVER_DISCONNECTED = 4;
+  SOLVER_FAILURE_KIND_TIMEOUT = 5;
+  SOLVER_FAILURE_KIND_CANCELLED = 6;
+  SOLVER_FAILURE_KIND_INTERNAL = 7;
+}

@@ -77,7 +77,7 @@ async function solveModel(CpSat: CpSatLike, testCase: CpSatCase, params: CpSatSo
   const modelBytes = await CpSat.createModel(testCase.model);
   const validation = await CpSat.validate(modelBytes);
   assert(validation.ok, `${testCase.name} validation failed: ${validation.message}`);
-  const result = await CpSat.solve(modelBytes, solveParams(params, overrides));
+  const result = await CpSat.solve(modelBytes, { solverParameters: solveParams(params, overrides) });
   assert(result.response, `${testCase.name} returned no solver response`);
   return result.response;
 }
@@ -199,12 +199,13 @@ export const pythonApiContractCases: CpSatCase[] = [
       const result = await CpSat.solve(
         modelBytes,
         {
-          ...solveParams(params),
-          enumerateAllSolutions: true,
-        },
-        {
-          onSolution(response) {
-            assertSolutionCallbackStatus(response, `${caseName} callback`);
+          solverParameters: {
+            ...solveParams(params),
+            enumerateAllSolutions: true,
+          },
+          onEvent(event) {
+            if (event.type !== 'solution') return;
+            assertSolutionCallbackStatus(event.response, `${caseName} callback`);
             solutionCount++;
           },
         },
@@ -239,13 +240,15 @@ export const pythonApiContractCases: CpSatCase[] = [
       const result = await CpSat.solve(
         modelBytes,
         {
-          ...solveParams(params),
-          linearizationLevel: 2,
-          logSearchProgress: true,
-        },
-        {
-          onBestBound(bound) {
-            bestBound = bound;
+          solverParameters: {
+            ...solveParams(params),
+            linearizationLevel: 2,
+            logSearchProgress: true,
+          },
+          onEvent(event) {
+            if (event.type === 'bestBound') {
+              bestBound = event.bound;
+            }
           },
         },
       );
@@ -1080,14 +1083,16 @@ export const pythonApiContractCases: CpSatCase[] = [
       const result = await CpSat.solve(
         modelBytes,
         {
-          ...solveParams(params),
-          logSearchProgress: true,
-          logToStdout: false,
-          logToResponse: true,
-        },
-        {
-          onLog(message) {
-            logLines.push(message);
+          solverParameters: {
+            ...solveParams(params),
+            logSearchProgress: true,
+            logToStdout: false,
+            logToResponse: true,
+          },
+          onEvent(event) {
+            if (event.type === 'log') {
+              logLines.push(event.message);
+            }
           },
         },
       );
@@ -1121,13 +1126,14 @@ export const pythonApiContractCases: CpSatCase[] = [
       const result = await CpSat.solve(
         modelBytes,
         {
-          ...solveParams(params),
-          enumerateAllSolutions: true,
-        },
-        {
-          onSolution(response) {
-            assert(response.solution?.length === 2, `${caseName} expected 2 solution values`);
-            const [xValue] = response.solution;
+          solverParameters: {
+            ...solveParams(params),
+            enumerateAllSolutions: true,
+          },
+          onEvent(event) {
+            if (event.type !== 'solution') return;
+            assert(event.response.solution?.length === 2, `${caseName} expected 2 solution values`);
+            const [xValue] = event.response.solution;
             assert(typeof xValue === 'number', `${caseName} expected x to be numeric`);
             seen.push(xValue);
           },
@@ -1162,13 +1168,15 @@ export const pythonApiContractCases: CpSatCase[] = [
       const result = await CpSat.solve(
         modelBytes,
         {
-          ...solveParams(params),
-          linearizationLevel: 2,
-          logSearchProgress: true,
-        },
-        {
-          onBestBound(bound) {
-            bestBound = bound;
+          solverParameters: {
+            ...solveParams(params),
+            linearizationLevel: 2,
+            logSearchProgress: true,
+          },
+          onEvent(event) {
+            if (event.type === 'bestBound') {
+              bestBound = event.bound;
+            }
           },
         },
       );
@@ -1187,8 +1195,10 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
       const result = await CpSat.solve(modelBytes, {
-        ...solveParams(params),
-        logSearchProgress: true,
+        solverParameters: {
+          ...solveParams(params),
+          logSearchProgress: true,
+        },
       });
       assert(result.response, `${this.name} returned no solver response`);
       assertStatus(result.response, 'MODEL_INVALID', this.name);

@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+import "job.proto";
+
+// CP-SAT bridge transport messages.
+//
+// These messages describe the outer request/response protocol used between a
+// caller and an execution engine, regardless of whether the transport is an
+// in-process executor, a Web Worker, or a server.
+//
+// The CP-SAT model, parameters, callback solution payloads, and final solve
+// response are intentionally encoded as opaque bytes here. Those bytes are
+// already typed by OR-Tools' own protobuf messages:
+//
+//   cp_model_proto: operations_research.sat.CpModelProto
+//   sat_parameters_proto: operations_research.sat.SatParameters
+//   cp_solver_response_proto: operations_research.sat.CpSolverResponse
+//
+// This file is the bridge schema, not a replacement for the CP-SAT schema.
+
+message CpSatBridgeRequest {
+  uint32 request_id = 1;
+
+  oneof payload {
+    CpSatSolveRequest solve = 10;
+    CpSatValidateRequest validate = 11;
+    CpSatSchemaRequest schema = 12;
+    CpSatCancelRequest cancel = 13;
+  }
+}
+
+message CpSatBridgeResponse {
+  uint32 request_id = 1;
+
+  oneof payload {
+    CpSatSolveResult solve_result = 10;
+    CpSatSolveEvent solve_event = 11;
+    CpSatValidateResult validate_result = 12;
+    CpSatSchemaResult schema_result = 13;
+    CpSatCancelled cancelled = 14;
+    SolverJobStatus job_status = 20;
+    SolverJobFailure failure = 21;
+    CpSatBridgeError error = 100;
+  }
+}
+
+message CpSatSolveRequest {
+  bytes cp_model_proto = 1;
+  bytes sat_parameters_proto = 2;
+  CpSatCallbackMask callback_mask = 3;
+  uint32 allocated_threads = 4;
+}
+
+message CpSatCallbackMask {
+  bool solution = 1;
+  bool best_bound = 2;
+  bool log = 3;
+}
+
+message CpSatSolveResult {
+  bytes cp_solver_response_proto = 1;
+}
+
+message CpSatSolveEvent {
+  oneof payload {
+    bytes solution_proto = 1;
+    double best_bound = 2;
+    string log = 3;
+  }
+}
+
+message CpSatValidateRequest {
+  bytes cp_model_proto = 1;
+}
+
+message CpSatValidateResult {
+  bool ok = 1;
+  string message = 2;
+}
+
+message CpSatSchemaRequest {}
+
+message CpSatSchemaResult {
+  string cp_model_proto_schema = 1;
+  string sat_parameters_proto_schema = 2;
+}
+
+message CpSatCancelRequest {
+  uint32 target_request_id = 1;
+}
+
+message CpSatCancelled {
+  uint32 target_request_id = 1;
+}
+
+message CpSatBridgeError {
+  string message = 1;
+}

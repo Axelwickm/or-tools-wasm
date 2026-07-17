@@ -72,6 +72,7 @@ import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
+import { runCpSatSolverStructureCases } from '../browser-basic-src/cpsat_solver_structure_runner.ts';
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
@@ -100,6 +101,9 @@ async function assertCaseResults(t: TestContext, runtime: string, results: Named
 }
 
 test('runs the shared high-level CP-SAT Python parity cases in Node', async (t) => {
+  const structureResults = await runCpSatSolverStructureCases(CpSatApi as never);
+  await assertCaseResults(t, 'node CP-SAT solver structure', structureResults);
+
   const results = await runCpSatHighLevelParityCasesForPackage(CpSatApi);
   await assertCaseResults(t, 'node high-level CP-SAT', results);
 });

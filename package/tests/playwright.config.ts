@@ -1,9 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const fixtureGroup = process.env.FIXTURE_GROUP;
 const fixtureTimeout = 240_000;
-const packageDir = path.resolve(__dirname, '../package');
+const configDir = path.dirname(fileURLToPath(import.meta.url));
+const packageDir = path.resolve(configDir, '..');
 const webServers = [
   {
     fixture: 'vite',

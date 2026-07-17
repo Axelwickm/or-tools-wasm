@@ -1,0 +1,11 @@
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-es
+    out: ../javascript/lib/generated/bridge
+    opt:
+      - target=ts
+      - import_extension=js
+      - js_import_style=module
+      - json_types=true
+      - valid_types=protovalidate_required

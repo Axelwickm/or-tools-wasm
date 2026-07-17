@@ -1,4 +1,4 @@
-import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance } from 'or-tools-wasm/cp-sat';
+import { CpSat, type CpSatModelInstance } from 'or-tools-wasm/cp-sat';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type SolverMethod = 'sat' | 'sat_table' | 'sat_column';
@@ -315,7 +315,7 @@ const applyWorkerBridgePreference = (enabled: boolean) => {
   if (workerBridgeToggle) {
     workerBridgeToggle.checked = enabled;
   }
-  setWorkerBridgeEnabled(enabled);
+  CpSat.setExecutor({ type: enabled ? 'worker' : 'direct' });
 };
 
 if (workerBridgeToggle) {
@@ -1122,7 +1122,7 @@ const runExperiment = async () => {
 
     appendStatus('Solving…');
     try {
-      const result = await CpSat.solve(modelInstance, params);
+      const result = await CpSat.solve(modelInstance, { solverParameters: params });
       const response = result.response;
       if (!response) {
         appendStatus('Solver returned no response.');

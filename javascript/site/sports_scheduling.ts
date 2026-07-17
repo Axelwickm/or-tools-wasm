@@ -1,4 +1,4 @@
-import { CpSat, setWorkerBridgeEnabled, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
+import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Domain = [number, number] | number[];
@@ -60,7 +60,7 @@ function applyWorkerBridgePreference(enabled: boolean) {
   if (workerBridgeToggle) {
     workerBridgeToggle.checked = enabled;
   }
-  setWorkerBridgeEnabled(enabled);
+  CpSat.setExecutor({ type: enabled ? 'worker' : 'direct' });
 }
 
 function append(text: string) {
@@ -479,7 +479,7 @@ async function runSportsScheduling() {
 
     append('Solving…');
     try {
-      const result = await CpSat.solve(model, params);
+      const result = await CpSat.solve(model, { solverParameters: params });
       const response = result.response;
       if (!response || !statusEl) {
         append('Solver returned no response.');

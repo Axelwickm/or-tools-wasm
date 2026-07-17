@@ -1,8 +1,12 @@
 import { runCpSatHighLevelParityCases } from './cases/ortools/sat/index.ts';
+import type { CpSatExecutorConfiguration } from './cpsat_types.ts';
 
 export { cpSatHighLevelParityCases, runCpSatHighLevelParityCases } from './cases/ortools/sat/index.ts';
 
 type HighLevelCpSatPackage = {
+  CpSat: {
+    setExecutor(configuration: CpSatExecutorConfiguration): void;
+  };
   CpModel: unknown;
   ArithmeticError: unknown;
   BoundedLinearExpression: unknown;
@@ -20,8 +24,6 @@ type HighLevelCpSatPackage = {
   object_is_a_false_literal: unknown;
   object_is_a_true_literal: unknown;
   rebuild_from_linear_expression_proto: unknown;
-  setWorkerBridgeEnabled: (enabled: boolean) => void;
-  isWorkerBridgeEnabled: () => boolean;
   sum: unknown;
   weightedSum: unknown;
 };
@@ -45,8 +47,7 @@ export function cpSatHighLevelApiFromPackage(api: HighLevelCpSatPackage) {
     object_is_a_false_literal: api.object_is_a_false_literal,
     object_is_a_true_literal: api.object_is_a_true_literal,
     rebuild_from_linear_expression_proto: api.rebuild_from_linear_expression_proto,
-    setWorkerBridgeEnabled: api.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: api.isWorkerBridgeEnabled,
+    setExecutor: (configuration: CpSatExecutorConfiguration) => api.CpSat.setExecutor(configuration),
     sum: api.sum,
     weightedSum: api.weightedSum,
   };

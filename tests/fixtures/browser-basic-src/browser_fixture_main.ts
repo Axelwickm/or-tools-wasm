@@ -1,5 +1,7 @@
 import { runCpSatHighLevelParityCasesForPackage } from './cpsat_high_level_runner.ts';
+import { cpSatCases } from './cpsat_cases.ts';
 import { runCpSatCases } from './cpsat_runner.ts';
+import { runCpSatSolverStructureCases } from './cpsat_solver_structure_runner.ts';
 import { runKnapsackCases } from './knapsack_runner.ts';
 import { runMathOptCases } from './mathopt_runner.ts';
 import { runMPSolverCases } from './mp_solver_runner.ts';
@@ -8,6 +10,7 @@ import { runPdlpCases } from './pdlp_runner.ts';
 import { runRcpspCases } from './rcpsp_runner.ts';
 import { runRoutingCases } from './routing_runner.ts';
 import { runSetCoverCases } from './set_cover_runner.ts';
+import { serverExecutorHost } from './shared_case.ts';
 
 type PackageModule = Record<string, any>;
 
@@ -25,8 +28,10 @@ export type BrowserFixtureApis = {
 
 const statusEl = document.getElementById('status');
 
+type ManualExecutorMode = 'direct' | 'worker' | 'server';
+
 type RunResult = {
-  mode: 'direct' | 'worker';
+  mode: 'direct' | 'worker' | 'server';
   ok: boolean;
   solverStatus?: unknown;
   cases: Array<{
@@ -56,6 +61,104 @@ type WorkerStats = {
 function setStatus(value: unknown) {
   if (statusEl) {
     statusEl.textContent = JSON.stringify(value, null, 2);
+  }
+}
+
+function installCpSatExecutorSwitcher(CpSat: PackageModule) {
+  const host = document.createElement('input');
+  host.id = 'cp-sat-server-host';
+  host.type = 'url';
+  host.value = serverExecutorHost;
+  host.placeholder = 'Server host';
+
+  const authToken = document.createElement('input');
+  authToken.id = 'cp-sat-server-auth-token';
+  authToken.type = 'password';
+  authToken.placeholder = 'Bearer token';
+
+  const executor = document.createElement('select');
+  executor.id = 'cp-sat-executor';
+  for (const mode of ['direct', 'worker', 'server'] as const) {
+    const option = document.createElement('option');
+    option.value = mode;
+    option.textContent = mode;
+    executor.append(option);
+  }
+
+  const run = document.createElement('button');
+  run.id = 'cp-sat-run-selected-executor';
+  run.type = 'submit';
+  run.textContent = 'Run CP-SAT';
+
+  const result = document.createElement('pre');
+  result.id = 'cp-sat-executor-result';
+  result.textContent = 'manual cp-sat run pending';
+
+  const controls = document.createElement('form');
+  controls.id = 'cp-sat-executor-controls';
+  controls.style.display = 'flex';
+  controls.style.flexWrap = 'wrap';
+  controls.style.gap = '8px';
+  controls.style.alignItems = 'center';
+  controls.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void runManualCpSatSolve(CpSat, executor.value as ManualExecutorMode, host.value, authToken.value, result, run);
+  });
+  controls.append(executor, host, authToken, run);
+
+  statusEl?.before(controls, result);
+}
+
+async function runManualCpSatSolve(
+  CpSat: PackageModule,
+  mode: ManualExecutorMode,
+  host: string,
+  authToken: string,
+  output: HTMLElement,
+  button: HTMLButtonElement,
+) {
+  button.disabled = true;
+  const startedAt = performance.now();
+  output.textContent = JSON.stringify({ ok: false, phase: 'manual-cp-sat', executor: mode }, null, 2);
+
+  try {
+    if (mode === 'server') {
+      await assertManualServerHealth(host, authToken);
+      CpSat.setExecutor({
+        type: 'server',
+        host,
+        authToken: authToken || undefined,
+        statusIntervalMs: 20,
+      });
+    } else {
+      CpSat.setExecutor({ type: mode });
+    }
+
+    const solverStatus = await cpSatCases[0].run(CpSat as never, { numSearchWorkers: 1 });
+    output.textContent = JSON.stringify({
+      ok: true,
+      executor: mode,
+      solverStatus,
+      elapsedMs: Math.round(performance.now() - startedAt),
+    }, null, 2);
+  } catch (error) {
+    output.textContent = JSON.stringify({
+      ok: false,
+      executor: mode,
+      error: error instanceof Error ? error.message : String(error),
+    }, null, 2);
+  } finally {
+    CpSat.setExecutor({ type: 'auto' });
+    button.disabled = false;
+  }
+}
+
+async function assertManualServerHealth(host: string, authToken: string) {
+  const response = await fetch(new URL('healthz', host), {
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+  });
+  if (!response.ok) {
+    throw new Error(`Server health check failed (${response.status} ${response.statusText})`);
   }
 }
 
@@ -143,6 +246,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     MathOptApi,
     PdlpApi,
   } = apis;
+  installCpSatExecutorSwitcher(CpSatApi.CpSat);
   setStatus({ ok: false, phase: 'running' });
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
@@ -239,8 +343,15 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     setWorkerBridgeEnabled: PdlpApi.setWorkerBridgeEnabled,
     isWorkerBridgeEnabled: PdlpApi.isWorkerBridgeEnabled,
   }));
+  setStatus({ ok: false, phase: 'cp-sat-solver-structure' });
+  const cpSatSolverStructure = await runWithWorkerStats(workerSpy, () =>
+    runCpSatSolverStructureCases(CpSatApi as never)
+  );
   setStatus({
     ok: true,
+    cpSatSolverStructureResults: cpSatSolverStructure.result,
+    cpSatSolverStructureWorkerStatsBefore: cpSatSolverStructure.before,
+    cpSatSolverStructureWorkerStatsAfter: cpSatSolverStructure.after,
     results: cpSat.result,
     cpSatWorkerStatsBefore: cpSat.before,
     cpSatWorkerStatsAfter: cpSat.after,
