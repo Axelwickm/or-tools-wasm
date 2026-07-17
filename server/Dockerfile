@@ -14,9 +14,12 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY CMakeLists.txt Version.txt ./
+COPY bridge-types ./bridge-types
 COPY cmake ./cmake
+COPY javascript/generated_proto_schemas.h.in ./javascript/generated_proto_schemas.h.in
 COPY ortools ./ortools
 COPY patches ./patches
+COPY scripts/embed_proto.cmake ./scripts/embed_proto.cmake
 COPY server ./server
 
 RUN set -eux; \
