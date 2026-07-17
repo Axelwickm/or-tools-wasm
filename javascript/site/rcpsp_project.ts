@@ -1,10 +1,10 @@
 import {
   initRcpsp,
-  isWorkerBridgeEnabled,
   RcpspModelBuilder,
   type RcpspScheduleTask,
-  setWorkerBridgeEnabled,
+  setExecutor,
 } from 'or-tools-wasm/rcpsp';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 type ActivitySpec = {
   name: string;
@@ -27,7 +27,7 @@ const statusEl = document.getElementById('status');
 const metricsEl = document.getElementById('metrics');
 const timelineEl = document.getElementById('timeline');
 const activitiesEl = document.getElementById('activities');
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const workersInput = document.getElementById('workers') as HTMLInputElement | null;
 
 let scheduleTasks: RcpspScheduleTask[] = [];
@@ -196,10 +196,9 @@ async function solve() {
     renderTimeline();
 
     const workers = Math.max(1, Number(workersInput?.value || 1));
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     appendStatus('Initializing RCPSP surface...');
     await initRcpsp();
-    appendStatus(`Solving with worker bridge ${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}...`);
+    appendStatus(`Solving with the ${executorSelector?.value ?? 'auto'} executor...`);
     const result = await buildProject().solve({ numWorkers: workers, maxTimeInSeconds: 5 });
     scheduleTasks = result.tasks;
     makespan = result.makespan;
@@ -214,6 +213,8 @@ async function solve() {
     setRunning(false);
   }
 }
+
+configureSolverExecutorSelector({ setExecutor }, executorSelector);
 
 activitiesEl?.addEventListener('pointerover', (event) => {
   const target = event.target;

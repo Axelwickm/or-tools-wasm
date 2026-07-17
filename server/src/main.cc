@@ -9,6 +9,7 @@
 #include "server/src/cp_sat_executor.h"
 #include "server/src/http_server.h"
 #include "server/src/job_scheduler.h"
+#include "server/src/knapsack_executor.h"
 #include "server/src/server_config.h"
 #include "server/src/solver_job_service.h"
 
@@ -21,6 +22,7 @@ int RunHttpServer(const ortools_wasm::server::ServerConfig& config) {
   ortools_wasm::server::JobScheduler scheduler(options);
   ortools_wasm::server::SolverJobService job_service(scheduler);
   job_service.Register(std::make_unique<ortools_wasm::server::CpSatExecutor>());
+  job_service.Register(std::make_unique<ortools_wasm::server::KnapsackExecutor>());
 
   std::cout << "server http_bind=" << config.host << ":" << config.port << '\n';
   if (config.bearer_token.empty()) {

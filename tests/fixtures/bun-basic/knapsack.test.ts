@@ -1,10 +1,8 @@
 import {
   initKnapsack,
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
-  setWorkerBridgeEnabled,
+  setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/knapsack';
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
@@ -15,13 +13,11 @@ await runBunFixture(async () => {
     initKnapsack,
     KnapsackSolver,
     KnapsackSolverType,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
-    isWorkerBridgeAvailable,
+    setExecutor,
   });
   assertAllCases('bun Knapsack', knapsackResults);
   console.log(`bun ran ${knapsackResults.length} Knapsack cases`);
 }, async () => {
-  setWorkerBridgeEnabled(false);
+  setExecutor({ type: 'direct' });
   await terminateLoadedRuntimeThreads();
 });

@@ -58,7 +58,7 @@ const commonNodeBuildOptions = {
   sourcemap: false,
 };
 
-async function patchBundledCpSatWorkerUrls() {
+async function patchBundledSolverWorkerUrls() {
   for (const entryName of ['cp-sat', 'rcpsp']) {
     const entryPath = path.join(outDir, `${entryName}.js`);
     const source = await readFile(entryPath, 'utf8');
@@ -75,6 +75,17 @@ async function patchBundledCpSatWorkerUrls() {
       await writeFile(entryPath, patchedSource);
     }
   }
+  const knapsackPath = path.join(outDir, 'knapsack.js');
+  const knapsackSource = await readFile(knapsackPath, 'utf8');
+  await writeFile(knapsackPath, knapsackSource
+    .replaceAll(
+      'new URL("./knapsack_node_worker_bridge.js", import.meta.url)',
+      'new URL("./knapsack/knapsack_node_worker_bridge.js", import.meta.url)',
+    )
+    .replaceAll(
+      'new URL("./worker.js", import.meta.url)',
+      'new URL("./knapsack/worker.js", import.meta.url)',
+    ));
 }
 
 await rm(outDir, { recursive: true, force: true });
@@ -94,6 +105,13 @@ await build({
   entryPoints: [path.join(sourceDir, 'ortools_worker.ts')],
   outfile: path.join(outDir, 'ortools_worker.js'),
   plugins: [rootExternalLoaderPlugin],
+});
+
+await build({
+  ...commonNodeBuildOptions,
+  entryPoints: [path.join(sourceDir, 'knapsack/worker.ts')],
+  outfile: path.join(outDir, 'knapsack/worker.js'),
+  plugins: [nestedExternalLoaderPlugin],
 });
 
 await build({
@@ -169,4 +187,25 @@ await import('./worker.js');
 `,
 );
 
-await patchBundledCpSatWorkerUrls();
+await writeFile(
+  path.join(outDir, 'knapsack/knapsack_node_worker_bridge.js'),
+  `import { parentPort } from 'node:worker_threads';
+
+if (!parentPort) {
+  throw new Error('Knapsack worker bridge must run inside a Node worker thread.');
+}
+
+const postToParent = parentPort.postMessage.bind(parentPort);
+Object.assign(globalThis, {
+  self: globalThis,
+  postMessage: (message, transfer) => postToParent(message, transfer),
+});
+parentPort.on('message', (message) => {
+  globalThis.onmessage?.({ data: message });
+});
+
+await import('./worker.js');
+`,
+);
+
+await patchBundledSolverWorkerUrls();

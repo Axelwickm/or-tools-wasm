@@ -8,9 +8,9 @@ import { runMPSolverCases } from './mp_solver_runner.ts';
 import { runNetworkFlowCases } from './network_flow_runner.ts';
 import { runPdlpCases } from './pdlp_runner.ts';
 import { runRcpspCases } from './rcpsp_runner.ts';
+import { executorFixtureModes, serverExecutorHost } from './shared_case.ts';
 import { runRoutingCases } from './routing_runner.ts';
 import { runSetCoverCases } from './set_cover_runner.ts';
-import { serverExecutorHost } from './shared_case.ts';
 
 type PackageModule = Record<string, any>;
 
@@ -55,7 +55,6 @@ type WorkerStats = {
   routingSolve: number;
   mpSolverSolve: number;
   mathOptSolve: number;
-  knapsackSolve: number;
   graphSolve: number;
   setCoverSolve: number;
   pdlpSolve: number;
@@ -242,7 +241,6 @@ function installWorkerSpy() {
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
         mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
-        knapsackSolve: messages.filter((message) => message.type === 'knapsackSolve').length,
         graphSolve: messages.filter((message) => message.type === 'graphSolve').length,
         setCoverSolve: messages.filter((message) => message.type === 'setCover').length,
         pdlpSolve: messages.filter((message) => message.type === 'pdlp').length,
@@ -340,10 +338,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     initKnapsack: KnapsackApi.initKnapsack,
     KnapsackSolver: KnapsackApi.KnapsackSolver,
     KnapsackSolverType: KnapsackApi.KnapsackSolverType,
-    setWorkerBridgeEnabled: KnapsackApi.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: KnapsackApi.isWorkerBridgeEnabled,
-    isWorkerBridgeAvailable: KnapsackApi.isWorkerBridgeAvailable,
-  }));
+    setExecutor: KnapsackApi.setExecutor,
+  }, { modes: executorFixtureModes }));
   setStatus({ ok: false, phase: 'network-flow' });
   const networkFlow = await runWithWorkerStats(workerSpy, () => runNetworkFlowCases({
     initNetworkFlow: NetworkFlowApi.initNetworkFlow,
@@ -356,7 +352,10 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   setStatus({ ok: false, phase: 'set-cover' });
   const setCover = await runWithWorkerStats(workerSpy, () => runSetCoverCases(SetCoverApi as never));
   setStatus({ ok: false, phase: 'rcpsp' });
-  const rcpsp = await runWithWorkerStats(workerSpy, () => runRcpspCases(RcpspApi as never));
+  const rcpsp = await runWithWorkerStats(workerSpy, () => runRcpspCases(
+    RcpspApi as never,
+    { modes: executorFixtureModes },
+  ));
   setStatus({ ok: false, phase: 'mathopt' });
   const mathOpt = await runWithWorkerStats(workerSpy, () => runMathOptCases({
     initMathOpt: MathOptApi.initMathOpt,

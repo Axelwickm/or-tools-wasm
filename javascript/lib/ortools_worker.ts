@@ -89,49 +89,6 @@ function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
   return ptr;
 }
 
-function flattenWeights(weights: number[][], itemCount: number) {
-  const flattened: number[] = [];
-  for (const dimension of weights) {
-    if (dimension.length !== itemCount) {
-      throw new Error('KnapsackSolver: each weight dimension must match profits length.');
-    }
-    flattened.push(...dimension);
-  }
-  return flattened;
-}
-
-async function solveKnapsackInWorker(message: Extract<WorkerRequest, { type: 'knapsackSolve' }>) {
-  const module = await loadMPSolverRuntime();
-  const profitsPtr = copyFloat64ToHeap(module, message.profits);
-  const weightsPtr = copyFloat64ToHeap(module, flattenWeights(message.weights, message.profits.length));
-  const capacitiesPtr = copyFloat64ToHeap(module, message.capacities);
-  const namePtr = module.allocateUTF8(message.name);
-  try {
-    return await module.ccall(
-      'knapsack_solve_serialized',
-      'string',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-      [
-        message.solverType,
-        namePtr,
-        message.useReduction ? 1 : 0,
-        message.timeLimitSeconds,
-        profitsPtr,
-        message.profits.length,
-        weightsPtr,
-        message.weights.length,
-        capacitiesPtr,
-      ],
-      { async: true },
-    ) as string;
-  } finally {
-    if (profitsPtr) module._free(profitsPtr);
-    if (weightsPtr) module._free(weightsPtr);
-    if (capacitiesPtr) module._free(capacitiesPtr);
-    module._free(namePtr);
-  }
-}
-
 async function solveGraphInWorker(message: Extract<WorkerRequest, { type: 'graphSolve' }>) {
   const module = await loadGraphRuntime();
   if (message.algorithm === 'maxFlow') {
@@ -573,11 +530,6 @@ const handlers = {
     type: 'mpSolverSolveResult',
     id: message.id,
     bytes: await solveMPSolverInWorker(message),
-  }),
-  knapsackSolve: async (message) => ({
-    type: 'knapsackSolveResult',
-    id: message.id,
-    result: await solveKnapsackInWorker(message),
   }),
   graphSolve: async (message) => ({
     type: 'graphSolveResult',

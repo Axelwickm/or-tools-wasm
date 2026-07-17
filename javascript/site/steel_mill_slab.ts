@@ -1,5 +1,5 @@
 import { CpSat, type CpSatModelInstance } from 'or-tools-wasm/cp-sat';
-import { configureCpSatExecutorSelector } from './cp_sat_executor_selector.js';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type SolverMethod = 'sat' | 'sat_table' | 'sat_column';
@@ -312,7 +312,7 @@ const setReadyIndicator = (text: string) => {
   }
 };
 
-configureCpSatExecutorSelector(CpSat, executorSelector);
+configureSolverExecutorSelector(CpSat, executorSelector);
 
 if (workersInput) {
   workersInput.max = String(maxWorkerCount);

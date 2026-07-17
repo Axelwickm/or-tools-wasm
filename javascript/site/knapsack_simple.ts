@@ -1,16 +1,16 @@
 import {
   initKnapsack,
-  isWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
-  setWorkerBridgeEnabled,
+  setExecutor,
 } from 'or-tools-wasm/knapsack';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 const matrixEl = document.getElementById('matrix') as HTMLTableElement | null;
 const solutionOutput = document.getElementById('solution-output');
 const usageOutput = document.getElementById('usage-output');
 const statusEl = document.getElementById('status');
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const addItemButton = document.getElementById('add-item') as HTMLButtonElement | null;
 const removeItemButton = document.getElementById('remove-item') as HTMLButtonElement | null;
@@ -181,7 +181,6 @@ async function runKnapsack() {
     renderMatrix();
     renderSolution();
 
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     appendStatus('Initializing Knapsack runtime...');
     await initKnapsack();
 
@@ -191,7 +190,7 @@ async function runKnapsack() {
     );
     solver.init(values, weights, capacities);
 
-    appendStatus(`Solving with worker bridge ${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}...`);
+    appendStatus(`Solving with ${executorSelector?.value ?? 'auto'} executor...`);
     lastProfit = await solver.solve();
     selectedItems = values
       .map((_, item) => item)
@@ -258,3 +257,4 @@ removeResourceButton?.addEventListener('click', removeResource);
 
 renderMatrix();
 renderSolution();
+configureSolverExecutorSelector({ setExecutor }, executorSelector);

@@ -112,18 +112,6 @@ export type MPSolverSolveRequest = {
   numThreads?: number;
 };
 
-export type KnapsackSolveRequest = {
-  type: 'knapsackSolve';
-  id: number;
-  solverType: number;
-  name: string;
-  useReduction: boolean;
-  timeLimitSeconds: number;
-  profits: number[];
-  weights: number[][];
-  capacities: number[];
-};
-
 export type GraphSolveRequest =
   | {
       type: 'graphSolve';
@@ -216,7 +204,6 @@ export type WorkerRequest =
   | SchemaRequest
   | RoutingSolveRequest
   | MPSolverSolveRequest
-  | KnapsackSolveRequest
   | GraphSolveRequest
   | SetCoverRequest
   | MathOptInitRequest
@@ -236,7 +223,6 @@ export type WorkerResponse =
   | { type: 'schemaResult'; id: number; schema: 'mp_solver'; schemas: { linear_solver: string; optional_boolean: string } }
   | { type: 'routingSolveResult'; id: number; result: RoutingSolveResult | null }
   | { type: 'mpSolverSolveResult'; id: number; bytes: Uint8Array }
-  | { type: 'knapsackSolveResult'; id: number; result: string }
   | { type: 'graphSolveResult'; id: number; result: string }
   | { type: 'setCoverResult'; id: number; result: string }
   | { type: 'mathOptInitResult'; id: number }

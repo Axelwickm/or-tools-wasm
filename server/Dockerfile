@@ -44,12 +44,13 @@ RUN --mount=type=cache,id=ortools-native-cmake-build,target=/build/server,sharin
     -DUSE_GLPK=OFF \
     -DUSE_HIGHS=OFF \
     -DUSE_PDLP=OFF \
-    -DUSE_SCIP=OFF \
+    -DUSE_SCIP=ON \
     -DUSE_XPRESS=OFF; \
   cmake --build /build/server --target \
     server_cp_sat_hello \
     server_job_scheduler_test \
     server_cp_sat_executor_test \
+    server_knapsack_executor_test \
     server_solver_job_service_test \
     server_config_test; \
   rm -rf /opt/ortools-server; \

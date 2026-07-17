@@ -96,9 +96,18 @@ const externalRuntimeLoaderPlugin = {
 const externalWorkerRuntimeLoaderPlugin = {
   name: 'external-worker-runtime-loader',
   setup(buildContext) {
-    externalRuntimeLoaderPlugin.setup(buildContext);
-    buildContext.onResolve({ filter: /^(?:\.\.?\/)+(?:runtime_loader|worker_bridge)\.js$/ }, (args) => ({
+    buildContext.onResolve({ filter: /^node:/ }, (args) => ({
       path: args.path,
+      external: true,
+    }));
+    buildContext.onResolve({ filter: /^@bufbuild\/protobuf(?:\/.*)?$/ }, (args) => ({
+      path: require.resolve(args.path),
+    }));
+    buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
+      path: require.resolve('protobufjs'),
+    }));
+    buildContext.onResolve({ filter: /^(?:\.\.?\/)+(?:runtime_loader|worker_bridge)\.js$/ }, (args) => ({
+      path: `../${path.basename(args.path)}`,
       external: true,
     }));
   },
@@ -123,25 +132,27 @@ async function bundleBrowserEntry() {
   }
 }
 
-async function bundleCpSatWorker() {
-  await build({
-    entryPoints: [path.join(sourceDir, 'cp_sat/worker.ts')],
-    outfile: path.join(outDir, 'cp_sat/worker.js'),
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    target: 'es2020',
-    define: {
-      __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
-    },
-    minifySyntax: true,
-    sourcemap: false,
-    plugins: [externalWorkerRuntimeLoaderPlugin],
-  });
+async function bundleSolverWorkers() {
+  for (const solver of ['cp_sat', 'knapsack']) {
+    await build({
+      entryPoints: [path.join(sourceDir, `${solver}/worker.ts`)],
+      outfile: path.join(outDir, `${solver}/worker.js`),
+      bundle: true,
+      format: 'esm',
+      platform: 'browser',
+      target: 'es2020',
+      define: {
+        __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
+      },
+      minifySyntax: true,
+      sourcemap: false,
+      plugins: [externalWorkerRuntimeLoaderPlugin],
+    });
+  }
 }
 
-async function patchBundledCpSatWorkerUrls() {
-  for (const entryName of publicEntryNames) {
+async function patchBundledSolverWorkerUrls() {
+  for (const entryName of ['cp-sat', 'rcpsp']) {
     const entryPath = path.join(outDir, `${entryName}.js`);
     const source = await readFile(entryPath, 'utf8');
     const patchedSource = source
@@ -155,6 +166,12 @@ async function patchBundledCpSatWorkerUrls() {
       await writeFile(entryPath, patchedSource);
     }
   }
+  const knapsackPath = path.join(outDir, 'knapsack.js');
+  const knapsackSource = await readFile(knapsackPath, 'utf8');
+  await writeFile(knapsackPath, knapsackSource
+    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./knapsack/worker.js", import.meta.url)')
+    .replaceAll('#internal-wasm/', '../wasm/')
+    .replaceAll('?no-inline', ''));
 }
 
 await rm(outDir, { recursive: true, force: true });
@@ -165,8 +182,8 @@ for await (const sourcePath of listTypeScriptFiles(sourceDir)) {
 }
 
 await bundleBrowserEntry();
-await bundleCpSatWorker();
-await patchBundledCpSatWorkerUrls();
+await bundleSolverWorkers();
+await patchBundledSolverWorkerUrls();
 
 try {
   for await (const declarationPath of listDeclarationFiles(path.join(packageBuildDir, 'lib'))) {

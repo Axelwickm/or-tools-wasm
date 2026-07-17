@@ -1,5 +1,11 @@
-import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { fixtureModesFor, passedCase, withWorkerBridgeMode } from './shared_case.ts';
+import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  fixtureModes,
+  passedCase,
+  serverExecutorConfiguration,
+  solverJobStates,
+} from './shared_case.ts';
 
 export type KnapsackCaseResult = {
   id: string;
@@ -8,16 +14,16 @@ export type KnapsackCaseResult = {
   source?: string;
   upstream?: string;
   tags?: string[];
-  mode?: FixtureMode;
+  mode?: ExecutorFixtureMode;
   ok: boolean;
   profit: number;
   selectedItems: number[];
   optimal: boolean;
-} & SharedCaseResult;
+} & SharedCaseResult<ExecutorFixtureMode>;
 
 type KnapsackSolverLike = {
   init(profits: number[], weights: number[][], capacities: number[]): void;
-  solve(): Promise<number>;
+  solve(options?: { onEvent?: (event: { type: string; status?: { state: number } }) => void }): Promise<number>;
   best_solution_contains(itemId: number): boolean;
   is_solution_optimal(): boolean;
   set_use_reduction(useReduction: boolean): void;
@@ -36,9 +42,7 @@ export type KnapsackApi = {
     KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER: number;
     KNAPSACK_DIVIDE_AND_CONQUER_SOLVER: number;
   };
-  setWorkerBridgeEnabled: (enabled: boolean) => void;
-  isWorkerBridgeEnabled: () => boolean;
-  isWorkerBridgeAvailable?: () => boolean;
+  setExecutor(configuration: { type: 'auto' | 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -58,7 +62,14 @@ async function realSolve(
   const solver = new api.KnapsackSolver(solverType, 'solver');
   solver.set_use_reduction(useReduction);
   solver.init(profits, weights, capacities);
-  const profit = await solver.solve();
+  const states: number[] = [];
+  const profit = await solver.solve({
+    onEvent: (event) => {
+      if (event.type === 'status' && event.status) states.push(event.status.state);
+    },
+  });
+  assert(states.includes(solverJobStates.RUNNING), 'Knapsack solve did not emit RUNNING status');
+  assert(states.includes(solverJobStates.SUCCEEDED), 'Knapsack solve did not emit SUCCEEDED status');
   return {
     profit,
     selectedItems: profits.map((_, item) => item).filter((item) => solver.best_solution_contains(item)),
@@ -163,7 +174,7 @@ async function solveKnapsackProblem(
 
 async function runKnapsackProblemCase(
   api: KnapsackApi,
-  mode: FixtureMode,
+  mode: ExecutorFixtureMode,
   name: string,
   profits: number[],
   weights: number[][],
@@ -184,7 +195,7 @@ type KnapsackCase = SharedCase<KnapsackApi, {
   profit: number;
   selectedItems: number[];
   optimal: boolean;
-}>;
+}, ExecutorFixtureMode>;
 
 export const knapsackCases: KnapsackCase[] = [
   {
@@ -264,16 +275,24 @@ export const knapsackCases: KnapsackCase[] = [
   },
 ];
 
-export async function runKnapsackCases(api: KnapsackApi): Promise<KnapsackCaseResult[]> {
-  await api.initKnapsack();
+export async function runKnapsackCases(
+  api: KnapsackApi,
+  options: { modes?: readonly ExecutorFixtureMode[] } = {},
+): Promise<KnapsackCaseResult[]> {
   const results: KnapsackCaseResult[] = [];
-  for (const mode of fixtureModesFor(api)) {
-    await withWorkerBridgeMode(api, mode, 'Knapsack', async () => {
+  const modes = options.modes ?? fixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
+  for (const mode of modes) {
+    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
+    try {
+      await api.initKnapsack();
       for (const testCase of knapsackCases) {
         const result = await testCase.run(api, { mode });
         results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
       }
-    });
+    } finally {
+      api.setExecutor({ type: 'auto' });
+    }
   }
   return results;
 }

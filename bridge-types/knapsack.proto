@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+// Knapsack solver payloads carried by the generic job.proto envelope.
+message KnapsackBridgeRequest {
+  int32 solver_type = 1;
+  string name = 2;
+  bool use_reduction = 3;
+  double time_limit_seconds = 4;
+  repeated double profits = 5;
+  repeated KnapsackWeightDimension weights = 6;
+  repeated double capacities = 7;
+}
+
+message KnapsackWeightDimension {
+  repeated double values = 1;
+}
+
+message KnapsackBridgeResponse {
+  double profit = 1;
+  bool optimal = 2;
+  repeated bool contains = 3;
+}

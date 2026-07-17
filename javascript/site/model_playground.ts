@@ -4,7 +4,7 @@ import {
   type CpSatEventMask,
   type SatParameters,
 } from 'or-tools-wasm/cp-sat';
-import { configureCpSatExecutorSelector } from './cp_sat_executor_selector.js';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 const sampleModel = {
@@ -206,7 +206,7 @@ async function solveModel() {
   }
 }
 
-configureCpSatExecutorSelector(CpSat, executorSelector);
+configureSolverExecutorSelector(CpSat, executorSelector);
 
 loadSampleButton?.addEventListener('click', loadSample);
 validateButton?.addEventListener('click', () => {

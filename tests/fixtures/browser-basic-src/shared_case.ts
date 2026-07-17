@@ -6,6 +6,11 @@ export type ExecutorFixtureMode = FixtureMode | 'server';
 
 export const executorFixtureModes: readonly ExecutorFixtureMode[] = ['direct', 'worker', 'server'];
 
+export const solverJobStates = {
+  RUNNING: 3,
+  SUCCEEDED: 6,
+} as const;
+
 export const serverExecutorHost = 'http://127.0.0.1:17827/';
 export const serverExecutorAuthToken: string | undefined = undefined;
 

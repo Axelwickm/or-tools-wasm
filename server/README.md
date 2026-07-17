@@ -1,7 +1,7 @@
-# Native OR-Tools Server Sandbox
+# Native OR-Tools Server
 
-This folder builds a small native C++ CP-SAT executable against the checked-in
-Google OR-Tools source.
+This folder builds the native solver job server against the checked-in Google
+OR-Tools source.
 
 Build and run it with Docker Compose:
 
@@ -65,11 +65,11 @@ Event reads are non-destructive. Each retained status transition and solver
 event has a monotonically increasing sequence ID, so clients can poll without
 losing or duplicating callbacks.
 
-The native server currently registers CP-SAT and supports schema, validate,
-and solve requests. Cancellation uses the same generic protobuf command as the
-worker executor. Queued cancellation is immediate; a running executor receives
-a scoped cancellation signal, which CP-SAT handles with its native search-stop
-mechanism.
+The native server currently registers CP-SAT and Knapsack executors. CP-SAT
+supports schema, validate, solve, callbacks, and native search interruption.
+Knapsack jobs reserve one scheduler thread and return the same typed result as
+the direct and worker executors. Cancellation uses the same generic protobuf
+command for every solver; queued cancellation is immediate.
 
 The server path is native C++. JavaScript remains only on the client/package
 side for selecting a server executor and sending bridge protobuf bytes.

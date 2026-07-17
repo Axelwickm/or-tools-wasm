@@ -263,6 +263,10 @@ async function loadMpSolverModule(): Promise<OrToolsWasmModule> {
   return mpSolverModule;
 }
 
+export async function loadKnapsackNative(): Promise<void> {
+  await loadMpSolverModule();
+}
+
 function getMpSolverModule(): OrToolsWasmModule {
   if (!mpSolverModule) {
     throw new Error('MPSolver API is not initialized. Call await initMPSolver() before constructing MPSolver objects.');
@@ -522,13 +526,6 @@ export async function initMPSolver(): Promise<void> {
   await loadMpSolverModule();
 }
 
-export async function initKnapsack(): Promise<void> {
-  if (shouldUseMPSolverBridge()) {
-    return;
-  }
-  await loadMpSolverModule();
-}
-
 export function isMPSolverWorkerBridgeAvailable(): boolean {
   return isMPSolverWorkerBridgeRuntimeAvailable();
 }
@@ -616,20 +613,7 @@ export enum ScalingValues {
   SCALING_ON = 1,
 }
 
-export enum KnapsackSolverType {
-  KNAPSACK_BRUTE_FORCE_SOLVER = 0,
-  KNAPSACK_64ITEMS_SOLVER = 1,
-  KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER = 2,
-  KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER = 3,
-  KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER = 5,
-  KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER = 6,
-  KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER = 7,
-  KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER = 8,
-  KNAPSACK_DIVIDE_AND_CONQUER_SOLVER = 9,
-  KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER = 10,
-}
-
-type NativeKnapsackResult = {
+export type NativeKnapsackResult = {
   ok: boolean;
   profit?: number;
   optimal?: boolean;
@@ -665,8 +649,8 @@ function parseKnapsackResult(serialized: string): NativeKnapsackResult {
   return result;
 }
 
-async function solveKnapsackDirect(
-  solverType: KnapsackSolverType,
+export async function executeKnapsackNative(
+  solverType: number,
   name: string,
   useReduction: boolean,
   timeLimitSeconds: number,
@@ -704,138 +688,6 @@ async function solveKnapsackDirect(
     if (profitsPtr) module._free(profitsPtr);
     if (weightsPtr) module._free(weightsPtr);
     if (capacitiesPtr) module._free(capacitiesPtr);
-  }
-}
-
-async function solveKnapsack(
-  solverType: KnapsackSolverType,
-  name: string,
-  useReduction: boolean,
-  timeLimitSeconds: number,
-  profits: number[],
-  weights: number[][],
-  capacities: number[],
-): Promise<NativeKnapsackResult> {
-  if (shouldUseMPSolverBridge()) {
-    const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'knapsackSolveResult' }>>({
-      type: 'knapsackSolve',
-      id: nextWorkerBridgeRequestId(),
-      solverType,
-      name,
-      useReduction,
-      timeLimitSeconds,
-      profits,
-      weights,
-      capacities,
-    });
-    return parseKnapsackResult(response.result);
-  }
-  return solveKnapsackDirect(solverType, name, useReduction, timeLimitSeconds, profits, weights, capacities);
-}
-
-export class KnapsackSolver {
-  static readonly SolverType = KnapsackSolverType;
-  static readonly KNAPSACK_BRUTE_FORCE_SOLVER = KnapsackSolverType.KNAPSACK_BRUTE_FORCE_SOLVER;
-  static readonly KNAPSACK_64ITEMS_SOLVER = KnapsackSolverType.KNAPSACK_64ITEMS_SOLVER;
-  static readonly KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER = KnapsackSolverType.KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER;
-  static readonly KNAPSACK_DIVIDE_AND_CONQUER_SOLVER = KnapsackSolverType.KNAPSACK_DIVIDE_AND_CONQUER_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER;
-
-  private profits: number[] = [];
-  private weights: number[][] = [];
-  private capacities: number[] = [];
-  private useReduction = true;
-  private timeLimitSeconds = 0;
-  private solutionContains: boolean[] = [];
-  private solutionOptimal = false;
-
-  constructor(
-    private readonly solverType: KnapsackSolverType,
-    private readonly solverName: string,
-  ) {
-    if (!shouldUseMPSolverBridge()) {
-      getMpSolverModule();
-    }
-  }
-
-  init(profits: number[], weights: number[][], capacities: number[]): void {
-    if (weights.length !== capacities.length) {
-      throw new Error('KnapsackSolver.init: weights dimensions must match capacities length.');
-    }
-    flattenKnapsackWeights(weights, profits.length);
-    this.profits = [...profits];
-    this.weights = weights.map((dimension) => [...dimension]);
-    this.capacities = [...capacities];
-    this.solutionContains = [];
-    this.solutionOptimal = false;
-  }
-
-  Init(profits: number[], weights: number[][], capacities: number[]): void {
-    this.init(profits, weights, capacities);
-  }
-
-  async solve(): Promise<number> {
-    const result = await solveKnapsack(
-      this.solverType,
-      this.solverName,
-      this.useReduction,
-      this.timeLimitSeconds,
-      this.profits,
-      this.weights,
-      this.capacities,
-    );
-    this.solutionContains = result.contains ?? [];
-    this.solutionOptimal = result.optimal === true;
-    return Number(result.profit ?? 0);
-  }
-
-  Solve(): Promise<number> {
-    return this.solve();
-  }
-
-  best_solution_contains(itemId: number): boolean {
-    return this.solutionContains[itemId] === true;
-  }
-
-  BestSolutionContains(itemId: number): boolean {
-    return this.best_solution_contains(itemId);
-  }
-
-  is_solution_optimal(): boolean {
-    return this.solutionOptimal;
-  }
-
-  IsSolutionOptimal(): boolean {
-    return this.is_solution_optimal();
-  }
-
-  set_use_reduction(useReduction: boolean): void {
-    this.useReduction = useReduction;
-  }
-
-  SetUseReduction(useReduction: boolean): void {
-    this.set_use_reduction(useReduction);
-  }
-
-  set_time_limit(timeLimitSeconds: number): void {
-    this.timeLimitSeconds = timeLimitSeconds;
-  }
-
-  SetTimeLimit(timeLimitSeconds: number): void {
-    this.set_time_limit(timeLimitSeconds);
-  }
-
-  getName(): string {
-    return this.solverName;
-  }
-
-  GetName(): string {
-    return this.getName();
   }
 }
 

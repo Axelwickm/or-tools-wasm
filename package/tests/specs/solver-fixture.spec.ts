@@ -189,12 +189,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       bridgeTerminated?: number;
     };
     knapsackWorkerStatsBefore?: {
-      knapsackSolve?: number;
+      executorWorkerRequests?: Record<string, number>;
+      activeExecutorWorkers?: Record<string, number>;
     };
     knapsackWorkerStatsAfter?: {
-      knapsackSolve?: number;
       activeBridge?: number;
       bridgeTerminated?: number;
+      executorWorkerRequests?: Record<string, number>;
+      activeExecutorWorkers?: Record<string, number>;
     };
     networkFlowWorkerStatsBefore?: {
       graphSolve?: number;
@@ -445,10 +447,13 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }),
   ]));
   expectStableCaseIds(parsedStatus.mpSolverResults, 'MPSolver');
-  expect(parsedStatus.knapsackWorkerStatsBefore?.knapsackSolve).toBe(0);
-  expect(parsedStatus.knapsackWorkerStatsAfter?.knapsackSolve).toBeGreaterThanOrEqual(3);
+  expect(parsedStatus.knapsackWorkerStatsAfter?.executorWorkerRequests?.knapsack).toBeGreaterThan(
+    parsedStatus.knapsackWorkerStatsBefore?.executorWorkerRequests?.knapsack ?? 0,
+  );
   expect(parsedStatus.knapsackWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.knapsackWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.knapsackWorkerStatsAfter?.activeExecutorWorkers?.knapsack).toBeGreaterThan(
+    parsedStatus.knapsackWorkerStatsBefore?.activeExecutorWorkers?.knapsack ?? 0,
+  );
   expect(parsedStatus.knapsackResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
       name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension (direct)',
@@ -466,6 +471,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension (worker)',
       ok: true,
       profit: 7534,
+      optimal: true,
+    }),
+    expect.objectContaining({
+      name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension (server)',
+      ok: true,
+      profit: 34,
       optimal: true,
     }),
   ]));
@@ -500,27 +511,26 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   expect(parsedStatus.rcpspWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
     parsedStatus.rcpspWorkerStatsBefore?.executorWorkerRequests?.['cp-sat'] ?? 0,
   );
-  expect(parsedStatus.rcpspWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.rcpspWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
   expect(parsedStatus.rcpspResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      name: 'RcpspTest.testParseAndAccess (direct)',
+      name: 'RcpspTest.testParseAndAccess',
       ok: true,
       makespan: null,
     }),
     expect.objectContaining({
-      name: 'RcpspTest.testParseAndAccess (worker)',
-      ok: true,
-      makespan: null,
-    }),
-    expect.objectContaining({
-      name: 'RcpspCpSatSample.house_project (direct, 1 worker)',
+      name: 'RcpspCpSatSample.house_project (direct)',
       ok: true,
       makespan: 8,
       statusName: 'OPTIMAL',
     }),
     expect.objectContaining({
-      name: 'RcpspCpSatSample.house_project (worker, 4 workers)',
+      name: 'RcpspCpSatSample.house_project (worker)',
+      ok: true,
+      makespan: 8,
+      statusName: 'OPTIMAL',
+    }),
+    expect.objectContaining({
+      name: 'RcpspCpSatSample.house_project (server)',
       ok: true,
       makespan: 8,
       statusName: 'OPTIMAL',

@@ -1,5 +1,5 @@
 import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
-import { configureCpSatExecutorSelector } from './cp_sat_executor_selector.js';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Domain = [number, number] | number[];
@@ -49,7 +49,7 @@ if (workerInput) {
   workerInput.min = '1';
   workerInput.value = String(maxWorkerCount);
 }
-configureCpSatExecutorSelector(CpSat, executorSelector);
+configureSolverExecutorSelector(CpSat, executorSelector);
 
 function append(text: string) {
   if (statusEl) {

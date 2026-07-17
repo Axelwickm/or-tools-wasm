@@ -14,11 +14,9 @@ import {
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
-  isWorkerBridgeAvailable as isKnapsackWorkerBridgeAvailable,
-  isWorkerBridgeEnabled as isKnapsackWorkerBridgeEnabled,
   KnapsackSolver,
   KnapsackSolverType,
-  setWorkerBridgeEnabled as setKnapsackWorkerBridgeEnabled,
+  setExecutor as setKnapsackExecutor,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
@@ -153,9 +151,7 @@ test('runs the shared Knapsack cases in Node', async (t) => {
     initKnapsack,
     KnapsackSolver,
     KnapsackSolverType,
-    setWorkerBridgeEnabled: setKnapsackWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isKnapsackWorkerBridgeEnabled,
-    isWorkerBridgeAvailable: isKnapsackWorkerBridgeAvailable,
+    setExecutor: setKnapsackExecutor,
   });
   await assertCaseResults(t, 'node Knapsack', knapsackResults);
 });

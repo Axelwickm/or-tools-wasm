@@ -1,5 +1,11 @@
-import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { fixtureModes, passedCase, setWorkerBridgeMode } from './shared_case.ts';
+import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  fixtureModes,
+  passedCase,
+  serverExecutorConfiguration,
+  solverJobStates,
+} from './shared_case.ts';
 
 export type RcpspCaseResult = {
   id: string;
@@ -8,11 +14,18 @@ export type RcpspCaseResult = {
   source?: string;
   upstream?: string;
   tags?: string[];
-  mode?: FixtureMode;
+  mode?: ExecutorFixtureMode;
   ok: boolean;
   makespan: number | null;
   statusName?: string;
-} & SharedCaseResult;
+} & SharedCaseResult<ExecutorFixtureMode>;
+
+type RcpspEventLike =
+  | { type: 'status'; status: { state: number } }
+  | { type: 'failure'; failure: { message: string } }
+  | { type: 'solution'; makespan: number; tasks: Array<{ name: string; start: number; end: number }> }
+  | { type: 'bestBound'; bound: number }
+  | { type: 'log'; message: string };
 
 type RcpspProblemProtoLike = {
   resources?: unknown[];
@@ -28,7 +41,11 @@ type RcpspParserLike = {
 type RcpspProblemLike = {
   export_model_as_proto(): RcpspProblemProtoLike;
   to_cp_sat_model(): { proto(): { constraints?: unknown[] } };
-  solve(params?: unknown): Promise<{
+  solve(params?: unknown, options?: {
+    onEvent?(event: RcpspEventLike): void | Promise<void>;
+    eventMask?: { solution?: boolean; bestBound?: boolean; log?: boolean };
+    signal?: AbortSignal;
+  }): Promise<{
     makespan: number | null;
     statusName: string;
     tasks: Array<{ name: string; start: number; end: number; demands: number[]; successors: number[] }>;
@@ -49,9 +66,10 @@ export type RcpspApi = {
     from_proto(proto: RcpspProblemProtoLike): RcpspProblemLike;
   };
   RcpspModelBuilder: { new(name?: string): RcpspModelBuilderLike };
-  setWorkerBridgeEnabled(enabled: boolean): void;
-  isWorkerBridgeEnabled(): boolean;
-  setExecutor(configuration: { type: 'auto' | FixtureMode }): void;
+  setExecutor(configuration:
+    | { type: 'auto' | 'direct' | 'worker' }
+    | { type: 'server'; host: string; authToken?: string; statusIntervalMs?: number }
+  ): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -152,19 +170,19 @@ RESOURCEAVAILABILITIES:
    12   13    4   12
 ************************************************************************`;
 
-async function runParserParity(api: RcpspApi, mode: FixtureMode): Promise<{ makespan: null }> {
+async function runParserParity(api: RcpspApi): Promise<{ makespan: null }> {
   // TEMP: parity - mirrors ortools/scheduling/python/rcpsp_test.py
   // RcpspTest.testParseAndAccess assertion-by-assertion, using parse_string()
   // because browser fixtures do not expose Python's filesystem parse_file path.
   const parser = new api.RcpspParser();
-  assert(parser.parse_string(J301_1_SM), `RcpspTest.testParseAndAccess (${mode}) parse_string`);
+  assert(parser.parse_string(J301_1_SM), 'RcpspTest.testParseAndAccess parse_string');
   const problem = parser.problem();
-  assert(problem.resources?.length === 4, `RcpspTest.testParseAndAccess (${mode}) resources length`);
-  assert(problem.tasks?.length === 32, `RcpspTest.testParseAndAccess (${mode}) tasks length`);
+  assert(problem.resources?.length === 4, 'RcpspTest.testParseAndAccess resources length');
+  assert(problem.tasks?.length === 32, 'RcpspTest.testParseAndAccess tasks length');
   return { makespan: null };
 }
 
-async function runCpSatBackedSchedule(api: RcpspApi, mode: FixtureMode, numWorkers: number): Promise<{ makespan: number | null; statusName: string }> {
+async function runCpSatBackedSchedule(api: RcpspApi, mode: ExecutorFixtureMode): Promise<{ makespan: number | null; statusName: string }> {
   const problem = new api.RcpspModelBuilder('house_project')
     .add_resource({ name: 'crew', capacity: 3 })
     .add_activity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
@@ -177,17 +195,39 @@ async function runCpSatBackedSchedule(api: RcpspApi, mode: FixtureMode, numWorke
   assert(proto.resources?.length === 1, `RCPSP CP-SAT sample (${mode}) resources length`);
   assert(proto.tasks?.length === 7, `RCPSP CP-SAT sample (${mode}) source/tasks/sink length`);
   assert((problem.to_cp_sat_model().proto().constraints ?? []).length > 0, `RCPSP CP-SAT sample (${mode}) generated constraints`);
-  const result = await problem.solve({ numWorkers, maxTimeInSeconds: 5 });
-  assert(result.statusName === 'OPTIMAL' || result.statusName === 'FEASIBLE', `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) status ${result.statusName}`);
-  assert(result.makespan === 8, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) expected makespan 8, got ${result.makespan}`);
+  const events: RcpspEventLike[] = [];
+  const result = await problem.solve({ numWorkers: 1, maxTimeInSeconds: 5 }, {
+    eventMask: { solution: true, bestBound: true },
+    onEvent: (event) => {
+      events.push(event);
+    },
+  });
+  assert(result.statusName === 'OPTIMAL' || result.statusName === 'FEASIBLE', `RCPSP CP-SAT sample (${mode}) status ${result.statusName}`);
+  assert(result.makespan === 8, `RCPSP CP-SAT sample (${mode}) expected makespan 8, got ${result.makespan}`);
   const byName = new Map(result.tasks.map((task) => [task.name, task]));
-  assert(byName.get('site')?.start === 0, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) site start`);
-  assert(byName.get('frame')?.start === 3, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) frame start`);
-  assert(byName.get('inspect')?.end === 8, `RCPSP CP-SAT sample (${mode}, ${numWorkers} workers) inspect end`);
+  assert(byName.get('site')?.start === 0, `RCPSP CP-SAT sample (${mode}) site start`);
+  assert(byName.get('frame')?.start === 3, `RCPSP CP-SAT sample (${mode}) frame start`);
+  assert(byName.get('inspect')?.end === 8, `RCPSP CP-SAT sample (${mode}) inspect end`);
+  const states = events.flatMap((event) => event.type === 'status' ? [event.status.state] : []);
+  assert(states.includes(solverJobStates.RUNNING), `RCPSP CP-SAT sample (${mode}) missing RUNNING status`);
+  assert(states.includes(solverJobStates.SUCCEEDED), `RCPSP CP-SAT sample (${mode}) missing SUCCEEDED status`);
+  const solution = events.find((event) => event.type === 'solution');
+  assert(solution?.type === 'solution', `RCPSP CP-SAT sample (${mode}) missing semantic solution event`);
+  assert(solution.makespan === 8, `RCPSP CP-SAT sample (${mode}) event makespan`);
+  assert(solution.tasks.some((task) => task.name === 'inspect' && task.end === 8), `RCPSP CP-SAT sample (${mode}) event schedule`);
+  const controller = new AbortController();
+  controller.abort();
+  let cancellation: unknown = null;
+  try {
+    await problem.solve({ numWorkers: 1 }, { signal: controller.signal });
+  } catch (error) {
+    cancellation = error;
+  }
+  assert(cancellation instanceof Error && cancellation.name === 'AbortError', `RCPSP CP-SAT sample (${mode}) AbortSignal cancellation`);
   return { makespan: result.makespan, statusName: result.statusName };
 }
 
-type RcpspCase = SharedCase<RcpspApi, { makespan: number | null; statusName?: string }>;
+type RcpspCase = SharedCase<RcpspApi, { makespan: number | null; statusName?: string }, ExecutorFixtureMode>;
 
 export const rcpspCases: RcpspCase[] = [
   {
@@ -197,38 +237,36 @@ export const rcpspCases: RcpspCase[] = [
     source: 'ortools/scheduling/python/rcpsp_test.py',
     upstream: 'RcpspTest.testParseAndAccess',
     tags: ['python-parity', 'parser'],
-    run: (api, context) => runParserParity(api, context.mode ?? 'direct'),
+    run: (api) => runParserParity(api),
   },
   {
     id: 'rcpsp.sample.house_project_cp_sat',
     name: 'RcpspCpSatSample.house_project',
     solver: 'rcpsp',
-    tags: ['contract', 'cp-sat-backed', 'threading'],
-    run: (api, context) => runCpSatBackedSchedule(api, context.mode ?? 'direct', context.threads ?? 1),
+    tags: ['contract', 'cp-sat-backed', 'events'],
+    run: (api, context) => runCpSatBackedSchedule(api, context.mode ?? 'direct'),
   },
 ];
 
-export async function runRcpspCases(api: RcpspApi): Promise<RcpspCaseResult[]> {
+export async function runRcpspCases(
+  api: RcpspApi,
+  options: { modes?: readonly ExecutorFixtureMode[] } = {},
+): Promise<RcpspCaseResult[]> {
   await api.initRcpsp();
   const results: RcpspCaseResult[] = [];
-  for (const mode of fixtureModes) {
-    setWorkerBridgeMode(api, mode, 'RCPSP');
-    api.setExecutor({ type: mode });
+  const parserCase = rcpspCases[0];
+  results.push(passedCase(parserCase, {}, await parserCase.run(api, {})));
+  const modes = options.modes ?? fixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
+  const solveCase = rcpspCases[1];
+  for (const mode of modes) {
+    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
     try {
-      for (const testCase of rcpspCases) {
-        const threadsToRun = testCase.tags?.includes('threading') ? [1, 4] : [undefined];
-        for (const threads of threadsToRun) {
-          const context = { mode, threads };
-          const name = threads === undefined
-            ? `${testCase.name} (${mode})`
-            : `${testCase.name} (${mode}, ${threads} worker${threads === 1 ? '' : 's'})`;
-          const result = await testCase.run(api, context);
-          results.push(passedCase({ ...testCase, name }, context, result));
-        }
-      }
+      const context = { mode };
+      const result = await solveCase.run(api, context);
+      results.push(passedCase({ ...solveCase, name: `${solveCase.name} (${mode})` }, context, result));
     } finally {
       api.setExecutor({ type: 'auto' });
-      api.setWorkerBridgeEnabled(false);
     }
   }
   return results;

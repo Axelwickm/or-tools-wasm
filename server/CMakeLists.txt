@@ -38,7 +38,7 @@ set(USE_GUROBI OFF CACHE BOOL "Use Gurobi solver" FORCE)
 set(USE_GLPK OFF CACHE BOOL "Use GLPK solver" FORCE)
 set(USE_HIGHS OFF CACHE BOOL "Use HiGHS solver" FORCE)
 set(USE_PDLP OFF CACHE BOOL "Use PDLP solver" FORCE)
-set(USE_SCIP OFF CACHE BOOL "Use SCIP solver" FORCE)
+set(USE_SCIP ON CACHE BOOL "Use SCIP solver" FORCE)
 set(USE_XPRESS OFF CACHE BOOL "Use Xpress solver" FORCE)
 
 if(NOT TARGET ortools::ortools)
@@ -54,10 +54,12 @@ set(SERVER_OPTIONAL_BOOLEAN_PROTO "${REPO_ROOT}/ortools/util/optional_boolean.pr
 set(SERVER_PROTO_SCHEMA_TEMPLATE "${REPO_ROOT}/javascript/generated_proto_schemas.h.in")
 set(BRIDGE_PROTO_SRCS
   "${BRIDGE_PROTO_OUT_DIR}/job.pb.cc"
-  "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.cc")
+  "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.cc")
 set(BRIDGE_PROTO_HDRS
   "${BRIDGE_PROTO_OUT_DIR}/job.pb.h"
-  "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.h")
+  "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.h")
 
 add_custom_command(
   OUTPUT ${BRIDGE_PROTO_SRCS} ${BRIDGE_PROTO_HDRS}
@@ -67,9 +69,11 @@ add_custom_command(
     "--cpp_out=${BRIDGE_PROTO_OUT_DIR}"
     "job.proto"
     "cp_sat.proto"
+    "knapsack.proto"
   DEPENDS
     "${REPO_ROOT}/bridge-types/job.proto"
     "${REPO_ROOT}/bridge-types/cp_sat.proto"
+    "${REPO_ROOT}/bridge-types/knapsack.proto"
     protobuf::protoc
   COMMENT "Generate C++ protobufs for server bridge types"
   VERBATIM)
@@ -112,6 +116,7 @@ add_executable(server_cp_sat_hello
   src/cp_sat_executor.cc
   src/http_server.cc
   src/job_scheduler.cc
+  src/knapsack_executor.cc
   src/main.cc
   src/server_config.cc
   src/solver_job_service.cc)
@@ -161,9 +166,22 @@ target_link_libraries(server_cp_sat_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
+add_executable(server_knapsack_executor_test
+  src/job_scheduler.cc
+  src/knapsack_executor.cc
+  src/knapsack_executor_test.cc)
+target_include_directories(server_knapsack_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_knapsack_executor_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
 if(BUILD_TESTING)
   add_test(NAME server_job_scheduler_test COMMAND server_job_scheduler_test)
   add_test(NAME server_config_test COMMAND server_config_test)
   add_test(NAME server_solver_job_service_test COMMAND server_solver_job_service_test)
   add_test(NAME server_cp_sat_executor_test COMMAND server_cp_sat_executor_test)
+  add_test(NAME server_knapsack_executor_test COMMAND server_knapsack_executor_test)
 endif()
