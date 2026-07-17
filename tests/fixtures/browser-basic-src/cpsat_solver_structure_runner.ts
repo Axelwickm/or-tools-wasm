@@ -32,7 +32,7 @@ type CpSatPackageApi = {
 
 type SolverStructureMode = 'auto' | ExecutorFixtureMode;
 
-export type CpSatSolverStructureResult = SharedCaseResult & {
+export type CpSatSolverStructureResult = SharedCaseResult<ExecutorFixtureMode> & {
   executor?: SolverStructureMode;
   publicMethods?: string[];
   solverStatus?: unknown;

@@ -81,26 +81,30 @@ export type SharedCaseMetadata = {
   tags?: string[];
 };
 
-export type SharedCaseContext = {
-  mode?: ExecutorFixtureMode;
+export type SharedCaseContext<Mode extends string = FixtureMode> = {
+  mode?: Mode;
   workerProfile?: string;
   params?: Record<string, unknown>;
   threads?: number;
 };
 
-export type SharedCase<Api, Result extends Record<string, unknown> = Record<string, unknown>> = SharedCaseMetadata & {
-  run(api: Api, context: SharedCaseContext): Promise<Result>;
+export type SharedCase<
+  Api,
+  Result extends Record<string, unknown> = Record<string, unknown>,
+  Mode extends string = FixtureMode,
+> = SharedCaseMetadata & {
+  run(api: Api, context: SharedCaseContext<Mode>): Promise<Result>;
 };
 
-export type SharedCaseResult = SharedCaseMetadata & SharedCaseContext & {
+export type SharedCaseResult<Mode extends string = FixtureMode> = SharedCaseMetadata & SharedCaseContext<Mode> & {
   ok: boolean;
 };
 
-export function passedCase<Result extends Record<string, unknown>>(
+export function passedCase<Result extends Record<string, unknown>, Mode extends string = FixtureMode>(
   testCase: SharedCaseMetadata,
-  context: SharedCaseContext,
+  context: SharedCaseContext<Mode>,
   result: Result,
-): SharedCaseResult & Result {
+): SharedCaseResult<Mode> & Result {
   return {
     ...result,
     id: testCase.id,
