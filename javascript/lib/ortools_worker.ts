@@ -36,46 +36,40 @@ async function loadCpSatRuntime() {
 const readUint32LE = (buffer: ArrayBufferLike, ptr: number) =>
   new DataView(buffer, ptr, 4).getUint32(0, true);
 
-function readUint32FromBytes(bytes: Uint8Array, offset: number) {
-  return new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, true);
-}
-
-function postCallbackEnvelopeEvents(id: number, bytes: Uint8Array) {
-  let offset = 0;
-  const eventCount = readUint32FromBytes(bytes, offset);
-  offset += 4;
-  for (let i = 0; i < eventCount; i++) {
-    const eventType = bytes[offset++];
-    const payloadLength = readUint32FromBytes(bytes, offset);
-    offset += 4;
-    const payload = bytes.slice(offset, offset + payloadLength);
-    offset += payloadLength;
+function registerCpSatCallbackSink(module: OrToolsWasmModule, requestId: number) {
+  const callbacks: {
+    nextId: number;
+    sinks: Map<number, (eventType: number, payload: Uint8Array) => void>;
+  } = module.__ortoolsCpSatCallbacks ??= {
+    nextId: 1,
+    sinks: new Map<number, (eventType: number, payload: Uint8Array) => void>(),
+  };
+  const callbackId = callbacks.nextId++;
+  callbacks.sinks.set(callbackId, (eventType, payload) => {
     if (eventType === SOLUTION_CALLBACK_EVENT) {
       workerScope.postMessage({
         type: 'solveCallback',
-        id,
+        id: requestId,
         eventType: 'solution',
         bytes: payload,
       } satisfies WorkerResponse);
     } else if (eventType === BEST_BOUND_CALLBACK_EVENT) {
       workerScope.postMessage({
         type: 'solveCallback',
-        id,
+        id: requestId,
         eventType: 'bestBound',
         bound: new DataView(payload.buffer, payload.byteOffset, payload.byteLength).getFloat64(0, true),
       } satisfies WorkerResponse);
     } else if (eventType === LOG_CALLBACK_EVENT) {
       workerScope.postMessage({
         type: 'solveCallback',
-        id,
+        id: requestId,
         eventType: 'log',
         message: new TextDecoder().decode(payload),
       } satisfies WorkerResponse);
     }
-  }
-  const responseLength = readUint32FromBytes(bytes, offset);
-  offset += 4;
-  return bytes.slice(offset, offset + responseLength);
+  });
+  return callbackId;
 }
 
 const copyBytesToHeap = (module: OrToolsWasmModule, bytes: Uint8Array | null) => {
@@ -260,19 +254,22 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
   const modelPtr = copyBytesToHeap(module, modelBytes);
   const paramsPtr = copyBytesToHeap(module, paramsBytes ?? null);
   let responsePtr = 0;
+  let callbackId = 0;
 
   try {
     if (callbackFlags) {
+      callbackId = registerCpSatCallbackSink(module, requestId);
       responsePtr = (await module.ccall(
         'solve_model_with_callback_events',
         'number',
-        ['number', 'number', 'number', 'number', 'number', 'number'],
+        ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
         [
           modelPtr,
           modelBytes.length,
           paramsPtr,
           paramsBytes ? paramsBytes.length : 0,
           callbackFlags,
+          callbackId,
           lenPtr,
         ],
         { async: true },
@@ -293,6 +290,7 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
       )) as number;
     }
   } finally {
+    if (callbackId) module.__ortoolsCpSatCallbacks.sinks.delete(callbackId);
     if (modelPtr) module._free(modelPtr);
     if (paramsPtr) module._free(paramsPtr);
   }
@@ -307,9 +305,6 @@ async function solveModel(modelBytes: Uint8Array, paramsBytes?: Uint8Array, requ
 
   const bytes = module.HEAPU8.slice(responsePtr, responsePtr + len);
   module._free_buffer(responsePtr);
-  if (callbackFlags) {
-    return postCallbackEnvelopeEvents(requestId, bytes);
-  }
   return bytes;
 }
 

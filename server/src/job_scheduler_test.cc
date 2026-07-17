@@ -235,6 +235,25 @@ void RequestsCooperativeCancellationForRunningJob() {
   ExpectEq(handle.status().state, JobState::kCancelled, "running cancel status");
 }
 
+void InvokesScopedCancellationHandler() {
+  JobScheduler scheduler({1, 8});
+  ManualEvent handler_registered;
+  ManualEvent interrupted;
+
+  auto handle = scheduler.Submit(Spec(), [&](JobContext& context) {
+    auto registration = context.OnCancellation([&] { interrupted.Set(); });
+    handler_registered.Set();
+    interrupted.Wait();
+    return JobResult::Cancelled("interrupted");
+  });
+
+  Expect(handler_registered.WaitFor(2s), "cancellation handler registers");
+  Expect(handle.Cancel(), "running cancel accepted");
+  Expect(interrupted.WaitFor(2s), "running cancellation invokes handler");
+  ExpectEq(handle.result().get().state, JobState::kCancelled,
+           "handler-driven cancellation result");
+}
+
 void CapturesJobExceptionsAsFailures() {
   JobScheduler scheduler({1, 8});
   auto handle = scheduler.Submit(Spec(), [](JobContext&) -> JobResult {
@@ -291,6 +310,7 @@ int RunAllTests() {
       {"LargerJobWaitsForEnoughTokens", LargerJobWaitsForEnoughTokens},
       {"CancelsQueuedJob", CancelsQueuedJob},
       {"RequestsCooperativeCancellationForRunningJob", RequestsCooperativeCancellationForRunningJob},
+      {"InvokesScopedCancellationHandler", InvokesScopedCancellationHandler},
       {"CapturesJobExceptionsAsFailures", CapturesJobExceptionsAsFailures},
       {"RejectsSubmissionsAfterShutdown", RejectsSubmissionsAfterShutdown},
       {"RejectsInvalidSchedulerOptions", RejectsInvalidSchedulerOptions},

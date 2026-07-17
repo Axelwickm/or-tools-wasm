@@ -4,25 +4,18 @@
 
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
-import type { SolverJobFailure, SolverJobFailureJson, SolverJobStatus, SolverJobStatusJson } from "./job_pb.js";
-import { file_job } from "./job_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file cp_sat.proto.
  */
 export const file_cp_sat: GenFile = /*@__PURE__*/
-  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEirQIKEkNwU2F0QnJpZGdlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgNEjoKBXNvbHZlGAogASgLMikub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlUmVxdWVzdEgAEkAKCHZhbGlkYXRlGAsgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFZhbGlkYXRlUmVxdWVzdEgAEjwKBnNjaGVtYRgMIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTY2hlbWFSZXF1ZXN0SAASPAoGY2FuY2VsGA0gASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdENhbmNlbFJlcXVlc3RIAEIJCgdwYXlsb2FkIrYEChNDcFNhdEJyaWRnZVJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKA0SQAoMc29sdmVfcmVzdWx0GAogASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlUmVzdWx0SAASPgoLc29sdmVfZXZlbnQYCyABKAsyJy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U29sdmVFdmVudEgAEkYKD3ZhbGlkYXRlX3Jlc3VsdBgMIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlc3VsdEgAEkIKDXNjaGVtYV9yZXN1bHQYDSABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U2NoZW1hUmVzdWx0SAASOwoJY2FuY2VsbGVkGA4gASgLMiYub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdENhbmNlbGxlZEgAEj0KCmpvYl9zdGF0dXMYFCABKAsyJy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckpvYlN0YXR1c0gAEjsKB2ZhaWx1cmUYFSABKAsyKC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckpvYkZhaWx1cmVIABI5CgVlcnJvchhkIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRCcmlkZ2VFcnJvckgAQgkKB3BheWxvYWQipgEKEUNwU2F0U29sdmVSZXF1ZXN0EhYKDmNwX21vZGVsX3Byb3RvGAEgASgMEhwKFHNhdF9wYXJhbWV0ZXJzX3Byb3RvGAIgASgMEkAKDWNhbGxiYWNrX21hc2sYAyABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0Q2FsbGJhY2tNYXNrEhkKEWFsbG9jYXRlZF90aHJlYWRzGAQgASgNIkYKEUNwU2F0Q2FsbGJhY2tNYXNrEhAKCHNvbHV0aW9uGAEgASgIEhIKCmJlc3RfYm91bmQYAiABKAgSCwoDbG9nGAMgASgIIjQKEENwU2F0U29sdmVSZXN1bHQSIAoYY3Bfc29sdmVyX3Jlc3BvbnNlX3Byb3RvGAEgASgMIlsKD0NwU2F0U29sdmVFdmVudBIYCg5zb2x1dGlvbl9wcm90bxgBIAEoDEgAEhQKCmJlc3RfYm91bmQYAiABKAFIABINCgNsb2cYAyABKAlIAEIJCgdwYXlsb2FkIi4KFENwU2F0VmFsaWRhdGVSZXF1ZXN0EhYKDmNwX21vZGVsX3Byb3RvGAEgASgMIjIKE0NwU2F0VmFsaWRhdGVSZXN1bHQSCgoCb2sYASABKAgSDwoHbWVzc2FnZRgCIAEoCSIUChJDcFNhdFNjaGVtYVJlcXVlc3QiVwoRQ3BTYXRTY2hlbWFSZXN1bHQSHQoVY3BfbW9kZWxfcHJvdG9fc2NoZW1hGAEgASgJEiMKG3NhdF9wYXJhbWV0ZXJzX3Byb3RvX3NjaGVtYRgCIAEoCSIvChJDcFNhdENhbmNlbFJlcXVlc3QSGQoRdGFyZ2V0X3JlcXVlc3RfaWQYASABKA0iKwoOQ3BTYXRDYW5jZWxsZWQSGQoRdGFyZ2V0X3JlcXVlc3RfaWQYASABKA0iIwoQQ3BTYXRCcmlkZ2VFcnJvchIPCgdtZXNzYWdlGAEgASgJYgZwcm90bzM", [file_job]);
+  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi2wEKEkNwU2F0QnJpZGdlUmVxdWVzdBI6CgVzb2x2ZRgKIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlcXVlc3RIABJACgh2YWxpZGF0ZRgLIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlcXVlc3RIABI8CgZzY2hlbWEYDCABKAsyKi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U2NoZW1hUmVxdWVzdEgAQgkKB3BheWxvYWQirgIKE0NwU2F0QnJpZGdlUmVzcG9uc2USQAoMc29sdmVfcmVzdWx0GAogASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlUmVzdWx0SAASPgoLc29sdmVfZXZlbnQYCyABKAsyJy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U29sdmVFdmVudEgAEkYKD3ZhbGlkYXRlX3Jlc3VsdBgMIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlc3VsdEgAEkIKDXNjaGVtYV9yZXN1bHQYDSABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U2NoZW1hUmVzdWx0SABCCQoHcGF5bG9hZCKLAQoRQ3BTYXRTb2x2ZVJlcXVlc3QSFgoOY3BfbW9kZWxfcHJvdG8YASABKAwSHAoUc2F0X3BhcmFtZXRlcnNfcHJvdG8YAiABKAwSQAoNY2FsbGJhY2tfbWFzaxgDIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRDYWxsYmFja01hc2siRgoRQ3BTYXRDYWxsYmFja01hc2sSEAoIc29sdXRpb24YASABKAgSEgoKYmVzdF9ib3VuZBgCIAEoCBILCgNsb2cYAyABKAgiNAoQQ3BTYXRTb2x2ZVJlc3VsdBIgChhjcF9zb2x2ZXJfcmVzcG9uc2VfcHJvdG8YASABKAwiWwoPQ3BTYXRTb2x2ZUV2ZW50EhgKDnNvbHV0aW9uX3Byb3RvGAEgASgMSAASFAoKYmVzdF9ib3VuZBgCIAEoAUgAEg0KA2xvZxgDIAEoCUgAQgkKB3BheWxvYWQiLgoUQ3BTYXRWYWxpZGF0ZVJlcXVlc3QSFgoOY3BfbW9kZWxfcHJvdG8YASABKAwiMgoTQ3BTYXRWYWxpZGF0ZVJlc3VsdBIKCgJvaxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIhQKEkNwU2F0U2NoZW1hUmVxdWVzdCJXChFDcFNhdFNjaGVtYVJlc3VsdBIdChVjcF9tb2RlbF9wcm90b19zY2hlbWEYASABKAkSIwobc2F0X3BhcmFtZXRlcnNfcHJvdG9fc2NoZW1hGAIgASgJYgZwcm90bzM");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.CpSatBridgeRequest
  */
 export type CpSatBridgeRequest = Message<"ortools_wasm.bridge.v1.CpSatBridgeRequest"> & {
-  /**
-   * @generated from field: uint32 request_id = 1;
-   */
-  requestId: number;
-
   /**
    * @generated from oneof ortools_wasm.bridge.v1.CpSatBridgeRequest.payload
    */
@@ -44,12 +37,6 @@ export type CpSatBridgeRequest = Message<"ortools_wasm.bridge.v1.CpSatBridgeRequ
      */
     value: CpSatSchemaRequest;
     case: "schema";
-  } | {
-    /**
-     * @generated from field: ortools_wasm.bridge.v1.CpSatCancelRequest cancel = 13;
-     */
-    value: CpSatCancelRequest;
-    case: "cancel";
   } | { case: undefined; value?: undefined };
 };
 
@@ -57,11 +44,6 @@ export type CpSatBridgeRequest = Message<"ortools_wasm.bridge.v1.CpSatBridgeRequ
  * @generated from message ortools_wasm.bridge.v1.CpSatBridgeRequest
  */
 export type CpSatBridgeRequestJson = {
-  /**
-   * @generated from field: uint32 request_id = 1;
-   */
-  requestId?: number;
-
   /**
    * @generated from field: ortools_wasm.bridge.v1.CpSatSolveRequest solve = 10;
    */
@@ -76,11 +58,6 @@ export type CpSatBridgeRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.CpSatSchemaRequest schema = 12;
    */
   schema?: CpSatSchemaRequestJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.CpSatCancelRequest cancel = 13;
-   */
-  cancel?: CpSatCancelRequestJson;
 };
 
 export type CpSatBridgeRequestValid = CpSatBridgeRequest;
@@ -96,11 +73,6 @@ export const CpSatBridgeRequestSchema: GenMessage<CpSatBridgeRequest, {jsonType:
  * @generated from message ortools_wasm.bridge.v1.CpSatBridgeResponse
  */
 export type CpSatBridgeResponse = Message<"ortools_wasm.bridge.v1.CpSatBridgeResponse"> & {
-  /**
-   * @generated from field: uint32 request_id = 1;
-   */
-  requestId: number;
-
   /**
    * @generated from oneof ortools_wasm.bridge.v1.CpSatBridgeResponse.payload
    */
@@ -128,30 +100,6 @@ export type CpSatBridgeResponse = Message<"ortools_wasm.bridge.v1.CpSatBridgeRes
      */
     value: CpSatSchemaResult;
     case: "schemaResult";
-  } | {
-    /**
-     * @generated from field: ortools_wasm.bridge.v1.CpSatCancelled cancelled = 14;
-     */
-    value: CpSatCancelled;
-    case: "cancelled";
-  } | {
-    /**
-     * @generated from field: ortools_wasm.bridge.v1.SolverJobStatus job_status = 20;
-     */
-    value: SolverJobStatus;
-    case: "jobStatus";
-  } | {
-    /**
-     * @generated from field: ortools_wasm.bridge.v1.SolverJobFailure failure = 21;
-     */
-    value: SolverJobFailure;
-    case: "failure";
-  } | {
-    /**
-     * @generated from field: ortools_wasm.bridge.v1.CpSatBridgeError error = 100;
-     */
-    value: CpSatBridgeError;
-    case: "error";
   } | { case: undefined; value?: undefined };
 };
 
@@ -159,11 +107,6 @@ export type CpSatBridgeResponse = Message<"ortools_wasm.bridge.v1.CpSatBridgeRes
  * @generated from message ortools_wasm.bridge.v1.CpSatBridgeResponse
  */
 export type CpSatBridgeResponseJson = {
-  /**
-   * @generated from field: uint32 request_id = 1;
-   */
-  requestId?: number;
-
   /**
    * @generated from field: ortools_wasm.bridge.v1.CpSatSolveResult solve_result = 10;
    */
@@ -183,26 +126,6 @@ export type CpSatBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.CpSatSchemaResult schema_result = 13;
    */
   schemaResult?: CpSatSchemaResultJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.CpSatCancelled cancelled = 14;
-   */
-  cancelled?: CpSatCancelledJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.SolverJobStatus job_status = 20;
-   */
-  jobStatus?: SolverJobStatusJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.SolverJobFailure failure = 21;
-   */
-  failure?: SolverJobFailureJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.CpSatBridgeError error = 100;
-   */
-  error?: CpSatBridgeErrorJson;
 };
 
 export type CpSatBridgeResponseValid = CpSatBridgeResponse;
@@ -232,11 +155,6 @@ export type CpSatSolveRequest = Message<"ortools_wasm.bridge.v1.CpSatSolveReques
    * @generated from field: ortools_wasm.bridge.v1.CpSatCallbackMask callback_mask = 3;
    */
   callbackMask?: CpSatCallbackMask | undefined;
-
-  /**
-   * @generated from field: uint32 allocated_threads = 4;
-   */
-  allocatedThreads: number;
 };
 
 /**
@@ -257,11 +175,6 @@ export type CpSatSolveRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.CpSatCallbackMask callback_mask = 3;
    */
   callbackMask?: CpSatCallbackMaskJson;
-
-  /**
-   * @generated from field: uint32 allocated_threads = 4;
-   */
-  allocatedThreads?: number;
 };
 
 export type CpSatSolveRequestValid = CpSatSolveRequest;
@@ -535,91 +448,4 @@ export type CpSatSchemaResultValid = CpSatSchemaResult;
  */
 export const CpSatSchemaResultSchema: GenMessage<CpSatSchemaResult, {jsonType: CpSatSchemaResultJson, validType: CpSatSchemaResultValid}> = /*@__PURE__*/
   messageDesc(file_cp_sat, 9);
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatCancelRequest
- */
-export type CpSatCancelRequest = Message<"ortools_wasm.bridge.v1.CpSatCancelRequest"> & {
-  /**
-   * @generated from field: uint32 target_request_id = 1;
-   */
-  targetRequestId: number;
-};
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatCancelRequest
- */
-export type CpSatCancelRequestJson = {
-  /**
-   * @generated from field: uint32 target_request_id = 1;
-   */
-  targetRequestId?: number;
-};
-
-export type CpSatCancelRequestValid = CpSatCancelRequest;
-
-/**
- * Describes the message ortools_wasm.bridge.v1.CpSatCancelRequest.
- * Use `create(CpSatCancelRequestSchema)` to create a new message.
- */
-export const CpSatCancelRequestSchema: GenMessage<CpSatCancelRequest, {jsonType: CpSatCancelRequestJson, validType: CpSatCancelRequestValid}> = /*@__PURE__*/
-  messageDesc(file_cp_sat, 10);
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatCancelled
- */
-export type CpSatCancelled = Message<"ortools_wasm.bridge.v1.CpSatCancelled"> & {
-  /**
-   * @generated from field: uint32 target_request_id = 1;
-   */
-  targetRequestId: number;
-};
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatCancelled
- */
-export type CpSatCancelledJson = {
-  /**
-   * @generated from field: uint32 target_request_id = 1;
-   */
-  targetRequestId?: number;
-};
-
-export type CpSatCancelledValid = CpSatCancelled;
-
-/**
- * Describes the message ortools_wasm.bridge.v1.CpSatCancelled.
- * Use `create(CpSatCancelledSchema)` to create a new message.
- */
-export const CpSatCancelledSchema: GenMessage<CpSatCancelled, {jsonType: CpSatCancelledJson, validType: CpSatCancelledValid}> = /*@__PURE__*/
-  messageDesc(file_cp_sat, 11);
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatBridgeError
- */
-export type CpSatBridgeError = Message<"ortools_wasm.bridge.v1.CpSatBridgeError"> & {
-  /**
-   * @generated from field: string message = 1;
-   */
-  message: string;
-};
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatBridgeError
- */
-export type CpSatBridgeErrorJson = {
-  /**
-   * @generated from field: string message = 1;
-   */
-  message?: string;
-};
-
-export type CpSatBridgeErrorValid = CpSatBridgeError;
-
-/**
- * Describes the message ortools_wasm.bridge.v1.CpSatBridgeError.
- * Use `create(CpSatBridgeErrorSchema)` to create a new message.
- */
-export const CpSatBridgeErrorSchema: GenMessage<CpSatBridgeError, {jsonType: CpSatBridgeErrorJson, validType: CpSatBridgeErrorValid}> = /*@__PURE__*/
-  messageDesc(file_cp_sat, 12);
 

@@ -9,6 +9,10 @@ Build and run it with Docker Compose:
 docker compose -f server/docker-compose.yml up --build
 ```
 
+The Dockerfile uses a BuildKit cache mount for the native CMake build tree, so
+rebuilding after server-only edits should reuse downloaded dependencies and
+previous OR-Tools objects.
+
 Run the native server tests in the same Docker Compose build:
 
 ```sh
@@ -41,23 +45,31 @@ The default executable is `server_cp_sat_hello`, built from
 GET  /healthz
 POST /jobs
 GET  /jobs/:id
+GET  /jobs/:id/events?after=:sequence
 GET  /jobs/:id/result
 POST /jobs/:id/cancel
 ```
 
 The job API carries generic `SolverBridgeRequest` / `SolverBridgeResponse`
 protobuf bytes. Solver-specific payloads, events, and results are nested as
-opaque bytes inside that generic envelope. Polling responses use this contract:
+opaque bytes inside that generic envelope. Status, events, and results have
+separate responsibilities:
 
 ```text
-200 + SolverBridgeResponse  returned status, event, failure, or final result
-202 + SolverBridgeResponse  job accepted or still running, usually status/event
-204 + empty body            no new status/result available yet
+GET /jobs/:id         current SolverJobStatus snapshot
+GET /jobs/:id/events?after=N   SolverEventBatch after sequence N
+GET /jobs/:id/result           final result or execution failure; 204 while pending
 ```
 
+Event reads are non-destructive. Each retained status transition and solver
+event has a monotonically increasing sequence ID, so clients can poll without
+losing or duplicating callbacks.
+
 The native server currently registers CP-SAT and supports schema, validate,
-and solve requests. Cancellation works for queued jobs; interrupting an active
-native CP-SAT solve is still pending.
+and solve requests. Cancellation uses the same generic protobuf command as the
+worker executor. Queued cancellation is immediate; a running executor receives
+a scoped cancellation signal, which CP-SAT handles with its native search-stop
+mechanism.
 
 The server path is native C++. JavaScript remains only on the client/package
 side for selecting a server executor and sending bridge protobuf bytes.

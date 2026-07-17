@@ -4,6 +4,7 @@ export type {
   CpSatApi,
   CpSatEvent,
   CpSatEventHandler,
+  CpSatEventMask,
   CpSatModelInstance,
   CpSatRawSolveOptions,
   CpSatSchemas,

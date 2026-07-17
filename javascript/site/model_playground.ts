@@ -1,4 +1,10 @@
-import { CpSat, type SatParameters } from 'or-tools-wasm/cp-sat';
+import {
+  CpSat,
+  type CpSatEvent,
+  type CpSatEventMask,
+  type SatParameters,
+} from 'or-tools-wasm/cp-sat';
+import { configureCpSatExecutorSelector } from './cp_sat_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 const sampleModel = {
@@ -17,9 +23,14 @@ const sampleModel = {
       },
     },
   ],
+  objective: {
+    vars: [0, 1],
+    coeffs: [1, 2],
+  },
 };
 
 const sampleParams: SatParameters = {
+  logSearchProgress: true,
   maxTimeInSeconds: 5,
   numWorkers: 1,
 };
@@ -27,14 +38,21 @@ const sampleParams: SatParameters = {
 const modelInput = document.getElementById('model-input') as HTMLTextAreaElement | null;
 const paramsInput = document.getElementById('params-input') as HTMLTextAreaElement | null;
 const resultOutput = document.getElementById('result-output') as HTMLPreElement | null;
+const eventOutput = document.getElementById('event-output') as HTMLPreElement | null;
 const statusEl = document.getElementById('status') as HTMLElement | null;
 const loadSampleButton = document.getElementById('load-sample') as HTMLButtonElement | null;
 const validateButton = document.getElementById('validate') as HTMLButtonElement | null;
 const solveButton = document.getElementById('solve') as HTMLButtonElement | null;
 const cancelButton = document.getElementById('cancel') as HTMLButtonElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
+const solutionEventsInput = document.getElementById('solution-events') as HTMLInputElement | null;
+const boundEventsInput = document.getElementById('bound-events') as HTMLInputElement | null;
+const logEventsInput = document.getElementById('log-events') as HTMLInputElement | null;
+const clearEventsButton = document.getElementById('clear-events') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
+let solveController: AbortController | null = null;
+let solveStartedAt = 0;
 
 if (workerInput) {
   workerInput.max = String(maxWorkerCount);
@@ -55,11 +73,42 @@ function setResult(value: unknown) {
   }
 }
 
-function setRunning(running: boolean) {
+function setRunning(running: boolean, cancellable = false) {
   if (validateButton) validateButton.disabled = running;
   if (solveButton) solveButton.disabled = running;
   if (loadSampleButton) loadSampleButton.disabled = running;
-  if (cancelButton) cancelButton.disabled = !running;
+  if (executorSelector) executorSelector.disabled = running;
+  if (cancelButton) cancelButton.disabled = !running || !cancellable;
+}
+
+function clearEvents() {
+  if (eventOutput) eventOutput.textContent = '';
+}
+
+function stringify(value: unknown): string {
+  return JSON.stringify(value, (_key, item) => {
+    if (typeof item === 'bigint') return item.toString();
+    if (item instanceof Uint8Array) return `<${item.byteLength} bytes>`;
+    return item;
+  });
+}
+
+function appendEvent(event: CpSatEvent) {
+  if (!eventOutput) return;
+  const elapsed = ((performance.now() - solveStartedAt) / 1000).toFixed(3);
+  const display = event.type === 'solution'
+    ? { type: event.type, response: event.response, bytes: `<${event.bytes.byteLength} bytes>` }
+    : event;
+  eventOutput.textContent += `${elapsed}s ${stringify(display)}\n`;
+  eventOutput.scrollTop = eventOutput.scrollHeight;
+}
+
+function selectedEventMask(): CpSatEventMask {
+  return {
+    solution: solutionEventsInput?.checked ?? false,
+    bestBound: boundEventsInput?.checked ?? false,
+    log: logEventsInput?.checked ?? false,
+  };
 }
 
 function loadSample() {
@@ -130,30 +179,34 @@ async function validateModel() {
 }
 
 async function solveModel() {
-  setRunning(true);
+  const controller = new AbortController();
+  solveController = controller;
+  solveStartedAt = performance.now();
+  clearEvents();
+  setRunning(true, true);
   setStatus('Building model...');
   try {
     const modelBytes = await buildModelBytes();
     const params = parseParams();
     setStatus('Solving...');
-    const result = await CpSat.solve(modelBytes, { solverParameters: params });
+    const result = await CpSat.solve(modelBytes, {
+      solverParameters: params,
+      eventMask: selectedEventMask(),
+      onEvent: appendEvent,
+      signal: controller.signal,
+    });
     setResult(result.response ?? { bytes: Array.from(result.bytes) });
     setStatus('Solve finished.');
   } catch (error) {
-    setStatus('Solve failed.');
+    setStatus(controller.signal.aborted ? 'Solve cancelled.' : 'Solve failed.');
     setResult((error as Error).message);
   } finally {
+    if (solveController === controller) solveController = null;
     setRunning(false);
   }
 }
 
-if (workerBridgeToggle) {
-  workerBridgeToggle.checked = true;
-  CpSat.setExecutor({ type: workerBridgeToggle.checked ? 'worker' : 'direct' });
-  workerBridgeToggle.addEventListener('change', () => {
-    CpSat.setExecutor({ type: workerBridgeToggle.checked ? 'worker' : 'direct' });
-  });
-}
+configureCpSatExecutorSelector(CpSat, executorSelector);
 
 loadSampleButton?.addEventListener('click', loadSample);
 validateButton?.addEventListener('click', () => {
@@ -163,8 +216,9 @@ solveButton?.addEventListener('click', () => {
   void solveModel();
 });
 cancelButton?.addEventListener('click', () => {
-  void CpSat.cancelSolve();
+  solveController?.abort();
   setStatus('Cancel requested.');
 });
+clearEventsButton?.addEventListener('click', clearEvents);
 
 loadSample();

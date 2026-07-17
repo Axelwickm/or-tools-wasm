@@ -5,11 +5,16 @@
   <title>CP-SAT - Model Playground</title>
   <link rel="stylesheet" href="./example.css">
   <style>
-    textarea, pre {
+    textarea, #result-output {
       min-height: 22rem;
     }
     .params {
       min-height: 8rem;
+    }
+    #event-output {
+      min-height: 12rem;
+      max-height: 32rem;
+      overflow: auto;
     }
   </style>
 </head>
@@ -33,12 +38,18 @@ const params: SatParameters = {
   numWorkers: workers,
 };
 
-CpSat.setExecutor({ type: 'worker' });
+CpSat.setExecutor({ type: 'worker' }); // Or direct/server.
 const model = await CpSat.createModel(modelJson);
 const validation = await CpSat.validate(model);
 if (!validation.ok) throw new Error(validation.message);
 
-const result = await CpSat.solve(model, { solverParameters: params });
+const controller = new AbortController();
+const result = await CpSat.solve(model, {
+  solverParameters: params,
+  eventMask: { solution: true, bestBound: true, log: true },
+  onEvent: (event) => console.log(event),
+  signal: controller.signal,
+});
 console.log(result.response);</code></pre>
       </details>
     </div>
@@ -49,7 +60,7 @@ console.log(result.response);</code></pre>
         <li>The model input is raw JSON shaped like a CP-SAT <code>CpModelProto</code>.</li>
         <li>The parameter input is JSON shaped like <code>SatParameters</code>.</li>
         <li>Validate checks whether the protobuf model is structurally acceptable before solving.</li>
-        <li>Solve sends the encoded proto directly to the CP-SAT WebAssembly runtime.</li>
+        <li>Solve sends the same encoded request through the selected executor.</li>
       </ul>
     </div>
 
@@ -59,7 +70,15 @@ console.log(result.response);</code></pre>
       <button id="solve">Solve</button>
       <button id="cancel" disabled>Cancel</button>
       <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1"></label>
-      <label><input id="use-worker-bridge" type="checkbox" checked /> Use worker bridge</label>
+      <label>Executor <select id="cp-sat-executor">
+        <option value="direct">Direct</option>
+        <option value="worker" selected>Worker</option>
+        <option value="server">Server</option>
+      </select></label>
+      <label><input id="solution-events" type="checkbox" checked> Solutions</label>
+      <label><input id="bound-events" type="checkbox" checked> Best bounds</label>
+      <label><input id="log-events" type="checkbox" checked> Logs</label>
+      <button id="clear-events">Clear events</button>
     </div>
     <div id="status" class="status-line" role="status" aria-live="polite"></div>
 
@@ -73,6 +92,8 @@ console.log(result.response);</code></pre>
       <section>
         <h2>Result</h2>
         <pre id="result-output"></pre>
+        <h2>Events</h2>
+        <pre id="event-output" aria-live="polite"></pre>
       </section>
     </div>
   </main>

@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM debian:bookworm-slim
 
 WORKDIR /repo
@@ -22,7 +24,8 @@ COPY patches ./patches
 COPY scripts/embed_proto.cmake ./scripts/embed_proto.cmake
 COPY server ./server
 
-RUN set -eux; \
+RUN --mount=type=cache,id=ortools-native-cmake-build,target=/build/server,sharing=locked \
+  set -eux; \
   major="$(sed -n 's/^OR_TOOLS_MAJOR=//p' Version.txt)"; \
   minor="$(sed -n 's/^OR_TOOLS_MINOR=//p' Version.txt)"; \
   echo "Building native OR-Tools ${major}.${minor} CP-SAT hello world"; \
@@ -46,6 +49,15 @@ RUN set -eux; \
   cmake --build /build/server --target \
     server_cp_sat_hello \
     server_job_scheduler_test \
-    server_config_test
+    server_cp_sat_executor_test \
+    server_solver_job_service_test \
+    server_config_test; \
+  rm -rf /opt/ortools-server; \
+  mkdir -p /opt; \
+  cp -a /build/server /opt/ortools-server
+
+RUN rm -rf /build/server \
+  && mkdir -p /build \
+  && ln -s /opt/ortools-server /build/server
 
 CMD ["/build/server/server_cp_sat_hello"]

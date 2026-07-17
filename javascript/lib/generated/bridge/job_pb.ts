@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file job.proto.
  */
 export const file_job: GenFile = /*@__PURE__*/
-  fileDesc("Cglqb2IucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEiZQoTU29sdmVyQnJpZGdlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRIPCgdwYXlsb2FkGAMgASgMEhkKEXJlcXVlc3RlZF90aHJlYWRzGAQgASgNIoACChRTb2x2ZXJCcmlkZ2VSZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRIOCgZqb2JfaWQYAyABKAQSOQoGc3RhdHVzGAogASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JTdGF0dXNIABI7CgdmYWlsdXJlGAsgASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JGYWlsdXJlSAASFwoNZXZlbnRfcGF5bG9hZBgMIAEoDEgAEhgKDnJlc3VsdF9wYXlsb2FkGA0gASgMSABCCQoHcGF5bG9hZCLNAQoPU29sdmVySm9iU3RhdHVzEhIKCnJlcXVlc3RfaWQYASABKA0SDgoGc29sdmVyGAIgASgJEjUKBXN0YXRlGAMgASgOMiYub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JTdGF0ZRIVCg1jcmVhdGVkX2F0X21zGAQgASgEEhUKDXN0YXJ0ZWRfYXRfbXMYBSABKAQSGQoRYWxsb2NhdGVkX3RocmVhZHMYBiABKA0SFgoOcXVldWVfcG9zaXRpb24YByABKA0iogEKEFNvbHZlckpvYkZhaWx1cmUSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSNwoEa2luZBgDIAEoDjIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyRmFpbHVyZUtpbmQSDwoHbWVzc2FnZRgEIAEoCRINCgV0cmFjZRgFIAEoCRIRCglyZXRyeWFibGUYBiABKAgqigIKDlNvbHZlckpvYlN0YXRlEiAKHFNPTFZFUl9KT0JfU1RBVEVfVU5TUEVDSUZJRUQQABIbChdTT0xWRVJfSk9CX1NUQVRFX1FVRVVFRBABEh0KGVNPTFZFUl9KT0JfU1RBVEVfU1RBUlRJTkcQAhIcChhTT0xWRVJfSk9CX1NUQVRFX1JVTk5JTkcQAxIfChtTT0xWRVJfSk9CX1NUQVRFX0NBTkNFTExJTkcQBBIeChpTT0xWRVJfSk9CX1NUQVRFX0NBTkNFTExFRBAFEh4KGlNPTFZFUl9KT0JfU1RBVEVfU1VDQ0VFREVEEAYSGwoXU09MVkVSX0pPQl9TVEFURV9GQUlMRUQQByrFAgoRU29sdmVyRmFpbHVyZUtpbmQSIwofU09MVkVSX0ZBSUxVUkVfS0lORF9VTlNQRUNJRklFRBAAEiYKIlNPTFZFUl9GQUlMVVJFX0tJTkRfRVhFQ1VUT1JfRVJST1IQARIqCiZTT0xWRVJfRkFJTFVSRV9LSU5EX1JVTlRJTUVfTE9BRF9FUlJPUhACEiQKIFNPTFZFUl9GQUlMVVJFX0tJTkRfV09SS0VSX0NSQVNIEAMSKwonU09MVkVSX0ZBSUxVUkVfS0lORF9TRVJWRVJfRElTQ09OTkVDVEVEEAQSHwobU09MVkVSX0ZBSUxVUkVfS0lORF9USU1FT1VUEAUSIQodU09MVkVSX0ZBSUxVUkVfS0lORF9DQU5DRUxMRUQQBhIgChxTT0xWRVJfRkFJTFVSRV9LSU5EX0lOVEVSTkFMEAdiBnByb3RvMw");
+  fileDesc("Cglqb2IucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi4wEKE1NvbHZlckJyaWRnZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSQQoIc2V0dGluZ3MYAyABKAsyLy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckV4ZWN1dGlvblNldHRpbmdzEhkKD2V4ZWN1dGVfcGF5bG9hZBgKIAEoDEgAEj0KBmNhbmNlbBgLIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyQ2FuY2VsUmVxdWVzdEgAQgsKCW9wZXJhdGlvbiI0ChdTb2x2ZXJFeGVjdXRpb25TZXR0aW5ncxIZChFyZXF1ZXN0ZWRfdGhyZWFkcxgBIAEoDSIwChNTb2x2ZXJDYW5jZWxSZXF1ZXN0EhkKEXRhcmdldF9yZXF1ZXN0X2lkGAEgASgNItYCChRTb2x2ZXJCcmlkZ2VSZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRIOCgZqb2JfaWQYAyABKAQSEwoLc2VxdWVuY2VfaWQYBCABKAQSOQoGc3RhdHVzGAogASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JTdGF0dXNIABI7CgdmYWlsdXJlGAsgASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JGYWlsdXJlSAASFwoNZXZlbnRfcGF5bG9hZBgMIAEoDEgAEhgKDnJlc3VsdF9wYXlsb2FkGA0gASgMSAASPwoJY2FuY2VsbGVkGA4gASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JDYW5jZWxsZWRIAEIJCgdwYXlsb2FkIi8KElNvbHZlckpvYkNhbmNlbGxlZBIZChF0YXJnZXRfcmVxdWVzdF9pZBgBIAEoDSJTChBTb2x2ZXJFdmVudEJhdGNoEj8KCXJlc3BvbnNlcxgBIAMoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyQnJpZGdlUmVzcG9uc2UizQEKD1NvbHZlckpvYlN0YXR1cxISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRI1CgVzdGF0ZRgDIAEoDjImLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVySm9iU3RhdGUSFQoNY3JlYXRlZF9hdF9tcxgEIAEoBBIVCg1zdGFydGVkX2F0X21zGAUgASgEEhkKEWFsbG9jYXRlZF90aHJlYWRzGAYgASgNEhYKDnF1ZXVlX3Bvc2l0aW9uGAcgASgNIqIBChBTb2x2ZXJKb2JGYWlsdXJlEhIKCnJlcXVlc3RfaWQYASABKA0SDgoGc29sdmVyGAIgASgJEjcKBGtpbmQYAyABKA4yKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckZhaWx1cmVLaW5kEg8KB21lc3NhZ2UYBCABKAkSDQoFdHJhY2UYBSABKAkSEQoJcmV0cnlhYmxlGAYgASgIKooCCg5Tb2x2ZXJKb2JTdGF0ZRIgChxTT0xWRVJfSk9CX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXU09MVkVSX0pPQl9TVEFURV9RVUVVRUQQARIdChlTT0xWRVJfSk9CX1NUQVRFX1NUQVJUSU5HEAISHAoYU09MVkVSX0pPQl9TVEFURV9SVU5OSU5HEAMSHwobU09MVkVSX0pPQl9TVEFURV9DQU5DRUxMSU5HEAQSHgoaU09MVkVSX0pPQl9TVEFURV9DQU5DRUxMRUQQBRIeChpTT0xWRVJfSk9CX1NUQVRFX1NVQ0NFRURFRBAGEhsKF1NPTFZFUl9KT0JfU1RBVEVfRkFJTEVEEAcq5wMKEVNvbHZlckZhaWx1cmVLaW5kEiMKH1NPTFZFUl9GQUlMVVJFX0tJTkRfVU5TUEVDSUZJRUQQABImCiJTT0xWRVJfRkFJTFVSRV9LSU5EX0VYRUNVVE9SX0VSUk9SEAESKgomU09MVkVSX0ZBSUxVUkVfS0lORF9SVU5USU1FX0xPQURfRVJST1IQAhIkCiBTT0xWRVJfRkFJTFVSRV9LSU5EX1dPUktFUl9DUkFTSBADEisKJ1NPTFZFUl9GQUlMVVJFX0tJTkRfU0VSVkVSX0RJU0NPTk5FQ1RFRBAEEh8KG1NPTFZFUl9GQUlMVVJFX0tJTkRfVElNRU9VVBAFEiEKHVNPTFZFUl9GQUlMVVJFX0tJTkRfQ0FOQ0VMTEVEEAYSIAocU09MVkVSX0ZBSUxVUkVfS0lORF9JTlRFUk5BTBAHEicKI1NPTFZFUl9GQUlMVVJFX0tJTkRfSU5WQUxJRF9SRVFVRVNUEAgSJwojU09MVkVSX0ZBSUxVUkVfS0lORF9VTkFVVEhFTlRJQ0FURUQQCRIiCh5TT0xWRVJfRkFJTFVSRV9LSU5EX1FVRVVFX0ZVTEwQChIqCiZTT0xWRVJfRkFJTFVSRV9LSU5EX1VOU1VQUE9SVEVEX1NPTFZFUhALYgZwcm90bzM");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverBridgeRequest
@@ -27,17 +27,26 @@ export type SolverBridgeRequest = Message<"ortools_wasm.bridge.v1.SolverBridgeRe
   solver: string;
 
   /**
-   * @generated from field: bytes payload = 3;
+   * @generated from field: ortools_wasm.bridge.v1.SolverExecutionSettings settings = 3;
    */
-  payload: Uint8Array;
+  settings?: SolverExecutionSettings | undefined;
 
   /**
-   * 0 means unknown/default. Server schedulers may use this as an admission
-   * hint when the solver request can estimate its thread use up front.
-   *
-   * @generated from field: uint32 requested_threads = 4;
+   * @generated from oneof ortools_wasm.bridge.v1.SolverBridgeRequest.operation
    */
-  requestedThreads: number;
+  operation: {
+    /**
+     * @generated from field: bytes execute_payload = 10;
+     */
+    value: Uint8Array;
+    case: "executePayload";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.SolverCancelRequest cancel = 11;
+     */
+    value: SolverCancelRequest;
+    case: "cancel";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -55,17 +64,19 @@ export type SolverBridgeRequestJson = {
   solver?: string;
 
   /**
-   * @generated from field: bytes payload = 3;
+   * @generated from field: ortools_wasm.bridge.v1.SolverExecutionSettings settings = 3;
    */
-  payload?: string;
+  settings?: SolverExecutionSettingsJson;
 
   /**
-   * 0 means unknown/default. Server schedulers may use this as an admission
-   * hint when the solver request can estimate its thread use up front.
-   *
-   * @generated from field: uint32 requested_threads = 4;
+   * @generated from field: bytes execute_payload = 10;
    */
-  requestedThreads?: number;
+  executePayload?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SolverCancelRequest cancel = 11;
+   */
+  cancel?: SolverCancelRequestJson;
 };
 
 export type SolverBridgeRequestValid = SolverBridgeRequest;
@@ -76,6 +87,68 @@ export type SolverBridgeRequestValid = SolverBridgeRequest;
  */
 export const SolverBridgeRequestSchema: GenMessage<SolverBridgeRequest, {jsonType: SolverBridgeRequestJson, validType: SolverBridgeRequestValid}> = /*@__PURE__*/
   messageDesc(file_job, 0);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverExecutionSettings
+ */
+export type SolverExecutionSettings = Message<"ortools_wasm.bridge.v1.SolverExecutionSettings"> & {
+  /**
+   * 0 means that the solver's default resource requirement is requested.
+   *
+   * @generated from field: uint32 requested_threads = 1;
+   */
+  requestedThreads: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverExecutionSettings
+ */
+export type SolverExecutionSettingsJson = {
+  /**
+   * 0 means that the solver's default resource requirement is requested.
+   *
+   * @generated from field: uint32 requested_threads = 1;
+   */
+  requestedThreads?: number;
+};
+
+export type SolverExecutionSettingsValid = SolverExecutionSettings;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverExecutionSettings.
+ * Use `create(SolverExecutionSettingsSchema)` to create a new message.
+ */
+export const SolverExecutionSettingsSchema: GenMessage<SolverExecutionSettings, {jsonType: SolverExecutionSettingsJson, validType: SolverExecutionSettingsValid}> = /*@__PURE__*/
+  messageDesc(file_job, 1);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverCancelRequest
+ */
+export type SolverCancelRequest = Message<"ortools_wasm.bridge.v1.SolverCancelRequest"> & {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverCancelRequest
+ */
+export type SolverCancelRequestJson = {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId?: number;
+};
+
+export type SolverCancelRequestValid = SolverCancelRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverCancelRequest.
+ * Use `create(SolverCancelRequestSchema)` to create a new message.
+ */
+export const SolverCancelRequestSchema: GenMessage<SolverCancelRequest, {jsonType: SolverCancelRequestJson, validType: SolverCancelRequestValid}> = /*@__PURE__*/
+  messageDesc(file_job, 2);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverBridgeResponse
@@ -97,6 +170,14 @@ export type SolverBridgeResponse = Message<"ortools_wasm.bridge.v1.SolverBridgeR
    * @generated from field: uint64 job_id = 3;
    */
   jobId: bigint;
+
+  /**
+   * Monotonically increases for responses belonging to the same job. A zero
+   * value means that the transport does not retain a replayable event log.
+   *
+   * @generated from field: uint64 sequence_id = 4;
+   */
+  sequenceId: bigint;
 
   /**
    * @generated from oneof ortools_wasm.bridge.v1.SolverBridgeResponse.payload
@@ -125,6 +206,12 @@ export type SolverBridgeResponse = Message<"ortools_wasm.bridge.v1.SolverBridgeR
      */
     value: Uint8Array;
     case: "resultPayload";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.SolverJobCancelled cancelled = 14;
+     */
+    value: SolverJobCancelled;
+    case: "cancelled";
   } | { case: undefined; value?: undefined };
 };
 
@@ -150,6 +237,14 @@ export type SolverBridgeResponseJson = {
   jobId?: string;
 
   /**
+   * Monotonically increases for responses belonging to the same job. A zero
+   * value means that the transport does not retain a replayable event log.
+   *
+   * @generated from field: uint64 sequence_id = 4;
+   */
+  sequenceId?: string;
+
+  /**
    * @generated from field: ortools_wasm.bridge.v1.SolverJobStatus status = 10;
    */
   status?: SolverJobStatusJson;
@@ -168,6 +263,11 @@ export type SolverBridgeResponseJson = {
    * @generated from field: bytes result_payload = 13;
    */
   resultPayload?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SolverJobCancelled cancelled = 14;
+   */
+  cancelled?: SolverJobCancelledJson;
 };
 
 export type SolverBridgeResponseValid = SolverBridgeResponse;
@@ -177,7 +277,65 @@ export type SolverBridgeResponseValid = SolverBridgeResponse;
  * Use `create(SolverBridgeResponseSchema)` to create a new message.
  */
 export const SolverBridgeResponseSchema: GenMessage<SolverBridgeResponse, {jsonType: SolverBridgeResponseJson, validType: SolverBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_job, 1);
+  messageDesc(file_job, 3);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverJobCancelled
+ */
+export type SolverJobCancelled = Message<"ortools_wasm.bridge.v1.SolverJobCancelled"> & {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverJobCancelled
+ */
+export type SolverJobCancelledJson = {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId?: number;
+};
+
+export type SolverJobCancelledValid = SolverJobCancelled;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverJobCancelled.
+ * Use `create(SolverJobCancelledSchema)` to create a new message.
+ */
+export const SolverJobCancelledSchema: GenMessage<SolverJobCancelled, {jsonType: SolverJobCancelledJson, validType: SolverJobCancelledValid}> = /*@__PURE__*/
+  messageDesc(file_job, 4);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverEventBatch
+ */
+export type SolverEventBatch = Message<"ortools_wasm.bridge.v1.SolverEventBatch"> & {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.SolverBridgeResponse responses = 1;
+   */
+  responses: SolverBridgeResponse[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverEventBatch
+ */
+export type SolverEventBatchJson = {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.SolverBridgeResponse responses = 1;
+   */
+  responses?: SolverBridgeResponseJson[];
+};
+
+export type SolverEventBatchValid = SolverEventBatch;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverEventBatch.
+ * Use `create(SolverEventBatchSchema)` to create a new message.
+ */
+export const SolverEventBatchSchema: GenMessage<SolverEventBatch, {jsonType: SolverEventBatchJson, validType: SolverEventBatchValid}> = /*@__PURE__*/
+  messageDesc(file_job, 5);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobStatus
@@ -266,7 +424,7 @@ export type SolverJobStatusValid = SolverJobStatus;
  * Use `create(SolverJobStatusSchema)` to create a new message.
  */
 export const SolverJobStatusSchema: GenMessage<SolverJobStatus, {jsonType: SolverJobStatusJson, validType: SolverJobStatusValid}> = /*@__PURE__*/
-  messageDesc(file_job, 2);
+  messageDesc(file_job, 6);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobFailure
@@ -345,7 +503,7 @@ export type SolverJobFailureValid = SolverJobFailure;
  * Use `create(SolverJobFailureSchema)` to create a new message.
  */
 export const SolverJobFailureSchema: GenMessage<SolverJobFailure, {jsonType: SolverJobFailureJson, validType: SolverJobFailureValid}> = /*@__PURE__*/
-  messageDesc(file_job, 3);
+  messageDesc(file_job, 7);
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SolverJobState
@@ -446,12 +604,32 @@ export enum SolverFailureKind {
    * @generated from enum value: SOLVER_FAILURE_KIND_INTERNAL = 7;
    */
   INTERNAL = 7,
+
+  /**
+   * @generated from enum value: SOLVER_FAILURE_KIND_INVALID_REQUEST = 8;
+   */
+  INVALID_REQUEST = 8,
+
+  /**
+   * @generated from enum value: SOLVER_FAILURE_KIND_UNAUTHENTICATED = 9;
+   */
+  UNAUTHENTICATED = 9,
+
+  /**
+   * @generated from enum value: SOLVER_FAILURE_KIND_QUEUE_FULL = 10;
+   */
+  QUEUE_FULL = 10,
+
+  /**
+   * @generated from enum value: SOLVER_FAILURE_KIND_UNSUPPORTED_SOLVER = 11;
+   */
+  UNSUPPORTED_SOLVER = 11,
 }
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SolverFailureKind
  */
-export type SolverFailureKindJson = "SOLVER_FAILURE_KIND_UNSPECIFIED" | "SOLVER_FAILURE_KIND_EXECUTOR_ERROR" | "SOLVER_FAILURE_KIND_RUNTIME_LOAD_ERROR" | "SOLVER_FAILURE_KIND_WORKER_CRASH" | "SOLVER_FAILURE_KIND_SERVER_DISCONNECTED" | "SOLVER_FAILURE_KIND_TIMEOUT" | "SOLVER_FAILURE_KIND_CANCELLED" | "SOLVER_FAILURE_KIND_INTERNAL";
+export type SolverFailureKindJson = "SOLVER_FAILURE_KIND_UNSPECIFIED" | "SOLVER_FAILURE_KIND_EXECUTOR_ERROR" | "SOLVER_FAILURE_KIND_RUNTIME_LOAD_ERROR" | "SOLVER_FAILURE_KIND_WORKER_CRASH" | "SOLVER_FAILURE_KIND_SERVER_DISCONNECTED" | "SOLVER_FAILURE_KIND_TIMEOUT" | "SOLVER_FAILURE_KIND_CANCELLED" | "SOLVER_FAILURE_KIND_INTERNAL" | "SOLVER_FAILURE_KIND_INVALID_REQUEST" | "SOLVER_FAILURE_KIND_UNAUTHENTICATED" | "SOLVER_FAILURE_KIND_QUEUE_FULL" | "SOLVER_FAILURE_KIND_UNSUPPORTED_SOLVER";
 
 /**
  * Describes the enum ortools_wasm.bridge.v1.SolverFailureKind.

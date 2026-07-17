@@ -14,6 +14,7 @@ namespace ortools_wasm::server {
 struct HttpBinaryRequest {
   std::string body;
   std::map<std::string, std::string> headers;
+  std::map<std::string, std::string> query_parameters;
   std::vector<std::string> path_matches;
 };
 

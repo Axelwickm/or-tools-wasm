@@ -8,8 +8,12 @@ namespace ortools_wasm::server {
 class CpSatExecutor final : public SolverExecutor {
  public:
   std::string solver() const override;
+  int RequestedThreads(const SolverExecutorRequest& request,
+                       int client_requested_threads,
+                       int server_total_threads) const override;
   SolverExecutorResult Execute(const SolverExecutorRequest& request,
-                               const JobContext& context) override;
+                               const JobContext& context,
+                               const SolverEventSink& emit_event) override;
 };
 
 }  // namespace ortools_wasm::server

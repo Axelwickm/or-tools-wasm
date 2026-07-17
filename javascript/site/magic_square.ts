@@ -1,4 +1,5 @@
 import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
+import { configureCpSatExecutorSelector } from './cp_sat_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type MagicSquareExpr = {
@@ -24,28 +25,16 @@ const solutionGrid = document.getElementById('solution-grid') as HTMLElement | n
 const sizeInput = document.getElementById('size') as HTMLInputElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const maxWorkerCount = getMaxWorkerCount();
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
-
-function applyWorkerBridgePreference(enabled: boolean) {
-  CpSat.setExecutor({ type: enabled ? 'worker' : 'direct' });
-}
 
 if (workerInput) {
   workerInput.max = String(maxWorkerCount);
   workerInput.min = '1';
   workerInput.value = String(maxWorkerCount);
 }
-if (workerBridgeToggle) {
-  workerBridgeToggle.checked = true;
-  applyWorkerBridgePreference(workerBridgeToggle.checked);
-  workerBridgeToggle.addEventListener('change', () => {
-    const enabled = workerBridgeToggle.checked;
-    applyWorkerBridgePreference(enabled);
-    console.debug('[MagicSquare] worker bridge preference set to', enabled);
-  });
-}
+configureCpSatExecutorSelector(CpSat, executorSelector);
 
 function append(text: string) {
   if (statusEl) {

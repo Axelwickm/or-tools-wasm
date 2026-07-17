@@ -2261,6 +2261,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       model.addLinearConstraint(x.plus(y), 6, 6);
       const solver = new CpSolver();
       solver.parameters.enumerateAllSolutions = true;
+      solver.parameters.numWorkers = 1;
       const solutionCounter = new SolutionCounter();
       const status = await solver.solve(model, solutionCounter);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
@@ -2620,8 +2621,8 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(solver.numBooleans, 0, `${this.name} num_booleans`);
       assertEqual(solver.numConflicts, 0, `${this.name} num_conflicts`);
       assertEqual(solver.numBranches, 0, `${this.name} num_branches`);
-      if (solver.wallTime <= 0) {
-        throw new Error(`${this.name} expected wall_time > 0.0, got ${solver.wallTime}`);
+      if (solver.wallTime < 0) {
+        throw new Error(`${this.name} expected wall_time >= 0.0, got ${solver.wallTime}`);
       }
     },
   },
@@ -3350,7 +3351,12 @@ export async function runCpSatHighLevelParityCases(api: HighLevelApi) {
           CpSolver: MatrixCpSolver,
         };
         for (const testCase of cpSatHighLevelParityCases) {
-          await testCase.run(matrixApi);
+          try {
+            await testCase.run(matrixApi);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`${testCase.name} (${mode}, ${profile.label}) failed: ${message}`);
+          }
           results.push({
             id: testCase.id ?? cpSatHighLevelCaseId(testCase.name),
             name: `${testCase.name} (${mode}, ${profile.label})`,

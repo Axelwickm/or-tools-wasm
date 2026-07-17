@@ -3,6 +3,7 @@
 #include <utility>
 
 #include <httplib.h>
+#include "job.pb.h"
 
 namespace ortools_wasm::server {
 namespace {
@@ -30,6 +31,15 @@ std::vector<std::string> PathMatchesFromRequest(const httplib::Request& request)
     matches.push_back(request.matches[index].str());
   }
   return matches;
+}
+
+std::map<std::string, std::string> QueryParametersFromRequest(
+    const httplib::Request& request) {
+  std::map<std::string, std::string> parameters;
+  for (const auto& parameter : request.params) {
+    parameters.emplace(parameter.first, parameter.second);
+  }
+  return parameters;
 }
 
 void WriteResponse(const HttpBinaryResponse& source, httplib::Response& target) {
@@ -67,6 +77,7 @@ class HttpServer::Impl {
 
       HttpBinaryRequest binary_request;
       binary_request.headers = HeadersFromRequest(request);
+      binary_request.query_parameters = QueryParametersFromRequest(request);
       binary_request.path_matches = PathMatchesFromRequest(request);
       WriteResponse(handler(binary_request), response);
     });
@@ -107,7 +118,20 @@ class HttpServer::Impl {
     response.status = 401;
     AddCorsHeaders(response);
     response.set_header("WWW-Authenticate", "Bearer");
-    response.set_content("unauthorized\n", kPlainTextContentType);
+    ::ortools_wasm::bridge::v1::SolverBridgeRequest bridge_request;
+    bridge_request.ParseFromString(request.body);
+    ::ortools_wasm::bridge::v1::SolverBridgeResponse bridge_response;
+    bridge_response.set_request_id(bridge_request.request_id());
+    bridge_response.set_solver(bridge_request.solver());
+    auto* failure = bridge_response.mutable_failure();
+    failure->set_request_id(bridge_request.request_id());
+    failure->set_solver(bridge_request.solver());
+    failure->set_kind(
+        ::ortools_wasm::bridge::v1::SOLVER_FAILURE_KIND_UNAUTHENTICATED);
+    failure->set_message("Authentication failed.");
+    failure->set_retryable(false);
+    response.set_content(bridge_response.SerializeAsString(),
+                         "application/x-protobuf");
     return false;
   }
 

@@ -5,9 +5,9 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include <emscripten/bind.h>
+#include <emscripten/em_asm.h>
 #include <emscripten/emscripten.h>
 
 #include "generated_proto_schemas.h"
@@ -39,11 +39,6 @@ enum class CallbackEventType : uint8_t {
   kSolution = 1,
   kBestBound = 2,
   kLog = 3,
-};
-
-struct CallbackEvent {
-  CallbackEventType type;
-  std::string payload;
 };
 
 #ifndef ORTOOLS_WASM_ALLOWED_ORIGINS
@@ -190,41 +185,15 @@ uint8_t* CopyStringToBuffer(const std::string& message, size_t* out_len) {
   return buffer;
 }
 
-void AppendUint32(std::string* out, uint32_t value) {
-  out->append(reinterpret_cast<const char*>(&value), sizeof(value));
-}
-
-uint8_t* SerializeCallbackEnvelope(const std::vector<CallbackEvent>& events,
-                                   const CpSolverResponse& response,
-                                   size_t* out_len) {
-  if (out_len == nullptr) return nullptr;
-
-  std::string response_data;
-  if (!response.SerializeToString(&response_data)) {
-    *out_len = 0;
-    return nullptr;
-  }
-
-  std::string envelope;
-  envelope.reserve(sizeof(uint32_t) + events.size() * 8 + response_data.size());
-  AppendUint32(&envelope, static_cast<uint32_t>(events.size()));
-  for (const CallbackEvent& event : events) {
-    envelope.push_back(static_cast<char>(event.type));
-    AppendUint32(&envelope, static_cast<uint32_t>(event.payload.size()));
-    envelope.append(event.payload);
-  }
-  AppendUint32(&envelope, static_cast<uint32_t>(response_data.size()));
-  envelope.append(response_data);
-
-  auto* buffer =
-      static_cast<uint8_t*>(std::malloc(sizeof(uint8_t) * envelope.size()));
-  if (buffer == nullptr) {
-    *out_len = 0;
-    return nullptr;
-  }
-  std::memcpy(buffer, envelope.data(), envelope.size());
-  *out_len = envelope.size();
-  return buffer;
+void EmitCallbackEvent(int callback_id, CallbackEventType event_type,
+                       std::string_view payload) {
+  MAIN_THREAD_EM_ASM(
+      {
+        const sink = Module.__ortoolsCpSatCallbacks?.sinks.get($0);
+        if (sink) sink($1, HEAPU8.slice($2, $2 + $3));
+      },
+      callback_id, static_cast<int>(event_type), payload.data(),
+      payload.size());
 }
 
 std::string EncodeDouble(double value) {
@@ -233,44 +202,13 @@ std::string EncodeDouble(double value) {
   return payload;
 }
 
-bool HasCallbackEvent(const std::vector<CallbackEvent>& events,
-                      CallbackEventType type) {
-  for (const CallbackEvent& event : events) {
-    if (event.type == type) return true;
-  }
-  return false;
-}
-
-void AppendSolutionEvent(std::vector<CallbackEvent>* events,
-                         const CpSolverResponse& response) {
-  std::string data;
-  if (response.SerializeToString(&data)) {
-    events->push_back({CallbackEventType::kSolution, std::move(data)});
-  }
-}
-
-void AppendSolutionEventsFromResponse(std::vector<CallbackEvent>* events,
-                                      const CpSolverResponse& response) {
-  if (response.additional_solutions().empty()) {
-    if (!response.solution().empty()) AppendSolutionEvent(events, response);
-    return;
-  }
-  for (const auto& solution : response.additional_solutions()) {
-    CpSolverResponse callback_response = response;
-    callback_response.clear_solution();
-    callback_response.mutable_solution()->Assign(solution.values().begin(),
-                                                 solution.values().end());
-    AppendSolutionEvent(events, callback_response);
-  }
-}
-
 }  // namespace
 
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
     const uint8_t* model_data, size_t model_len, const uint8_t* params_data,
-    size_t params_len, int callback_flags, size_t* out_len);
+    size_t params_len, int callback_flags, int callback_id, size_t* out_len);
 
 EMSCRIPTEN_KEEPALIVE const char* get_cp_model_schema() {
   return kCpModelProtoSchema;
@@ -282,14 +220,14 @@ EMSCRIPTEN_KEEPALIVE const char* get_sat_parameters_schema() {
 
 EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
     const uint8_t* model_data, size_t model_len, const uint8_t* params_data,
-    size_t params_len, int callback_flags, size_t* out_len) {
+    size_t params_len, int callback_flags, int callback_id, size_t* out_len) {
   if (out_len == nullptr) return nullptr;
   *out_len = 0;
 
   const OriginCheckResult& origin_check = CheckOriginAllowed();
   if (!origin_check.allowed) {
     const auto response = MakeInvalidResponse(origin_check.error);
-    return SerializeCallbackEnvelope({}, response, out_len);
+    return SerializeResponse(response, out_len);
   }
 
   CpModelProto model_proto;
@@ -297,50 +235,35 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
       (model_data == nullptr ||
        !model_proto.ParseFromArray(model_data, static_cast<int>(model_len)))) {
     const auto response = MakeInvalidResponse("Failed to parse CpModelProto.");
-    return SerializeCallbackEnvelope({}, response, out_len);
+    return SerializeResponse(response, out_len);
   }
 
   SatParameters sat_params;
   if (params_data != nullptr && params_len > 0) {
     sat_params.ParseFromArray(params_data, static_cast<int>(params_len));
   }
-  if ((callback_flags & kSolutionCallbackFlag) != 0) {
-    sat_params.set_fill_additional_solutions_in_response(true);
-    if (sat_params.enumerate_all_solutions() &&
-        sat_params.solution_pool_size() < 100000) {
-      sat_params.set_solution_pool_size(100000);
-    }
-  }
-
   Model model;
   model.Add(NewSatParameters(sat_params));
-  std::mutex callback_events_mutex;
-  std::vector<CallbackEvent> callback_events;
   if ((callback_flags & kSolutionCallbackFlag) != 0) {
     model.Add(NewFeasibleSolutionObserver(
-        [&callback_events_mutex, &callback_events](const CpSolverResponse& response) {
+        [callback_id](const CpSolverResponse& response) {
           std::string data;
           if (!response.SerializeToString(&data)) return;
-          std::lock_guard<std::mutex> lock(callback_events_mutex);
-          callback_events.push_back({CallbackEventType::kSolution, std::move(data)});
+          EmitCallbackEvent(callback_id, CallbackEventType::kSolution, data);
         }));
   }
   if ((callback_flags & kBestBoundCallbackFlag) != 0) {
-    model.Add(NewBestBoundCallback(
-        [&callback_events_mutex, &callback_events](double bound) {
-          std::lock_guard<std::mutex> lock(callback_events_mutex);
-          callback_events.push_back(
-              {CallbackEventType::kBestBound, EncodeDouble(bound)});
-        }));
+    model.Add(NewBestBoundCallback([callback_id](double bound) {
+      EmitCallbackEvent(callback_id, CallbackEventType::kBestBound,
+                        EncodeDouble(bound));
+    }));
   }
   if ((callback_flags & kLogCallbackFlag) != 0) {
     model.GetOrCreate<operations_research::SolverLogger>()
         ->AddInfoLoggingCallback(
-            [&callback_events_mutex, &callback_events](
-                const std::string& message) {
-          std::lock_guard<std::mutex> lock(callback_events_mutex);
-          callback_events.push_back({CallbackEventType::kLog, message});
-        });
+            [callback_id](const std::string& message) {
+              EmitCallbackEvent(callback_id, CallbackEventType::kLog, message);
+            });
   }
 
   {
@@ -354,21 +277,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
     std::lock_guard<std::mutex> lock(g_active_model_mutex);
     g_active_model = nullptr;
   }
-  if ((callback_flags & kSolutionCallbackFlag) != 0 &&
-      !HasCallbackEvent(callback_events, CallbackEventType::kSolution)) {
-    AppendSolutionEventsFromResponse(&callback_events, response);
-  }
-  if ((callback_flags & kBestBoundCallbackFlag) != 0 &&
-      !HasCallbackEvent(callback_events, CallbackEventType::kBestBound)) {
-    callback_events.push_back(
-        {CallbackEventType::kBestBound, EncodeDouble(response.best_objective_bound())});
-  }
-  if ((callback_flags & kLogCallbackFlag) != 0 &&
-      !HasCallbackEvent(callback_events, CallbackEventType::kLog) &&
-      !response.solve_log().empty()) {
-    callback_events.push_back({CallbackEventType::kLog, response.solve_log()});
-  }
-  return SerializeCallbackEnvelope(callback_events, response, out_len);
+  return SerializeResponse(response, out_len);
 }
 
 // Solve a CpModelProto and optional SatParameters provided as serialized binary

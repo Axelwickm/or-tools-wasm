@@ -1,4 +1,5 @@
 import { CpSat, type CpSatModelInstance } from 'or-tools-wasm/cp-sat';
+import { configureCpSatExecutorSelector } from './cp_sat_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type SolverMethod = 'sat' | 'sat_table' | 'sat_column';
@@ -291,7 +292,7 @@ const breakSymCheckbox = document.getElementById('break-symmetries') as HTMLInpu
 const workersInput = document.getElementById('workers') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
 const appendStatus = (text: string) => {
@@ -311,28 +312,13 @@ const setReadyIndicator = (text: string) => {
   }
 };
 
-const applyWorkerBridgePreference = (enabled: boolean) => {
-  if (workerBridgeToggle) {
-    workerBridgeToggle.checked = enabled;
-  }
-  CpSat.setExecutor({ type: enabled ? 'worker' : 'direct' });
-};
-
-if (workerBridgeToggle) {
-  workerBridgeToggle.checked = true;
-  workerBridgeToggle.addEventListener('change', () => {
-    applyWorkerBridgePreference(workerBridgeToggle.checked);
-  });
-  applyWorkerBridgePreference(true);
-}
+configureCpSatExecutorSelector(CpSat, executorSelector);
 
 if (workersInput) {
   workersInput.max = String(maxWorkerCount);
   workersInput.min = '1';
   workersInput.value = String(maxWorkerCount);
 }
-
-const shouldUseWorkerBridge = () => Boolean(workerBridgeToggle?.checked);
 
 const createProblemSelector = () => {
   if (!problemSelect) return;

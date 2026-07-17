@@ -9,6 +9,7 @@
 #include "server/src/http_server.h"
 #include "server/src/job_scheduler.h"
 #include "server/src/solver_executor.h"
+#include "job.pb.h"
 
 namespace ortools_wasm::server {
 
@@ -23,6 +24,7 @@ class SolverJobService {
 
   HttpBinaryResponse Submit(const HttpBinaryRequest& request);
   HttpBinaryResponse Status(const HttpBinaryRequest& request);
+  HttpBinaryResponse Events(const HttpBinaryRequest& request);
   HttpBinaryResponse Result(const HttpBinaryRequest& request);
   HttpBinaryResponse Cancel(const HttpBinaryRequest& request);
 
@@ -36,7 +38,11 @@ class SolverJobService {
                                     int http_status) const;
   HttpBinaryResponse FailureResponse(uint32_t request_id, const std::string& solver,
                                      uint64_t job_id, std::string message,
-                                     int http_status) const;
+                                     int http_status,
+                                     ::ortools_wasm::bridge::v1::SolverFailureKind kind =
+                                         ::ortools_wasm::bridge::v1::SOLVER_FAILURE_KIND_EXECUTOR_ERROR,
+                                     bool retryable = false,
+                                     std::string trace = {}) const;
   HttpBinaryResponse ResultResponse(uint32_t request_id, const std::string& solver,
                                     uint64_t job_id, const std::string& payload) const;
 

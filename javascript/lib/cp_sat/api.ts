@@ -2,6 +2,7 @@ import { create } from '@bufbuild/protobuf';
 import {
   CpSatExecutor,
   createCpSatCallbackMask,
+  type CpSatExecutorEvent,
   type CpSatExecutorEventHandler,
   type CpSatExecutorLike,
 } from './executor.js';
@@ -21,7 +22,11 @@ import {
 import type { SolverJobEvent } from '../solver_executor.js';
 import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
+import Long from 'long';
 import * as protobufModule from 'protobufjs';
+
+protobufModule.util.Long = Long;
+protobufModule.configure();
 
 export {
   CpSolverStatus,
@@ -49,17 +54,25 @@ export type CpSatEvent =
 
 export type CpSatEventHandler = (event: CpSatEvent) => void | Promise<void>;
 
+export type CpSatEventMask = {
+  solution?: boolean;
+  bestBound?: boolean;
+  log?: boolean;
+};
+
 export type CpSatSolverParameters = Uint8Array | SatParameters | null;
 
 export type CpSatSolveOptions = {
   solverParameters?: CpSatSolverParameters;
   onEvent?: CpSatEventHandler;
+  eventMask?: CpSatEventMask;
   signal?: AbortSignal;
 };
 
 export type CpSatRawSolveOptions = {
   solverParameters?: Uint8Array | null;
   onEvent?: CpSatEventHandler;
+  eventMask?: CpSatEventMask;
   signal?: AbortSignal;
 };
 
@@ -78,6 +91,8 @@ export type CpSatModelInstance = Uint8Array;
 
 const isBrowserMainThread = typeof window !== 'undefined' && typeof document !== 'undefined';
 
+const directCpSatExecutor = new CpSatExecutor();
+const workerCpSatExecutor = new CpSatWorkerExecutor();
 let cpSatExecutor: CpSatExecutorLike = createCpSatExecutor();
 const ignoreCpSatProgress: CpSatExecutorEventHandler = () => {};
 
@@ -88,9 +103,9 @@ function createCpSatExecutor(configuration: ExecutorConfiguration = { type: 'aut
 function createResolvedCpSatExecutor(executor: ResolvedExecutorConfiguration): CpSatExecutorLike {
   switch (executor.type) {
     case 'direct':
-      return new CpSatExecutor();
+      return directCpSatExecutor;
     case 'worker':
-      return new CpSatWorkerExecutor();
+      return workerCpSatExecutor;
     case 'server':
       return new CpSatServerExecutor(executor);
   }
@@ -101,9 +116,7 @@ function loadModule() {
 }
 
 function setCpSatExecutor(configuration: ExecutorConfiguration) {
-  const previousExecutor = cpSatExecutor;
   cpSatExecutor = createCpSatExecutor(configuration);
-  previousExecutor.terminate('CP-SAT executor replaced.');
 }
 
 let schemaPromise: Promise<CpSatSchemas> | null = null;
@@ -113,9 +126,8 @@ async function fetchSchemas(): Promise<CpSatSchemas> {
   const job = executor.execute({
     case: 'schema',
     value: create(CpSatSchemaRequestSchema),
-  }, ignoreCpSatProgress);
+  }, { onEvent: ignoreCpSatProgress });
   const response = await job.result;
-  throwIfBridgeFailure(response);
   if (response.payload.case !== 'schemaResult') {
     throw new Error('CP-SAT executor returned the wrong schema payload.');
   }
@@ -259,27 +271,59 @@ async function decodeSolverResponse(bytes: Uint8Array): Promise<CpSolverResponse
   return toCpSolverResponse(solverType, bytes);
 }
 
+type ProtobufLong = {
+  low: number;
+  high: number;
+  unsigned: boolean;
+};
+
+function isProtobufLong(value: unknown): value is ProtobufLong {
+  return Long.isLong(value);
+}
+
+function exactLongValue(value: ProtobufLong) {
+  const bigint = value.unsigned
+    ? (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0)
+    : BigInt(value.high) * 0x100000000n + BigInt(value.low >>> 0);
+  if (bigint >= BigInt(Number.MIN_SAFE_INTEGER) &&
+      bigint <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    return Number(bigint);
+  }
+  return {
+    low: value.low,
+    high: value.high,
+    unsigned: value.unsigned,
+  };
+}
+
+function preserveExactLongs(value: unknown): unknown {
+  if (isProtobufLong(value)) return exactLongValue(value);
+  if (value instanceof Uint8Array) return value;
+  if (Array.isArray(value)) return value.map(preserveExactLongs);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, preserveExactLongs(entry)]),
+    );
+  }
+  return value;
+}
+
 function toCpSolverResponse(solverType: CpSolverResponseType, bytes: Uint8Array): CpSolverResponse {
   const decoded = solverType.decode(bytes);
-  return solverType.toObject(decoded, {
+  const response = solverType.toObject(decoded, {
     enums: String,
-    longs: Number,
     defaults: true,
     arrays: true,
     objects: true,
-  }) as CpSolverResponse;
+  });
+  return preserveExactLongs(response) as CpSolverResponse;
 }
 
 function mapBridgeSolveEvent(
   solverType: CpSolverResponseType | undefined,
-  event: CpSatBridgeResponse,
+  event: CpSatExecutorEvent,
 ): CpSatEvent | null {
-  if (event.payload.case === 'jobStatus') {
-    return { type: 'status', status: event.payload.value };
-  }
-  if (event.payload.case === 'failure') {
-    return { type: 'failure', failure: event.payload.value };
-  }
+  if ('type' in event) return event;
   if (event.payload.case !== 'solveEvent') return null;
   const solveEvent = event.payload.value;
   if (solveEvent.payload.case === 'solutionProto') {
@@ -313,20 +357,6 @@ function createAbortError(signal: AbortSignal) {
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
     throw createAbortError(signal);
-  }
-}
-
-function throwIfBridgeFailure(response: CpSatBridgeResponse): void {
-  if (response.payload.case === 'error') {
-    throw new Error(response.payload.value.message);
-  }
-  if (response.payload.case === 'failure') {
-    const failure = response.payload.value;
-    const error = new Error(failure.message);
-    if (failure.trace) {
-      error.stack = failure.trace;
-    }
-    throw error;
   }
 }
 
@@ -378,8 +408,9 @@ async function modelStats(model: Uint8Array): Promise<string> {
 
 type CpSatExecuteOptions = {
   solverParametersBytes: Uint8Array | null;
-  allocatedThreads: number;
+  requestedThreads: number;
   onEvent?: CpSatEventHandler;
+  eventMask?: CpSatEventMask;
   signal?: AbortSignal;
 };
 
@@ -389,7 +420,10 @@ async function executeSolve(
 ) {
   throwIfAborted(options.signal);
 
-  const solverType = options.onEvent ? await resolveCpSolverResponseType() : undefined;
+  const eventMask = options.onEvent
+    ? options.eventMask ?? { solution: true, bestBound: true, log: true }
+    : {};
+  const solverType = eventMask.solution ? await resolveCpSolverResponseType() : undefined;
   throwIfAborted(options.signal);
 
   const executor = cpSatExecutor;
@@ -411,13 +445,12 @@ async function executeSolve(
       cpModelProto: modelBytes,
       satParametersProto: options.solverParametersBytes ?? new Uint8Array(),
       callbackMask: createCpSatCallbackMask(
-        Boolean(options.onEvent),
-        Boolean(options.onEvent),
-        Boolean(options.onEvent),
+        Boolean(eventMask.solution),
+        Boolean(eventMask.bestBound),
+        Boolean(eventMask.log),
       ),
-      allocatedThreads: options.allocatedThreads,
     }),
-  }, onEvent);
+  }, { requestedThreads: options.requestedThreads, onEvent });
   const abortSolve = () => {
     if (!options.signal) return;
     abortError = createAbortError(options.signal);
@@ -435,7 +468,6 @@ async function executeSolve(
     if (abortError) {
       throw abortError;
     }
-    throwIfBridgeFailure(response);
     if (response.payload.case !== 'solveResult') {
       throw new Error('CP-SAT executor returned the wrong solve payload.');
     }
@@ -454,14 +486,15 @@ async function solveRaw(
 ) {
   const result = await executeSolve(modelBytes, {
     solverParametersBytes: options.solverParameters ?? null,
-    allocatedThreads: 0,
+    requestedThreads: 0,
     onEvent: options.onEvent,
+    eventMask: options.eventMask,
     signal: options.signal,
   });
   return result.bytes;
 }
 
-function resolveAllocatedThreads(params?: CpSatSolverParameters): number {
+function resolveRequestedThreads(params?: CpSatSolverParameters): number {
   if (!params || params instanceof Uint8Array) {
     return 0;
   }
@@ -472,22 +505,18 @@ async function solve(
   modelBytes: Uint8Array,
   options: CpSatSolveOptions = {},
 ): Promise<CpSatSolveResult> {
-  const allocatedThreads = resolveAllocatedThreads(options.solverParameters);
+  const requestedThreads = resolveRequestedThreads(options.solverParameters);
   const paramsBytes = await resolveParamsBytes(options.solverParameters);
-  const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const { bytes, solverType } = await executeSolve(modelBytes, {
     solverParametersBytes: paramsBytes,
     onEvent: options.onEvent,
-    allocatedThreads,
+    eventMask: options.eventMask,
+    requestedThreads,
     signal: options.signal,
   });
-  const elapsedSeconds = ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - started) / 1000;
   let response: CpSolverResponse | null = null;
   if (bytes.length > 0) {
     response = solverType ? toCpSolverResponse(solverType, bytes) : await decodeSolverResponse(bytes);
-    if ((response.wallTime ?? 0) <= 0) {
-      response.wallTime = Math.max(elapsedSeconds, Number.EPSILON);
-    }
   }
   return { bytes, response };
 }
@@ -497,9 +526,8 @@ async function validate(model: Uint8Array) {
   const job = executor.execute({
     case: 'validate',
     value: create(CpSatValidateRequestSchema, { cpModelProto: model }),
-  }, ignoreCpSatProgress);
+  }, { onEvent: ignoreCpSatProgress });
   const response = await job.result;
-  throwIfBridgeFailure(response);
   if (response.payload.case !== 'validateResult') {
     throw new Error('CP-SAT executor returned the wrong validate payload.');
   }

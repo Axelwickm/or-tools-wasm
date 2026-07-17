@@ -2,7 +2,12 @@ import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { loadRuntime } from '../runtime_loader.js';
 import { encodeSolverBridgeRequest } from '../solver_bridge.js';
-import type { SolverExecutor, SolverJob } from '../solver_executor.js';
+import type {
+  SolverExecutionOptions,
+  SolverExecutor,
+  SolverJob,
+  SolverJobEvent,
+} from '../solver_executor.js';
 import {
   CpSatBridgeResponseSchema,
   CpSatBridgeRequestSchema,
@@ -11,14 +16,10 @@ import {
   CpSatSolveResultSchema,
   CpSatValidateResultSchema,
   CpSatSchemaResultSchema,
-  CpSatCancelRequestSchema,
-  CpSatCancelledSchema,
-  CpSatBridgeErrorSchema,
   type CpSatCallbackMask,
   type CpSatSolveEvent,
   type CpSatSolveRequest,
   type CpSatValidateRequest,
-  type CpSatCancelRequest,
   type CpSatBridgeRequest,
   type CpSatBridgeResponse,
 } from '../generated/bridge/cp_sat_pb.js';
@@ -37,8 +38,8 @@ const SOLUTION_CALLBACK_EVENT = 1;
 const BEST_BOUND_CALLBACK_EVENT = 2;
 const LOG_CALLBACK_EVENT = 3;
 
-export type CpSatExecutorEventHandler = (event: CpSatBridgeResponse) => void | Promise<void>;
-export type CpSatExecutorBytesEventHandler = (eventBytes: Uint8Array) => void | Promise<void>;
+export type CpSatExecutorEvent = SolverJobEvent | CpSatBridgeResponse;
+export type CpSatExecutorEventHandler = (event: CpSatExecutorEvent) => void | Promise<void>;
 export type CpSatExecutorRequest = CpSatBridgeRequest['payload'];
 export type CpSatExecutorJob = SolverJob<CpSatBridgeResponse>;
 export type CpSatExecutorLike = SolverExecutor<CpSatExecutorRequest, CpSatBridgeResponse, CpSatBridgeResponse>;
@@ -50,16 +51,47 @@ type CpSatRunResult = {
 const readUint32LE = (buffer: ArrayBufferLike, ptr: number) =>
   new DataView(buffer, ptr, 4).getUint32(0, true);
 
-function readUint32FromBytes(bytes: Uint8Array, offset: number) {
-  return new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, true);
-}
-
 function callbackFlags(mask?: CpSatCallbackMask) {
   let flags = 0;
   if (mask?.solution) flags |= SOLUTION_CALLBACK_FLAG;
   if (mask?.bestBound) flags |= BEST_BOUND_CALLBACK_FLAG;
   if (mask?.log) flags |= LOG_CALLBACK_FLAG;
   return flags;
+}
+
+type CpSatWasmCallbackRegistry = {
+  nextId: number;
+  sinks: Map<number, (eventType: number, payload: Uint8Array) => void>;
+};
+
+function cpSatWasmCallbacks(module: OrToolsWasmModule): CpSatWasmCallbackRegistry {
+  return module.__ortoolsCpSatCallbacks ??= {
+    nextId: 1,
+    sinks: new Map(),
+  };
+}
+
+function cpSatCallbackEvent(eventType: number, payload: Uint8Array): CpSatBridgeResponse | null {
+  let eventPayload: CpSatSolveEvent['payload'];
+  if (eventType === SOLUTION_CALLBACK_EVENT) {
+    eventPayload = { case: 'solutionProto', value: payload };
+  } else if (eventType === BEST_BOUND_CALLBACK_EVENT) {
+    eventPayload = {
+      case: 'bestBound',
+      value: new DataView(payload.buffer, payload.byteOffset, payload.byteLength).getFloat64(0, true),
+    };
+  } else if (eventType === LOG_CALLBACK_EVENT) {
+    eventPayload = { case: 'log', value: new TextDecoder().decode(payload) };
+  } else {
+    return null;
+  }
+
+  return create(CpSatBridgeResponseSchema, {
+    payload: {
+      case: 'solveEvent',
+      value: create(CpSatSolveEventSchema, { payload: eventPayload }),
+    },
+  });
 }
 
 function copyBytesToHeap(module: OrToolsWasmModule, bytes: Uint8Array | null | undefined) {
@@ -73,100 +105,69 @@ function nowMs() {
   return BigInt(Date.now());
 }
 
-export function createCpSatJobStatusBridgeResponse(
+export function createCpSatJobStatusEvent(
   requestId: number,
   state: SolverJobState,
   createdAtMs: bigint,
   startedAtMs: bigint = 0n,
   allocatedThreads = 0,
   queuePosition = 0,
-): CpSatBridgeResponse {
-  return create(CpSatBridgeResponseSchema, {
-    requestId,
-    payload: {
-      case: 'jobStatus',
-      value: create(SolverJobStatusSchema, {
-        requestId,
-        solver: 'cp-sat',
-        state,
-        createdAtMs,
-        startedAtMs,
-        allocatedThreads,
-        queuePosition,
-      }),
-    },
-  });
+): SolverJobEvent {
+  return {
+    type: 'status',
+    status: create(SolverJobStatusSchema, {
+      requestId,
+      solver: 'cp-sat',
+      state,
+      createdAtMs,
+      startedAtMs,
+      allocatedThreads,
+      queuePosition,
+    }),
+  };
 }
 
-export function createCpSatFailureBridgeResponse(
+export function createCpSatFailureEvent(
   requestId: number,
   message: string,
   kind: SolverFailureKind = SolverFailureKind.INTERNAL,
   trace = '',
   retryable = false,
-): CpSatBridgeResponse {
-  return create(CpSatBridgeResponseSchema, {
-    requestId,
-    payload: {
-      case: 'failure',
-      value: create(SolverJobFailureSchema, {
-        requestId,
-        solver: 'cp-sat',
-        kind,
-        message,
-        trace,
-        retryable,
-      }),
-    },
-  });
+): SolverJobEvent {
+  return {
+    type: 'failure',
+    failure: create(SolverJobFailureSchema, {
+      requestId, solver: 'cp-sat', kind, message, trace, retryable,
+    }),
+  };
 }
 
-export function cpSatResponseFromSolverBridgeResponse(
-  requestId: number,
+export function cpSatEventFromSolverBridgeResponse(
   response: SolverBridgeResponse,
-  failureKind: SolverFailureKind,
-): CpSatBridgeResponse {
+): CpSatExecutorEvent | null {
   switch (response.payload.case) {
     case 'eventPayload':
     case 'resultPayload':
       return fromBinary(CpSatBridgeResponseSchema, response.payload.value);
     case 'status':
-      return create(CpSatBridgeResponseSchema, {
-        requestId,
-        payload: {
-          case: 'jobStatus',
-          value: response.payload.value,
-        },
-      });
+      return { type: 'status', status: response.payload.value };
     case 'failure':
-      return create(CpSatBridgeResponseSchema, {
-        requestId,
-        payload: {
-          case: 'failure',
-          value: response.payload.value,
-        },
-      });
+      return { type: 'failure', failure: response.payload.value };
     default:
-      return createCpSatFailureBridgeResponse(
-        requestId,
-        'Solver bridge response has no payload.',
-        failureKind,
-        '',
-        true,
-      );
+      return null;
   }
 }
 
-function requestedThreads(request: CpSatBridgeRequest): number {
-  return request.payload.case === 'solve' ? request.payload.value.allocatedThreads : 0;
-}
-
-export function encodeCpSatSolverBridgeRequest(request: CpSatBridgeRequest): Uint8Array {
+export function encodeCpSatSolverBridgeRequest(
+  requestId: number,
+  request: CpSatBridgeRequest,
+  requestedThreads = 0,
+): Uint8Array {
   return encodeSolverBridgeRequest({
-    requestId: request.requestId,
+    requestId,
     solver: 'cp-sat',
     payload: toBinary(CpSatBridgeRequestSchema, request),
-    requestedThreads: requestedThreads(request),
+    requestedThreads,
   });
 }
 
@@ -175,11 +176,12 @@ export class CpSatExecutor implements CpSatExecutorLike {
 
   private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
+  private readonly cancelledRequests = new Set<number>();
 
   constructor(private readonly loadModuleImpl: () => Promise<OrToolsWasmModule> = loadRuntime) {}
 
-  load() {
-    return this.loadModule();
+  async load(): Promise<void> {
+    await this.loadModule();
   }
 
   loadModule() {
@@ -189,96 +191,85 @@ export class CpSatExecutor implements CpSatExecutorLike {
 
   execute(
     payload: CpSatExecutorRequest,
-    onEvent: CpSatExecutorEventHandler,
+    options: SolverExecutionOptions<CpSatBridgeResponse>,
   ): CpSatExecutorJob {
-    const request = this.createRequest(payload);
+    const requestId = this.nextCpSatRequestId();
     return {
-      requestId: request.requestId,
-      result: this.run(request, onEvent),
-      cancel: () => this.cancel(this.nextCpSatRequestId(), request.requestId, onEvent),
+      requestId,
+      result: this.run(requestId, payload, options.onEvent, options.requestedThreads ?? 0),
+      cancel: () => this.cancel(requestId, options.onEvent),
     };
   }
 
   private async run(
-    request: CpSatBridgeRequest,
+    requestId: number,
+    payload: CpSatExecutorRequest,
     onEvent: CpSatExecutorEventHandler,
+    requestedThreads: number,
   ): Promise<CpSatBridgeResponse> {
     const createdAtMs = nowMs();
     try {
-      await onEvent(createCpSatJobStatusBridgeResponse(
-        request.requestId,
+      await onEvent(createCpSatJobStatusEvent(
+        requestId,
         SolverJobState.STARTING,
         createdAtMs,
       ));
       let result: CpSatRunResult;
-      switch (request.payload.case) {
+      switch (payload.case) {
         case 'solve':
           result = {
-            response: await this.solve(request.requestId, request.payload.value, createdAtMs, onEvent),
+            response: await this.solve(requestId, payload.value, createdAtMs, onEvent, requestedThreads),
             terminalState: SolverJobState.SUCCEEDED,
           };
           break;
         case 'validate':
           result = {
-            response: await this.validate(request.requestId, request.payload.value, createdAtMs, onEvent),
+            response: await this.validate(requestId, payload.value, createdAtMs, onEvent),
             terminalState: SolverJobState.SUCCEEDED,
           };
           break;
         case 'schema':
           result = {
-            response: await this.getSchemas(request.requestId, createdAtMs, onEvent),
+            response: await this.getSchemas(requestId, createdAtMs, onEvent),
             terminalState: SolverJobState.SUCCEEDED,
           };
           break;
-        case 'cancel':
-          result = {
-            response: await this.cancelRequest(request.requestId, request.payload.value, createdAtMs, onEvent),
-            terminalState: SolverJobState.CANCELLED,
-          };
-          break;
         default:
-          result = {
-            response: this.error(request.requestId, 'CP-SAT bridge request has no payload.'),
-            terminalState: SolverJobState.FAILED,
-          };
+          throw new Error('CP-SAT bridge request has no payload.');
       }
-      await onEvent(createCpSatJobStatusBridgeResponse(
-        request.requestId,
-        result.terminalState,
+      const terminalState = this.cancelledRequests.has(requestId)
+        ? SolverJobState.CANCELLED
+        : result.terminalState;
+      await onEvent(createCpSatJobStatusEvent(
+        requestId,
+        terminalState,
         createdAtMs,
       ));
       return result.response;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const trace = error instanceof Error ? error.stack ?? '' : '';
-      const failure = createCpSatFailureBridgeResponse(request.requestId, message, SolverFailureKind.INTERNAL, trace);
+      const failure = createCpSatFailureEvent(requestId, message, SolverFailureKind.INTERNAL, trace);
       await onEvent(failure);
-      await onEvent(createCpSatJobStatusBridgeResponse(
-        request.requestId,
+      await onEvent(createCpSatJobStatusEvent(
+        requestId,
         SolverJobState.FAILED,
         createdAtMs,
       ));
-      return failure;
+      throw error;
+    } finally {
+      this.cancelledRequests.delete(requestId);
     }
-  }
-
-  async executeBytes(
-    requestBytes: Uint8Array,
-    onEvent: CpSatExecutorBytesEventHandler,
-  ): Promise<Uint8Array> {
-    const request = fromBinary(CpSatBridgeRequestSchema, requestBytes);
-    const response = await this.run(request, async (event) => {
-      await onEvent(toBinary(CpSatBridgeResponseSchema, event));
-    });
-    return toBinary(CpSatBridgeResponseSchema, response);
   }
 
   private async cancel(
     requestId: number,
-    targetRequestId: number,
     onEvent: CpSatExecutorEventHandler,
-  ): Promise<CpSatBridgeResponse> {
-    return this.run(createCpSatCancelBridgeRequest(requestId, targetRequestId), onEvent);
+  ): Promise<void> {
+    this.cancelledRequests.add(requestId);
+    await onEvent(createCpSatJobStatusEvent(requestId, SolverJobState.CANCELLING, nowMs()));
+    const module = await this.loadModule();
+    module.ccall('interrupt_solve', 'void', [], []);
   }
 
   terminate(_reason?: string): void {}
@@ -287,27 +278,21 @@ export class CpSatExecutor implements CpSatExecutorLike {
     return this.nextRequestId++;
   }
 
-  private createRequest(payload: CpSatExecutorRequest): CpSatBridgeRequest {
-    return create(CpSatBridgeRequestSchema, {
-      requestId: this.nextCpSatRequestId(),
-      payload,
-    });
-  }
-
   private async solve(
     requestId: number,
     solveRequest: CpSatSolveRequest,
     createdAtMs: bigint,
     onEvent: CpSatExecutorEventHandler,
+    requestedThreads: number,
   ): Promise<CpSatBridgeResponse> {
     const module = await this.loadModule();
     const startedAtMs = nowMs();
-    await onEvent(createCpSatJobStatusBridgeResponse(
+    await onEvent(createCpSatJobStatusEvent(
       requestId,
       SolverJobState.RUNNING,
       createdAtMs,
       startedAtMs,
-      solveRequest.allocatedThreads,
+      requestedThreads,
     ));
     const modelBytes = solveRequest.cpModelProto;
     const paramsBytes = solveRequest.satParametersProto;
@@ -316,14 +301,33 @@ export class CpSatExecutor implements CpSatExecutorLike {
     const modelPtr = copyBytesToHeap(module, modelBytes);
     const paramsPtr = copyBytesToHeap(module, paramsBytes);
     let responsePtr = 0;
+    let callbackId = 0;
+    let callbackError: unknown = null;
+    const pendingCallbacks: Promise<void>[] = [];
 
     try {
       if (flags) {
+        const callbacks = cpSatWasmCallbacks(module);
+        callbackId = callbacks.nextId++;
+        callbacks.sinks.set(callbackId, (eventType, payload) => {
+          const event = cpSatCallbackEvent(eventType, payload);
+          if (!event || callbackError) return;
+          try {
+            const pending = onEvent(event);
+            if (pending) {
+              pendingCallbacks.push(Promise.resolve(pending).catch((error) => {
+                callbackError ??= error;
+              }));
+            }
+          } catch (error) {
+            callbackError ??= error;
+          }
+        });
         responsePtr = await module.ccall(
           'solve_model_with_callback_events',
           'number',
-          ['number', 'number', 'number', 'number', 'number', 'number'],
-          [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, flags, lenPtr],
+          ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+          [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, flags, callbackId, lenPtr],
           { async: true },
         ) as number;
       } else {
@@ -340,64 +344,23 @@ export class CpSatExecutor implements CpSatExecutorLike {
       const bytes = responsePtr && len
         ? module.HEAPU8.slice(responsePtr, responsePtr + len)
         : new Uint8Array();
-      const responseBytes = flags ? await this.postCallbackEvents(requestId, bytes, onEvent) : bytes;
+      await Promise.all(pendingCallbacks);
+      if (callbackError) throw callbackError;
       return create(CpSatBridgeResponseSchema, {
-        requestId,
         payload: {
           case: 'solveResult',
           value: create(CpSatSolveResultSchema, {
-            cpSolverResponseProto: responseBytes,
+            cpSolverResponseProto: bytes,
           }),
         },
       });
     } finally {
+      if (callbackId) cpSatWasmCallbacks(module).sinks.delete(callbackId);
       if (modelPtr) module._free(modelPtr);
       if (paramsPtr) module._free(paramsPtr);
       if (lenPtr) module._free(lenPtr);
       if (responsePtr) module._free_buffer(responsePtr);
     }
-  }
-
-  private async postCallbackEvents(
-    requestId: number,
-    envelopeBytes: Uint8Array,
-    onEvent: CpSatExecutorEventHandler,
-  ) {
-    let offset = 0;
-    const eventCount = readUint32FromBytes(envelopeBytes, offset);
-    offset += 4;
-    for (let i = 0; i < eventCount; i++) {
-      const eventType = envelopeBytes[offset++];
-      const payloadLength = readUint32FromBytes(envelopeBytes, offset);
-      offset += 4;
-      const payload = envelopeBytes.slice(offset, offset + payloadLength);
-      offset += payloadLength;
-
-      let eventPayload: CpSatSolveEvent['payload'];
-      if (eventType === SOLUTION_CALLBACK_EVENT) {
-        eventPayload = { case: 'solutionProto', value: payload };
-      } else if (eventType === BEST_BOUND_CALLBACK_EVENT) {
-        eventPayload = {
-          case: 'bestBound',
-          value: new DataView(payload.buffer, payload.byteOffset, payload.byteLength).getFloat64(0, true),
-        };
-      } else if (eventType === LOG_CALLBACK_EVENT) {
-        eventPayload = { case: 'log', value: new TextDecoder().decode(payload) };
-      } else {
-        continue;
-      }
-
-      await onEvent(create(CpSatBridgeResponseSchema, {
-        requestId,
-        payload: {
-          case: 'solveEvent',
-          value: create(CpSatSolveEventSchema, { payload: eventPayload }),
-        },
-      }));
-    }
-    const responseLength = readUint32FromBytes(envelopeBytes, offset);
-    offset += 4;
-    return envelopeBytes.slice(offset, offset + responseLength);
   }
 
   private async validate(
@@ -408,7 +371,7 @@ export class CpSatExecutor implements CpSatExecutorLike {
   ): Promise<CpSatBridgeResponse> {
     const module = await this.loadModule();
     const startedAtMs = nowMs();
-    await onEvent(createCpSatJobStatusBridgeResponse(
+    await onEvent(createCpSatJobStatusEvent(
       requestId,
       SolverJobState.RUNNING,
       createdAtMs,
@@ -434,7 +397,6 @@ export class CpSatExecutor implements CpSatExecutorLike {
         : '';
 
       return create(CpSatBridgeResponseSchema, {
-        requestId,
         payload: {
           case: 'validateResult',
           value: create(CpSatValidateResultSchema, { ok: message.length === 0, message }),
@@ -454,14 +416,13 @@ export class CpSatExecutor implements CpSatExecutorLike {
   ): Promise<CpSatBridgeResponse> {
     const module = await this.loadModule();
     const startedAtMs = nowMs();
-    await onEvent(createCpSatJobStatusBridgeResponse(
+    await onEvent(createCpSatJobStatusEvent(
       requestId,
       SolverJobState.RUNNING,
       createdAtMs,
       startedAtMs,
     ));
     return create(CpSatBridgeResponseSchema, {
-      requestId,
       payload: {
         case: 'schemaResult',
         value: create(CpSatSchemaResultSchema, {
@@ -472,49 +433,6 @@ export class CpSatExecutor implements CpSatExecutorLike {
     });
   }
 
-  private async cancelRequest(
-    requestId: number,
-    cancelRequest: CpSatCancelRequest,
-    createdAtMs: bigint,
-    onEvent: CpSatExecutorEventHandler,
-  ): Promise<CpSatBridgeResponse> {
-    const module = await this.loadModule();
-    const startedAtMs = nowMs();
-    await onEvent(createCpSatJobStatusBridgeResponse(
-      requestId,
-      SolverJobState.CANCELLING,
-      createdAtMs,
-      startedAtMs,
-    ));
-    module.ccall('interrupt_solve', 'void', [], []);
-    return create(CpSatBridgeResponseSchema, {
-      requestId,
-      payload: {
-        case: 'cancelled',
-        value: create(CpSatCancelledSchema, { targetRequestId: cancelRequest.targetRequestId }),
-      },
-    });
-  }
-
-  private error(requestId: number, message: string): CpSatBridgeResponse {
-    return create(CpSatBridgeResponseSchema, {
-      requestId,
-      payload: {
-        case: 'error',
-        value: create(CpSatBridgeErrorSchema, { message }),
-      },
-    });
-  }
-}
-
-export function createCpSatCancelBridgeRequest(requestId: number, targetRequestId: number) {
-  return create(CpSatBridgeRequestSchema, {
-    requestId,
-    payload: {
-      case: 'cancel',
-      value: create(CpSatCancelRequestSchema, { targetRequestId }),
-    },
-  });
 }
 
 export function createCpSatCallbackMask(solution: boolean, bestBound: boolean, log: boolean) {

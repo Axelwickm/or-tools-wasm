@@ -8,10 +8,13 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
 namespace ortools_wasm::server {
+
+class JobCancellationState;
 
 enum class JobState {
   kQueued,
@@ -62,6 +65,32 @@ struct SchedulerStats {
   int queued_jobs = 0;
 };
 
+class JobQueueFullError : public std::runtime_error {
+ public:
+  using std::runtime_error::runtime_error;
+};
+
+class CancellationRegistration {
+ public:
+  CancellationRegistration() = default;
+  ~CancellationRegistration();
+
+  CancellationRegistration(CancellationRegistration&& other) noexcept;
+  CancellationRegistration& operator=(CancellationRegistration&& other) noexcept;
+  CancellationRegistration(const CancellationRegistration&) = delete;
+  CancellationRegistration& operator=(const CancellationRegistration&) = delete;
+
+ private:
+  friend class JobContext;
+
+  CancellationRegistration(std::shared_ptr<JobCancellationState> state,
+                           uint64_t handler_id);
+  void Reset();
+
+  std::shared_ptr<JobCancellationState> state_;
+  uint64_t handler_id_ = 0;
+};
+
 class JobContext {
  public:
   uint64_t job_id() const { return job_id_; }
@@ -69,18 +98,20 @@ class JobContext {
   int requested_threads() const { return requested_threads_; }
   int allocated_threads() const { return allocated_threads_; }
   bool cancellation_requested() const;
+  CancellationRegistration OnCancellation(std::function<void()> handler) const;
 
  private:
   friend class JobScheduler;
 
   JobContext(uint64_t job_id, std::string solver, int requested_threads,
-             int allocated_threads, std::shared_ptr<std::atomic_bool> cancel_flag);
+             int allocated_threads,
+             std::shared_ptr<JobCancellationState> cancellation);
 
   uint64_t job_id_;
   std::string solver_;
   int requested_threads_;
   int allocated_threads_;
-  std::shared_ptr<std::atomic_bool> cancel_flag_;
+  std::shared_ptr<JobCancellationState> cancellation_;
 };
 
 class JobScheduler;

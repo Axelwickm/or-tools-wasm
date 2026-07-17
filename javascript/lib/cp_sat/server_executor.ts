@@ -1,19 +1,26 @@
-import { create } from '@bufbuild/protobuf';
+import { create, fromBinary } from '@bufbuild/protobuf';
 import type { ServerExecutorConfiguration } from '../executor_configuration.js';
 import {
   decodeSolverBridgeResponse,
+  encodeSolverBridgeCancelRequest,
 } from '../solver_bridge.js';
 import { DEFAULT_SOLVER_STATUS_INTERVAL_MS } from '../solver_executor.js';
+import type { SolverExecutionOptions } from '../solver_executor.js';
 import {
   CpSatBridgeRequestSchema,
+  CpSatBridgeResponseSchema,
   type CpSatBridgeRequest,
   type CpSatBridgeResponse,
 } from '../generated/bridge/cp_sat_pb.js';
-import { SolverFailureKind, type SolverBridgeResponse } from '../generated/bridge/job_pb.js';
 import {
-  cpSatResponseFromSolverBridgeResponse,
-  createCpSatCancelBridgeRequest,
-  createCpSatFailureBridgeResponse,
+  SolverEventBatchSchema,
+  SolverFailureKind,
+  type SolverJobFailure,
+  type SolverBridgeResponse,
+} from '../generated/bridge/job_pb.js';
+import {
+  cpSatEventFromSolverBridgeResponse,
+  createCpSatFailureEvent,
   encodeCpSatSolverBridgeRequest,
   type CpSatExecutorEventHandler,
   type CpSatExecutorJob,
@@ -22,62 +29,27 @@ import {
 } from './executor.js';
 
 const PROTOBUF_CONTENT_TYPE = 'application/x-protobuf';
-// Server polling contract:
-//   200 + SolverBridgeResponse: event/status/failure/result payload.
-//   202 + SolverBridgeResponse: accepted or still running, usually status/event.
-//   204 + empty body: no new status/result available yet.
 const JOB_ACCEPTED_STATUS = 202;
 const JOB_NOT_READY_STATUS = 204;
 
 type FetchLike = typeof fetch;
 
+class RemoteSolverError extends Error {
+  constructor(readonly failure: SolverJobFailure, readonly emitted = false) {
+    super(failure.message);
+    if (failure.trace) this.stack = failure.trace;
+  }
+}
+
 function currentFetch(fetchImpl?: FetchLike): FetchLike {
   const fetchFn = fetchImpl ?? globalThis.fetch;
-  if (typeof fetchFn !== 'function') {
-    throw new Error('CP-SAT server executor requires fetch().');
-  }
+  if (typeof fetchFn !== 'function') throw new Error('CP-SAT server executor requires fetch().');
   return fetchFn.bind(globalThis) as FetchLike;
 }
 
 function normalizeBaseUrl(url: string | URL): string {
   const value = String(url);
   return value.endsWith('/') ? value : `${value}/`;
-}
-
-function serverBaseUrl(configuration: ServerExecutorConfiguration): string {
-  const endpoint = configuration.host ?? configuration.url;
-  if (!endpoint) {
-    throw new Error('CP-SAT server executor requires a server host.');
-  }
-  return normalizeBaseUrl(endpoint);
-}
-
-function serverHeaders(configuration: ServerExecutorConfiguration): Record<string, string> {
-  const headers = { ...configuration.headers };
-  if (configuration.authToken) {
-    headers.Authorization = `Bearer ${configuration.authToken}`;
-  }
-  return headers;
-}
-
-function jobsEndpoint(baseUrl: string): string {
-  return new URL('jobs', baseUrl).href;
-}
-
-function jobEndpoint(baseUrl: string, jobId: bigint): string {
-  return new URL(`jobs/${jobId.toString()}`, baseUrl).href;
-}
-
-function jobResultEndpoint(baseUrl: string, jobId: bigint): string {
-  return new URL(`jobs/${jobId.toString()}/result`, baseUrl).href;
-}
-
-function jobCancelEndpoint(baseUrl: string, jobId: bigint): string {
-  return new URL(`jobs/${jobId.toString()}/cancel`, baseUrl).href;
-}
-
-async function readResponseBytes(response: Response): Promise<Uint8Array> {
-  return new Uint8Array(await response.arrayBuffer());
 }
 
 function bytesBody(bytes: Uint8Array): ArrayBuffer {
@@ -99,224 +71,187 @@ export class CpSatServerExecutor implements CpSatExecutorLike {
   private readonly statusIntervalMs: number;
 
   constructor(configuration: ServerExecutorConfiguration) {
-    this.baseUrl = serverBaseUrl(configuration);
-    this.headers = serverHeaders(configuration);
+    const endpoint = configuration.host ?? configuration.url;
+    if (!endpoint) throw new Error('CP-SAT server executor requires a server host.');
+    this.baseUrl = normalizeBaseUrl(endpoint);
+    this.headers = { ...configuration.headers };
+    if (configuration.authToken) this.headers.Authorization = `Bearer ${configuration.authToken}`;
     this.fetchImpl = configuration.fetch;
     this.statusIntervalMs = configuration.statusIntervalMs ?? DEFAULT_SOLVER_STATUS_INTERVAL_MS;
   }
 
   execute(
     payload: CpSatExecutorRequest,
-    onEvent: CpSatExecutorEventHandler,
+    options: SolverExecutionOptions<CpSatBridgeResponse>,
   ): CpSatExecutorJob {
-    const request = this.createRequest(payload);
-    const submitted = this.submit(request);
+    const requestId = this.nextCpSatRequestId();
+    const request = create(CpSatBridgeRequestSchema, { payload });
+    const submitted = this.submit(requestId, request, options.requestedThreads ?? 0);
     return {
-      requestId: request.requestId,
-      result: this.run(request, submitted, onEvent),
-      cancel: () => this.cancel(request.requestId, submitted, onEvent),
+      requestId,
+      result: this.run(requestId, submitted, options.onEvent),
+      cancel: () => this.cancel(requestId, submitted),
     };
   }
 
-  async load(): Promise<void> {}
+  async load(): Promise<void> {
+    const response = await currentFetch(this.fetchImpl)(new URL('healthz', this.baseUrl), {
+      headers: this.headers,
+    });
+    if (!response.ok) {
+      throw new Error(`CP-SAT server health check failed (${response.status} ${response.statusText}).`);
+    }
+  }
 
   terminate(_reason?: string): void {}
 
-  private async submit(request: CpSatBridgeRequest): Promise<SolverBridgeResponse> {
-    const response = await currentFetch(this.fetchImpl)(jobsEndpoint(this.baseUrl), {
+  private async submit(
+    requestId: number,
+    request: CpSatBridgeRequest,
+    requestedThreads: number,
+  ): Promise<SolverBridgeResponse> {
+    const bytes = encodeCpSatSolverBridgeRequest(requestId, request, requestedThreads);
+    const response = await currentFetch(this.fetchImpl)(new URL('jobs', this.baseUrl), {
       method: 'POST',
-      headers: {
-        accept: PROTOBUF_CONTENT_TYPE,
-        'content-type': PROTOBUF_CONTENT_TYPE,
-        ...this.headers,
-      },
-      body: bytesBody(encodeCpSatSolverBridgeRequest(request)),
+      headers: { accept: PROTOBUF_CONTENT_TYPE, 'content-type': PROTOBUF_CONTENT_TYPE, ...this.headers },
+      body: bytesBody(bytes),
     });
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(`CP-SAT server job submission failed (${response.status} ${response.statusText}): ${detail}`);
-    }
-
-    return decodeSolverBridgeResponse(await readResponseBytes(response));
+    if (!response.ok) await this.throwHttpError('submission', response);
+    return decodeSolverBridgeResponse(new Uint8Array(await response.arrayBuffer()));
   }
 
   private async run(
-    request: CpSatBridgeRequest,
+    requestId: number,
     submitted: Promise<SolverBridgeResponse>,
     onEvent: CpSatExecutorEventHandler,
   ): Promise<CpSatBridgeResponse> {
     try {
       const submittedResponse = await submitted;
-      const submittedResult = await this.handleBridgeResponse(request.requestId, submittedResponse, onEvent);
-      if (submittedResult) return submittedResult;
-      if (submittedResponse.jobId === 0n) {
-        throw new Error('CP-SAT server did not return a job id.');
-      }
-      return await this.pollResult(request.requestId, submittedResponse.jobId, onEvent);
+      const immediate = await this.handleResponse(submittedResponse, onEvent);
+      if (immediate) return immediate;
+      if (submittedResponse.jobId === 0n) throw new Error('CP-SAT server did not return a job id.');
+      return await this.pollResult(
+        submittedResponse.jobId,
+        submittedResponse.sequenceId,
+        onEvent,
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const trace = error instanceof Error ? error.stack ?? '' : '';
-      const failure = createCpSatFailureBridgeResponse(
-        request.requestId,
-        message,
+      if (error instanceof RemoteSolverError) {
+        if (!error.emitted) await onEvent({ type: 'failure', failure: error.failure });
+        throw error;
+      }
+      const failure = createCpSatFailureEvent(
+        requestId,
+        error instanceof Error ? error.message : String(error),
         SolverFailureKind.SERVER_DISCONNECTED,
-        trace,
+        error instanceof Error ? error.stack ?? '' : '',
         true,
       );
       await onEvent(failure);
-      return failure;
+      throw error;
     }
   }
 
   private async pollResult(
-    requestId: number,
     jobId: bigint,
+    initialSequenceId: bigint,
     onEvent: CpSatExecutorEventHandler,
   ): Promise<CpSatBridgeResponse> {
+    let sequenceId = initialSequenceId;
     for (;;) {
       await delay(this.statusIntervalMs);
-
-      const statusResult = await this.pollStatus(requestId, jobId, onEvent);
-      if (statusResult) return statusResult;
-
-      const response = await currentFetch(this.fetchImpl)(jobResultEndpoint(this.baseUrl, jobId), {
-        method: 'GET',
-        headers: {
-          accept: PROTOBUF_CONTENT_TYPE,
-          ...this.headers,
-        },
-      });
-
-      if (response.status === JOB_NOT_READY_STATUS) continue;
-      if (response.status !== JOB_ACCEPTED_STATUS && !response.ok) {
-        const detail = await response.text().catch(() => '');
-        throw new Error(`CP-SAT server job result failed (${response.status} ${response.statusText}): ${detail}`);
+      const eventsResponse = await currentFetch(this.fetchImpl)(
+        new URL(`jobs/${jobId}/events?after=${sequenceId}`, this.baseUrl),
+        { headers: { accept: PROTOBUF_CONTENT_TYPE, ...this.headers } },
+      );
+      if (!eventsResponse.ok) await this.throwHttpError('events', eventsResponse);
+      const eventBytes = new Uint8Array(await eventsResponse.arrayBuffer());
+      if (eventBytes.byteLength) {
+        const batch = fromBinary(SolverEventBatchSchema, eventBytes);
+        for (const outer of batch.responses) {
+          if (outer.sequenceId > sequenceId) sequenceId = outer.sequenceId;
+          const eventResult = await this.handleResponse(outer, onEvent);
+          if (eventResult) return eventResult;
+        }
       }
 
-      const bytes = await readResponseBytes(response);
-      if (bytes.byteLength === 0) continue;
-      const bridgeResponse = decodeSolverBridgeResponse(bytes);
-      const result = await this.handleBridgeResponse(requestId, bridgeResponse, onEvent);
+      const outer = await this.fetchJob(new URL(`jobs/${jobId}/result`, this.baseUrl), 'result');
+      if (!outer) continue;
+      const result = await this.handleResponse(outer, onEvent);
       if (result) return result;
     }
   }
 
-  private async pollStatus(
-    requestId: number,
-    jobId: bigint,
-    onEvent: CpSatExecutorEventHandler,
-  ): Promise<CpSatBridgeResponse | null> {
-    const response = await currentFetch(this.fetchImpl)(jobEndpoint(this.baseUrl, jobId), {
-      method: 'GET',
-      headers: {
-        accept: PROTOBUF_CONTENT_TYPE,
-        ...this.headers,
-      },
+  private async fetchJob(url: URL, operation: string): Promise<SolverBridgeResponse | null> {
+    const response = await currentFetch(this.fetchImpl)(url, {
+      headers: { accept: PROTOBUF_CONTENT_TYPE, ...this.headers },
     });
-
     if (response.status === JOB_NOT_READY_STATUS) return null;
-    if (response.status !== JOB_ACCEPTED_STATUS && !response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(`CP-SAT server job status failed (${response.status} ${response.statusText}): ${detail}`);
-    }
-
-    const bytes = await readResponseBytes(response);
-    if (bytes.byteLength === 0) return null;
-    return this.handleBridgeResponse(requestId, decodeSolverBridgeResponse(bytes), onEvent);
+    if (response.status !== JOB_ACCEPTED_STATUS && !response.ok) await this.throwHttpError(operation, response);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return bytes.byteLength ? decodeSolverBridgeResponse(bytes) : null;
   }
 
-  private async handleBridgeResponse(
-    requestId: number,
-    response: SolverBridgeResponse,
+  private async handleResponse(
+    outer: SolverBridgeResponse,
     onEvent: CpSatExecutorEventHandler,
   ): Promise<CpSatBridgeResponse | null> {
-    if (response.solver && response.solver !== this.solver) {
-      return createCpSatFailureBridgeResponse(
-        requestId,
-        `CP-SAT server returned response for unsupported solver: ${response.solver}`,
-        SolverFailureKind.SERVER_DISCONNECTED,
-        '',
-        true,
-      );
+    if (outer.solver && outer.solver !== this.solver) {
+      throw new Error(`CP-SAT server returned response for unsupported solver: ${outer.solver}`);
     }
-
-    const cpSatResponse = cpSatResponseFromSolverBridgeResponse(
-      requestId,
-      response,
-      SolverFailureKind.SERVER_DISCONNECTED,
-    );
-    switch (response.payload.case) {
-      case 'eventPayload':
-      case 'status':
-        await onEvent(cpSatResponse);
-        return null;
-      case 'failure':
-      case 'resultPayload':
-        return cpSatResponse;
-      default:
-        return cpSatResponse;
+    if (outer.payload.case === 'failure') {
+      await onEvent({ type: 'failure', failure: outer.payload.value });
+      throw new RemoteSolverError(outer.payload.value, true);
     }
+    if (outer.payload.case === 'resultPayload') {
+      return fromBinary(CpSatBridgeResponseSchema, outer.payload.value);
+    }
+    const event = cpSatEventFromSolverBridgeResponse(outer);
+    if (event) await onEvent(event);
+    return null;
   }
 
   private async cancel(
     targetRequestId: number,
     submitted: Promise<SolverBridgeResponse>,
-    onEvent: CpSatExecutorEventHandler,
-  ): Promise<CpSatBridgeResponse> {
-    const cancelRequest = createCpSatCancelBridgeRequest(this.nextCpSatRequestId(), targetRequestId);
-    try {
-      const submittedResponse = await submitted;
-      if (submittedResponse.jobId === 0n) {
-        throw new Error('CP-SAT server did not return a job id.');
+  ): Promise<void> {
+    const outer = await submitted;
+    if (outer.jobId === 0n) throw new Error('CP-SAT server did not return a job id.');
+    const requestId = this.nextCpSatRequestId();
+    const bytes = encodeSolverBridgeCancelRequest(requestId, this.solver, targetRequestId);
+    const response = await currentFetch(this.fetchImpl)(new URL(`jobs/${outer.jobId}/cancel`, this.baseUrl), {
+      method: 'POST',
+      headers: { accept: PROTOBUF_CONTENT_TYPE, 'content-type': PROTOBUF_CONTENT_TYPE, ...this.headers },
+      body: bytesBody(bytes),
+    });
+    if (!response.ok) await this.throwHttpError('cancel', response);
+    const responseBytes = new Uint8Array(await response.arrayBuffer());
+    if (responseBytes.byteLength) {
+      const acknowledgement = decodeSolverBridgeResponse(responseBytes);
+      if (acknowledgement.payload.case === 'failure') {
+        throw new RemoteSolverError(acknowledgement.payload.value);
       }
-
-      const response = await currentFetch(this.fetchImpl)(jobCancelEndpoint(this.baseUrl, submittedResponse.jobId), {
-        method: 'POST',
-        headers: {
-          accept: PROTOBUF_CONTENT_TYPE,
-          'content-type': PROTOBUF_CONTENT_TYPE,
-          ...this.headers,
-        },
-        body: bytesBody(encodeCpSatSolverBridgeRequest(cancelRequest)),
-      });
-      if (!response.ok) {
-        const detail = await response.text().catch(() => '');
-        throw new Error(`CP-SAT server cancel failed (${response.status} ${response.statusText}): ${detail}`);
+      if (acknowledgement.payload.case !== 'cancelled' ||
+          acknowledgement.payload.value.targetRequestId !== targetRequestId) {
+        throw new Error('CP-SAT server returned an invalid cancellation acknowledgement.');
       }
-
-      const bridgeResponse = decodeSolverBridgeResponse(await readResponseBytes(response));
-      const cpSatResponse = await this.handleBridgeResponse(cancelRequest.requestId, bridgeResponse, onEvent);
-      return cpSatResponse ?? createCpSatFailureBridgeResponse(
-        cancelRequest.requestId,
-        'CP-SAT server cancel did not return a terminal response.',
-        SolverFailureKind.SERVER_DISCONNECTED,
-        '',
-        true,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const trace = error instanceof Error ? error.stack ?? '' : '';
-      const failure = createCpSatFailureBridgeResponse(
-        cancelRequest.requestId,
-        message,
-        SolverFailureKind.SERVER_DISCONNECTED,
-        trace,
-        true,
-      );
-      await onEvent(failure);
-      return failure;
     }
+  }
+
+  private async throwHttpError(operation: string, response: Response): Promise<never> {
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes(PROTOBUF_CONTENT_TYPE)) {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength) {
+        const outer = decodeSolverBridgeResponse(bytes);
+        if (outer.payload.case === 'failure') throw new RemoteSolverError(outer.payload.value);
+      }
+    }
+    const detail = await response.text().catch(() => '');
+    throw new Error(`CP-SAT server job ${operation} failed (${response.status} ${response.statusText}): ${detail}`);
   }
 
   private nextCpSatRequestId() {
     return this.nextRequestId++;
-  }
-
-  private createRequest(payload: CpSatExecutorRequest): CpSatBridgeRequest {
-    return create(CpSatBridgeRequestSchema, {
-      requestId: this.nextCpSatRequestId(),
-      payload,
-    });
   }
 }

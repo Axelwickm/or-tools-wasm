@@ -40,6 +40,9 @@ int RunHttpServer(const ortools_wasm::server::ServerConfig& config) {
   server.AddGetRoute(R"(/jobs/(\d+))", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
     return job_service.Status(request);
   });
+  server.AddGetRoute(R"(/jobs/(\d+)/events)", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
+    return job_service.Events(request);
+  });
   server.AddGetRoute(R"(/jobs/(\d+)/result)", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
     return job_service.Result(request);
   });

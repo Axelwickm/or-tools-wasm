@@ -5,6 +5,7 @@ const rootDir = path.resolve(__dirname, '..');
 const siteRoot = path.resolve(rootDir, 'javascript/site');
 const distDir = path.resolve(__dirname, 'build/javascript/site');
 const browserBuildDir = path.resolve(__dirname, 'build/javascript/browser');
+const wasmBuildDir = path.resolve(__dirname, 'build/javascript/wasm');
 const packageBrowserAliases = [
   ['or-tools-wasm', 'index'],
   ['or-tools-wasm/cp-sat', 'cp-sat'],
@@ -32,6 +33,13 @@ export default defineConfig({
     format: 'es',
   },
   server: {
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(siteRoot),
+        browserBuildDir,
+        wasmBuildDir,
+      ],
+    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',

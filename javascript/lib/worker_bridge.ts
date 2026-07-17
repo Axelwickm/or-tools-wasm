@@ -88,7 +88,7 @@ export function terminateWorkerBridge(reason?: string) {
 async function createBridgeWorker(): Promise<BridgeWorker> {
   if (!isPackagedBrowserBuild && (isNode || isDeno)) {
     const workerThreadsSpecifier = 'node:worker_threads';
-    const { Worker: NodeWorker } = await import(workerThreadsSpecifier);
+    const { Worker: NodeWorker } = await import(/* @vite-ignore */ workerThreadsSpecifier);
     const nodeWorkerBridge = './node_worker_bridge.js';
     return new NodeWorker(new URL(nodeWorkerBridge, import.meta.url), { execArgv: [] }) as BridgeWorker;
   }

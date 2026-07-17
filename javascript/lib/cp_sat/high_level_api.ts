@@ -2586,9 +2586,18 @@ export class CpSolver {
     const mergedParams = solveParams instanceof Uint8Array ? solveParams : { ...this.parameters, ...(solveParams ?? {}) };
     const modelBytes = await CpSat.createModel(model.proto());
     const hasInternalEvents = Boolean(solutionCallback || this.bestBoundCallback || this.logCallback);
+    let eventMask = options.eventMask;
+    if (hasInternalEvents && (eventMask || !options.onEvent)) {
+      eventMask = {
+        solution: Boolean(solutionCallback) || Boolean(eventMask?.solution),
+        bestBound: Boolean(this.bestBoundCallback) || Boolean(eventMask?.bestBound),
+        log: Boolean(this.logCallback) || Boolean(eventMask?.log),
+      };
+    }
     const result = await CpSat.solve(modelBytes, {
       solverParameters: mergedParams,
       signal: options.signal,
+      eventMask,
       onEvent: hasInternalEvents || options.onEvent
         ? async (event) => {
             if (event.type === 'solution') {

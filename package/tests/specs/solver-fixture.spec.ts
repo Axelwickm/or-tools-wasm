@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('runs the shared solver fixture cases with and without the worker bridge', async ({ page }) => {
+test('runs the shared solver fixture cases across executor modes', async ({ page }) => {
   const browserErrors: string[] = [];
   let failOnPageError: (error: Error) => void = () => {};
   const pageErrorPromise = new Promise<never>((_, reject) => {
@@ -71,6 +71,8 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
         bridge?: number;
         bridgeTerminated?: number;
         activeBridge?: number;
+        activeExecutorWorkers?: Record<string, number>;
+        executorWorkerRequests?: Record<string, number>;
         cpSatSolve?: number;
       };
     }>;
@@ -84,12 +86,13 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
       responseBytesLength?: number;
     }>;
     cpSatSolverStructureWorkerStatsBefore?: {
-      cpSatSolve?: number;
+      executorWorkerRequests?: Record<string, number>;
+      activeExecutorWorkers?: Record<string, number>;
     };
     cpSatSolverStructureWorkerStatsAfter?: {
-      cpSatSolve?: number;
+      executorWorkerRequests?: Record<string, number>;
       activeBridge?: number;
-      bridgeTerminated?: number;
+      activeExecutorWorkers?: Record<string, number>;
     };
     highLevelCpSatResults?: Array<{
       id?: string;
@@ -100,19 +103,22 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
       params?: Record<string, unknown>;
     }>;
     highLevelCpSatWorkerStatsBefore?: {
-      cpSatSolve?: number;
+      executorWorkerRequests?: Record<string, number>;
+      activeExecutorWorkers?: Record<string, number>;
     };
     highLevelCpSatWorkerStatsAfter?: {
-      cpSatSolve?: number;
+      executorWorkerRequests?: Record<string, number>;
       activeBridge?: number;
-      bridgeTerminated?: number;
+      activeExecutorWorkers?: Record<string, number>;
     };
     cpSatWorkerStatsBefore?: {
-      activeBridge?: number;
+      executorWorkerRequests?: Record<string, number>;
+      activeExecutorWorkers?: Record<string, number>;
     };
     cpSatWorkerStatsAfter?: {
       activeBridge?: number;
-      bridgeTerminated?: number;
+      activeExecutorWorkers?: Record<string, number>;
+      executorWorkerRequests?: Record<string, number>;
     };
     routingResults?: Array<{
       id?: string;
@@ -208,9 +214,11 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
     };
     rcpspWorkerStatsBefore?: {
       cpSatSolve?: number;
+      executorWorkerRequests?: Record<string, number>;
     };
     rcpspWorkerStatsAfter?: {
       cpSatSolve?: number;
+      executorWorkerRequests?: Record<string, number>;
       activeBridge?: number;
       bridgeTerminated?: number;
     };
@@ -299,11 +307,13 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
       expect(result.responseBytesLength).toBeGreaterThan(0);
     }
   }
-  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.cpSatSolve).toBeGreaterThan(
-    parsedStatus.cpSatSolverStructureWorkerStatsBefore?.cpSatSolve ?? -1,
+  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
+    parsedStatus.cpSatSolverStructureWorkerStatsBefore?.executorWorkerRequests?.['cp-sat'] ?? -1,
   );
   expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBe(
+    parsedStatus.cpSatSolverStructureWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'],
+  );
   expect(parsedStatus.results).toHaveLength(6);
   expect(parsedStatus.results).toEqual([
     expect.objectContaining({ mode: 'direct', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
@@ -334,7 +344,7 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
   );
   expect(parsedStatus.results?.[0].workerStats?.total).toBeGreaterThanOrEqual(4);
   expect(parsedStatus.results?.[2].workerStats?.total).toBeGreaterThanOrEqual(5);
-  expect(parsedStatus.highLevelCpSatWorkerStatsBefore?.cpSatSolve).toBe(0);
+  expect(parsedStatus.highLevelCpSatWorkerStatsBefore?.executorWorkerRequests?.['cp-sat']).toBeUndefined();
   const highLevelCpSatProfilesByCase = new Map<string, Set<string>>();
   for (const result of parsedStatus.highLevelCpSatResults ?? []) {
     if (!result.id) continue;
@@ -345,13 +355,21 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
   for (const [caseId, profiles] of highLevelCpSatProfilesByCase) {
     expect([...profiles].sort(), `high-level CP-SAT executor matrix for ${caseId}`).toEqual(expectedHighLevelCpSatProfiles);
   }
-  expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.cpSatSolve).toBeGreaterThan(0);
+  expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(0);
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBeGreaterThan(
+    parsedStatus.highLevelCpSatWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'] ?? 0,
+  );
   expect(parsedStatus.cpSatWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.cpSatWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(parsedStatus.cpSatWorkerStatsBefore?.activeBridge ?? -1);
-  expect(parsedStatus.results?.[0].workerStats?.cpSatSolve).toBe(parsedStatus.highLevelCpSatWorkerStatsAfter?.cpSatSolve);
-  expect(parsedStatus.results?.[2].workerStats?.cpSatSolve).toBeGreaterThan(parsedStatus.results?.[0].workerStats?.cpSatSolve ?? 0);
+  expect(parsedStatus.cpSatWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBe(
+    parsedStatus.cpSatWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'],
+  );
+  expect(parsedStatus.results?.[0].workerStats?.executorWorkerRequests?.['cp-sat']).toBe(
+    parsedStatus.highLevelCpSatWorkerStatsAfter?.executorWorkerRequests?.['cp-sat'],
+  );
+  expect(parsedStatus.results?.[2].workerStats?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
+    parsedStatus.results?.[0].workerStats?.executorWorkerRequests?.['cp-sat'] ?? 0,
+  );
   expect(parsedStatus.routingResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
       name: 'TestPyWrapRoutingModel.testRoutingSearchParameters (direct)',
@@ -479,7 +497,9 @@ test('runs the shared solver fixture cases with and without the worker bridge', 
   expect(parsedStatus.setCoverWorkerStatsAfter?.activeBridge).toBe(0);
   expect(parsedStatus.setCoverWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
   expectStableCaseIds(parsedStatus.setCoverResults, 'Set Cover');
-  expect(parsedStatus.rcpspWorkerStatsAfter?.cpSatSolve).toBeGreaterThan(parsedStatus.rcpspWorkerStatsBefore?.cpSatSolve ?? 0);
+  expect(parsedStatus.rcpspWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
+    parsedStatus.rcpspWorkerStatsBefore?.executorWorkerRequests?.['cp-sat'] ?? 0,
+  );
   expect(parsedStatus.rcpspWorkerStatsAfter?.activeBridge).toBe(0);
   expect(parsedStatus.rcpspWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
   expect(parsedStatus.rcpspResults).toEqual(expect.arrayContaining([

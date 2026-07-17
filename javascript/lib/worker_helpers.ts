@@ -1,6 +1,7 @@
 type WorkerLike<Request, Response> = {
   postMessage(message: Request, transfer?: Transferable[]): void;
   terminate(): void | Promise<number>;
+  ref?(): void;
   unref?(): void;
   onmessage?: ((event: MessageEvent<Response>) => void) | null;
   onerror?: ((event: ErrorEvent) => void) | null;
@@ -17,7 +18,7 @@ type PendingRequest<Response> = {
 
 export type ManagedWorkerOptions<Request, Response> = {
   createWorker(): Promise<WorkerLike<Request, Response>>;
-  isReady(message: Response): boolean;
+  isReady?(message: Response): boolean;
   getRequestId(request: Request): number;
   getResponseId(message: Response): number | undefined;
   isEvent?(message: Response): boolean;
@@ -34,11 +35,13 @@ export class ManagedWorker<Request, Response> {
   constructor(private readonly options: ManagedWorkerOptions<Request, Response>) {}
 
   async load(): Promise<void> {
-    await this.ensureReady();
+    const worker = await this.ensureReady();
+    worker.unref?.();
   }
 
   async post(request: Request, onEvent?: (value: Response) => void | Promise<void>, transfer?: Transferable[]): Promise<Response> {
     const worker = await this.ensureReady();
+    worker.ref?.();
     return new Promise<Response>((resolve, reject) => {
       this.pendingRequests.set(this.options.getRequestId(request), {
         resolve,
@@ -75,11 +78,10 @@ export class ManagedWorker<Request, Response> {
     if (this.worker) return this.worker;
 
     const worker = await this.options.createWorker();
-    worker.unref?.();
     this.worker = worker;
     this.readyPromise = new Promise<void>((resolve, reject) => {
       const handleMessage = (message: Response) => {
-        if (this.options.isReady(message)) {
+        if (this.options.isReady?.(message)) {
           resolve();
           return;
         }
@@ -96,6 +98,7 @@ export class ManagedWorker<Request, Response> {
                   this.pendingRequests.delete(id!);
                 }
                 pending.reject(error);
+                if (this.pendingRequests.size === 0) worker.unref?.();
               });
           }
           return;
@@ -106,6 +109,7 @@ export class ManagedWorker<Request, Response> {
           if (pending) {
             pending.reject(error);
             this.pendingRequests.delete(id!);
+            if (this.pendingRequests.size === 0) worker.unref?.();
           } else {
             reject(error);
           }
@@ -115,8 +119,14 @@ export class ManagedWorker<Request, Response> {
         if (pending) {
           this.pendingRequests.delete(id!);
           pending.eventChain.then(
-            () => pending.resolve(message),
-            (error) => pending.reject(error),
+            () => {
+              pending.resolve(message);
+              if (this.pendingRequests.size === 0) worker.unref?.();
+            },
+            (error) => {
+              pending.reject(error);
+              if (this.pendingRequests.size === 0) worker.unref?.();
+            },
           );
         }
       };
@@ -136,6 +146,7 @@ export class ManagedWorker<Request, Response> {
         worker.onmessage = (event: MessageEvent<Response>) => handleMessage(event.data);
         worker.onerror = handleError;
       }
+      if (!this.options.isReady) resolve();
     });
 
     return worker;

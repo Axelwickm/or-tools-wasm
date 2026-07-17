@@ -72,6 +72,11 @@ export type CpSatEvent =
 export type CpSatSolveOptions = {
   solverParameters?: CpSatSolveParams;
   onEvent?: (event: CpSatEvent) => void;
+  eventMask?: {
+    solution?: boolean;
+    bestBound?: boolean;
+    log?: boolean;
+  };
   signal?: AbortSignal;
 };
 

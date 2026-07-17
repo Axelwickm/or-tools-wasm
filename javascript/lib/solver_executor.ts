@@ -1,47 +1,21 @@
+import {
+  SolverFailureKind as GeneratedSolverFailureKind,
+  SolverJobState as GeneratedSolverJobState,
+  type SolverJobFailure as GeneratedSolverJobFailure,
+  type SolverJobStatus as GeneratedSolverJobStatus,
+} from './generated/bridge/job_pb.js';
+
 export const DEFAULT_SOLVER_STATUS_INTERVAL_MS = 2000;
 
 export type SolverExecutorEventHandler<Event> = (event: Event) => void | Promise<void>;
 
-export const SolverJobState = {
-  UNSPECIFIED: 0,
-  QUEUED: 1,
-  STARTING: 2,
-  RUNNING: 3,
-  CANCELLING: 4,
-  CANCELLED: 5,
-  SUCCEEDED: 6,
-  FAILED: 7,
-} as const;
+export const SolverJobState = GeneratedSolverJobState;
 
-export type SolverJobStatus = {
-  requestId: number;
-  solver: string;
-  state: number;
-  createdAtMs: bigint;
-  startedAtMs: bigint;
-  allocatedThreads: number;
-  queuePosition: number;
-};
+export type SolverJobStatus = GeneratedSolverJobStatus;
 
-export const SolverFailureKind = {
-  UNSPECIFIED: 0,
-  EXECUTOR_ERROR: 1,
-  RUNTIME_LOAD_ERROR: 2,
-  WORKER_CRASH: 3,
-  SERVER_DISCONNECTED: 4,
-  TIMEOUT: 5,
-  CANCELLED: 6,
-  INTERNAL: 7,
-} as const;
+export const SolverFailureKind = GeneratedSolverFailureKind;
 
-export type SolverJobFailure = {
-  requestId: number;
-  solver: string;
-  kind: number;
-  message: string;
-  trace: string;
-  retryable: boolean;
-};
+export type SolverJobFailure = GeneratedSolverJobFailure;
 
 export type SolverJobEvent =
   | { type: 'status'; status: SolverJobStatus }
@@ -50,12 +24,17 @@ export type SolverJobEvent =
 export type SolverJob<Response> = {
   readonly requestId: number;
   readonly result: Promise<Response>;
-  cancel(): Promise<Response>;
+  cancel(): Promise<void>;
+};
+
+export type SolverExecutionOptions<Event> = {
+  requestedThreads?: number;
+  onEvent: SolverExecutorEventHandler<SolverJobEvent | Event>;
 };
 
 export type SolverExecutor<Request, Response, Event> = {
   readonly solver: string;
-  execute(request: Request, onEvent: SolverExecutorEventHandler<Event>): SolverJob<Response>;
-  load(): Promise<unknown>;
+  execute(request: Request, options: SolverExecutionOptions<Event>): SolverJob<Response>;
+  load(): Promise<void>;
   terminate(reason?: string): void;
 };

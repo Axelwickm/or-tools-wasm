@@ -20,6 +20,7 @@ type CpSatPublicApi = CpSatLike & {
   solveRaw(model: Uint8Array, options?: {
     solverParameters?: Uint8Array | null;
     onEvent?: CpSatSolveOptions['onEvent'];
+    eventMask?: CpSatSolveOptions['eventMask'];
     signal?: AbortSignal;
   }): Promise<Uint8Array>;
   getSchemas(): Promise<unknown>;
@@ -37,6 +38,8 @@ export type CpSatSolverStructureResult = SharedCaseResult<ExecutorFixtureMode> &
   publicMethods?: string[];
   solverStatus?: unknown;
   statusStates?: number[];
+  eventTypes?: string[];
+  solutionEventWasLive?: boolean;
   responseBytesLength?: number;
 };
 
@@ -101,9 +104,18 @@ async function runSolveContract(CpSat: CpSatPublicApi, mode: SolverStructureMode
     CpSat.setExecutor({ type: mode });
   }
   try {
-    const result = await CpSat.solve(modelBytes, {
+    let solveSettled = false;
+    let solutionEventWasLive = false;
+    const solvePromise = CpSat.solve(modelBytes, {
       solverParameters: { numSearchWorkers: 1 },
-      onEvent: (event) => events.push(event),
+      eventMask: { solution: true },
+      onEvent: (event) => {
+        events.push(event);
+        if (event.type === 'solution') solutionEventWasLive = !solveSettled;
+      },
+    });
+    const result = await solvePromise.finally(() => {
+      solveSettled = true;
     });
     assertResponse(result.response, mode);
     if (result.bytes.length === 0) {
@@ -117,10 +129,24 @@ async function runSolveContract(CpSat: CpSatPublicApi, mode: SolverStructureMode
       .filter((event): event is Extract<CpSatEvent, { type: 'status' }> => event.type === 'status')
       .map((event) => event.status.state);
     assertStatusEvents(statusStates, mode);
+    const solverEventTypes = events
+      .filter((event) => event.type !== 'status' && event.type !== 'failure')
+      .map((event) => event.type);
+    if (!solverEventTypes.includes('solution')) {
+      throw new Error(`CP-SAT shared solver structure solve (${mode}) did not emit a solution event`);
+    }
+    if (solverEventTypes.some((type) => type !== 'solution')) {
+      throw new Error(`CP-SAT shared solver structure solve (${mode}) ignored its solution-only event mask`);
+    }
+    if (!solutionEventWasLive) {
+      throw new Error(`CP-SAT shared solver structure solve (${mode}) buffered its solution event`);
+    }
     return {
       executor: mode,
       solverStatus: result.response?.status,
       statusStates,
+      eventTypes: solverEventTypes,
+      solutionEventWasLive,
       responseBytesLength: result.bytes.length,
     };
   } finally {

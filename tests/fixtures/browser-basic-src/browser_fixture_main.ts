@@ -48,6 +48,9 @@ type WorkerStats = {
   bridge: number;
   bridgeTerminated: number;
   activeBridge: number;
+  executorWorkers: Record<string, number>;
+  activeExecutorWorkers: Record<string, number>;
+  executorWorkerRequests: Record<string, number>;
   cpSatSolve: number;
   routingSolve: number;
   mpSolverSolve: number;
@@ -164,32 +167,44 @@ async function assertManualServerHealth(host: string, authToken: string) {
 
 function installWorkerSpy() {
   const originalWorker = window.Worker;
-  const creations: Array<{ id: number; url: string; name?: string; bridge: boolean }> = [];
-  const terminations: Array<{ id: number; bridge: boolean }> = [];
-  const messages: Array<{ type?: string }> = [];
+  const creations: Array<{
+    id: number;
+    url: string;
+    name?: string;
+    bridge: boolean;
+    executor?: string;
+  }> = [];
+  const terminations: Array<{ id: number; bridge: boolean; executor?: string }> = [];
+  const messages: Array<{ type?: string; executor?: string }> = [];
   let nextWorkerId = 1;
 
   window.Worker = function WorkerSpy(scriptURL: string | URL, options?: WorkerOptions) {
     const worker = new originalWorker(scriptURL, options);
     const name = options?.name;
-    const bridge = !name?.startsWith('em-pthread-');
+    const executor = name?.startsWith('ortools-executor-')
+      ? name.slice('ortools-executor-'.length)
+      : undefined;
+    const bridge = !executor && !name?.startsWith('em-pthread-');
     const id = nextWorkerId++;
     creations.push({
       id,
       url: String(scriptURL),
       name,
       bridge,
+      executor,
     });
     const originalPostMessage = worker.postMessage.bind(worker);
     worker.postMessage = ((message: unknown, transferOrOptions?: StructuredSerializeOptions | Transferable[]) => {
-      if (message && typeof message === 'object' && 'type' in message) {
+      if (executor && message instanceof Uint8Array) {
+        messages.push({ executor });
+      } else if (message && typeof message === 'object' && 'type' in message) {
         messages.push({ type: String((message as { type: unknown }).type) });
       }
       return originalPostMessage(message, transferOrOptions as StructuredSerializeOptions);
     }) as Worker['postMessage'];
     const originalTerminate = worker.terminate.bind(worker);
     worker.terminate = (() => {
-      terminations.push({ id, bridge });
+      terminations.push({ id, bridge, executor });
       return originalTerminate();
     }) as Worker['terminate'];
     return worker;
@@ -197,6 +212,22 @@ function installWorkerSpy() {
 
   return {
     snapshot(): WorkerStats {
+      const executorNames = new Set(
+        creations.flatMap((creation) => creation.executor ? [creation.executor] : []),
+      );
+      const executorWorkers = Object.fromEntries([...executorNames].map((executor) => [
+        executor,
+        creations.filter((creation) => creation.executor === executor).length,
+      ]));
+      const activeExecutorWorkers = Object.fromEntries([...executorNames].map((executor) => [
+        executor,
+        creations.filter((creation) => creation.executor === executor).length
+          - terminations.filter((termination) => termination.executor === executor).length,
+      ]));
+      const executorWorkerRequests = Object.fromEntries([...executorNames].map((executor) => [
+        executor,
+        messages.filter((message) => message.executor === executor).length,
+      ]));
       return {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
@@ -204,6 +235,9 @@ function installWorkerSpy() {
         bridgeTerminated: terminations.filter((termination) => termination.bridge).length,
         activeBridge: creations.filter((creation) => creation.bridge).length
           - terminations.filter((termination) => termination.bridge).length,
+        executorWorkers,
+        activeExecutorWorkers,
+        executorWorkerRequests,
         cpSatSolve: messages.filter((message) => message.type === 'solve').length,
         routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
         mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,

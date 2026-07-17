@@ -5,10 +5,21 @@ package ortools_wasm.bridge.v1;
 message SolverBridgeRequest {
   uint32 request_id = 1;
   string solver = 2;
-  bytes payload = 3;
-  // 0 means unknown/default. Server schedulers may use this as an admission
-  // hint when the solver request can estimate its thread use up front.
-  uint32 requested_threads = 4;
+  SolverExecutionSettings settings = 3;
+
+  oneof operation {
+    bytes execute_payload = 10;
+    SolverCancelRequest cancel = 11;
+  }
+}
+
+message SolverExecutionSettings {
+  // 0 means that the solver's default resource requirement is requested.
+  uint32 requested_threads = 1;
+}
+
+message SolverCancelRequest {
+  uint32 target_request_id = 1;
 }
 
 message SolverBridgeResponse {
@@ -16,13 +27,25 @@ message SolverBridgeResponse {
   string solver = 2;
   // 0 means the response is not associated with a server-side queued job.
   uint64 job_id = 3;
+  // Monotonically increases for responses belonging to the same job. A zero
+  // value means that the transport does not retain a replayable event log.
+  uint64 sequence_id = 4;
 
   oneof payload {
     SolverJobStatus status = 10;
     SolverJobFailure failure = 11;
     bytes event_payload = 12;
     bytes result_payload = 13;
+    SolverJobCancelled cancelled = 14;
   }
+}
+
+message SolverJobCancelled {
+  uint32 target_request_id = 1;
+}
+
+message SolverEventBatch {
+  repeated SolverBridgeResponse responses = 1;
 }
 
 message SolverJobStatus {
@@ -64,4 +87,8 @@ enum SolverFailureKind {
   SOLVER_FAILURE_KIND_TIMEOUT = 5;
   SOLVER_FAILURE_KIND_CANCELLED = 6;
   SOLVER_FAILURE_KIND_INTERNAL = 7;
+  SOLVER_FAILURE_KIND_INVALID_REQUEST = 8;
+  SOLVER_FAILURE_KIND_UNAUTHENTICATED = 9;
+  SOLVER_FAILURE_KIND_QUEUE_FULL = 10;
+  SOLVER_FAILURE_KIND_UNSUPPORTED_SOLVER = 11;
 }

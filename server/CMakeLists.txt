@@ -137,7 +137,33 @@ add_executable(server_config_test
   src/server_config_test.cc)
 target_include_directories(server_config_test PRIVATE "${REPO_ROOT}")
 
+add_executable(server_solver_job_service_test
+  src/job_scheduler.cc
+  src/solver_job_service.cc
+  src/solver_job_service_test.cc)
+target_include_directories(server_solver_job_service_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_solver_job_service_test PRIVATE
+  protobuf::libprotobuf
+  server_bridge_proto)
+
+add_executable(server_cp_sat_executor_test
+  src/cp_sat_executor.cc
+  src/cp_sat_executor_test.cc
+  src/job_scheduler.cc)
+add_dependencies(server_cp_sat_executor_test server_proto_schemas)
+target_include_directories(server_cp_sat_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${CMAKE_BINARY_DIR}/server_proto_schemas")
+target_link_libraries(server_cp_sat_executor_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
 if(BUILD_TESTING)
   add_test(NAME server_job_scheduler_test COMMAND server_job_scheduler_test)
   add_test(NAME server_config_test COMMAND server_config_test)
+  add_test(NAME server_solver_job_service_test COMMAND server_solver_job_service_test)
+  add_test(NAME server_cp_sat_executor_test COMMAND server_cp_sat_executor_test)
 endif()

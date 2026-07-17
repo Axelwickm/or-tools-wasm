@@ -39,6 +39,24 @@ function assertNumber(value: unknown, expected: number, message: string) {
   assert(value === expected, `${message}: expected ${expected}, got ${value}`);
 }
 
+function int64ToBigInt(value: unknown, message: string) {
+  if (typeof value === 'number') {
+    assert(Number.isSafeInteger(value), `${message}: received an unsafe rounded number`);
+    return BigInt(value);
+  }
+  if (typeof value === 'string') return BigInt(value);
+  assert(
+    value !== null && typeof value === 'object' &&
+      typeof (value as { low?: unknown }).low === 'number' &&
+      typeof (value as { high?: unknown }).high === 'number',
+    `${message}: expected an exact int64 representation`,
+  );
+  const long = value as { low: number; high: number; unsigned?: boolean };
+  return long.unsigned
+    ? (BigInt(long.high >>> 0) << 32n) | BigInt(long.low >>> 0)
+    : BigInt(long.high) * 0x100000000n + BigInt(long.low >>> 0);
+}
+
 type CpSatLinearExpr = {
   vars?: number[];
   coeffs?: number[];
@@ -70,6 +88,16 @@ function solveParams(params: CpSatSolveParams, overrides: CpSatSolveParams = {})
     ...DEFAULT_SOLVE_PARAMS,
     ...params,
     ...overrides,
+  };
+}
+
+function exactEnumerationParams(params: CpSatSolveParams, overrides: CpSatSolveParams = {}) {
+  const rest = solveParams(params, overrides);
+  delete rest.numWorkers;
+  delete rest.numSearchWorkers;
+  return {
+    ...rest,
+    numSearchWorkers: 1,
   };
 }
 
@@ -114,6 +142,30 @@ function helperSimpleSolveModel() {
 }
 
 export const pythonApiContractCases: CpSatCase[] = [
+  {
+    name: 'CpSatContract/test_int64_solution_precision',
+    source: 'javascript/lib/cp_sat/api.ts',
+    tags: ['contract', 'int64'],
+    model: {
+      variables: [{
+        name: 'x',
+        domain: [
+          { low: 1, high: 2097152, unsigned: false },
+          { low: 1, high: 2097152, unsigned: false },
+        ],
+      }],
+    },
+    async run(CpSat, params) {
+      const response = await solveModel(CpSat, this, params);
+      assertStatus(response, 'OPTIMAL', this.name);
+      assert(response.solution?.length === 1, `${this.name} expected one solution value`);
+      assert(
+        int64ToBigInt(response.solution[0], this.name) === 9007199254740993n,
+        `${this.name} did not preserve the exact int64 solution`,
+      );
+      return response.status;
+    },
+  },
   {
     // TEMP: parity - CpModelHelperTest.test_simple_solve matches upstream proto solve assertions using the shared CP-SAT contract API.
     name: 'CpModelHelperTest/test_simple_solve',
@@ -200,7 +252,7 @@ export const pythonApiContractCases: CpSatCase[] = [
         modelBytes,
         {
           solverParameters: {
-            ...solveParams(params),
+            ...exactEnumerationParams(params),
             enumerateAllSolutions: true,
           },
           onEvent(event) {
@@ -1127,7 +1179,7 @@ export const pythonApiContractCases: CpSatCase[] = [
         modelBytes,
         {
           solverParameters: {
-            ...solveParams(params),
+            ...exactEnumerationParams(params),
             enumerateAllSolutions: true,
           },
           onEvent(event) {

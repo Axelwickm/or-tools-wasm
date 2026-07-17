@@ -121,5 +121,6 @@ MODULE.bazel.lock
 
 # NPM stuff
 **/.npm-cache/
+/.playwright-mcp/
 /package/README.md
 /package/LICENSE

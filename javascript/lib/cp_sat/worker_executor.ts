@@ -1,7 +1,9 @@
-import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
+import { create, fromBinary } from '@bufbuild/protobuf';
 import { ManagedWorker, defaultLoadErrorMessage } from '../worker_helpers.js';
 import {
   decodeSolverBridgeResponse,
+  decodeSolverBridgeRequest,
+  encodeSolverBridgeCancelRequest,
 } from '../solver_bridge.js';
 import {
   CpSatBridgeRequestSchema,
@@ -10,19 +12,20 @@ import {
   type CpSatBridgeResponse,
 } from '../generated/bridge/cp_sat_pb.js';
 import {
-  cpSatResponseFromSolverBridgeResponse,
+  SolverFailureKind,
+  SolverJobFailureSchema,
+  type SolverBridgeResponse,
+} from '../generated/bridge/job_pb.js';
+import {
+  cpSatEventFromSolverBridgeResponse,
+  createCpSatFailureEvent,
   encodeCpSatSolverBridgeRequest,
-  createCpSatCancelBridgeRequest,
-  createCpSatFailureBridgeResponse,
+  type CpSatExecutorEventHandler,
+  type CpSatExecutorJob,
+  type CpSatExecutorLike,
+  type CpSatExecutorRequest,
 } from './executor.js';
-import { SolverFailureKind } from '../generated/bridge/job_pb.js';
-import type {
-  CpSatExecutorBytesEventHandler,
-  CpSatExecutorEventHandler,
-  CpSatExecutorJob,
-  CpSatExecutorLike,
-  CpSatExecutorRequest,
-} from './executor.js';
+import type { SolverExecutionOptions } from '../solver_executor.js';
 
 declare const __ORTOOLS_WASM_BROWSER_BUILD__: boolean | undefined;
 
@@ -30,150 +33,135 @@ const isDeno = 'Deno' in globalThis;
 const isBun = 'Bun' in globalThis;
 const isNode = typeof process !== 'undefined' && typeof process.versions?.node === 'string' && !isDeno && !isBun;
 
-type CpSatWorkerRequest = {
-  id: number;
-  bytes: Uint8Array;
-};
-
-type CpSatWorkerResponse =
-  | { type: 'ready' }
-  | { type: 'result'; id: number; bytes: Uint8Array }
-  | { type: 'event'; id: number; bytes: Uint8Array }
-  | { type: 'error'; id: number; error: string };
-
 type BridgeWorker = {
-  postMessage(message: CpSatWorkerRequest, transfer?: Transferable[]): void;
+  postMessage(message: Uint8Array, transfer?: Transferable[]): void;
   terminate(): void | Promise<number>;
+  ref?(): void;
   unref?(): void;
-  onmessage?: ((event: MessageEvent<CpSatWorkerResponse>) => void) | null;
+  onmessage?: ((event: MessageEvent<Uint8Array>) => void) | null;
   onerror?: ((event: ErrorEvent) => void) | null;
-  on?(event: 'message', listener: (message: CpSatWorkerResponse) => void): void;
+  on?(event: 'message', listener: (message: Uint8Array) => void): void;
   on?(event: 'error', listener: (error: Error) => void): void;
 };
 
 async function createCpSatWorker(): Promise<BridgeWorker> {
   if (typeof __ORTOOLS_WASM_BROWSER_BUILD__ !== 'undefined' && __ORTOOLS_WASM_BROWSER_BUILD__) {
-    return new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }) as BridgeWorker;
+    return new Worker(new URL('./worker.js', import.meta.url), {
+      type: 'module',
+      name: 'ortools-executor-cp-sat',
+    }) as BridgeWorker;
   }
   if (isNode || isDeno) {
     const { Worker: NodeWorker } = await import('node:worker_threads');
     return new NodeWorker(new URL('./cp_sat_node_worker_bridge.js', import.meta.url), { execArgv: [] }) as BridgeWorker;
   }
-  return new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }) as BridgeWorker;
+  return new Worker(new URL('./worker.js', import.meta.url), {
+    type: 'module',
+    name: 'ortools-executor-cp-sat',
+  }) as BridgeWorker;
+}
+
+function response(bytes: Uint8Array): SolverBridgeResponse {
+  return decodeSolverBridgeResponse(bytes);
 }
 
 export class CpSatWorkerExecutor implements CpSatExecutorLike {
   readonly solver = 'cp-sat';
   private nextRequestId = 1;
 
-  private readonly worker = new ManagedWorker<CpSatWorkerRequest, CpSatWorkerResponse>({
+  private readonly worker = new ManagedWorker<Uint8Array, Uint8Array>({
     createWorker: createCpSatWorker,
-    isReady: (message) => message.type === 'ready',
-    getRequestId: (request) => request.id,
-    getResponseId: (message) => 'id' in message ? message.id : undefined,
-    isEvent: (message) => message.type === 'event',
-    isError: (message) => message.type === 'error',
-    errorMessage: (message) => message.type === 'error' ? message.error : 'CP-SAT worker request failed.',
+    getRequestId: (bytes) => decodeSolverBridgeRequest(bytes).requestId,
+    getResponseId: (bytes) => response(bytes).requestId,
+    isEvent: (bytes) => {
+      const payload = response(bytes).payload.case;
+      return payload === 'eventPayload' || payload === 'status';
+    },
     loadErrorMessage: (error) => defaultLoadErrorMessage(error).replace('Worker', 'CP-SAT worker'),
   });
 
-  private async run(
-    request: CpSatBridgeRequest,
-    onEvent: CpSatExecutorEventHandler,
-  ): Promise<CpSatBridgeResponse> {
-    const bridgeRequestBytes = encodeCpSatSolverBridgeRequest(request);
-    try {
-      const response = await this.worker.post(
-        { id: request.requestId, bytes: bridgeRequestBytes },
-        (event) => {
-          if (event.type === 'event') {
-            return onEvent(cpSatResponseFromSolverBridgeResponse(
-              request.requestId,
-              decodeSolverBridgeResponse(event.bytes),
-              SolverFailureKind.WORKER_CRASH,
-            ));
-          }
-        },
-        [bridgeRequestBytes.buffer],
-      );
-      if (response.type !== 'result') {
-        if (response.type === 'error') {
-          const failure = createCpSatFailureBridgeResponse(
-            request.requestId,
-            response.error,
-            SolverFailureKind.WORKER_CRASH,
-            '',
-            true,
-          );
-          await onEvent(failure);
-          return failure;
-        }
-        throw new Error(`CP-SAT worker returned unexpected response type: ${response.type}`);
-      }
-      return cpSatResponseFromSolverBridgeResponse(
-        request.requestId,
-        decodeSolverBridgeResponse(response.bytes),
-        SolverFailureKind.WORKER_CRASH,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const trace = error instanceof Error ? error.stack ?? '' : '';
-      const failure = createCpSatFailureBridgeResponse(
-        request.requestId,
-        message,
-        SolverFailureKind.WORKER_CRASH,
-        trace,
-        true,
-      );
-      await onEvent(failure);
-      return failure;
-    }
-  }
-
   execute(
     payload: CpSatExecutorRequest,
-    onEvent: CpSatExecutorEventHandler,
+    options: SolverExecutionOptions<CpSatBridgeResponse>,
   ): CpSatExecutorJob {
-    const request = this.createRequest(payload);
+    const requestId = this.nextCpSatRequestId();
+    const request = create(CpSatBridgeRequestSchema, { payload });
     return {
-      requestId: request.requestId,
-      result: this.run(request, onEvent),
-      cancel: () => this.cancel(this.nextCpSatRequestId(), request.requestId, onEvent),
+      requestId,
+      result: this.run(requestId, request, options),
+      cancel: () => this.cancel(requestId, options.onEvent),
     };
-  }
-
-  async executeBytes(requestBytes: Uint8Array, onEvent: CpSatExecutorBytesEventHandler): Promise<Uint8Array> {
-    const request = fromBinary(CpSatBridgeRequestSchema, requestBytes);
-    const response = await this.run(request, async (event) => {
-      await onEvent(toBinary(CpSatBridgeResponseSchema, event));
-    });
-    return toBinary(CpSatBridgeResponseSchema, response);
   }
 
   async load(): Promise<void> {
     await this.worker.load();
   }
 
-  private async cancel(
-    requestId: number,
-    targetRequestId: number,
-    onEvent: CpSatExecutorEventHandler,
-  ): Promise<CpSatBridgeResponse> {
-    return this.run(createCpSatCancelBridgeRequest(requestId, targetRequestId), onEvent);
-  }
-
   terminate(reason?: string): void {
     this.worker.terminate(reason ?? 'CP-SAT worker executor terminated.');
   }
 
-  private nextCpSatRequestId() {
-    return this.nextRequestId++;
+  private async run(
+    requestId: number,
+    request: CpSatBridgeRequest,
+    options: SolverExecutionOptions<CpSatBridgeResponse>,
+  ): Promise<CpSatBridgeResponse> {
+    const bytes = encodeCpSatSolverBridgeRequest(requestId, request, options.requestedThreads);
+    let failureHandled = false;
+    try {
+      const resultBytes = await this.worker.post(bytes, async (eventBytes) => {
+        const event = cpSatEventFromSolverBridgeResponse(response(eventBytes));
+        if (event) await options.onEvent(event);
+      }, [bytes.buffer]);
+      const outer = response(resultBytes);
+      if (outer.payload.case === 'failure') {
+        await options.onEvent({ type: 'failure', failure: outer.payload.value });
+        failureHandled = true;
+        const error = new Error(outer.payload.value.message);
+        if (outer.payload.value.trace) error.stack = outer.payload.value.trace;
+        throw error;
+      }
+      if (outer.payload.case !== 'resultPayload') {
+        throw new Error(`CP-SAT worker returned unexpected response: ${outer.payload.case ?? 'empty'}`);
+      }
+      return fromBinary(CpSatBridgeResponseSchema, outer.payload.value);
+    } catch (error) {
+      if (failureHandled) throw error;
+      const failure = createCpSatFailureEvent(
+        requestId,
+        error instanceof Error ? error.message : String(error),
+        SolverFailureKind.WORKER_CRASH,
+        error instanceof Error ? error.stack ?? '' : '',
+        true,
+      );
+      await options.onEvent(failure);
+      throw error;
+    }
   }
 
-  private createRequest(payload: CpSatExecutorRequest): CpSatBridgeRequest {
-    return create(CpSatBridgeRequestSchema, {
-      requestId: this.nextCpSatRequestId(),
-      payload,
-    });
+  private async cancel(
+    targetRequestId: number,
+    onEvent: CpSatExecutorEventHandler,
+  ): Promise<void> {
+    const requestId = this.nextCpSatRequestId();
+    const bytes = encodeSolverBridgeCancelRequest(requestId, this.solver, targetRequestId);
+    try {
+      await this.worker.post(bytes, undefined, [bytes.buffer]);
+    } catch (error) {
+      const failure = create(SolverJobFailureSchema, {
+        requestId,
+        solver: this.solver,
+        kind: SolverFailureKind.WORKER_CRASH,
+        message: error instanceof Error ? error.message : String(error),
+        trace: error instanceof Error ? error.stack ?? '' : '',
+        retryable: true,
+      });
+      await onEvent({ type: 'failure', failure });
+      throw error;
+    }
+  }
+
+  private nextCpSatRequestId() {
+    return this.nextRequestId++;
   }
 }
