@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
 
+type WorkerStats = {
+  total?: number;
+  pthread?: number;
+  executorWorkers?: Record<string, number>;
+  activeExecutorWorkers?: Record<string, number>;
+  executorWorkerRequests?: Record<string, number>;
+};
+
 test('runs the shared solver fixture cases across executor modes', async ({ page }) => {
   const browserErrors: string[] = [];
   let failOnPageError: (error: Error) => void = () => {};
@@ -65,16 +73,7 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
         ok?: boolean;
         solverStatus?: string;
       }>;
-      workerStats?: {
-        total?: number;
-        pthread?: number;
-        bridge?: number;
-        bridgeTerminated?: number;
-        activeBridge?: number;
-        activeExecutorWorkers?: Record<string, number>;
-        executorWorkerRequests?: Record<string, number>;
-        cpSatSolve?: number;
-      };
+      workerStats?: WorkerStats;
     }>;
     cpSatSolverStructureResults?: Array<{
       id?: string;
@@ -85,15 +84,8 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       statusStates?: number[];
       responseBytesLength?: number;
     }>;
-    cpSatSolverStructureWorkerStatsBefore?: {
-      executorWorkerRequests?: Record<string, number>;
-      activeExecutorWorkers?: Record<string, number>;
-    };
-    cpSatSolverStructureWorkerStatsAfter?: {
-      executorWorkerRequests?: Record<string, number>;
-      activeBridge?: number;
-      activeExecutorWorkers?: Record<string, number>;
-    };
+    cpSatSolverStructureWorkerStatsBefore?: WorkerStats;
+    cpSatSolverStructureWorkerStatsAfter?: WorkerStats;
     highLevelCpSatResults?: Array<{
       id?: string;
       name?: string;
@@ -102,24 +94,10 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       workerProfile?: string;
       params?: Record<string, unknown>;
     }>;
-    highLevelCpSatWorkerStatsBefore?: {
-      executorWorkerRequests?: Record<string, number>;
-      activeExecutorWorkers?: Record<string, number>;
-    };
-    highLevelCpSatWorkerStatsAfter?: {
-      executorWorkerRequests?: Record<string, number>;
-      activeBridge?: number;
-      activeExecutorWorkers?: Record<string, number>;
-    };
-    cpSatWorkerStatsBefore?: {
-      executorWorkerRequests?: Record<string, number>;
-      activeExecutorWorkers?: Record<string, number>;
-    };
-    cpSatWorkerStatsAfter?: {
-      activeBridge?: number;
-      activeExecutorWorkers?: Record<string, number>;
-      executorWorkerRequests?: Record<string, number>;
-    };
+    highLevelCpSatWorkerStatsBefore?: WorkerStats;
+    highLevelCpSatWorkerStatsAfter?: WorkerStats;
+    cpSatWorkerStatsBefore?: WorkerStats;
+    cpSatWorkerStatsAfter?: WorkerStats;
     routingResults?: Array<{
       id?: string;
       name?: string;
@@ -172,74 +150,22 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       name?: string;
       ok?: boolean;
     }>;
-    routingWorkerStatsBefore?: {
-      routingSolve?: number;
-    };
-    routingWorkerStatsAfter?: {
-      routingSolve?: number;
-      activeBridge?: number;
-      bridgeTerminated?: number;
-    };
-    mpSolverWorkerStatsBefore?: {
-      mpSolverSolve?: number;
-    };
-    mpSolverWorkerStatsAfter?: {
-      mpSolverSolve?: number;
-      activeBridge?: number;
-      bridgeTerminated?: number;
-    };
-    knapsackWorkerStatsBefore?: {
-      executorWorkerRequests?: Record<string, number>;
-      activeExecutorWorkers?: Record<string, number>;
-    };
-    knapsackWorkerStatsAfter?: {
-      activeBridge?: number;
-      bridgeTerminated?: number;
-      executorWorkerRequests?: Record<string, number>;
-      activeExecutorWorkers?: Record<string, number>;
-    };
-    networkFlowWorkerStatsBefore?: {
-      graphSolve?: number;
-    };
-    networkFlowWorkerStatsAfter?: {
-      graphSolve?: number;
-      activeBridge?: number;
-      bridgeTerminated?: number;
-    };
-    setCoverWorkerStatsBefore?: {
-      setCoverSolve?: number;
-    };
-    setCoverWorkerStatsAfter?: {
-      setCoverSolve?: number;
-      activeBridge?: number;
-      bridgeTerminated?: number;
-    };
-    rcpspWorkerStatsBefore?: {
-      cpSatSolve?: number;
-      executorWorkerRequests?: Record<string, number>;
-    };
-    rcpspWorkerStatsAfter?: {
-      cpSatSolve?: number;
-      executorWorkerRequests?: Record<string, number>;
-      activeBridge?: number;
-      bridgeTerminated?: number;
-    };
-    mathOptWorkerStatsBefore?: {
-      mathOptSolve?: number;
-    };
-    mathOptWorkerStatsAfter?: {
-      mathOptSolve?: number;
-      activeBridge?: number;
-      bridgeTerminated?: number;
-    };
-    pdlpWorkerStatsBefore?: {
-      pdlpSolve?: number;
-    };
-    pdlpWorkerStatsAfter?: {
-      pdlpSolve?: number;
-      activeBridge?: number;
-      bridgeTerminated?: number;
-    };
+    routingWorkerStatsBefore?: WorkerStats;
+    routingWorkerStatsAfter?: WorkerStats;
+    mpSolverWorkerStatsBefore?: WorkerStats;
+    mpSolverWorkerStatsAfter?: WorkerStats;
+    knapsackWorkerStatsBefore?: WorkerStats;
+    knapsackWorkerStatsAfter?: WorkerStats;
+    networkFlowWorkerStatsBefore?: WorkerStats;
+    networkFlowWorkerStatsAfter?: WorkerStats;
+    setCoverWorkerStatsBefore?: WorkerStats;
+    setCoverWorkerStatsAfter?: WorkerStats;
+    rcpspWorkerStatsBefore?: WorkerStats;
+    rcpspWorkerStatsAfter?: WorkerStats;
+    mathOptWorkerStatsBefore?: WorkerStats;
+    mathOptWorkerStatsAfter?: WorkerStats;
+    pdlpWorkerStatsBefore?: WorkerStats;
+    pdlpWorkerStatsAfter?: WorkerStats;
   };
   const expectStableCaseIds = (results: Array<{ id?: string; ok?: boolean }> | undefined, label: string) => {
     expect(results?.length, `${label} result count`).toBeGreaterThan(0);
@@ -312,7 +238,6 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
     parsedStatus.cpSatSolverStructureWorkerStatsBefore?.executorWorkerRequests?.['cp-sat'] ?? -1,
   );
-  expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.activeBridge).toBe(0);
   expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBe(
     parsedStatus.cpSatSolverStructureWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'],
   );
@@ -358,11 +283,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     expect([...profiles].sort(), `high-level CP-SAT executor matrix for ${caseId}`).toEqual(expectedHighLevelCpSatProfiles);
   }
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(0);
-  expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.activeBridge).toBe(0);
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBeGreaterThan(
     parsedStatus.highLevelCpSatWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'] ?? 0,
   );
-  expect(parsedStatus.cpSatWorkerStatsAfter?.activeBridge).toBe(0);
   expect(parsedStatus.cpSatWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBe(
     parsedStatus.cpSatWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'],
   );
@@ -383,14 +306,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }),
   ]));
   expectStableCaseIds(parsedStatus.routingResults, 'routing');
-  expect(parsedStatus.routingWorkerStatsBefore?.routingSolve).toBe(0);
-  expect(parsedStatus.routingWorkerStatsAfter?.routingSolve).toBeGreaterThan(1);
-  expect(parsedStatus.routingWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.routingWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
-  expect(parsedStatus.mpSolverWorkerStatsBefore?.mpSolverSolve).toBe(0);
-  expect(parsedStatus.mpSolverWorkerStatsAfter?.mpSolverSolve).toBeGreaterThanOrEqual(2);
-  expect(parsedStatus.mpSolverWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.mpSolverWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.routingWorkerStatsAfter?.executorWorkerRequests?.routing).toBeGreaterThan(
+    parsedStatus.routingWorkerStatsBefore?.executorWorkerRequests?.routing ?? 0,
+  );
+  expect(parsedStatus.mpSolverWorkerStatsAfter?.executorWorkerRequests?.['mp-solver']).toBeGreaterThan(
+    parsedStatus.mpSolverWorkerStatsBefore?.executorWorkerRequests?.['mp-solver'] ?? 0,
+  );
   expect(parsedStatus.mpSolverResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
       name: 'MPSolver: MPModelRequest solve (direct, 1 worker)',
@@ -405,13 +326,37 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       values: expect.objectContaining({ x: 3, y: 2 }),
     }),
     expect.objectContaining({
-      name: 'MPSolver: simple_lp_program.py',
+      name: 'MPSolver: simple_lp_program.py (direct)',
       ok: true,
       objective: 25,
       values: expect.objectContaining({ x: 0, y: 2.5 }),
     }),
     expect.objectContaining({
-      name: 'MPSolver: simple_mip_program.py',
+      name: 'MPSolver: simple_lp_program.py (worker)',
+      ok: true,
+      objective: 25,
+      values: expect.objectContaining({ x: 0, y: 2.5 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: simple_lp_program.py (server)',
+      ok: true,
+      objective: 25,
+      values: expect.objectContaining({ x: 0, y: 2.5 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: simple_mip_program.py (direct)',
+      ok: true,
+      objective: 23,
+      values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: simple_mip_program.py (worker)',
+      ok: true,
+      objective: 23,
+      values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: simple_mip_program.py (server)',
       ok: true,
       objective: 23,
       values: expect.objectContaining({ x: 3, y: 2 }),
@@ -429,6 +374,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       values: expect.objectContaining({ analytics: 1, dashboard: 0, alerts: 1 }),
     }),
     expect.objectContaining({
+      name: 'MPSolver: BOP binary project selection (server)',
+      ok: true,
+      objective: 13,
+      values: expect.objectContaining({ analytics: 1, dashboard: 0, alerts: 1 }),
+    }),
+    expect.objectContaining({
       name: 'MPSolver: BOP integer production (direct)',
       ok: true,
       objective: 19,
@@ -436,6 +387,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }),
     expect.objectContaining({
       name: 'MPSolver: BOP integer production (worker)',
+      ok: true,
+      objective: 19,
+      values: expect.objectContaining({ x: 3, y: 2 }),
+    }),
+    expect.objectContaining({
+      name: 'MPSolver: BOP integer production (server)',
       ok: true,
       objective: 19,
       values: expect.objectContaining({ x: 3, y: 2 }),
@@ -450,7 +407,6 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   expect(parsedStatus.knapsackWorkerStatsAfter?.executorWorkerRequests?.knapsack).toBeGreaterThan(
     parsedStatus.knapsackWorkerStatsBefore?.executorWorkerRequests?.knapsack ?? 0,
   );
-  expect(parsedStatus.knapsackWorkerStatsAfter?.activeBridge).toBe(0);
   expect(parsedStatus.knapsackWorkerStatsAfter?.activeExecutorWorkers?.knapsack).toBeGreaterThan(
     parsedStatus.knapsackWorkerStatsBefore?.activeExecutorWorkers?.knapsack ?? 0,
   );
@@ -481,10 +437,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }),
   ]));
   expectStableCaseIds(parsedStatus.knapsackResults, 'Knapsack');
-  expect(parsedStatus.networkFlowWorkerStatsBefore?.graphSolve).toBe(0);
-  expect(parsedStatus.networkFlowWorkerStatsAfter?.graphSolve).toBeGreaterThanOrEqual(3);
-  expect(parsedStatus.networkFlowWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.networkFlowWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.networkFlowWorkerStatsAfter?.executorWorkerRequests?.['network-flow']).toBeGreaterThan(
+    parsedStatus.networkFlowWorkerStatsBefore?.executorWorkerRequests?.['network-flow'] ?? 0,
+  );
   expect(parsedStatus.networkFlowResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
       name: 'simple_max_flow_program.py (direct)',
@@ -501,12 +456,16 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       ok: true,
       objectiveValue: 265,
     }),
+    expect.objectContaining({
+      name: 'simple_max_flow_program.py (server)',
+      ok: true,
+      objectiveValue: 60,
+    }),
   ]));
   expectStableCaseIds(parsedStatus.networkFlowResults, 'Network Flow');
-  expect(parsedStatus.setCoverWorkerStatsBefore?.setCoverSolve).toBe(0);
-  expect(parsedStatus.setCoverWorkerStatsAfter?.setCoverSolve).toBeGreaterThanOrEqual(1);
-  expect(parsedStatus.setCoverWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.setCoverWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.setCoverWorkerStatsAfter?.executorWorkerRequests?.['set-cover']).toBeGreaterThan(
+    parsedStatus.setCoverWorkerStatsBefore?.executorWorkerRequests?.['set-cover'] ?? 0,
+  );
   expectStableCaseIds(parsedStatus.setCoverResults, 'Set Cover');
   expect(parsedStatus.rcpspWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
     parsedStatus.rcpspWorkerStatsBefore?.executorWorkerRequests?.['cp-sat'] ?? 0,
@@ -537,13 +496,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }),
   ]));
   expectStableCaseIds(parsedStatus.rcpspResults, 'RCPSP');
-  expect(parsedStatus.mathOptWorkerStatsBefore?.mathOptSolve).toBe(0);
-  expect(parsedStatus.mathOptWorkerStatsAfter?.mathOptSolve).toBeGreaterThanOrEqual(1);
-  expect(parsedStatus.mathOptWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.mathOptWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.mathOptWorkerStatsAfter?.executorWorkerRequests?.mathopt).toBeGreaterThan(
+    parsedStatus.mathOptWorkerStatsBefore?.executorWorkerRequests?.mathopt ?? 0,
+  );
   expectStableCaseIds(parsedStatus.mathOptResults, 'MathOpt');
-  expect(parsedStatus.pdlpWorkerStatsAfter?.pdlpSolve).toBeGreaterThan(parsedStatus.pdlpWorkerStatsBefore?.pdlpSolve ?? 0);
-  expect(parsedStatus.pdlpWorkerStatsAfter?.activeBridge).toBe(0);
-  expect(parsedStatus.pdlpWorkerStatsAfter?.bridgeTerminated).toBeGreaterThan(0);
+  expect(parsedStatus.pdlpWorkerStatsAfter?.executorWorkerRequests?.pdlp).toBeGreaterThan(
+    parsedStatus.pdlpWorkerStatsBefore?.executorWorkerRequests?.pdlp ?? 0,
+  );
   expectStableCaseIds(parsedStatus.pdlpResults, 'PDLP');
 });

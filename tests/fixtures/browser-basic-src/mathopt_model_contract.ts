@@ -1126,7 +1126,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
 
 export async function runMathOptModelContractCases(
   api: MathOptApi,
-  mode: 'direct' | 'worker' = 'direct',
+  mode: 'direct' | 'worker' | 'server' = 'direct',
   threads = 1,
 ): Promise<MathOptModelCaseResult[]> {
   await api.initMathOpt();

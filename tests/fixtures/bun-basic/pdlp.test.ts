@@ -1,8 +1,7 @@
 import {
   initPdlp,
-  isWorkerBridgeEnabled,
   Pdlp,
-  setWorkerBridgeEnabled,
+  setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/pdlp';
 import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
@@ -12,12 +11,11 @@ await runBunFixture(async () => {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
+    setExecutor,
   });
   assertAllCases('bun PDLP', pdlpResults);
   console.log(`bun ran ${pdlpResults.length} PDLP cases`);
 }, async () => {
-  setWorkerBridgeEnabled(false);
+  setExecutor({ type: 'direct' });
   await terminateLoadedRuntimeThreads();
 });

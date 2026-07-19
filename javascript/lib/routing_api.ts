@@ -1,13 +1,27 @@
+import { create } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from './wasm_module_types.js';
 import { loadRoutingRuntime } from './runtime_loader.js';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
+import { resolveExecutorConfiguration } from './executor_configuration.js';
 import {
-  isWorkerBridgeEnabled,
-  nextWorkerBridgeRequestId,
-  postWorkerRequest,
-  setWorkerBridgeEnabled,
-  shouldUseWorkerBridge,
-} from './worker_bridge.js';
-import type { RoutingModelOperation, RoutingSolveResult, WorkerResponse } from './worker_protocol.js';
+  RoutingAddConstantDimensionSchema,
+  RoutingAddDimensionSchema,
+  RoutingAddDimensionWithVehicleCapacitySchema,
+  RoutingAddDimensionWithVehicleTransitsSchema,
+  RoutingAddDisjunctionSchema,
+  RoutingAddMatrixDimensionSchema,
+  RoutingAddPickupAndDeliverySchema,
+  RoutingAddVectorDimensionSchema,
+  RoutingBridgeRequestSchema,
+  RoutingMatrixSchema,
+  RoutingModelOperationSchema,
+  type RoutingModelOperation as BridgeRoutingOperation,
+} from './generated/bridge/routing_pb.js';
+import type { SolverJobEvent } from './solver_executor.js';
+import { RoutingExecutor, type RoutingExecutorLike } from './routing/executor.js';
+import { RoutingServerExecutor } from './routing/server_executor.js';
+import { RoutingWorkerExecutor } from './routing/worker_executor.js';
+import type { RoutingModelOperation, RoutingSolveResult } from './worker_routing.js';
 
 type RoutingTransitCallback = (fromIndex: number, toIndex: number) => number;
 
@@ -18,6 +32,29 @@ type RoutingModule = OrToolsWasmModule & {
 let nextTransitCallbackId = 1;
 let routingModulePromise: Promise<RoutingModule> | null = null;
 let routingModule: RoutingModule | null = null;
+const directExecutor = new RoutingExecutor();
+const workerExecutor = new RoutingWorkerExecutor();
+let resolvedExecutorConfiguration = resolveExecutorConfiguration();
+let executor: RoutingExecutorLike = createResolvedExecutor(resolvedExecutorConfiguration);
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): RoutingExecutorLike {
+  switch (configuration.type) {
+    case 'direct': return directExecutor;
+    case 'worker': return workerExecutor;
+    case 'server': return new RoutingServerExecutor(configuration);
+  }
+}
+
+export function setRoutingExecutor(configuration: ExecutorConfiguration): void {
+  resolvedExecutorConfiguration = resolveExecutorConfiguration(configuration);
+  executor = createResolvedExecutor(resolvedExecutorConfiguration);
+}
+
+export type RoutingEvent = SolverJobEvent;
+export type RoutingSolveOptions = {
+  onEvent?: (event: RoutingEvent) => void | Promise<void>;
+  signal?: AbortSignal;
+};
 
 function toNumber(value: unknown): number {
   return typeof value === 'bigint' ? Number(value) : value as number;
@@ -52,7 +89,7 @@ function canDeleteNativeRoutingModel(): boolean {
 }
 
 function shouldUseNativeRoutingRuntime(): boolean {
-  return !shouldUseWorkerBridge();
+  return resolvedExecutorConfiguration.type === 'direct';
 }
 
 async function loadRoutingModule(): Promise<RoutingModule> {
@@ -69,18 +106,8 @@ function getRoutingModule(): RoutingModule {
 }
 
 export async function initRouting(): Promise<void> {
-  if (!shouldUseNativeRoutingRuntime()) {
-    return;
-  }
-  await loadRoutingModule();
-}
-
-export function setRoutingWorkerBridgeEnabled(enabled: boolean): void {
-  setWorkerBridgeEnabled(enabled);
-}
-
-export function isRoutingWorkerBridgeEnabled(): boolean {
-  return isWorkerBridgeEnabled();
+  await executor.load();
+  if (shouldUseNativeRoutingRuntime()) await loadRoutingModule();
 }
 
 export enum FirstSolutionStrategy {
@@ -487,6 +514,54 @@ export class RoutingDimension {
   }
 }
 
+function bridgeMatrix(values: BigInt64Array | number[], dimension: number) {
+  return create(RoutingMatrixSchema, {
+    values: [...values].map((value) => BigInt(value)),
+    dimension,
+  });
+}
+
+function bridgeOperation(operation: RoutingModelOperation, dimension: number): BridgeRoutingOperation {
+  switch (operation.type) {
+    case 'addDimension':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addDimension', value: create(RoutingAddDimensionSchema, {
+        transitMatrix: bridgeMatrix(operation.transitMatrix, dimension), slackMax: BigInt(operation.slackMax),
+        capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
+      }) } });
+    case 'addDimensionWithVehicleCapacity':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addDimensionWithVehicleCapacity', value: create(RoutingAddDimensionWithVehicleCapacitySchema, {
+        transitMatrix: bridgeMatrix(operation.transitMatrix, dimension), slackMax: BigInt(operation.slackMax),
+        capacities: operation.capacities.map(BigInt), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
+      }) } });
+    case 'addDimensionWithVehicleTransits':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addDimensionWithVehicleTransits', value: create(RoutingAddDimensionWithVehicleTransitsSchema, {
+        transitMatrices: operation.transitMatrices.map((matrix) => bridgeMatrix(matrix, dimension)), slackMax: BigInt(operation.slackMax),
+        capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
+      }) } });
+    case 'addConstantDimension':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addConstantDimension', value: create(RoutingAddConstantDimensionSchema, {
+        value: BigInt(operation.value), capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
+      }) } });
+    case 'addVectorDimension':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addVectorDimension', value: create(RoutingAddVectorDimensionSchema, {
+        values: operation.values.map(BigInt), capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
+      }) } });
+    case 'addMatrixDimension':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addMatrixDimension', value: create(RoutingAddMatrixDimensionSchema, {
+        matrix: bridgeMatrix(operation.matrix.flat(), operation.matrix.length), capacity: BigInt(operation.capacity),
+        fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
+      }) } });
+    case 'addDisjunction':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addDisjunction', value: create(RoutingAddDisjunctionSchema, {
+        indices: operation.indices.map(BigInt), penalty: operation.penalty === undefined ? undefined : BigInt(operation.penalty),
+      }) } });
+    case 'addPickupAndDelivery':
+      return create(RoutingModelOperationSchema, { operation: { case: 'addPickupAndDelivery', value: create(RoutingAddPickupAndDeliverySchema, {
+        pickup: BigInt(operation.pickup), delivery: BigInt(operation.delivery),
+      }) } });
+  }
+}
+
 export class Assignment {
   constructor(
     private readonly routing: RoutingModel,
@@ -512,12 +587,8 @@ export class Assignment {
 }
 
 export class RoutingModel {
-  static setWorkerBridgeEnabled(enabled: boolean): void {
-    setWorkerBridgeEnabled(enabled);
-  }
-
-  static isWorkerBridgeEnabled(): boolean {
-    return isWorkerBridgeEnabled();
+  static setExecutor(configuration: ExecutorConfiguration): void {
+    setRoutingExecutor(configuration);
   }
 
   readonly ready: Promise<void> = Promise.resolve();
@@ -581,57 +652,52 @@ export class RoutingModel {
     this.module._routing_set_arc_cost_evaluator_of_all_vehicles(this.handle, evaluatorIndex);
   }
 
-  private async solveWithWorkerRequest(parameters: RoutingSearchParameters): Promise<Assignment | null> {
-    const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'routingSolveResult' }>>({
-      type: 'routingSolve',
-      id: nextWorkerBridgeRequestId(),
+  private async solveWithExecutor(parameters: RoutingSearchParameters, options: RoutingSolveOptions): Promise<Assignment | null> {
+    if (options.signal?.aborted) throw routingAbortError(options.signal);
+    const dimension = this.manager.GetNumberOfIndices();
+    const request = create(RoutingBridgeRequestSchema, {
       numLocations: this.manager.numLocations,
       numVehicles: this.manager.numVehicles,
       starts: this.manager.starts,
       ends: this.manager.ends,
       firstSolutionStrategy: parameters.firstSolutionStrategy ?? 0,
-      solutionLimit: parameters.solution_limit ?? 0,
-      transitMatrix: this.buildTransitMatrix(),
-      transitMatrixDimension: this.manager.GetNumberOfIndices(),
-      operations: this.operations,
+      solutionLimit: BigInt(parameters.solution_limit ?? 0),
+      transitMatrix: bridgeMatrix(this.buildTransitMatrix(), dimension),
+      operations: this.operations.map((operation) => bridgeOperation(operation, dimension)),
       dimensionNames: [...this.dimensionNames],
     });
-    this.lastWorkerResult = response.result;
-    this.lastWorkerStatus = response.result?.status ?? null;
-    if (!response.result) return null;
-    const assignment = new Assignment(this, response.result);
+    const job = executor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
+    const onAbort = () => { void job.cancel().catch(() => {}); };
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    let response;
+    try {
+      response = await job.result;
+      if (options.signal?.aborted) throw routingAbortError(options.signal);
+    } finally {
+      options.signal?.removeEventListener('abort', onAbort);
+    }
+    const result: RoutingSolveResult | null = response.hasSolution ? {
+      status: response.status,
+      objectiveValue: Number(response.objectiveValue),
+      nextValues: response.nextValues.map(Number),
+      starts: response.starts.map(Number),
+      ends: response.ends.map(Number),
+      dimensionCumulValues: Object.fromEntries(response.dimensions.map((item) => [item.name, item.cumulValues.map(Number)])),
+    } : null;
+    this.lastWorkerResult = result;
+    this.lastWorkerStatus = result?.status ?? null;
+    if (!result) return null;
+    const assignment = new Assignment(this, result);
     this.lastObjectiveValue = assignment.ObjectiveValue();
     this.runAtSolutionCallbacks();
     return assignment;
   }
 
-  async SolveWithParameters(parameters: RoutingSearchParameters = DefaultRoutingSearchParameters()): Promise<Assignment | null> {
-    if (shouldUseWorkerBridge()) {
-      return this.solveWithWorkerRequest(parameters);
-    }
-    if (!this.module) {
-      throw new Error('RoutingModel.SolveWithParameters: native routing module is not available.');
-    }
-
-    this.installMatrixEvaluator();
-    this.lastWorkerResult = null;
-    this.lastWorkerStatus = null;
-    const ok = await this.module.ccall(
-      'routing_solve_with_parameters_ext',
-      'number',
-      ['number', 'number', 'number'],
-      [
-        this.handle,
-        parameters.firstSolutionStrategy ?? 0,
-        parameters.solution_limit ?? 0,
-      ],
-      { async: true },
-    ) as number;
-    if (ok !== 1) return null;
-    const assignment = new Assignment(this);
-    this.lastObjectiveValue = assignment.ObjectiveValue();
-    this.runAtSolutionCallbacks();
-    return assignment;
+  async SolveWithParameters(
+    parameters: RoutingSearchParameters = DefaultRoutingSearchParameters(),
+    options: RoutingSolveOptions = {},
+  ): Promise<Assignment | null> {
+    return this.solveWithExecutor(parameters, options);
   }
 
   async Solve(): Promise<Assignment | null> {
@@ -1398,4 +1464,11 @@ export class RoutingModel {
       callback();
     }
   }
+}
+
+function routingAbortError(signal: AbortSignal) {
+  if (signal.reason instanceof Error) return signal.reason;
+  const error = new Error(signal.reason === undefined ? 'The Routing solve was aborted.' : String(signal.reason));
+  error.name = 'AbortError';
+  return error;
 }

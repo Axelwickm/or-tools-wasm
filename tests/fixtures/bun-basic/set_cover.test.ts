@@ -8,6 +8,6 @@ await runBunFixture(async () => {
   assertAllCases('bun Set Cover', setCoverResults);
   console.log(`bun ran ${setCoverResults.length} Set Cover cases`);
 }, async () => {
-  SetCoverApi.setWorkerBridgeEnabled(false);
+  SetCoverApi.setExecutor({ type: 'auto' });
   await terminateLoadedRuntimeThreads();
 });

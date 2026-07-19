@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+message MathOptSolveRequest {
+  bytes solve_request_proto = 1;
+  bool use_interrupter = 2;
+  bool interrupt_at_start = 3;
+}
+
+message MathOptIncrementalCreateRequest {
+  bytes solve_request_proto = 1;
+}
+
+message MathOptIncrementalSolveRequest {
+  uint64 handle = 1;
+  bytes solve_request_proto = 2;
+  optional bytes model_update_proto = 3;
+  bool use_interrupter = 4;
+  bool interrupt_at_start = 5;
+}
+
+message MathOptIncrementalDeleteRequest {
+  uint64 handle = 1;
+}
+
+message MathOptBridgeRequest {
+  oneof payload {
+    MathOptSolveRequest solve = 1;
+    MathOptIncrementalCreateRequest incremental_create = 2;
+    MathOptIncrementalSolveRequest incremental_solve = 3;
+    MathOptIncrementalDeleteRequest incremental_delete = 4;
+  }
+}
+
+message MathOptBridgeResponse {
+  bytes solve_response_proto = 1;
+}

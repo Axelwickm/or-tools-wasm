@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+message RoutingMatrix {
+  repeated int64 values = 1;
+  int32 dimension = 2;
+}
+
+message RoutingAddDimension {
+  RoutingMatrix transit_matrix = 1;
+  int64 slack_max = 2;
+  int64 capacity = 3;
+  bool fix_start_cumul_to_zero = 4;
+  string name = 5;
+}
+
+message RoutingAddDimensionWithVehicleCapacity {
+  RoutingMatrix transit_matrix = 1;
+  int64 slack_max = 2;
+  repeated int64 capacities = 3;
+  bool fix_start_cumul_to_zero = 4;
+  string name = 5;
+}
+
+message RoutingAddDimensionWithVehicleTransits {
+  repeated RoutingMatrix transit_matrices = 1;
+  int64 slack_max = 2;
+  int64 capacity = 3;
+  bool fix_start_cumul_to_zero = 4;
+  string name = 5;
+}
+
+message RoutingAddConstantDimension {
+  int64 value = 1;
+  int64 capacity = 2;
+  bool fix_start_cumul_to_zero = 3;
+  string name = 4;
+}
+
+message RoutingAddVectorDimension {
+  repeated int64 values = 1;
+  int64 capacity = 2;
+  bool fix_start_cumul_to_zero = 3;
+  string name = 4;
+}
+
+message RoutingAddMatrixDimension {
+  RoutingMatrix matrix = 1;
+  int64 capacity = 2;
+  bool fix_start_cumul_to_zero = 3;
+  string name = 4;
+}
+
+message RoutingAddDisjunction {
+  repeated int64 indices = 1;
+  optional int64 penalty = 2;
+}
+
+message RoutingAddPickupAndDelivery {
+  int64 pickup = 1;
+  int64 delivery = 2;
+}
+
+message RoutingModelOperation {
+  oneof operation {
+    RoutingAddDimension add_dimension = 1;
+    RoutingAddDimensionWithVehicleCapacity add_dimension_with_vehicle_capacity = 2;
+    RoutingAddDimensionWithVehicleTransits add_dimension_with_vehicle_transits = 3;
+    RoutingAddConstantDimension add_constant_dimension = 4;
+    RoutingAddVectorDimension add_vector_dimension = 5;
+    RoutingAddMatrixDimension add_matrix_dimension = 6;
+    RoutingAddDisjunction add_disjunction = 7;
+    RoutingAddPickupAndDelivery add_pickup_and_delivery = 8;
+  }
+}
+
+message RoutingBridgeRequest {
+  int32 num_locations = 1;
+  int32 num_vehicles = 2;
+  repeated int32 starts = 3;
+  repeated int32 ends = 4;
+  int32 first_solution_strategy = 5;
+  int64 solution_limit = 6;
+  RoutingMatrix transit_matrix = 7;
+  repeated RoutingModelOperation operations = 8;
+  repeated string dimension_names = 9;
+}
+
+message RoutingDimensionValues {
+  string name = 1;
+  repeated int64 cumul_values = 2;
+}
+
+message RoutingBridgeResponse {
+  bool has_solution = 1;
+  int32 status = 2;
+  int64 objective_value = 3;
+  repeated int64 next_values = 4;
+  repeated int64 starts = 5;
+  repeated int64 ends = 6;
+  repeated RoutingDimensionValues dimensions = 7;
+}

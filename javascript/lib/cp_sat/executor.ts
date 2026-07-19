@@ -1,12 +1,18 @@
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { loadRuntime } from '../runtime_loader.js';
-import { encodeSolverBridgeRequest } from '../solver_bridge.js';
-import type {
-  SolverExecutionOptions,
-  SolverExecutor,
-  SolverJob,
-  SolverJobEvent,
+import type { SolverBridgeCodec } from '../solver_bridge.js';
+import {
+  createSolverFailureEvent,
+  createSolverJobStatusEvent,
+  SolverFailureKind,
+  SolverJobState,
+  type SolverFailureKind as SolverFailureKindType,
+  type SolverJobState as SolverJobStateType,
+  type SolverExecutionOptions,
+  type SolverExecutor,
+  type SolverJob,
+  type SolverJobEvent,
 } from '../solver_executor.js';
 import {
   CpSatBridgeResponseSchema,
@@ -23,14 +29,6 @@ import {
   type CpSatBridgeRequest,
   type CpSatBridgeResponse,
 } from '../generated/bridge/cp_sat_pb.js';
-import {
-  SolverFailureKind,
-  SolverJobFailureSchema,
-  SolverJobState,
-  SolverJobStatusSchema,
-  type SolverBridgeResponse,
-} from '../generated/bridge/job_pb.js';
-
 const SOLUTION_CALLBACK_FLAG = 1 << 0;
 const BEST_BOUND_CALLBACK_FLAG = 1 << 1;
 const LOG_CALLBACK_FLAG = 1 << 2;
@@ -45,7 +43,25 @@ export type CpSatExecutorJob = SolverJob<CpSatBridgeResponse>;
 export type CpSatExecutorLike = SolverExecutor<CpSatExecutorRequest, CpSatBridgeResponse, CpSatBridgeResponse>;
 type CpSatRunResult = {
   response: CpSatBridgeResponse;
-  terminalState: SolverJobState;
+  terminalState: SolverJobStateType;
+};
+
+export const cpSatBridgeCodec: SolverBridgeCodec<
+  CpSatExecutorRequest,
+  CpSatBridgeResponse,
+  CpSatBridgeResponse
+> = {
+  solver: 'cp-sat',
+  label: 'CP-SAT',
+  encodeRequest: (payload) => toBinary(
+    CpSatBridgeRequestSchema,
+    create(CpSatBridgeRequestSchema, { payload }),
+  ),
+  decodeRequest: (payload) => fromBinary(CpSatBridgeRequestSchema, payload).payload,
+  encodeResult: (response) => toBinary(CpSatBridgeResponseSchema, response),
+  decodeResult: (payload) => fromBinary(CpSatBridgeResponseSchema, payload),
+  encodeEvent: (event) => toBinary(CpSatBridgeResponseSchema, event),
+  decodeEvent: (payload) => fromBinary(CpSatBridgeResponseSchema, payload),
 };
 
 const readUint32LE = (buffer: ArrayBufferLike, ptr: number) =>
@@ -105,70 +121,27 @@ function nowMs() {
   return BigInt(Date.now());
 }
 
-export function createCpSatJobStatusEvent(
+function createCpSatJobStatusEvent(
   requestId: number,
-  state: SolverJobState,
+  state: SolverJobStateType,
   createdAtMs: bigint,
   startedAtMs: bigint = 0n,
   allocatedThreads = 0,
   queuePosition = 0,
 ): SolverJobEvent {
-  return {
-    type: 'status',
-    status: create(SolverJobStatusSchema, {
-      requestId,
-      solver: 'cp-sat',
-      state,
-      createdAtMs,
-      startedAtMs,
-      allocatedThreads,
-      queuePosition,
-    }),
-  };
+  return createSolverJobStatusEvent(
+    'cp-sat', requestId, state, createdAtMs, startedAtMs, allocatedThreads, queuePosition,
+  );
 }
 
-export function createCpSatFailureEvent(
+function createCpSatFailureEvent(
   requestId: number,
   message: string,
-  kind: SolverFailureKind = SolverFailureKind.INTERNAL,
+  kind: SolverFailureKindType = SolverFailureKind.INTERNAL,
   trace = '',
   retryable = false,
 ): SolverJobEvent {
-  return {
-    type: 'failure',
-    failure: create(SolverJobFailureSchema, {
-      requestId, solver: 'cp-sat', kind, message, trace, retryable,
-    }),
-  };
-}
-
-export function cpSatEventFromSolverBridgeResponse(
-  response: SolverBridgeResponse,
-): CpSatExecutorEvent | null {
-  switch (response.payload.case) {
-    case 'eventPayload':
-    case 'resultPayload':
-      return fromBinary(CpSatBridgeResponseSchema, response.payload.value);
-    case 'status':
-      return { type: 'status', status: response.payload.value };
-    case 'failure':
-      return { type: 'failure', failure: response.payload.value };
-    default:
-      return null;
-  }
-}
-
-export function encodeCpSatSolverBridgeRequest(
-  requestId: number,
-  request: CpSatBridgeRequest,
-  requestedThreads = 0,
-): Uint8Array {
-  return encodeSolverBridgeRequest({
-    requestId,
-    solver: 'cp-sat',
-    payload: toBinary(CpSatBridgeRequestSchema, request),
-    requestedThreads,
-  });
+  return createSolverFailureEvent('cp-sat', requestId, message, kind, trace, retryable);
 }
 
 export class CpSatExecutor implements CpSatExecutorLike {

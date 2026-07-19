@@ -1,7 +1,8 @@
 import { mathOptExpressionContractCases } from './mathopt_expression_contract.ts';
 import { runMathOptModelContractCases } from './mathopt_model_contract.ts';
 import { mathoptSolveResultContractCases } from './mathopt_solve_result_contract.ts';
-import { fixtureModes, withWorkerBridgeMode } from './shared_case.ts';
+import type { ExecutorFixtureMode } from './shared_case.ts';
+import { assertServerExecutorIsRunning, executorFixtureModes, serverExecutorConfiguration } from './shared_case.ts';
 
 export type MathOptCaseResult = {
   id?: string;
@@ -10,7 +11,7 @@ export type MathOptCaseResult = {
   source?: string;
   upstream?: string;
   tags?: string[];
-  mode: 'direct' | 'worker';
+  mode: ExecutorFixtureMode;
   threads: number;
   ok: boolean;
   terminationReason: string;
@@ -18,8 +19,9 @@ export type MathOptCaseResult = {
   values: Record<string, number>;
 };
 
-type MathOptRunOptions = {
-  onProgress?: (name: string, mode: 'direct' | 'worker', threads: number) => void;
+export type MathOptRunOptions = {
+  modes?: readonly ExecutorFixtureMode[];
+  onProgress?: (name: string, mode: ExecutorFixtureMode, threads: number) => void;
 };
 
 type MathOptVariableLike = {
@@ -435,8 +437,7 @@ export type MathOptApi = {
       iterationLimit?: number;
       [key: string]: unknown;
     }): Uint8Array;
-    setWorkerBridgeEnabled: (enabled: boolean) => void;
-    isWorkerBridgeEnabled: () => boolean;
+    setExecutor(configuration: { type: 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
   };
 };
 
@@ -519,7 +520,7 @@ const activeSolveResultContractNames = new Set([
   'result_test.py/SolveResult helper methods',
 ]);
 
-async function runGlopLp(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {
+async function runGlopLp(api: MathOptApi, mode: ExecutorFixtureMode, threads: number): Promise<MathOptCaseResult> {
   const model = api.MathOpt.Model('mathopt_lp');
   const x = model.addVariable({ lowerBound: 0, name: 'x' });
   const y = model.addVariable({ lowerBound: 0, name: 'y' });
@@ -563,7 +564,7 @@ async function runGlopLp(api: MathOptApi, mode: 'direct' | 'worker', threads: nu
   });
 }
 
-async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {
+async function runCpSatMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: number): Promise<MathOptCaseResult> {
   const model = api.MathOpt.Model('mathopt_mip');
   const x = model.addVariable({ lowerBound: 0, upperBound: 10, integer: true, name: 'x' });
   const y = model.addVariable({ lowerBound: 0, upperBound: 10, integer: true, name: 'y' });
@@ -604,7 +605,7 @@ async function runCpSatMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
   });
 }
 
-async function runGScipMip(api: MathOptApi, mode: 'direct' | 'worker', threads: number): Promise<MathOptCaseResult> {
+async function runGScipMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: number): Promise<MathOptCaseResult> {
   const model = api.MathOpt.Model('mathopt_gscip_mip');
   const x = model.addVariable({ lowerBound: 0, upperBound: 10, integer: true, name: 'x' });
   const y = model.addVariable({ lowerBound: 0, upperBound: 10, integer: true, name: 'y' });
@@ -645,7 +646,7 @@ async function runGScipMip(api: MathOptApi, mode: 'direct' | 'worker', threads: 
   });
 }
 
-async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<MathOptCaseResult> {
+async function runGlpkLp(api: MathOptApi, mode: ExecutorFixtureMode): Promise<MathOptCaseResult> {
   const model = api.MathOpt.Model('mathopt_glpk_lp');
   const x = model.addVariable({ lowerBound: 0, name: 'x' });
   const y = model.addVariable({ lowerBound: 0, name: 'y' });
@@ -701,8 +702,10 @@ async function runGlpkLp(api: MathOptApi, mode: 'direct' | 'worker'): Promise<Ma
 
 export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
   const results: MathOptCaseResult[] = [];
-  for (const mode of fixtureModes) {
-    await withWorkerBridgeMode(api.MathOpt, mode, 'MathOpt', async () => {
+  const modes = options.modes ?? executorFixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
+  for (const mode of modes) {
+    api.MathOpt.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
       await api.initMathOpt();
       for (const threads of [1, 4]) {
         options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
@@ -759,7 +762,6 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
           tags: ['python-parity', 'model-api', mode],
         })
       ));
-    });
   }
   return results;
 }

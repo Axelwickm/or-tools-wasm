@@ -18,6 +18,7 @@ export {
   MathOptSolveParameters,
   MathOptSolverType,
   MathOptSparseVectorFilter,
+  setMathOptExecutor as setExecutor,
   PdlpLinesearchRule,
   PdlpOptimalityNorm,
   PdlpParameters,
@@ -41,6 +42,7 @@ export type {
   MathOptSolutionHintOptions,
   MathOptSolutionResult,
   MathOptSolveOptions,
+  MathOptEvent,
   MathOptSolveInterrupterLike,
   MathOptSolveParametersOptions,
   MathOptSolveResult,
@@ -50,16 +52,5 @@ export type {
   MathOptVariableOptions,
   PdlpParametersOptions,
 } from './mathopt_api.js';
-export {
-  configureServerBridge,
-  getServerBridgeUrl,
-  isServerBridgeEnabled,
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setServerBridgeEnabled,
-  setServerBridgeUrl,
-  setWorkerBridgeEnabled,
-  terminateWorkerBridge,
-  type ServerBridgeOptions,
-} from './worker_bridge.js';
+export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

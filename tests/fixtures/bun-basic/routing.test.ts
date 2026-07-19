@@ -7,14 +7,14 @@ import {
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
-  isWorkerBridgeEnabled,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
-  setWorkerBridgeEnabled,
+  setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/routing';
 import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
+import { fixtureModes } from '../browser-basic-src/shared_case.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -30,12 +30,11 @@ await runBunFixture(async () => {
     LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
-  });
+    setExecutor,
+  }, { modes: fixtureModes });
   assertAllCases('bun routing', routingResults);
   console.log(`bun ran ${routingResults.length} routing cases`);
 }, async () => {
-  setWorkerBridgeEnabled(false);
+  setExecutor({ type: 'direct' });
   await terminateLoadedRuntimeThreads();
 });

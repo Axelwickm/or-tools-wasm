@@ -1,6 +1,6 @@
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
-import { executeKnapsackNative, loadKnapsackNative } from '../mp_solver_api.js';
-import { encodeSolverBridgeRequest } from '../solver_bridge.js';
+import { executeKnapsackNative, loadMPSolverNativeModule } from '../mp_solver/native_runtime.js';
+import type { SolverBridgeCodec } from '../solver_bridge.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,
@@ -17,45 +17,27 @@ import {
   type KnapsackBridgeRequest,
   type KnapsackBridgeResponse,
 } from '../generated/bridge/knapsack_pb.js';
-import type { SolverBridgeResponse } from '../generated/bridge/job_pb.js';
 
 export type KnapsackExecutorEvent = SolverJobEvent;
 export type KnapsackExecutorEventHandler = (event: KnapsackExecutorEvent) => void | Promise<void>;
 export type KnapsackExecutorJob = SolverJob<KnapsackBridgeResponse>;
 export type KnapsackExecutorLike = SolverExecutor<KnapsackBridgeRequest, KnapsackBridgeResponse, never>;
 
+export const knapsackBridgeCodec: SolverBridgeCodec<
+  KnapsackBridgeRequest,
+  KnapsackBridgeResponse,
+  never
+> = {
+  solver: 'knapsack',
+  label: 'Knapsack',
+  encodeRequest: (request) => toBinary(KnapsackBridgeRequestSchema, request),
+  decodeRequest: (payload) => fromBinary(KnapsackBridgeRequestSchema, payload),
+  encodeResult: (response) => toBinary(KnapsackBridgeResponseSchema, response),
+  decodeResult: (payload) => fromBinary(KnapsackBridgeResponseSchema, payload),
+  defaultRequestedThreads: 1,
+};
+
 const nowMs = () => BigInt(Date.now());
-
-export function encodeKnapsackSolverBridgeRequest(
-  requestId: number,
-  request: KnapsackBridgeRequest,
-): Uint8Array {
-  return encodeSolverBridgeRequest({
-    requestId,
-    solver: 'knapsack',
-    payload: toBinary(KnapsackBridgeRequestSchema, request),
-    requestedThreads: 1,
-  });
-}
-
-export function knapsackEventFromSolverBridgeResponse(
-  response: SolverBridgeResponse,
-): KnapsackExecutorEvent | null {
-  if (response.payload.case === 'status') {
-    return { type: 'status', status: response.payload.value };
-  }
-  if (response.payload.case === 'failure') {
-    return { type: 'failure', failure: response.payload.value };
-  }
-  return null;
-}
-
-export function decodeKnapsackBridgeResult(response: SolverBridgeResponse): KnapsackBridgeResponse {
-  if (response.payload.case !== 'resultPayload') {
-    throw new Error(`Knapsack executor returned unexpected response: ${response.payload.case ?? 'empty'}`);
-  }
-  return fromBinary(KnapsackBridgeResponseSchema, response.payload.value);
-}
 
 export class KnapsackExecutor implements KnapsackExecutorLike {
   readonly solver = 'knapsack';
@@ -63,7 +45,7 @@ export class KnapsackExecutor implements KnapsackExecutorLike {
   private readonly cancelledRequests = new Set<number>();
 
   async load(): Promise<void> {
-    await loadKnapsackNative();
+    await loadMPSolverNativeModule();
   }
 
   execute(

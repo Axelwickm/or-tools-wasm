@@ -46,37 +46,6 @@ export async function assertServerExecutorIsRunning() {
   }
 }
 
-export type WorkerBridgeApi = {
-  setWorkerBridgeEnabled(enabled: boolean): void;
-  isWorkerBridgeEnabled(): boolean;
-  isWorkerBridgeAvailable?(): boolean;
-};
-
-export function fixtureModesFor(api: WorkerBridgeApi): readonly FixtureMode[] {
-  return api.isWorkerBridgeAvailable?.() === false ? ['direct'] : fixtureModes;
-}
-
-export function setWorkerBridgeMode(api: WorkerBridgeApi, mode: FixtureMode, label: string) {
-  api.setWorkerBridgeEnabled(mode === 'worker');
-  if (api.isWorkerBridgeEnabled() !== (mode === 'worker')) {
-    throw new Error(`${label} worker bridge state mismatch for ${mode}`);
-  }
-}
-
-export async function withWorkerBridgeMode<T>(
-  api: WorkerBridgeApi,
-  mode: FixtureMode,
-  label: string,
-  run: () => Promise<T>,
-): Promise<T> {
-  setWorkerBridgeMode(api, mode, label);
-  try {
-    return await run();
-  } finally {
-    api.setWorkerBridgeEnabled(false);
-  }
-}
-
 export type SharedCaseMetadata = {
   id: string;
   name: string;

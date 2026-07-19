@@ -203,7 +203,6 @@ type MathOptApi = {
     Model(name?: string): MathOptModelLike;
     solve(model: MathOptModelLike, options?: MathOptSolveOptions): Promise<MathOptSolveResult>;
     encodeSolveRequest(model: MathOptModelLike, options?: MathOptSolveOptions): Uint8Array;
-    setWorkerBridgeEnabled: (enabled: boolean) => void;
   };
 };
 

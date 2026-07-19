@@ -1,20 +1,39 @@
-import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadMathOptRuntime } from './runtime_loader.js';
-import type { WorkerResponse } from './worker_protocol.js';
+import { create } from '@bufbuild/protobuf';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
+import { resolveExecutorConfiguration } from './executor_configuration.js';
 import {
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
-  nextWorkerBridgeRequestId,
-  postWorkerRequest,
-  shouldUseWorkerBridge,
-} from './worker_bridge.js';
+  MathOptIncrementalCreateRequestSchema,
+  MathOptIncrementalDeleteRequestSchema,
+  MathOptIncrementalSolveRequestSchema,
+  MathOptSolveRequestSchema,
+} from './generated/bridge/mathopt_pb.js';
+import type { SolverJobEvent } from './solver_executor.js';
+import { MathOptExecutor, type MathOptExecutorLike, type MathOptExecutorRequest } from './mathopt/executor.js';
+import { MathOptServerExecutor } from './mathopt/server_executor.js';
+import { MathOptWorkerExecutor } from './mathopt/worker_executor.js';
 import type { SatParameters } from './generated/sat_parameters.js';
 
 type WireValue = Uint8Array;
 
-function shouldUseMathOptBridge(): boolean {
-  return shouldUseWorkerBridge();
+const directExecutor = new MathOptExecutor();
+const workerExecutor = new MathOptWorkerExecutor();
+let resolvedExecutorConfiguration = resolveExecutorConfiguration();
+let mathOptExecutor: MathOptExecutorLike = createResolvedExecutor(resolvedExecutorConfiguration);
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): MathOptExecutorLike {
+  switch (configuration.type) {
+    case 'direct': return directExecutor;
+    case 'worker': return workerExecutor;
+    case 'server': return new MathOptServerExecutor(configuration);
+  }
 }
+
+export function setMathOptExecutor(configuration: ExecutorConfiguration): void {
+  resolvedExecutorConfiguration = resolveExecutorConfiguration(configuration);
+  mathOptExecutor = createResolvedExecutor(resolvedExecutorConfiguration);
+}
+
+export type MathOptEvent = SolverJobEvent;
 
 export type MathOptLinearTerm = {
   variable: MathOptVariable;
@@ -140,6 +159,8 @@ export type MathOptSolveOptions = {
   cp_sat?: SatParameters | Uint8Array;
   pdlp?: PdlpParameters | PdlpParametersOptions | Uint8Array;
   glpk?: GlpkParameters | GlpkParametersOptions | Uint8Array;
+  onEvent?: (event: MathOptEvent) => void | Promise<void>;
+  signal?: AbortSignal;
 };
 
 export type MathOptSparseVectorFilterOptions<TElement = unknown> = {
@@ -1088,13 +1109,6 @@ const basisStatusNames: Record<number, string> = {
   4: 'BASIS_STATUS_FIXED_VALUE',
   5: 'BASIS_STATUS_BASIC',
 };
-
-let mathOptModulePromise: Promise<OrToolsWasmModule> | null = null;
-
-function loadMathOptModule(): Promise<OrToolsWasmModule> {
-  mathOptModulePromise ??= loadMathOptRuntime();
-  return mathOptModulePromise;
-}
 
 export class MathOptModel {
   readonly name: string;
@@ -2488,11 +2502,7 @@ export function completeLowerBound<TExpression>(
 }
 
 export async function initMathOpt(): Promise<void> {
-  if (shouldUseMathOptBridge()) {
-    await initMathOptViaWorker();
-    return;
-  }
-  await loadMathOptModule();
+  await mathOptExecutor.load();
 }
 
 export class MathOptIncrementalSolver {
@@ -2500,7 +2510,7 @@ export class MathOptIncrementalSolver {
   private checkpoint: MathOptModelSnapshot;
   private handle: number | null = null;
   private closed = false;
-  private readonly useWorkerBridge = shouldUseMathOptBridge();
+  private readonly executor = mathOptExecutor;
 
   constructor(
     readonly model: MathOptModel,
@@ -2519,9 +2529,10 @@ export class MathOptIncrementalSolver {
       ...this.options,
       solverType: this.solverType,
     });
-    const responseBytes = this.useWorkerBridge
-      ? await incrementalCreateViaWorker(requestBytes)
-      : await incrementalCreateDirect(requestBytes);
+    const responseBytes = await executeMathOptRequest(this.executor, {
+      case: 'incrementalCreate',
+      value: create(MathOptIncrementalCreateRequestSchema, { solveRequestProto: requestBytes }),
+    }, this.options);
     const response = readMessage(responseBytes);
     const statusBytes = response.messages.get(3)?.[0];
     if (statusBytes) {
@@ -2551,9 +2562,16 @@ export class MathOptIncrementalSolver {
     const updateBytes = this.model.encodeModelUpdateSince(this.checkpoint, { removeNames });
     const requestBytes = MathOpt.encodeSolveRequest(this.model, mergedOptions);
     const interrupterState = solveInterrupterState(mergedOptions);
-    const responseBytes = this.useWorkerBridge
-      ? await incrementalSolveViaWorker(handle, requestBytes, updateBytes, interrupterState)
-      : await incrementalSolveDirect(handle, requestBytes, updateBytes, interrupterState);
+    const responseBytes = await executeMathOptRequest(this.executor, {
+      case: 'incrementalSolve',
+      value: create(MathOptIncrementalSolveRequestSchema, {
+        handle: BigInt(handle),
+        solveRequestProto: requestBytes,
+        modelUpdateProto: updateBytes ?? undefined,
+        useInterrupter: interrupterState.useInterrupter,
+        interruptAtStart: interrupterState.interrupted,
+      }),
+    }, mergedOptions);
     const result = decodeSolveResponse(responseBytes, this.model);
     this.checkpoint = this.model.snapshot();
     const messageCallback = solveMessageCallback(mergedOptions);
@@ -2573,11 +2591,10 @@ export class MathOptIncrementalSolver {
     try {
       const handle = this.handle ?? await this.initPromise.catch(() => 0);
       if (handle > 0) {
-        if (this.useWorkerBridge) {
-          await incrementalDeleteViaWorker(handle);
-        } else {
-          await incrementalDeleteDirect(handle);
-        }
+        await executeMathOptRequest(this.executor, {
+          case: 'incrementalDelete',
+          value: create(MathOptIncrementalDeleteRequestSchema, { handle: BigInt(handle) }),
+        }, this.options);
       }
     } finally {
       this.handle = null;
@@ -2613,12 +2630,8 @@ export class MathOpt {
   static readonly LowerBoundedExpression = MathOptLowerBoundedExpression;
   static readonly UpperBoundedExpression = MathOptUpperBoundedExpression;
 
-  static setWorkerBridgeEnabled(enabled: boolean): void {
-    setWorkerBridgeEnabled(enabled);
-  }
-
-  static isWorkerBridgeEnabled(): boolean {
-    return isWorkerBridgeEnabled();
+  static setExecutor(configuration: ExecutorConfiguration): void {
+    setMathOptExecutor(configuration);
   }
 
   static Model(name = ''): MathOptModel {
@@ -2628,9 +2641,14 @@ export class MathOpt {
   static async solve(model: MathOptModel, options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
     const requestBytes = MathOpt.encodeSolveRequest(model, options);
     const interrupterState = solveInterrupterState(options);
-    const responseBytes = shouldUseMathOptBridge()
-      ? await solveViaWorker(requestBytes, interrupterState)
-      : await solveDirect(requestBytes, interrupterState);
+    const responseBytes = await executeMathOptRequest(mathOptExecutor, {
+      case: 'solve',
+      value: create(MathOptSolveRequestSchema, {
+        solveRequestProto: requestBytes,
+        useInterrupter: interrupterState.useInterrupter,
+        interruptAtStart: interrupterState.interrupted,
+      }),
+    }, options);
     const result = decodeSolveResponse(responseBytes, model);
     const messageCallback = solveMessageCallback(options);
     if (messageCallback && result.messages.length > 0) {
@@ -2763,152 +2781,25 @@ export class MathOpt {
   }
 }
 
-async function initMathOptViaWorker(): Promise<void> {
-  await postWorkerRequest<Extract<WorkerResponse, { type: 'mathOptInitResult' }>>({
-    type: 'mathOptInit',
-    id: nextWorkerBridgeRequestId(),
-  });
-}
-
-async function solveViaWorker(requestBytes: Uint8Array, interrupterState: MathOptSolveInterrupterState): Promise<Uint8Array> {
-  const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'mathOptSolveResult' }>>({
-    type: 'mathOptSolve',
-    id: nextWorkerBridgeRequestId(),
-    requestBytes,
-    useInterrupter: interrupterState.useInterrupter,
-    interruptAtStart: interrupterState.interrupted,
-  });
-  return new Uint8Array(response.bytes);
-}
-
-async function incrementalCreateViaWorker(requestBytes: Uint8Array): Promise<Uint8Array> {
-  const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'mathOptIncrementalResult' }>>({
-    type: 'mathOptIncrementalCreate',
-    id: nextWorkerBridgeRequestId(),
-    requestBytes,
-  });
-  return new Uint8Array(response.bytes);
-}
-
-async function incrementalSolveViaWorker(
-  handle: number,
-  requestBytes: Uint8Array,
-  updateBytes: Uint8Array | null,
-  interrupterState: MathOptSolveInterrupterState,
+async function executeMathOptRequest(
+  executor: MathOptExecutorLike,
+  request: MathOptExecutorRequest,
+  options: Pick<MathOptSolveOptions, 'threads' | 'onEvent' | 'signal'>,
 ): Promise<Uint8Array> {
-  const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'mathOptIncrementalResult' }>>({
-    type: 'mathOptIncrementalSolve',
-    id: nextWorkerBridgeRequestId(),
-    handle,
-    requestBytes,
-    updateBytes: updateBytes ?? undefined,
-    useInterrupter: interrupterState.useInterrupter,
-    interruptAtStart: interrupterState.interrupted,
+  if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('MathOpt solve aborted.', 'AbortError');
+  const job = executor.execute(request, {
+    requestedThreads: options.threads ?? 1,
+    onEvent: options.onEvent ?? (() => {}),
   });
-  return new Uint8Array(response.bytes);
-}
-
-async function incrementalDeleteViaWorker(handle: number): Promise<void> {
-  await postWorkerRequest<Extract<WorkerResponse, { type: 'mathOptIncrementalDeleted' }>>({
-    type: 'mathOptIncrementalDelete',
-    id: nextWorkerBridgeRequestId(),
-    handle,
-  });
-}
-
-async function solveDirect(requestBytes: Uint8Array, interrupterState: MathOptSolveInterrupterState): Promise<Uint8Array> {
-  const module = await loadMathOptModule();
-  const requestPtr = copyBytesToHeap(module, requestBytes);
-  const lenPtr = module._malloc(4);
+  const abort = () => { void job.cancel().catch(() => {}); };
+  options.signal?.addEventListener('abort', abort, { once: true });
   try {
-    const ptr = (await module.ccall(
-      'mathopt_solve_request',
-      'number',
-      ['number', 'number', 'number', 'number', 'number'],
-      [requestPtr, requestBytes.length, interrupterState.useInterrupter ? 1 : 0, interrupterState.interrupted ? 1 : 0, lenPtr],
-      { async: true },
-    )) as number;
-    const length = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
-    const bytes = ptr && length > 0 ? new Uint8Array(module.HEAPU8.subarray(ptr, ptr + length)) : new Uint8Array();
-    if (ptr) module._free(ptr);
-    return bytes;
+    const response = await job.result;
+    if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('MathOpt solve aborted.', 'AbortError');
+    return response.solveResponseProto;
   } finally {
-    if (requestPtr) module._free(requestPtr);
-    module._free(lenPtr);
+    options.signal?.removeEventListener('abort', abort);
   }
-}
-
-async function incrementalCreateDirect(requestBytes: Uint8Array): Promise<Uint8Array> {
-  const module = await loadMathOptModule();
-  const requestPtr = copyBytesToHeap(module, requestBytes);
-  const lenPtr = module._malloc(4);
-  try {
-    const ptr = (await module.ccall(
-      'mathopt_incremental_create',
-      'number',
-      ['number', 'number', 'number'],
-      [requestPtr, requestBytes.length, lenPtr],
-      { async: true },
-    )) as number;
-    const length = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
-    const bytes = ptr && length > 0 ? new Uint8Array(module.HEAPU8.subarray(ptr, ptr + length)) : new Uint8Array();
-    if (ptr) module._free(ptr);
-    return bytes;
-  } finally {
-    if (requestPtr) module._free(requestPtr);
-    module._free(lenPtr);
-  }
-}
-
-async function incrementalSolveDirect(
-  handle: number,
-  requestBytes: Uint8Array,
-  updateBytes: Uint8Array | null,
-  interrupterState: MathOptSolveInterrupterState,
-): Promise<Uint8Array> {
-  const module = await loadMathOptModule();
-  const requestPtr = copyBytesToHeap(module, requestBytes);
-  const updatePtr = updateBytes ? copyBytesToHeap(module, updateBytes) : 0;
-  const lenPtr = module._malloc(4);
-  try {
-    const ptr = (await module.ccall(
-      'mathopt_incremental_solve',
-      'number',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-      [
-        handle,
-        requestPtr,
-        requestBytes.length,
-        updatePtr,
-        updateBytes?.length ?? 0,
-        updateBytes ? 1 : 0,
-        interrupterState.useInterrupter ? 1 : 0,
-        interrupterState.interrupted ? 1 : 0,
-        lenPtr,
-      ],
-      { async: true },
-    )) as number;
-    const length = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
-    const bytes = ptr && length > 0 ? new Uint8Array(module.HEAPU8.subarray(ptr, ptr + length)) : new Uint8Array();
-    if (ptr) module._free(ptr);
-    return bytes;
-  } finally {
-    if (requestPtr) module._free(requestPtr);
-    if (updatePtr) module._free(updatePtr);
-    module._free(lenPtr);
-  }
-}
-
-async function incrementalDeleteDirect(handle: number): Promise<void> {
-  const module = await loadMathOptModule();
-  await module.ccall('mathopt_incremental_delete', undefined, ['number'], [handle], { async: true });
-}
-
-function copyBytesToHeap(module: OrToolsWasmModule, bytes: Uint8Array): number {
-  if (bytes.length === 0) return 0;
-  const ptr = module._malloc(bytes.length);
-  module.HEAPU8.set(bytes, ptr);
-  return ptr;
 }
 
 function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): Uint8Array {

@@ -1,13 +1,12 @@
 import {
   initMPSolver,
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
   MPSolver,
   MPSolverParameters,
-  setWorkerBridgeEnabled,
+  setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/mp-solver';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
+import { fixtureModes } from '../browser-basic-src/shared_case.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -15,13 +14,11 @@ await runBunFixture(async () => {
     initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
-    isWorkerBridgeAvailable,
-  });
+    setExecutor,
+  }, { modes: fixtureModes });
   assertAllCases('bun MPSolver', mpSolverResults);
   console.log(`bun ran ${mpSolverResults.length} MPSolver cases`);
 }, async () => {
-  setWorkerBridgeEnabled(false);
+  setExecutor({ type: 'direct' });
   await terminateLoadedRuntimeThreads();
 });

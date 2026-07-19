@@ -13,9 +13,7 @@ export {
   OptimizationProblemType,
   PresolveValues,
   ScalingValues,
-  isMPSolverWorkerBridgeAvailable as isWorkerBridgeAvailable,
-  isMPSolverWorkerBridgeEnabled as isWorkerBridgeEnabled,
-  setMPSolverWorkerBridgeEnabled as setWorkerBridgeEnabled,
+  setMPSolverExecutor as setExecutor,
 } from './mp_solver_api.js';
 export type {
   LinearSolverSchemas,
@@ -23,14 +21,8 @@ export type {
   MPSolverProtoSolveOptions,
   MPSolverProtoSolveResult,
   MPSolverSolutionResponse,
+  MPSolverEvent,
+  MPSolverExecutionOptions,
 } from './mp_solver_api.js';
-export {
-  configureServerBridge,
-  getServerBridgeUrl,
-  isServerBridgeEnabled,
-  setServerBridgeEnabled,
-  setServerBridgeUrl,
-  terminateWorkerBridge,
-  type ServerBridgeOptions,
-} from './worker_bridge.js';
+export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

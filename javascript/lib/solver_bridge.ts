@@ -11,6 +11,18 @@ import {
   type SolverJobStatus,
 } from './generated/bridge/job_pb.js';
 
+export type SolverBridgeCodec<Request, Response, Event> = {
+  solver: string;
+  label: string;
+  encodeRequest(request: Request): Uint8Array;
+  decodeRequest(payload: Uint8Array): Request;
+  encodeResult(response: Response): Uint8Array;
+  decodeResult(payload: Uint8Array): Response;
+  encodeEvent?(event: Event): Uint8Array;
+  decodeEvent?(payload: Uint8Array): Event | null;
+  defaultRequestedThreads?: number;
+};
+
 export type SolverBridgeRequestInput = {
   requestId: number;
   solver: string;

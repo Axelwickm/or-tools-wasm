@@ -8,19 +8,9 @@ export {
   SimpleMaxFlowStatus,
   SimpleMinCostFlow,
   SimpleMinCostFlowStatus,
+  setNetworkFlowExecutor as setExecutor,
   solveGraphPayload,
 } from './graph_api.js';
-export type { GraphSolvePayload } from './graph_api.js';
-export {
-  configureServerBridge,
-  getServerBridgeUrl,
-  isServerBridgeEnabled,
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setServerBridgeEnabled,
-  setServerBridgeUrl,
-  setWorkerBridgeEnabled,
-  terminateWorkerBridge,
-  type ServerBridgeOptions,
-} from './worker_bridge.js';
+export type { GraphSolvePayload, NetworkFlowEvent, NetworkFlowSolveOptions } from './graph_api.js';
+export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

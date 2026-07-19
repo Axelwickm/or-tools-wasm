@@ -1,16 +1,18 @@
-import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadPdlpRuntime } from './runtime_loader.js';
-import type { WorkerResponse } from './worker_protocol.js';
+import { create, toBinary } from '@bufbuild/protobuf';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
+import { resolveExecutorConfiguration } from './executor_configuration.js';
 import {
-  isWorkerBridgeEnabled,
-  nextWorkerBridgeRequestId,
-  postWorkerRequest,
-  setWorkerBridgeEnabled,
-  shouldUseWorkerBridge,
-} from './worker_bridge.js';
-
-let pdlpModulePromise: Promise<OrToolsWasmModule> | null = null;
-let pdlpModule: OrToolsWasmModule | null = null;
+  PdlpBridgeRequestSchema,
+  PdlpOperation,
+  PdlpQuadraticProgramSchema,
+  PdlpSolveParametersSchema,
+  type PdlpBridgeResponse,
+  type PdlpQuadraticProgram,
+} from './generated/bridge/pdlp_pb.js';
+import type { SolverJobEvent } from './solver_executor.js';
+import { PdlpExecutor, type PdlpExecutorLike } from './pdlp/executor.js';
+import { PdlpServerExecutor } from './pdlp/server_executor.js';
+import { PdlpWorkerExecutor } from './pdlp/worker_executor.js';
 
 export type SparseMatrixEntry = {
   row: number;
@@ -100,7 +102,31 @@ export type PdlpSolverResult = {
   solve_log: PdlpSolveLog;
 };
 
-type PdlpWorkerResponse = Extract<WorkerResponse, { type: 'pdlpResult' }>;
+export type PdlpEvent = SolverJobEvent;
+export type PdlpExecutionOptions = {
+  onEvent?: (event: PdlpEvent) => void | Promise<void>;
+  signal?: AbortSignal;
+};
+
+const directExecutor = new PdlpExecutor();
+const workerExecutor = new PdlpWorkerExecutor();
+let executor: PdlpExecutorLike = createExecutor({ type: 'auto' });
+
+function createExecutor(configuration: ExecutorConfiguration): PdlpExecutorLike {
+  return createResolvedExecutor(resolveExecutorConfiguration(configuration));
+}
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): PdlpExecutorLike {
+  switch (configuration.type) {
+    case 'direct': return directExecutor;
+    case 'worker': return workerExecutor;
+    case 'server': return new PdlpServerExecutor(configuration);
+  }
+}
+
+export function setPdlpExecutor(configuration: ExecutorConfiguration): void {
+  executor = createExecutor(configuration);
+}
 
 const terminationReasonNames: Record<number, string> = {
   0: 'TERMINATION_REASON_UNSPECIFIED',
@@ -119,160 +145,8 @@ const terminationReasonNames: Record<number, string> = {
   13: 'TERMINATION_REASON_INVALID_INITIAL_SOLUTION',
 };
 
-async function loadPdlpModule(): Promise<OrToolsWasmModule> {
-  if (!pdlpModulePromise) {
-    pdlpModulePromise = loadPdlpRuntime().then((module) => {
-      pdlpModule = module;
-      return module;
-    });
-  }
-  return pdlpModulePromise;
-}
-
-function getPdlpModule(): OrToolsWasmModule {
-  if (!pdlpModule) {
-    throw new Error('initPdlp() must be awaited before using the synchronous PDLP API.');
-  }
-  return pdlpModule;
-}
-
 export async function initPdlp(): Promise<void> {
-  if (shouldUseWorkerBridge()) {
-    return;
-  }
-  await loadPdlpModule();
-}
-
-function copyBytesToHeap(module: OrToolsWasmModule, bytes: Uint8Array): number {
-  if (!bytes.length) return 0;
-  const ptr = module._malloc(bytes.length);
-  module.HEAPU8.set(bytes, ptr);
-  return ptr;
-}
-
-function readUint32LE(buffer: ArrayBufferLike, ptr: number): number {
-  return new DataView(buffer, ptr, 4).getUint32(0, true);
-}
-
-async function readNativeBytes(module: OrToolsWasmModule, fn: (lenPtr: number) => number | Promise<number>): Promise<Uint8Array> {
-  const lenPtr = module._malloc(4);
-  let responsePtr = 0;
-  try {
-    responsePtr = await fn(lenPtr);
-    const len = readUint32LE(module.HEAPU8.buffer, lenPtr);
-    return responsePtr && len ? module.HEAPU8.slice(responsePtr, responsePtr + len) : new Uint8Array();
-  } finally {
-    if (responsePtr) {
-      module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
-    }
-    module._free(lenPtr);
-  }
-}
-
-async function runWithBytes<T>(bytes: Uint8Array, fn: (module: OrToolsWasmModule, ptr: number, len: number) => T | Promise<T>): Promise<T> {
-  const module = getPdlpModule();
-  const ptr = copyBytesToHeap(module, bytes);
-  try {
-    return await fn(module, ptr, bytes.length);
-  } finally {
-    if (ptr) module._free(ptr);
-  }
-}
-
-async function runPdlpWorker(operation: 'validate' | 'isLinear' | 'fromMpModel' | 'toMpModel' | 'solve', bytes: Uint8Array, options: { relaxIntegerVariables?: boolean; includeNames?: boolean } = {}): Promise<{ bytes: Uint8Array; value?: number }> {
-  const response = await postWorkerRequest<PdlpWorkerResponse>({
-    type: 'pdlp',
-    id: nextWorkerBridgeRequestId(),
-    operation,
-    bytes,
-    relaxIntegerVariables: options.relaxIntegerVariables,
-    includeNames: options.includeNames,
-  });
-  return { bytes: response.bytes, value: response.value };
-}
-
-class BinaryWriter {
-  private readonly parts: Uint8Array[] = [];
-
-  u8(value: number): void {
-    this.parts.push(Uint8Array.of(value & 0xff));
-  }
-
-  u32(value: number): void {
-    const bytes = new Uint8Array(4);
-    new DataView(bytes.buffer).setUint32(0, value, true);
-    this.parts.push(bytes);
-  }
-
-  double(value: number): void {
-    const bytes = new Uint8Array(8);
-    new DataView(bytes.buffer).setFloat64(0, value, true);
-    this.parts.push(bytes);
-  }
-
-  string(value: string): void {
-    const bytes = new TextEncoder().encode(value);
-    this.u32(bytes.length);
-    this.parts.push(bytes);
-  }
-
-  doubles(values: number[]): void {
-    this.u32(values.length);
-    for (const value of values) this.double(value);
-  }
-
-  strings(values: string[]): void {
-    this.u32(values.length);
-    for (const value of values) this.string(value);
-  }
-
-  finish(): Uint8Array {
-    const size = this.parts.reduce((sum, part) => sum + part.length, 0);
-    const output = new Uint8Array(size);
-    let offset = 0;
-    for (const part of this.parts) {
-      output.set(part, offset);
-      offset += part.length;
-    }
-    return output;
-  }
-}
-
-class BinaryReader {
-  private offset = 0;
-
-  constructor(private readonly bytes: Uint8Array) {}
-
-  u8(): number {
-    return this.bytes[this.offset++] ?? 0;
-  }
-
-  u32(): number {
-    const value = new DataView(this.bytes.buffer, this.bytes.byteOffset + this.offset, 4).getUint32(0, true);
-    this.offset += 4;
-    return value;
-  }
-
-  double(): number {
-    const value = new DataView(this.bytes.buffer, this.bytes.byteOffset + this.offset, 8).getFloat64(0, true);
-    this.offset += 8;
-    return value;
-  }
-
-  string(): string {
-    const size = this.u32();
-    const value = new TextDecoder().decode(this.bytes.slice(this.offset, this.offset + size));
-    this.offset += size;
-    return value;
-  }
-
-  doubles(): number[] {
-    return Array.from({ length: this.u32() }, () => this.double());
-  }
-
-  strings(): string[] {
-    return Array.from({ length: this.u32() }, () => this.string());
-  }
+  await executor.load();
 }
 
 function denseToEntries(dense: number[][]): SparseMatrixEntry[] {
@@ -338,74 +212,45 @@ function pad(values: number[], length: number, fill: number): number[] {
   return [...values, ...Array(Math.max(0, length - values.length)).fill(fill)];
 }
 
-function encodeQuadraticProgram(input: QuadraticProgramInput): Uint8Array {
+function toBridgeQuadraticProgram(input: QuadraticProgramInput): PdlpQuadraticProgram {
   const qp = normalizeQuadraticProgram(input);
-  const writer = new BinaryWriter();
-  writer.u32(qp.numVariables);
-  writer.u32(qp.numConstraints);
-  writer.string(qp.problemName);
-  writer.double(qp.objectiveOffset);
-  writer.double(qp.objectiveScalingFactor);
-  writer.doubles(qp.objectiveVector);
-  if (qp.objectiveMatrixDiagonal) {
-    writer.u8(1);
-    writer.doubles(qp.objectiveMatrixDiagonal);
-  } else {
-    writer.u8(0);
-  }
-  writer.doubles(qp.constraintLowerBounds);
-  writer.doubles(qp.constraintUpperBounds);
-  writer.doubles(qp.variableLowerBounds);
-  writer.doubles(qp.variableUpperBounds);
-  writer.strings(qp.variableNames);
-  writer.strings(qp.constraintNames);
-  writer.u32(qp.constraintMatrixEntries.length);
-  for (const entry of qp.constraintMatrixEntries) {
-    writer.u32(entry.row);
-    writer.u32(entry.column);
-    writer.double(entry.value);
-  }
-  return writer.finish();
-}
-
-function decodeQuadraticProgram(bytes: Uint8Array): QuadraticProgram {
-  const reader = new BinaryReader(bytes);
-  const numVariables = reader.u32();
-  const numConstraints = reader.u32();
-  const problemName = reader.string();
-  const objectiveOffset = reader.double();
-  const objectiveScalingFactor = reader.double();
-  const objectiveVector = reader.doubles();
-  const objectiveMatrixDiagonal = reader.u8() ? reader.doubles() : null;
-  const constraintLowerBounds = reader.doubles();
-  const constraintUpperBounds = reader.doubles();
-  const variableLowerBounds = reader.doubles();
-  const variableUpperBounds = reader.doubles();
-  const variableNames = reader.strings();
-  const constraintNames = reader.strings();
-  const entries = Array.from({ length: reader.u32() }, () => ({
-    row: reader.u32(),
-    column: reader.u32(),
-    value: reader.double(),
-  }));
-  return new QuadraticProgram({
-    problemName,
-    objectiveOffset,
-    objectiveScalingFactor,
-    objectiveVector,
-    objectiveMatrixDiagonal,
-    constraintLowerBounds,
-    constraintUpperBounds,
-    variableLowerBounds,
-    variableUpperBounds,
-    variableNames,
-    constraintNames,
-    constraintMatrix: { numRows: numConstraints, numColumns: numVariables, entries },
+  return create(PdlpQuadraticProgramSchema, {
+    numVariables: qp.numVariables,
+    numConstraints: qp.numConstraints,
+    problemName: qp.problemName,
+    objectiveOffset: qp.objectiveOffset,
+    objectiveScalingFactor: qp.objectiveScalingFactor,
+    objectiveVector: qp.objectiveVector,
+    objectiveMatrixDiagonal: qp.objectiveMatrixDiagonal ?? [],
+    hasObjectiveMatrixDiagonal: qp.objectiveMatrixDiagonal !== null,
+    constraintLowerBounds: qp.constraintLowerBounds,
+    constraintUpperBounds: qp.constraintUpperBounds,
+    variableLowerBounds: qp.variableLowerBounds,
+    variableUpperBounds: qp.variableUpperBounds,
+    variableNames: qp.variableNames,
+    constraintNames: qp.constraintNames,
+    constraintMatrixEntries: qp.constraintMatrixEntries,
   });
 }
 
-function encodeParams(params: PdlpSolveParams = {}): Uint8Array {
-  const writer = new BinaryWriter();
+function fromBridgeQuadraticProgram(qp: PdlpQuadraticProgram): QuadraticProgram {
+  return new QuadraticProgram({
+    problemName: qp.problemName,
+    objectiveOffset: qp.objectiveOffset,
+    objectiveScalingFactor: qp.objectiveScalingFactor,
+    objectiveVector: qp.objectiveVector,
+    objectiveMatrixDiagonal: qp.hasObjectiveMatrixDiagonal ? qp.objectiveMatrixDiagonal : null,
+    constraintLowerBounds: qp.constraintLowerBounds,
+    constraintUpperBounds: qp.constraintUpperBounds,
+    variableLowerBounds: qp.variableLowerBounds,
+    variableUpperBounds: qp.variableUpperBounds,
+    variableNames: qp.variableNames,
+    constraintNames: qp.constraintNames,
+    constraintMatrix: { numRows: qp.numConstraints, numColumns: qp.numVariables, entries: qp.constraintMatrixEntries },
+  });
+}
+
+function toBridgeParameters(params: PdlpSolveParams = {}) {
   const terminationCriteria = (params.terminationCriteria ?? params.termination_criteria) as {
     iterationLimit?: number;
     iteration_limit?: number;
@@ -424,73 +269,19 @@ function encodeParams(params: PdlpSolveParams = {}): Uint8Array {
     epsOptimalAbsolute?: number;
     eps_optimal_absolute?: number;
   } | undefined;
-  const iterationLimit = terminationCriteria?.iterationLimit ?? terminationCriteria?.iteration_limit;
-  if (iterationLimit !== undefined) {
-    writer.u8(1);
-    writer.u32(iterationLimit);
-  } else {
-    writer.u8(0);
-  }
-  const terminationCheckFrequency = params.terminationCheckFrequency ?? params.termination_check_frequency;
-  if (terminationCheckFrequency !== undefined) {
-    writer.u8(1);
-    writer.u32(terminationCheckFrequency);
-  } else {
-    writer.u8(0);
-  }
-  const epsOptimalRelative = simple?.epsOptimalRelative ?? simple?.eps_optimal_relative;
-  if (epsOptimalRelative !== undefined) {
-    writer.u8(1);
-    writer.double(epsOptimalRelative);
-  } else {
-    writer.u8(0);
-  }
-  const epsOptimalAbsolute = simple?.epsOptimalAbsolute ?? simple?.eps_optimal_absolute;
-  if (epsOptimalAbsolute !== undefined) {
-    writer.u8(1);
-    writer.double(epsOptimalAbsolute);
-  } else {
-    writer.u8(0);
-  }
-  const lInfRuizIterations = params.lInfRuizIterations ?? params.l_inf_ruiz_iterations;
-  if (lInfRuizIterations !== undefined) {
-    writer.u8(1);
-    writer.u32(lInfRuizIterations);
-  } else {
-    writer.u8(0);
-  }
-  const l2NormRescaling = params.l2NormRescaling ?? params.l2_norm_rescaling;
-  if (l2NormRescaling !== undefined) {
-    writer.u8(1);
-    writer.u8(l2NormRescaling ? 1 : 0);
-  } else {
-    writer.u8(0);
-  }
-  return writer.finish();
+  return create(PdlpSolveParametersSchema, {
+    iterationLimit: terminationCriteria?.iterationLimit ?? terminationCriteria?.iteration_limit,
+    terminationCheckFrequency: params.terminationCheckFrequency ?? params.termination_check_frequency,
+    epsOptimalRelative: simple?.epsOptimalRelative ?? simple?.eps_optimal_relative,
+    epsOptimalAbsolute: simple?.epsOptimalAbsolute ?? simple?.eps_optimal_absolute,
+    lInfRuizIterations: params.lInfRuizIterations ?? params.l_inf_ruiz_iterations,
+    l2NormRescaling: params.l2NormRescaling ?? params.l2_norm_rescaling,
+  });
 }
 
-function encodeInitialSolution(solution?: PrimalAndDualSolutionInput): Uint8Array {
-  const writer = new BinaryWriter();
-  if (!solution) {
-    writer.u8(0);
-    return writer.finish();
-  }
-  writer.u8(1);
-  writer.doubles(solution.primal_solution ?? solution.primalSolution ?? []);
-  writer.doubles(solution.dual_solution ?? solution.dualSolution ?? []);
-  return writer.finish();
-}
-
-function decodeSolverResult(bytes: Uint8Array): PdlpSolverResult {
-  const reader = new BinaryReader(bytes);
-  if (reader.u8() === 0) {
-    throw new Error(reader.string() || 'PDLP solve failed.');
-  }
-  const primalSolution = reader.doubles();
-  const dualSolution = reader.doubles();
-  const reducedCosts = reader.doubles();
-  const terminationReasonNumber = reader.u32();
-  const iterationCount = reader.u32();
+function solverResult(response: PdlpBridgeResponse): PdlpSolverResult {
+  if (!response.solverResult) throw new Error('PDLP solve returned no result.');
+  const { primalSolution, dualSolution, reducedCosts, terminationReason: terminationReasonNumber, iterationCount } = response.solverResult;
   const solveLog = {
     terminationReason: terminationReasonNames[terminationReasonNumber] ?? `TERMINATION_REASON_${terminationReasonNumber}`,
     termination_reason: terminationReasonNames[terminationReasonNumber] ?? `TERMINATION_REASON_${terminationReasonNumber}`,
@@ -509,61 +300,25 @@ function decodeSolverResult(bytes: Uint8Array): PdlpSolverResult {
   };
 }
 
-async function pdlpBytes(operation: 'validate' | 'fromMpModel' | 'toMpModel' | 'solve', bytes: Uint8Array, options: { relaxIntegerVariables?: boolean; includeNames?: boolean } = {}): Promise<Uint8Array> {
-  if (shouldUseWorkerBridge()) {
-    return (await runPdlpWorker(operation, bytes, options)).bytes;
+async function execute(request: Parameters<PdlpExecutorLike['execute']>[0], options: PdlpExecutionOptions = {}) {
+  if (options.signal?.aborted) throw abortError(options.signal);
+  const job = executor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
+  const onAbort = () => { void job.cancel().catch(() => {}); };
+  options.signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    const response = await job.result;
+    if (options.signal?.aborted) throw abortError(options.signal);
+    return response;
+  } finally {
+    options.signal?.removeEventListener('abort', onAbort);
   }
-  await initPdlp();
-  return runWithBytes(bytes, (module, ptr, len) => readNativeBytes(module, async (lenPtr) => {
-    if (operation === 'validate') {
-      return await module.ccall(
-        'pdlp_validate_quadratic_program',
-        'number',
-        ['number', 'number', 'number'],
-        [ptr, len, lenPtr],
-        { async: true },
-      ) as number;
-    }
-    if (operation === 'fromMpModel') {
-      return await module.ccall(
-        'pdlp_qp_from_mpmodel_proto',
-        'number',
-        ['number', 'number', 'number', 'number', 'number'],
-        [ptr, len, options.relaxIntegerVariables ? 1 : 0, options.includeNames ? 1 : 0, lenPtr],
-        { async: true },
-      ) as number;
-    }
-    if (operation === 'toMpModel') {
-      return await module.ccall(
-        'pdlp_qp_to_mpmodel_proto',
-        'number',
-        ['number', 'number', 'number'],
-        [ptr, len, lenPtr],
-        { async: true },
-      ) as number;
-    }
-    return await module.ccall(
-      'pdlp_primal_dual_hybrid_gradient',
-      'number',
-      ['number', 'number', 'number'],
-      [ptr, len, lenPtr],
-      { async: true },
-    ) as number;
-  }));
 }
 
-async function pdlpIsLinearProgram(bytes: Uint8Array): Promise<boolean> {
-  if (shouldUseWorkerBridge()) {
-    return (await runPdlpWorker('isLinear', bytes)).value === 1;
-  }
-  await initPdlp();
-  return (await runWithBytes(bytes, async (module, ptr, len) => await module.ccall(
-    'pdlp_is_linear_program',
-    'number',
-    ['number', 'number'],
-    [ptr, len],
-    { async: true },
-  ) as number)) === 1;
+function abortError(signal: AbortSignal) {
+  if (signal.reason instanceof Error) return signal.reason;
+  const error = new Error(signal.reason === undefined ? 'The PDLP operation was aborted.' : String(signal.reason));
+  error.name = 'AbortError';
+  return error;
 }
 
 export class QuadraticProgram {
@@ -634,7 +389,7 @@ export class QuadraticProgram {
   }
 
   toBytes(): Uint8Array {
-    return encodeQuadraticProgram(this);
+    return toBinary(PdlpQuadraticProgramSchema, toBridgeQuadraticProgram(this));
   }
 
   private assign(input: QuadraticProgramInput): void {
@@ -688,45 +443,55 @@ export const Pdlp = {
   QuadraticProgram,
   PrimalAndDualSolution,
 
-  setWorkerBridgeEnabled(enabled: boolean): void {
-    setWorkerBridgeEnabled(enabled);
+  setExecutor(configuration: ExecutorConfiguration): void {
+    setPdlpExecutor(configuration);
   },
 
-  isWorkerBridgeEnabled(): boolean {
-    return isWorkerBridgeEnabled();
+  async validateQuadraticProgramDimensions(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<void> {
+    const response = await execute(create(PdlpBridgeRequestSchema, {
+      operation: PdlpOperation.VALIDATE,
+      quadraticProgram: toBridgeQuadraticProgram(qp),
+    }), options);
+    if (response.validationError) throw new Error(response.validationError);
   },
 
-  async validateQuadraticProgramDimensions(qp: QuadraticProgramInput | QuadraticProgram): Promise<void> {
-    const message = new TextDecoder().decode(await pdlpBytes('validate', encodeQuadraticProgram(qp)));
-    if (message) throw new Error(message);
+  async validate_quadratic_program_dimensions(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<void> {
+    return this.validateQuadraticProgramDimensions(qp, options);
   },
 
-  async validate_quadratic_program_dimensions(qp: QuadraticProgramInput | QuadraticProgram): Promise<void> {
-    return this.validateQuadraticProgramDimensions(qp);
+  async isLinearProgram(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<boolean> {
+    return (await execute(create(PdlpBridgeRequestSchema, {
+      operation: PdlpOperation.IS_LINEAR,
+      quadraticProgram: toBridgeQuadraticProgram(qp),
+    }), options)).isLinear;
   },
 
-  async isLinearProgram(qp: QuadraticProgramInput | QuadraticProgram): Promise<boolean> {
-    return pdlpIsLinearProgram(encodeQuadraticProgram(qp));
+  async is_linear_program(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<boolean> {
+    return this.isLinearProgram(qp, options);
   },
 
-  async is_linear_program(qp: QuadraticProgramInput | QuadraticProgram): Promise<boolean> {
-    return this.isLinearProgram(qp);
-  },
-
-  async qpFromMpModelProto(proto: Uint8Array, options: { relaxIntegerVariables?: boolean; includeNames?: boolean } = {}): Promise<QuadraticProgram> {
-    const bytes = await pdlpBytes('fromMpModel', proto, options);
-    if (!bytes.length) throw new Error('PDLP could not convert MPModelProto to QuadraticProgram.');
-    return decodeQuadraticProgram(bytes);
+  async qpFromMpModelProto(proto: Uint8Array, conversion: { relaxIntegerVariables?: boolean; includeNames?: boolean } = {}, options: PdlpExecutionOptions = {}): Promise<QuadraticProgram> {
+    const response = await execute(create(PdlpBridgeRequestSchema, {
+      operation: PdlpOperation.FROM_MP_MODEL,
+      mpModelProto: proto,
+      relaxIntegerVariables: conversion.relaxIntegerVariables ?? false,
+      includeNames: conversion.includeNames ?? false,
+    }), options);
+    if (!response.quadraticProgram) throw new Error('PDLP could not convert MPModelProto to QuadraticProgram.');
+    return fromBridgeQuadraticProgram(response.quadraticProgram);
   },
 
   async qp_from_mpmodel_proto(proto: Uint8Array, relaxIntegerVariables = false, includeNames = false): Promise<QuadraticProgram> {
     return this.qpFromMpModelProto(proto, { relaxIntegerVariables, includeNames });
   },
 
-  async qpToMpModelProto(qp: QuadraticProgramInput | QuadraticProgram): Promise<Uint8Array> {
-    const bytes = await pdlpBytes('toMpModel', encodeQuadraticProgram(qp));
-    if (!bytes.length) throw new Error('PDLP could not convert QuadraticProgram to MPModelProto.');
-    return bytes;
+  async qpToMpModelProto(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<Uint8Array> {
+    const response = await execute(create(PdlpBridgeRequestSchema, {
+      operation: PdlpOperation.TO_MP_MODEL,
+      quadraticProgram: toBridgeQuadraticProgram(qp),
+    }), options);
+    if (!response.mpModelProto.length) throw new Error('PDLP could not convert QuadraticProgram to MPModelProto.');
+    return response.mpModelProto;
   },
 
   async qp_to_mpmodel_proto(qp: QuadraticProgramInput | QuadraticProgram): Promise<Uint8Array> {
@@ -737,29 +502,25 @@ export const Pdlp = {
     qp: QuadraticProgramInput | QuadraticProgram,
     params: PdlpSolveParams = {},
     initialSolution?: PrimalAndDualSolutionInput | PrimalAndDualSolution,
+    options: PdlpExecutionOptions = {},
   ): Promise<PdlpSolverResult> {
-    const bytes = concat([encodeQuadraticProgram(qp), encodeParams(params), encodeInitialSolution(initialSolution)]);
-    const resultBytes = await pdlpBytes('solve', bytes);
-    if (!resultBytes.length) throw new Error('PDLP solve failed.');
-    return decodeSolverResult(resultBytes);
+    return solverResult(await execute(create(PdlpBridgeRequestSchema, {
+      operation: PdlpOperation.SOLVE,
+      quadraticProgram: toBridgeQuadraticProgram(qp),
+      parameters: toBridgeParameters(params),
+      initialSolution: initialSolution ? {
+        primalSolution: initialSolution.primal_solution ?? initialSolution.primalSolution ?? [],
+        dualSolution: initialSolution.dual_solution ?? initialSolution.dualSolution ?? [],
+      } : undefined,
+    }), options));
   },
 
   async primal_dual_hybrid_gradient(
     qp: QuadraticProgramInput | QuadraticProgram,
     params: PdlpSolveParams = {},
     initialSolution?: PrimalAndDualSolutionInput | PrimalAndDualSolution,
+    options: PdlpExecutionOptions = {},
   ): Promise<PdlpSolverResult> {
-    return this.primalDualHybridGradient(qp, params, initialSolution);
+    return this.primalDualHybridGradient(qp, params, initialSolution, options);
   },
 };
-
-function concat(parts: Uint8Array[]): Uint8Array {
-  const size = parts.reduce((sum, part) => sum + part.length, 0);
-  const output = new Uint8Array(size);
-  let offset = 0;
-  for (const part of parts) {
-    output.set(part, offset);
-    offset += part.length;
-  }
-  return output;
-}

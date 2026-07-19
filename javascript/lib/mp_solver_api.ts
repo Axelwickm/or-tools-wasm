@@ -1,30 +1,51 @@
 import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadMPSolverRuntime } from './runtime_loader.js';
-import type { WorkerResponse } from './worker_protocol.js';
+import { loadMPSolverNativeModule } from './mp_solver/native_runtime.js';
+import { create } from '@bufbuild/protobuf';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
+import { resolveExecutorConfiguration } from './executor_configuration.js';
 import {
-  isWorkerBridgeAvailable as isGenericWorkerBridgeAvailable,
-  isWorkerBridgeEnabled as isGenericWorkerBridgeEnabled,
-  nextWorkerBridgeRequestId,
-  postWorkerRequest,
-  setWorkerBridgeEnabled as setGenericWorkerBridgeEnabled,
-  shouldUseWorkerBridge,
-} from './worker_bridge.js';
+  MpSolverSchemaRequestSchema,
+  MpSolverSolveRequestSchema,
+} from './generated/bridge/mp_solver_pb.js';
+import type { SolverJobEvent } from './solver_executor.js';
+import { MpSolverExecutor, type MpSolverExecutorLike } from './mp_solver/executor.js';
+import { MpSolverServerExecutor } from './mp_solver/server_executor.js';
+import { MpSolverWorkerExecutor } from './mp_solver/worker_executor.js';
 import * as protobufModule from 'protobufjs';
 
-let mpSolverModulePromise: Promise<OrToolsWasmModule> | null = null;
 let mpSolverModule: OrToolsWasmModule | null = null;
 let mpSolverExports: MpSolverExports | null = null;
 
 type CReturn = 'number' | 'bigint' | undefined;
 type CArg = 'number' | 'bigint';
 
-function isMPSolverWorkerBridgeRuntimeAvailable(): boolean {
-  return isGenericWorkerBridgeAvailable();
+function shouldUseSerializedMPSolverBackend(): boolean {
+  return resolvedExecutorConfiguration.type !== 'direct';
 }
 
-function shouldUseMPSolverBridge(): boolean {
-  return isMPSolverWorkerBridgeRuntimeAvailable() && shouldUseWorkerBridge();
+const directExecutor = new MpSolverExecutor();
+const workerExecutor = new MpSolverWorkerExecutor();
+let resolvedExecutorConfiguration = resolveExecutorConfiguration();
+let executor: MpSolverExecutorLike = createResolvedExecutor(resolvedExecutorConfiguration);
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): MpSolverExecutorLike {
+  switch (configuration.type) {
+    case 'direct': return directExecutor;
+    case 'worker': return workerExecutor;
+    case 'server': return new MpSolverServerExecutor(configuration);
+  }
 }
+
+export function setMPSolverExecutor(configuration: ExecutorConfiguration): void {
+  resolvedExecutorConfiguration = resolveExecutorConfiguration(configuration);
+  executor = createResolvedExecutor(resolvedExecutorConfiguration);
+}
+
+export type MPSolverEvent = SolverJobEvent;
+export type MPSolverExecutionOptions = {
+  onEvent?: (event: MPSolverEvent) => void | Promise<void>;
+  signal?: AbortSignal;
+};
 
 type MpSolverExports = {
   solverInfinity(): number;
@@ -257,14 +278,9 @@ function createMpSolverExports(module: OrToolsWasmModule): MpSolverExports {
 }
 
 async function loadMpSolverModule(): Promise<OrToolsWasmModule> {
-  mpSolverModulePromise ??= loadMPSolverRuntime();
-  mpSolverModule = await mpSolverModulePromise;
+  mpSolverModule = await loadMPSolverNativeModule();
   mpSolverExports ??= createMpSolverExports(mpSolverModule);
   return mpSolverModule;
-}
-
-export async function loadKnapsackNative(): Promise<void> {
-  await loadMpSolverModule();
 }
 
 function getMpSolverModule(): OrToolsWasmModule {
@@ -287,17 +303,6 @@ function withCString<T>(module: OrToolsWasmModule, value: string, fn: (ptr: numb
   module.HEAPU8.set(bytes, ptr);
   try {
     return fn(ptr);
-  } finally {
-    module._free(ptr);
-  }
-}
-
-async function withCStringAsync<T>(module: OrToolsWasmModule, value: string, fn: (ptr: number) => T | Promise<T>): Promise<T> {
-  const bytes = stringBytes(value);
-  const ptr = module._malloc(bytes.byteLength);
-  module.HEAPU8.set(bytes, ptr);
-  try {
-    return await fn(ptr);
   } finally {
     module._free(ptr);
   }
@@ -354,7 +359,7 @@ export type MPSolverProtoSolveOptions = {
   tolerance?: number;
   numThreads?: number;
   num_threads?: number;
-};
+} & MPSolverExecutionOptions;
 
 type ProtobufRoot = import('protobufjs').Root;
 type ProtobufType = import('protobufjs').Type;
@@ -367,24 +372,15 @@ let mpSolutionResponseTypePromise: Promise<ProtobufType> | null = null;
 
 async function getLinearSolverSchemas(): Promise<LinearSolverSchemas> {
   linearSolverSchemasPromise ??= (async () => {
-    if (shouldUseMPSolverBridge()) {
-      const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'schemaResult' }>>({
-        type: 'getSchemas',
-        id: nextWorkerBridgeRequestId(),
-        schema: 'mp_solver',
-      });
-      if (response.schema !== 'mp_solver') {
-        throw new Error('Worker returned the wrong schema payload for MPSolver.');
-      }
-      return {
-        linear_solver: response.schemas.linear_solver,
-        optional_boolean: response.schemas.optional_boolean,
-      };
-    }
-    const module = await loadMpSolverModule();
+    const job = executor.execute(
+      { case: 'schema', value: create(MpSolverSchemaRequestSchema) },
+      { onEvent: () => {} },
+    );
+    const response = await job.result;
+    if (response.payload.case !== 'schema') throw new Error('MP Solver executor returned the wrong schema response.');
     return {
-      linear_solver: module.ccall('get_linear_solver_schema', 'string', [], []) as string,
-      optional_boolean: module.ccall('get_optional_boolean_schema', 'string', [], []) as string,
+      linear_solver: response.payload.value.linearSolverProtoSchema,
+      optional_boolean: response.payload.value.optionalBooleanProtoSchema,
     };
   })();
   return linearSolverSchemasPromise;
@@ -467,52 +463,26 @@ function normalizedNumThreads(options: Pick<MPSolverProtoSolveOptions, 'numThrea
   return typeof numThreads === 'number' && Number.isInteger(numThreads) && numThreads > 1 ? numThreads : undefined;
 }
 
-async function solveModelRequestDirect(
-  requestBytes: Uint8Array,
-  options: Pick<MPSolverProtoSolveOptions, 'numThreads' | 'num_threads'> = {},
-): Promise<Uint8Array> {
-  const module = await loadMpSolverModule();
-  const requestPtr = copyBytesToHeap(module, requestBytes);
-  try {
-    const numThreads = normalizedNumThreads(options);
-    return readNativeBytes(module, async (lenPtr) => {
-      if (numThreads !== undefined) {
-        return await module.ccall(
-          'mp_solver_solve_model_request_with_threads',
-          'number',
-          ['number', 'number', 'number', 'number'],
-          [requestPtr, requestBytes.length, numThreads, lenPtr],
-          { async: true },
-        ) as number;
-      }
-      return await module.ccall(
-        'mp_solver_solve_model_request',
-        'number',
-        ['number', 'number', 'number'],
-        [requestPtr, requestBytes.length, lenPtr],
-        { async: true },
-      ) as number;
-    });
-  } finally {
-    if (requestPtr) module._free(requestPtr);
-  }
-}
-
 async function solveModelRequestBytes(
   requestBytes: Uint8Array,
-  options: Pick<MPSolverProtoSolveOptions, 'numThreads' | 'num_threads'> = {},
+  options: Pick<MPSolverProtoSolveOptions, 'numThreads' | 'num_threads' | 'onEvent' | 'signal'> = {},
 ): Promise<Uint8Array> {
-  if (shouldUseMPSolverBridge()) {
-    const numThreads = normalizedNumThreads(options);
-    const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'mpSolverSolveResult' }>>({
-      type: 'mpSolverSolve',
-      id: nextWorkerBridgeRequestId(),
-      requestBytes,
-      numThreads,
-    });
-    return new Uint8Array(response.bytes);
+  if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('MP Solver solve aborted.', 'AbortError');
+  const numThreads = normalizedNumThreads(options) ?? 1;
+  const job = executor.execute(
+    { case: 'solve', value: create(MpSolverSolveRequestSchema, { requestProto: requestBytes, numThreads }) },
+    { requestedThreads: numThreads, onEvent: options.onEvent ?? (() => {}) },
+  );
+  const abort = () => { void job.cancel().catch(() => {}); };
+  options.signal?.addEventListener('abort', abort, { once: true });
+  try {
+    const response = await job.result;
+    if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('MP Solver solve aborted.', 'AbortError');
+    if (response.payload.case !== 'responseProto') throw new Error('MP Solver executor returned the wrong solve response.');
+    return response.payload.value;
+  } finally {
+    options.signal?.removeEventListener('abort', abort);
   }
-  return solveModelRequestDirect(requestBytes, options);
 }
 
 function readCString(module: OrToolsWasmModule, ptr: number): string {
@@ -520,22 +490,8 @@ function readCString(module: OrToolsWasmModule, ptr: number): string {
 }
 
 export async function initMPSolver(): Promise<void> {
-  if (shouldUseMPSolverBridge()) {
-    return;
-  }
-  await loadMpSolverModule();
-}
-
-export function isMPSolverWorkerBridgeAvailable(): boolean {
-  return isMPSolverWorkerBridgeRuntimeAvailable();
-}
-
-export function setMPSolverWorkerBridgeEnabled(enabled: boolean): void {
-  setGenericWorkerBridgeEnabled(enabled);
-}
-
-export function isMPSolverWorkerBridgeEnabled(): boolean {
-  return isGenericWorkerBridgeEnabled() && isMPSolverWorkerBridgeRuntimeAvailable();
+  await executor.load();
+  if (!shouldUseSerializedMPSolverBackend()) await loadMpSolverModule();
 }
 
 export enum OptimizationProblemType {
@@ -611,84 +567,6 @@ export enum IncrementalityValues {
 export enum ScalingValues {
   SCALING_OFF = 0,
   SCALING_ON = 1,
-}
-
-export type NativeKnapsackResult = {
-  ok: boolean;
-  profit?: number;
-  optimal?: boolean;
-  name?: string;
-  contains?: boolean[];
-  error?: string;
-};
-
-function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]): number {
-  if (!values.length) return 0;
-  const ptr = module._malloc(values.length * Float64Array.BYTES_PER_ELEMENT);
-  const view = new Float64Array(module.HEAPU8.buffer, ptr, values.length);
-  view.set(values);
-  return ptr;
-}
-
-function flattenKnapsackWeights(weights: number[][], itemCount: number): number[] {
-  const flattened: number[] = [];
-  for (const dimension of weights) {
-    if (dimension.length !== itemCount) {
-      throw new Error('KnapsackSolver.init: each weight dimension must match profits length.');
-    }
-    flattened.push(...dimension);
-  }
-  return flattened;
-}
-
-function parseKnapsackResult(serialized: string): NativeKnapsackResult {
-  const result = JSON.parse(serialized) as NativeKnapsackResult;
-  if (!result.ok) {
-    throw new Error(result.error || 'KnapsackSolver.solve: native solve failed.');
-  }
-  return result;
-}
-
-export async function executeKnapsackNative(
-  solverType: number,
-  name: string,
-  useReduction: boolean,
-  timeLimitSeconds: number,
-  profits: number[],
-  weights: number[][],
-  capacities: number[],
-): Promise<NativeKnapsackResult> {
-  const module = await loadMpSolverModule();
-  const flattenedWeights = flattenKnapsackWeights(weights, profits.length);
-  const profitsPtr = copyFloat64ToHeap(module, profits);
-  const weightsPtr = copyFloat64ToHeap(module, flattenedWeights);
-  const capacitiesPtr = copyFloat64ToHeap(module, capacities);
-  try {
-    return await withCStringAsync(module, name, async (namePtr) => {
-      const resultPtr = await module.ccall(
-        'knapsack_solve_serialized',
-        'number',
-        ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-        [
-          solverType,
-          namePtr,
-          useReduction ? 1 : 0,
-          timeLimitSeconds,
-          profitsPtr,
-          profits.length,
-          weightsPtr,
-          weights.length,
-          capacitiesPtr,
-        ],
-        { async: true },
-      ) as number;
-      return parseKnapsackResult(readCString(module, resultPtr));
-    });
-  } finally {
-    if (profitsPtr) module._free(profitsPtr);
-    if (weightsPtr) module._free(weightsPtr);
-    if (capacitiesPtr) module._free(capacitiesPtr);
-  }
 }
 
 type MpWorkerVariableState = {
@@ -810,7 +688,7 @@ function workerProblemSupportsNumThreads(problemType: OptimizationProblemType): 
 
 function createWorkerSolverState(name: string, problemType: OptimizationProblemType): MpWorkerSolverState {
   if (!workerSupportsProblemType(problemType)) {
-    throw new Error(`MPSolver: problem type ${problemType} is not supported by the worker bridge facade.`);
+    throw new Error(`MPSolver: problem type ${problemType} is not supported by the serialized backend.`);
   }
   return {
     name,
@@ -1635,7 +1513,7 @@ class NativeMPSolverBackend implements MPSolverBackend {
   }
 }
 
-class BridgeMPSolverBackend implements MPSolverBackend {
+class SerializedMPSolverBackend implements MPSolverBackend {
   private readonly state: MpWorkerSolverState;
 
   constructor(name: string, problemType: OptimizationProblemType) {
@@ -2003,7 +1881,7 @@ class BridgeMPSolverBackend implements MPSolverBackend {
   }
 
   solverVersion(): string {
-    return 'OR-Tools worker bridge MPSolver';
+    return 'OR-Tools serialized MPSolver';
   }
 
   computeConstraintActivities(): number[] {
@@ -2303,7 +2181,7 @@ export class MPSolverParameters {
   readonly backend: MPSolverParametersBackend;
 
   constructor() {
-    this.backend = shouldUseMPSolverBridge()
+    this.backend = shouldUseSerializedMPSolverBackend()
       ? new BridgeMPSolverParametersBackend()
       : new NativeMPSolverParametersBackend();
   }
@@ -2391,8 +2269,8 @@ export class MPSolver {
     maybeHandle?: number,
   ) {
     if (typeof nameOrModule === 'string') {
-      this.backend = shouldUseMPSolverBridge()
-        ? new BridgeMPSolverBackend(nameOrModule, problemTypeOrExports as OptimizationProblemType)
+      this.backend = shouldUseSerializedMPSolverBackend()
+        ? new SerializedMPSolverBackend(nameOrModule, problemTypeOrExports as OptimizationProblemType)
         : NativeMPSolverBackend.create(nameOrModule, problemTypeOrExports as OptimizationProblemType);
     } else {
       this.backend = new NativeMPSolverBackend(nameOrModule, problemTypeOrExports as MpSolverExports, maybeHandle ?? 0);
@@ -2401,7 +2279,7 @@ export class MPSolver {
   }
 
   static CreateSolver(solverId: string): MPSolver | null {
-    if (shouldUseMPSolverBridge()) {
+    if (shouldUseSerializedMPSolverBackend()) {
       const problemType = workerParseSolverType(solverId);
       return problemType !== null && workerSupportsProblemType(problemType)
         ? new MPSolver(solverId, problemType)
@@ -2417,17 +2295,17 @@ export class MPSolver {
   }
 
   static Infinity(): number {
-    return shouldUseMPSolverBridge() ? Number.POSITIVE_INFINITY : getMpSolverExports().solverInfinity();
+    return shouldUseSerializedMPSolverBackend() ? Number.POSITIVE_INFINITY : getMpSolverExports().solverInfinity();
   }
 
   static SupportsProblemType(problemType: OptimizationProblemType): boolean {
-    return shouldUseMPSolverBridge()
+    return shouldUseSerializedMPSolverBackend()
       ? workerSupportsProblemType(problemType)
       : getMpSolverExports().solverSupportsProblemType(problemType) === 1;
   }
 
   static ParseSolverType(solverId: string): OptimizationProblemType | null {
-    if (shouldUseMPSolverBridge()) {
+    if (shouldUseSerializedMPSolverBackend()) {
       return workerParseSolverType(solverId);
     }
     const module = getMpSolverModule();
@@ -2444,16 +2322,8 @@ export class MPSolver {
     return MPSolver.SupportsProblemType(problemType) ? problemType : null;
   }
 
-  static setWorkerBridgeEnabled(enabled: boolean): void {
-    setMPSolverWorkerBridgeEnabled(enabled);
-  }
-
-  static isWorkerBridgeEnabled(): boolean {
-    return isMPSolverWorkerBridgeEnabled();
-  }
-
-  static isWorkerBridgeAvailable(): boolean {
-    return isMPSolverWorkerBridgeAvailable();
+  static setExecutor(configuration: ExecutorConfiguration): void {
+    setMPSolverExecutor(configuration);
   }
 
   static getLinearSolverSchemas(): Promise<LinearSolverSchemas> {

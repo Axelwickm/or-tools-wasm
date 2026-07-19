@@ -3,8 +3,11 @@ export {
   Pdlp,
   PrimalAndDualSolution,
   QuadraticProgram,
+  setPdlpExecutor as setExecutor,
 } from './pdlp_api.js';
 export type {
+  PdlpEvent,
+  PdlpExecutionOptions,
   PdlpSolveLog,
   PdlpSolveParams,
   PdlpSolverResult,
@@ -13,16 +16,5 @@ export type {
   SparseMatrixEntry,
   SparseMatrixInput,
 } from './pdlp_api.js';
-export {
-  configureServerBridge,
-  getServerBridgeUrl,
-  isServerBridgeEnabled,
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setServerBridgeEnabled,
-  setServerBridgeUrl,
-  setWorkerBridgeEnabled,
-  terminateWorkerBridge,
-  type ServerBridgeOptions,
-} from './worker_bridge.js';
+export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

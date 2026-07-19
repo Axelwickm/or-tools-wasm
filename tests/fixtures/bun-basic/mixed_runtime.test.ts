@@ -7,17 +7,17 @@ import {
 import {
   initMPSolver,
   MPSolver,
-  setWorkerBridgeEnabled as setMPSolverWorkerBridgeEnabled,
+  setExecutor as setMPSolverExecutor,
 } from 'or-tools-wasm/mp-solver';
 import {
   initNetworkFlow,
+  setExecutor as setNetworkFlowExecutor,
   SimpleMaxFlow,
-  setWorkerBridgeEnabled as setNetworkFlowWorkerBridgeEnabled,
 } from 'or-tools-wasm/network-flow';
 import {
   initMathOpt,
   MathOpt,
-  setWorkerBridgeEnabled as setMathOptWorkerBridgeEnabled,
+  setExecutor as setMathOptExecutor,
 } from 'or-tools-wasm/mathopt';
 import { runBunFixture } from './shared.ts';
 
@@ -40,7 +40,7 @@ async function runCpSatSmoke() {
 }
 
 async function runMPSolverSmoke() {
-  setMPSolverWorkerBridgeEnabled(true);
+  setMPSolverExecutor({ type: 'worker' });
   await initMPSolver();
   const solver = new MPSolver('bun_mixed_runtime_mp', MPSolver.GLOP_LINEAR_PROGRAMMING);
   const x = solver.NumVar(0, solver.infinity(), 'x');
@@ -58,7 +58,7 @@ async function runMPSolverSmoke() {
 }
 
 async function runNetworkFlowSmoke() {
-  setNetworkFlowWorkerBridgeEnabled(false);
+  setNetworkFlowExecutor({ type: 'direct' });
   await initNetworkFlow();
   const maxFlow = new SimpleMaxFlow();
   maxFlow.add_arcs_with_capacity([0, 0, 1, 2], [1, 2, 3, 3], [5, 3, 4, 4]);
@@ -68,7 +68,7 @@ async function runNetworkFlowSmoke() {
 }
 
 async function runMathOptSmoke() {
-  setMathOptWorkerBridgeEnabled(true);
+  setMathOptExecutor({ type: 'worker' });
   await initMathOpt();
   const model = MathOpt.Model('bun_mixed_runtime_mathopt');
   const x = model.addVariable({ lowerBound: 1, upperBound: 1, name: 'x' });
@@ -91,8 +91,8 @@ await runBunFixture(async () => {
   console.log('bun mixed runtime smoke passed');
 }, async () => {
   CpSat.setExecutor({ type: 'auto' });
-  setMPSolverWorkerBridgeEnabled(false);
-  setNetworkFlowWorkerBridgeEnabled(false);
-  setMathOptWorkerBridgeEnabled(false);
+  setMPSolverExecutor({ type: 'direct' });
+  setNetworkFlowExecutor({ type: 'auto' });
+  setMathOptExecutor({ type: 'direct' });
   await terminateLoadedRuntimeThreads();
 });

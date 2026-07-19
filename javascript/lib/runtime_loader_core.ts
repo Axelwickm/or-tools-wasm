@@ -158,9 +158,14 @@ export function detectRuntimePlacement(): RuntimePlacement {
 }
 
 export function selectRuntimeFlavorForPlacement(placement = detectRuntimePlacement()): RuntimeFlavor {
-  // Runtime flavor is independent from execution placement: direct and worker
-  // callers both use this policy, while worker_bridge.ts alone decides placement.
-  if (placement === 'browser-main' || placement === 'bun' || placement === 'deno') {
+  // Browser calls can cross Emscripten's JavaScript invoke trampolines. JSPI
+  // cannot suspend through those frames, regardless of which thread runs WASM.
+  if (
+    placement === 'browser-main'
+    || placement === 'browser-worker'
+    || placement === 'bun'
+    || placement === 'deno'
+  ) {
     return 'asyncify';
   }
   return isJspiSupported() ? 'jspi' : 'asyncify';

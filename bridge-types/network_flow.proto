@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+message NetworkFlowBridgeRequest {
+  oneof payload {
+    MaxFlowRequest max_flow = 1;
+    MinCostFlowRequest min_cost_flow = 2;
+    LinearSumAssignmentRequest linear_sum_assignment = 3;
+  }
+}
+
+message MaxFlowRequest {
+  repeated double tails = 1;
+  repeated double heads = 2;
+  repeated double capacities = 3;
+  double source = 4;
+  double sink = 5;
+}
+
+message MinCostFlowRequest {
+  repeated double tails = 1;
+  repeated double heads = 2;
+  repeated double capacities = 3;
+  repeated double unit_costs = 4;
+  repeated double supplies = 5;
+  bool solve_max_flow_with_min_cost = 6;
+}
+
+message LinearSumAssignmentRequest {
+  repeated double left_nodes = 1;
+  repeated double right_nodes = 2;
+  repeated double costs = 3;
+}
+
+message NetworkFlowBridgeResponse {
+  int32 status = 1;
+  double optimal_flow = 2;
+  double optimal_cost = 3;
+  double maximum_flow = 4;
+  int32 num_nodes = 5;
+  int32 num_arcs = 6;
+  repeated double flows = 7;
+  repeated double source_side_min_cut = 8;
+  repeated double sink_side_min_cut = 9;
+  repeated double right_mates = 10;
+  repeated double assignment_costs = 11;
+}

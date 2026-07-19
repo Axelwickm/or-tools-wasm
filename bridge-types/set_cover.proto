@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+enum SetCoverOperation {
+  SET_COVER_OPERATION_UNSPECIFIED = 0;
+  SET_COVER_OPERATION_TRIVIAL = 1;
+  SET_COVER_OPERATION_GREEDY = 2;
+  SET_COVER_OPERATION_ELEMENT_DEGREE = 3;
+  SET_COVER_OPERATION_LAZY_ELEMENT_DEGREE = 4;
+  SET_COVER_OPERATION_RANDOM = 5;
+  SET_COVER_OPERATION_STEEPEST = 6;
+  SET_COVER_OPERATION_GUIDED_LOCAL = 7;
+  SET_COVER_OPERATION_GUIDED_TABU = 8;
+}
+
+message SetCoverBridgeRequest {
+  SetCoverOperation operation = 1;
+  repeated double costs = 2;
+  repeated int32 starts = 3;
+  repeated int32 elements = 4;
+  repeated bool selected = 5;
+  repeated bool focus = 6;
+  bool has_focus = 7;
+  double max_iterations = 8;
+}
+
+message SetCoverBridgeResponse {
+  bool next_solution = 1;
+  double cost = 2;
+  int32 num_uncovered_elements = 3;
+  repeated bool selected = 4;
+  repeated int32 coverage = 5;
+  repeated int32 num_free_elements = 6;
+  repeated int32 num_coverage_le_1_elements = 7;
+  repeated bool is_redundant = 8;
+}

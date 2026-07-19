@@ -1,5 +1,11 @@
-import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
+import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  fixtureModes,
+  passedCase,
+  serverExecutorConfiguration,
+  solverJobStates,
+} from './shared_case.ts';
 
 export type NetworkFlowCaseResult = {
   id: string;
@@ -8,11 +14,15 @@ export type NetworkFlowCaseResult = {
   source?: string;
   upstream?: string;
   tags?: string[];
-  mode?: FixtureMode;
+  mode?: ExecutorFixtureMode;
   ok: boolean;
   status: number;
   objectiveValue: number;
-} & SharedCaseResult;
+} & SharedCaseResult<ExecutorFixtureMode>;
+
+type SolveOptions = {
+  onEvent?: (event: { type: string; status?: { state: number } }) => void;
+};
 
 type SimpleMaxFlowLike = {
   add_arcs_with_capacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>): number[];
@@ -21,7 +31,7 @@ type SimpleMaxFlowLike = {
   tail(arc: number): number;
   head(arc: number): number;
   capacity(arc: number): number;
-  solve(source: number, sink: number): Promise<number>;
+  solve(source: number, sink: number, options?: SolveOptions): Promise<number>;
   optimal_flow(): number;
   flow(arc: number): number;
   flows(arcs: ArrayLike<number>): number[];
@@ -39,7 +49,7 @@ type SimpleMinCostFlowLike = {
   capacity(arc: number): number;
   unit_cost(arc: number): number;
   supply(node: number): number;
-  solve(): Promise<number>;
+  solve(options?: SolveOptions): Promise<number>;
   optimal_cost(): number;
   maximum_flow(): number;
   flow(arc: number): number;
@@ -53,7 +63,7 @@ type SimpleLinearSumAssignmentLike = {
   left_node(arc: number): number;
   right_node(arc: number): number;
   cost(arc: number): number;
-  solve(): Promise<number>;
+  solve(options?: SolveOptions): Promise<number>;
   optimal_cost(): number;
   right_mate(leftNode: number): number;
   assignment_cost(leftNode: number): number;
@@ -73,8 +83,7 @@ export type NetworkFlowApi = {
     readonly OPTIMAL: number;
     new(): SimpleLinearSumAssignmentLike;
   };
-  setWorkerBridgeEnabled: (enabled: boolean) => void;
-  isWorkerBridgeEnabled: () => boolean;
+  setExecutor(configuration: { type: 'auto' | 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -87,7 +96,24 @@ function assertNumber(actual: number, expected: number, message: string) {
   assert(actual === expected, `${message}: expected ${expected}, got ${actual}`);
 }
 
-async function runMaxFlowSample(api: NetworkFlowApi, mode: FixtureMode): Promise<{ status: number; objectiveValue: number }> {
+function lifecycleStates() {
+  const states: number[] = [];
+  return {
+    states,
+    options: {
+      onEvent(event: { type: string; status?: { state: number } }) {
+        if (event.type === 'status' && event.status) states.push(event.status.state);
+      },
+    },
+  };
+}
+
+function assertLifecycle(states: number[], label: string) {
+  assert(states.includes(solverJobStates.RUNNING), `${label} did not emit RUNNING status`);
+  assert(states.includes(solverJobStates.SUCCEEDED), `${label} did not emit SUCCEEDED status`);
+}
+
+async function runMaxFlowSample(api: NetworkFlowApi, mode: ExecutorFixtureMode): Promise<{ status: number; objectiveValue: number }> {
   // TEMP: parity - mirrors ortools/graph/samples/simple_max_flow_program.py
   // with the same graph, source, sink, optimal flow, and flow/min-cut checks.
   const startNodes = [0, 0, 0, 1, 1, 2, 2, 3, 3];
@@ -103,7 +129,9 @@ async function runMaxFlowSample(api: NetworkFlowApi, mode: FixtureMode): Promise
   assertNumber(maxFlow.head(4), 4, `SimpleMaxFlow (${mode}) head(4)`);
   assertNumber(maxFlow.capacity(8), 20, `SimpleMaxFlow (${mode}) capacity(8)`);
 
-  const status = await maxFlow.solve(0, 4);
+  const lifecycle = lifecycleStates();
+  const status = await maxFlow.solve(0, 4, lifecycle.options);
+  assertLifecycle(lifecycle.states, `SimpleMaxFlow (${mode})`);
   assertNumber(status, api.SimpleMaxFlow.OPTIMAL, `SimpleMaxFlow (${mode}) status`);
   assertNumber(maxFlow.optimal_flow(), 60, `SimpleMaxFlow (${mode}) optimal_flow`);
   const flows = maxFlow.flows(allArcs);
@@ -121,7 +149,7 @@ async function runMaxFlowSample(api: NetworkFlowApi, mode: FixtureMode): Promise
   return { status, objectiveValue: maxFlow.optimal_flow() };
 }
 
-async function runMinCostFlowSample(api: NetworkFlowApi, mode: FixtureMode): Promise<{ status: number; objectiveValue: number }> {
+async function runMinCostFlowSample(api: NetworkFlowApi, mode: ExecutorFixtureMode): Promise<{ status: number; objectiveValue: number }> {
   // TEMP: parity - mirrors ortools/graph/samples/simple_min_cost_flow_program.py
   // with the same arcs, supplies, optimal status, cost, and per-arc cost sum.
   const startNodes = [0, 0, 1, 1, 1, 2, 2, 3, 4];
@@ -142,7 +170,9 @@ async function runMinCostFlowSample(api: NetworkFlowApi, mode: FixtureMode): Pro
   assertNumber(minCostFlow.unit_cost(4), 6, `SimpleMinCostFlow (${mode}) unit_cost(4)`);
   assertNumber(minCostFlow.supply(4), -15, `SimpleMinCostFlow (${mode}) supply(4)`);
 
-  const status = await minCostFlow.solve();
+  const lifecycle = lifecycleStates();
+  const status = await minCostFlow.solve(lifecycle.options);
+  assertLifecycle(lifecycle.states, `SimpleMinCostFlow (${mode})`);
   assertNumber(status, api.SimpleMinCostFlow.OPTIMAL, `SimpleMinCostFlow (${mode}) status`);
   assertNumber(minCostFlow.optimal_cost(), 150, `SimpleMinCostFlow (${mode}) optimal_cost`);
   assertNumber(minCostFlow.maximum_flow(), 20, `SimpleMinCostFlow (${mode}) maximum_flow`);
@@ -157,7 +187,7 @@ async function runMinCostFlowSample(api: NetworkFlowApi, mode: FixtureMode): Pro
   return { status, objectiveValue: minCostFlow.optimal_cost() };
 }
 
-async function runAssignmentSample(api: NetworkFlowApi, mode: FixtureMode): Promise<{ status: number; objectiveValue: number }> {
+async function runAssignmentSample(api: NetworkFlowApi, mode: ExecutorFixtureMode): Promise<{ status: number; objectiveValue: number }> {
   // TEMP: parity - mirrors ortools/graph/samples/assignment_linear_sum_assignment.py
   // with the same cost matrix, optimal status, assignment, and optimal cost.
   const costs = [
@@ -186,7 +216,9 @@ async function runAssignmentSample(api: NetworkFlowApi, mode: FixtureMode): Prom
   assertNumber(assignment.right_node(15), 3, `SimpleLinearSumAssignment (${mode}) right_node(15)`);
   assertNumber(assignment.cost(10), 90, `SimpleLinearSumAssignment (${mode}) cost(10)`);
 
-  const status = await assignment.solve();
+  const lifecycle = lifecycleStates();
+  const status = await assignment.solve(lifecycle.options);
+  assertLifecycle(lifecycle.states, `SimpleLinearSumAssignment (${mode})`);
   assertNumber(status, api.SimpleLinearSumAssignment.OPTIMAL, `SimpleLinearSumAssignment (${mode}) status`);
   assertNumber(assignment.optimal_cost(), 265, `SimpleLinearSumAssignment (${mode}) optimal_cost`);
   const expectedMates = [3, 2, 1, 0];
@@ -198,7 +230,7 @@ async function runAssignmentSample(api: NetworkFlowApi, mode: FixtureMode): Prom
   return { status, objectiveValue: assignment.optimal_cost() };
 }
 
-type NetworkFlowCase = SharedCase<NetworkFlowApi, { status: number; objectiveValue: number }>;
+type NetworkFlowCase = SharedCase<NetworkFlowApi, { status: number; objectiveValue: number }, ExecutorFixtureMode>;
 
 export const networkFlowCases: NetworkFlowCase[] = [
   {
@@ -230,16 +262,24 @@ export const networkFlowCases: NetworkFlowCase[] = [
   },
 ];
 
-export async function runNetworkFlowCases(api: NetworkFlowApi): Promise<NetworkFlowCaseResult[]> {
-  await api.initNetworkFlow();
+export async function runNetworkFlowCases(
+  api: NetworkFlowApi,
+  options: { modes?: readonly ExecutorFixtureMode[] } = {},
+): Promise<NetworkFlowCaseResult[]> {
   const results: NetworkFlowCaseResult[] = [];
-  for (const mode of fixtureModes) {
-    await withWorkerBridgeMode(api, mode, 'Network Flow', async () => {
+  const modes = options.modes ?? fixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
+  for (const mode of modes) {
+    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
+    try {
+      await api.initNetworkFlow();
       for (const testCase of networkFlowCases) {
         const result = await testCase.run(api, { mode });
         results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
       }
-    });
+    } finally {
+      api.setExecutor({ type: 'auto' });
+    }
   }
   return results;
 }

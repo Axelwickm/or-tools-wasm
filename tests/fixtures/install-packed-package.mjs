@@ -1,4 +1,4 @@
-import { copyFile, readdir, stat } from 'node:fs/promises';
+import { copyFile, readdir, rm, stat } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
@@ -18,6 +18,10 @@ const stableTarballPath = path.join(packageDir, 'or-tools-wasm-local.tgz');
 const npmCacheDir = path.join(repoRoot, '.npm-cache');
 
 function packCurrentPackage() {
+  if (process.env.ORTOOLS_WASM_SKIP_PACKAGE_BUILD === '1') {
+    console.log('Using the existing packed JS build.');
+    return;
+  }
   console.log('Packing current JS build.');
   const pack = spawnSync('npm', ['run', 'pack:js'], {
     cwd: packageRoot,
@@ -54,6 +58,10 @@ async function findPackedTarballs() {
 }
 
 async function installTarball(tarballPath) {
+  await rm(path.join(fixtureDir, 'node_modules/or-tools-wasm'), {
+    force: true,
+    recursive: true,
+  });
   const install = spawnSync(
     'npm',
     ['install', tarballPath, '--force', '--no-audit', '--no-fund', '--no-package-lock'],

@@ -3,14 +3,10 @@ import {
 } from 'or-tools-wasm/cp-sat';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import {
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
-} from 'or-tools-wasm/mp-solver';
-import {
   initMPSolver,
   MPSolver,
   MPSolverParameters,
+  setExecutor as setMPSolverExecutor,
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
@@ -20,8 +16,7 @@ import {
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
-  isWorkerBridgeEnabled as isNetworkFlowWorkerBridgeEnabled,
-  setWorkerBridgeEnabled as setNetworkFlowWorkerBridgeEnabled,
+  setExecutor as setNetworkFlowExecutor,
   SimpleLinearSumAssignment,
   SimpleMaxFlow,
   SimpleMinCostFlow,
@@ -34,9 +29,8 @@ import {
 } from 'or-tools-wasm/mathopt';
 import {
   initPdlp,
-  isWorkerBridgeEnabled as isPdlpWorkerBridgeEnabled,
   Pdlp,
-  setWorkerBridgeEnabled as setPdlpWorkerBridgeEnabled,
+  setExecutor as setPdlpExecutor,
 } from 'or-tools-wasm/pdlp';
 import {
   BOOL_FALSE,
@@ -47,12 +41,12 @@ import {
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
-  isWorkerBridgeEnabled as isRoutingWorkerBridgeEnabled,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
-  setWorkerBridgeEnabled as setRoutingWorkerBridgeEnabled,
+  setExecutor as setRoutingExecutor,
 } from 'or-tools-wasm/routing';
+import { fixtureModes } from '../browser-basic-src/shared_case.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runCpSatSolverStructureCases } from '../browser-basic-src/cpsat_solver_structure_runner.ts';
@@ -86,9 +80,6 @@ async function assertCaseSteps(t: Deno.TestContext, runtime: string, results: Na
 }
 
 Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
-  if (isWorkerBridgeEnabled()) {
-    throw new Error('Deno should use the direct runtime by default');
-  }
   const structureResults = await runCpSatSolverStructureCases(CpSatApi as never);
   await assertCaseSteps(t, 'deno CP-SAT solver structure', structureResults);
 
@@ -115,19 +106,16 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
-    setWorkerBridgeEnabled: setRoutingWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isRoutingWorkerBridgeEnabled,
-  });
+    setExecutor: setRoutingExecutor,
+  }, { modes: fixtureModes });
   await assertCaseSteps(t, 'deno routing', routingResults);
 
   const mpSolverResults = await runMPSolverCases({
     initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
-    isWorkerBridgeAvailable,
-  });
+    setExecutor: setMPSolverExecutor,
+  }, { modes: fixtureModes });
   await assertCaseSteps(t, 'deno MPSolver', mpSolverResults);
 
   const knapsackResults = await runKnapsackCases({
@@ -143,8 +131,7 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     SimpleMaxFlow,
     SimpleMinCostFlow,
     SimpleLinearSumAssignment,
-    setWorkerBridgeEnabled: setNetworkFlowWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isNetworkFlowWorkerBridgeEnabled,
+    setExecutor: setNetworkFlowExecutor,
   });
   await assertCaseSteps(t, 'deno Network Flow', networkFlowResults);
 
@@ -157,14 +144,13 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   const mathOptResults = await runMathOptCases({
     initMathOpt,
     MathOpt,
-  });
+  }, { modes: fixtureModes });
   await assertCaseSteps(t, 'deno MathOpt', mathOptResults);
 
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled: setPdlpWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isPdlpWorkerBridgeEnabled,
+    setExecutor: setPdlpExecutor,
   });
   await assertCaseSteps(t, 'deno PDLP', pdlpResults);
 });

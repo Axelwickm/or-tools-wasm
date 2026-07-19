@@ -1,6 +1,37 @@
 import type { OrToolsWasmModule } from './wasm_module_types.js';
 import { loadRoutingRuntime } from './runtime_loader.js';
-import type { RoutingSolveRequest, RoutingSolveResult } from './worker_protocol.js';
+
+export type RoutingModelOperation =
+  | { type: 'addDimension'; transitMatrix: BigInt64Array; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }
+  | { type: 'addDimensionWithVehicleCapacity'; transitMatrix: BigInt64Array; slackMax: number; capacities: number[]; fixStartCumulToZero: boolean; name: string }
+  | { type: 'addDimensionWithVehicleTransits'; transitMatrices: BigInt64Array[]; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }
+  | { type: 'addConstantDimension'; value: number; capacity: number; fixStartCumulToZero: boolean; name: string }
+  | { type: 'addVectorDimension'; values: number[]; capacity: number; fixStartCumulToZero: boolean; name: string }
+  | { type: 'addMatrixDimension'; matrix: number[][]; capacity: number; fixStartCumulToZero: boolean; name: string }
+  | { type: 'addDisjunction'; indices: number[]; penalty?: number }
+  | { type: 'addPickupAndDelivery'; pickup: number; delivery: number };
+
+export type RoutingSolveRequest = {
+  numLocations: number;
+  numVehicles: number;
+  starts: number[];
+  ends: number[];
+  firstSolutionStrategy: number;
+  solutionLimit: number;
+  transitMatrix: BigInt64Array;
+  transitMatrixDimension: number;
+  operations: RoutingModelOperation[];
+  dimensionNames: string[];
+};
+
+export type RoutingSolveResult = {
+  status: number;
+  objectiveValue: number;
+  nextValues: number[];
+  starts: number[];
+  ends: number[];
+  dimensionCumulValues: Record<string, number[]>;
+};
 
 let modulePromise: Promise<OrToolsWasmModule> | null = null;
 

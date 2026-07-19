@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+message PdlpSparseMatrixEntry {
+  int32 row = 1;
+  int32 column = 2;
+  double value = 3;
+}
+
+message PdlpQuadraticProgram {
+  int32 num_variables = 1;
+  int32 num_constraints = 2;
+  string problem_name = 3;
+  double objective_offset = 4;
+  double objective_scaling_factor = 5;
+  repeated double objective_vector = 6;
+  repeated double objective_matrix_diagonal = 7;
+  bool has_objective_matrix_diagonal = 8;
+  repeated double constraint_lower_bounds = 9;
+  repeated double constraint_upper_bounds = 10;
+  repeated double variable_lower_bounds = 11;
+  repeated double variable_upper_bounds = 12;
+  repeated string variable_names = 13;
+  repeated string constraint_names = 14;
+  repeated PdlpSparseMatrixEntry constraint_matrix_entries = 15;
+}
+
+message PdlpSolveParameters {
+  optional int32 iteration_limit = 1;
+  optional int32 termination_check_frequency = 2;
+  optional double eps_optimal_relative = 3;
+  optional double eps_optimal_absolute = 4;
+  optional int32 l_inf_ruiz_iterations = 5;
+  optional bool l2_norm_rescaling = 6;
+}
+
+message PdlpInitialSolution {
+  repeated double primal_solution = 1;
+  repeated double dual_solution = 2;
+}
+
+enum PdlpOperation {
+  PDLP_OPERATION_UNSPECIFIED = 0;
+  PDLP_OPERATION_VALIDATE = 1;
+  PDLP_OPERATION_IS_LINEAR = 2;
+  PDLP_OPERATION_FROM_MP_MODEL = 3;
+  PDLP_OPERATION_TO_MP_MODEL = 4;
+  PDLP_OPERATION_SOLVE = 5;
+}
+
+message PdlpBridgeRequest {
+  PdlpOperation operation = 1;
+  PdlpQuadraticProgram quadratic_program = 2;
+  bytes mp_model_proto = 3;
+  bool relax_integer_variables = 4;
+  bool include_names = 5;
+  PdlpSolveParameters parameters = 6;
+  PdlpInitialSolution initial_solution = 7;
+}
+
+message PdlpSolverResult {
+  repeated double primal_solution = 1;
+  repeated double dual_solution = 2;
+  repeated double reduced_costs = 3;
+  int32 termination_reason = 4;
+  int32 iteration_count = 5;
+}
+
+message PdlpBridgeResponse {
+  string validation_error = 1;
+  bool is_linear = 2;
+  PdlpQuadraticProgram quadratic_program = 3;
+  bytes mp_model_proto = 4;
+  PdlpSolverResult solver_result = 5;
+}

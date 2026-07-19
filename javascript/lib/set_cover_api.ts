@@ -1,13 +1,15 @@
-import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadSetCoverRuntime } from './runtime_loader.js';
-import type { WorkerResponse } from './worker_protocol.js';
+import { create } from '@bufbuild/protobuf';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
+import { resolveExecutorConfiguration } from './executor_configuration.js';
 import {
-  isWorkerBridgeEnabled,
-  nextWorkerBridgeRequestId,
-  postWorkerRequest,
-  setWorkerBridgeEnabled,
-  shouldUseWorkerBridge,
-} from './worker_bridge.js';
+  SetCoverBridgeRequestSchema,
+  SetCoverOperation,
+  type SetCoverBridgeResponse,
+} from './generated/bridge/set_cover_pb.js';
+import type { SolverJobEvent } from './solver_executor.js';
+import { SetCoverExecutor, type SetCoverExecutorLike } from './set_cover/executor.js';
+import { SetCoverServerExecutor } from './set_cover/server_executor.js';
+import { SetCoverWorkerExecutor } from './set_cover/worker_executor.js';
 
 export enum ConsistencyLevel {
   COST_AND_COVERAGE = 1,
@@ -31,19 +33,11 @@ export type SetCoverSolutionResponse = {
   toString(): string;
 };
 
-type NativeSetCoverResult =
-  | { ok: false; error: string }
-  | {
-      ok: true;
-      nextSolution: boolean;
-      cost: number;
-      numUncoveredElements: number;
-      selected: boolean[];
-      coverage: number[];
-      numFreeElements: number[];
-      numCoverageLe1Elements: number[];
-      isRedundant: boolean[];
-    };
+export type SetCoverEvent = SolverJobEvent;
+export type SetCoverSolveOptions = {
+  onEvent?: (event: SetCoverEvent) => void | Promise<void>;
+  signal?: AbortSignal;
+};
 
 type NativeSetCoverOperation =
   | 'trivial'
@@ -65,55 +59,46 @@ type SetCoverSolvePayload = {
   maxIterations: number;
 };
 
-const operationCode: Record<NativeSetCoverOperation, number> = {
-  trivial: 0,
-  greedy: 1,
-  elementDegree: 2,
-  lazyElementDegree: 3,
-  random: 4,
-  steepest: 5,
-  guidedLocal: 6,
-  guidedTabu: 7,
+const bridgeOperation: Record<NativeSetCoverOperation, SetCoverOperation> = {
+  trivial: SetCoverOperation.TRIVIAL,
+  greedy: SetCoverOperation.GREEDY,
+  elementDegree: SetCoverOperation.ELEMENT_DEGREE,
+  lazyElementDegree: SetCoverOperation.LAZY_ELEMENT_DEGREE,
+  random: SetCoverOperation.RANDOM,
+  steepest: SetCoverOperation.STEEPEST,
+  guidedLocal: SetCoverOperation.GUIDED_LOCAL,
+  guidedTabu: SetCoverOperation.GUIDED_TABU,
 };
 
-let setCoverModulePromise: Promise<OrToolsWasmModule> | null = null;
-let setCoverModule: OrToolsWasmModule | null = null;
+const directExecutor = new SetCoverExecutor();
+const workerExecutor = new SetCoverWorkerExecutor();
+let executor: SetCoverExecutorLike = createExecutor({ type: 'auto' });
+
+function createExecutor(configuration: ExecutorConfiguration): SetCoverExecutorLike {
+  return createResolvedExecutor(resolveExecutorConfiguration(configuration));
+}
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): SetCoverExecutorLike {
+  switch (configuration.type) {
+    case 'direct': return directExecutor;
+    case 'worker': return workerExecutor;
+    case 'server': return new SetCoverServerExecutor(configuration);
+  }
+}
 
 export async function initSetCover(): Promise<void> {
-  if (shouldUseWorkerBridge()) {
-    return;
-  }
-  setCoverModulePromise ??= loadSetCoverRuntime().then((module) => {
-    setCoverModule = module;
-    return module;
-  });
-  await setCoverModulePromise;
+  await executor.load();
 }
 
-function currentModule() {
-  if (!setCoverModule) {
-    throw new Error('Set Cover runtime has not been initialized. Call initSetCover() first.');
-  }
-  return setCoverModule;
+export function setSetCoverExecutor(configuration: ExecutorConfiguration): void {
+  executor = createExecutor(configuration);
 }
 
-function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
-  if (!values.length) return 0;
-  const ptr = module._malloc(values.length * Float64Array.BYTES_PER_ELEMENT);
-  new Float64Array(module.HEAPU8.buffer, ptr, values.length).set(values);
-  return ptr;
-}
-
-function boolsToNumbers(values: boolean[]) {
-  return values.map((value) => value ? 1 : 0);
-}
-
-function parseNativeResult(serialized: string): Extract<NativeSetCoverResult, { ok: true }> {
-  const result = JSON.parse(serialized) as NativeSetCoverResult;
-  if (!result.ok) {
-    throw new Error(result.error || 'SetCover: native operation failed.');
-  }
-  return result;
+function abortError(signal: AbortSignal) {
+  if (signal.reason instanceof Error) return signal.reason;
+  const error = new Error(signal.reason === undefined ? 'The Set Cover solve was aborted.' : String(signal.reason));
+  error.name = 'AbortError';
+  return error;
 }
 
 function assertSubsetIndex(index: number, numSubsets: number, label = 'subset') {
@@ -162,47 +147,34 @@ function deciles(values: number[]) {
   return Array.from({ length: 11 }, (_, index) => sorted[Math.min(sorted.length - 1, Math.floor((index * (sorted.length - 1)) / 10))]);
 }
 
-async function runNativeSetCover(payload: SetCoverSolvePayload) {
-  if (shouldUseWorkerBridge()) {
-    const response = await postWorkerRequest<Extract<WorkerResponse, { type: 'setCoverResult' }>>({
-      type: 'setCover',
-      id: nextWorkerBridgeRequestId(),
-      ...payload,
-    });
-    return parseNativeResult(response.result);
-  }
-
-  await initSetCover();
-  const module = currentModule();
-  const costsPtr = copyFloat64ToHeap(module, payload.costs);
-  const startsPtr = copyFloat64ToHeap(module, payload.starts);
-  const elementsPtr = copyFloat64ToHeap(module, payload.elements);
-  const selectedPtr = copyFloat64ToHeap(module, boolsToNumbers(payload.selected));
-  const focusPtr = payload.focus ? copyFloat64ToHeap(module, boolsToNumbers(payload.focus)) : 0;
+async function runNativeSetCover(payload: SetCoverSolvePayload, options: SetCoverSolveOptions = {}) {
+  if (options.signal?.aborted) throw abortError(options.signal);
+  const currentExecutor = executor;
+  const request = create(SetCoverBridgeRequestSchema, {
+    operation: bridgeOperation[payload.operation],
+    costs: payload.costs,
+    starts: payload.starts,
+    elements: payload.elements,
+    selected: payload.selected,
+    focus: payload.focus ?? [],
+    hasFocus: payload.focus !== null,
+    maxIterations: payload.maxIterations,
+  });
+  const job = currentExecutor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
+  let aborted: Error | null = null;
+  const onAbort = () => {
+    if (!options.signal) return;
+    aborted = abortError(options.signal);
+    void job.cancel().catch(() => {});
+  };
+  options.signal?.addEventListener('abort', onAbort, { once: true });
+  if (options.signal?.aborted) onAbort();
   try {
-    return parseNativeResult(await module.ccall(
-      'set_cover_next_solution_serialized',
-      'string',
-      ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-      [
-        costsPtr,
-        startsPtr,
-        elementsPtr,
-        payload.costs.length,
-        payload.elements.length,
-        selectedPtr,
-        focusPtr,
-        operationCode[payload.operation],
-        payload.maxIterations,
-      ],
-      { async: true },
-    ) as string);
+    const result = await job.result;
+    if (aborted) throw aborted;
+    return result;
   } finally {
-    if (costsPtr) module._free(costsPtr);
-    if (startsPtr) module._free(startsPtr);
-    if (elementsPtr) module._free(elementsPtr);
-    if (selectedPtr) module._free(selectedPtr);
-    if (focusPtr) module._free(focusPtr);
+    options.signal?.removeEventListener('abort', onAbort);
   }
 }
 
@@ -590,7 +562,7 @@ export class SetCoverInvariant {
     this.load_solution(selected);
   }
 
-  _applyNativeResult(result: Extract<NativeSetCoverResult, { ok: true }>) {
+  _applyNativeResult(result: SetCoverBridgeResponse) {
     this.selected = [...result.selected];
     this.currentCost = result.cost;
     this.uncoveredElements = result.numUncoveredElements;
@@ -619,7 +591,7 @@ abstract class SetCoverSolutionGenerator {
     this.maxIterations = maxIterations;
   }
 
-  async next_solution(focus?: number[] | boolean[]) {
+  async next_solution(focus?: number[] | boolean[], options: SetCoverSolveOptions = {}) {
     const model = this.invariant.model();
     let focusMask: boolean[] | null = null;
     if (Array.isArray(focus)) {
@@ -638,7 +610,7 @@ abstract class SetCoverSolutionGenerator {
       focusMask,
       this.operation,
       this.maxIterations,
-    ));
+    ), options);
     this.invariant._applyNativeResult(result);
     return result.nextSolution;
   }
@@ -809,5 +781,3 @@ export const write_orlib_scp = write_set_cover_proto;
 export const write_orlib_rail = write_set_cover_proto;
 export const write_set_cover_solution_text = write_set_cover_solution_proto;
 export const read_set_cover_solution_text = read_set_cover_solution_proto;
-
-export { isWorkerBridgeEnabled, setWorkerBridgeEnabled };

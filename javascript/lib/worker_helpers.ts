@@ -1,4 +1,19 @@
-type WorkerLike<Request, Response> = {
+import {
+  decodeSolverBridgeRequest,
+  decodeSolverBridgeResponse,
+  encodeSolverBridgeCancelRequest,
+  encodeSolverBridgeRequest,
+  type SolverBridgeCodec,
+} from './solver_bridge.js';
+import {
+  createSolverFailureEvent,
+  SolverFailureKind,
+  type SolverExecutionOptions,
+  type SolverExecutor,
+  type SolverJob,
+} from './solver_executor.js';
+
+export type WorkerLike<Request, Response> = {
   postMessage(message: Request, transfer?: Transferable[]): void;
   terminate(): void | Promise<number>;
   ref?(): void;
@@ -160,4 +175,126 @@ export function defaultLoadErrorMessage(errorLike: Error | ErrorEvent): string {
       ? errorLike.error.message
       : errorLike.message || 'The runtime blocked or failed to load the worker module.';
   return `Worker failed to load: ${detail}`;
+}
+
+export class SolverWorkerExecutor<Request, Response, Event>
+implements SolverExecutor<Request, Response, Event> {
+  readonly solver: string;
+  private nextRequestId = 1;
+  private readonly worker: ManagedWorker<Uint8Array, Uint8Array>;
+
+  constructor(
+    private readonly codec: SolverBridgeCodec<Request, Response, Event>,
+    createWorker: () => Promise<WorkerLike<Uint8Array, Uint8Array>>,
+  ) {
+    this.solver = codec.solver;
+    this.worker = new ManagedWorker({
+      createWorker,
+      getRequestId: (bytes) => decodeSolverBridgeRequest(bytes).requestId,
+      getResponseId: (bytes) => decodeSolverBridgeResponse(bytes).requestId,
+      isEvent: (bytes) => {
+        const payload = decodeSolverBridgeResponse(bytes).payload.case;
+        return payload === 'eventPayload' || payload === 'status';
+      },
+      loadErrorMessage: (error) =>
+        defaultLoadErrorMessage(error).replace('Worker', `${codec.label} worker`),
+    });
+  }
+
+  execute(request: Request, options: SolverExecutionOptions<Event>): SolverJob<Response> {
+    const requestId = this.nextRequestId++;
+    return {
+      requestId,
+      result: this.run(requestId, request, options),
+      cancel: () => this.cancel(requestId, options),
+    };
+  }
+
+  async load(): Promise<void> {
+    await this.worker.load();
+  }
+
+  terminate(reason?: string): void {
+    this.worker.terminate(reason ?? `${this.codec.label} worker executor terminated.`);
+  }
+
+  private async run(
+    requestId: number,
+    request: Request,
+    options: SolverExecutionOptions<Event>,
+  ): Promise<Response> {
+    const bytes = encodeSolverBridgeRequest({
+      requestId,
+      solver: this.solver,
+      payload: this.codec.encodeRequest(request),
+      requestedThreads: options.requestedThreads ?? this.codec.defaultRequestedThreads ?? 0,
+    });
+    let failureHandled = false;
+    try {
+      const resultBytes = await this.worker.post(bytes, async (eventBytes) => {
+        const outer = decodeSolverBridgeResponse(eventBytes);
+        if (outer.payload.case === 'status') {
+          await options.onEvent({ type: 'status', status: outer.payload.value });
+        } else if (outer.payload.case === 'eventPayload') {
+          const event = this.codec.decodeEvent?.(outer.payload.value);
+          if (event !== null && event !== undefined) await options.onEvent(event);
+        }
+      }, [bytes.buffer]);
+      const outer = decodeSolverBridgeResponse(resultBytes);
+      if (outer.payload.case === 'failure') {
+        failureHandled = true;
+        await options.onEvent({ type: 'failure', failure: outer.payload.value });
+        const error = new Error(outer.payload.value.message);
+        if (outer.payload.value.trace) error.stack = outer.payload.value.trace;
+        throw error;
+      }
+      if (outer.payload.case !== 'resultPayload') {
+        throw new Error(
+          `${this.codec.label} worker returned unexpected response: ${outer.payload.case ?? 'empty'}`,
+        );
+      }
+      return this.codec.decodeResult(outer.payload.value);
+    } catch (error) {
+      if (!failureHandled) {
+        await options.onEvent(createSolverFailureEvent(
+          this.solver,
+          requestId,
+          error instanceof Error ? error.message : String(error),
+          SolverFailureKind.WORKER_CRASH,
+          error instanceof Error ? error.stack ?? '' : '',
+          true,
+        ));
+      }
+      throw error;
+    }
+  }
+
+  private async cancel(
+    targetRequestId: number,
+    options: SolverExecutionOptions<Event>,
+  ): Promise<void> {
+    const requestId = this.nextRequestId++;
+    const bytes = encodeSolverBridgeCancelRequest(requestId, this.solver, targetRequestId);
+    try {
+      const responseBytes = await this.worker.post(bytes, undefined, [bytes.buffer]);
+      const response = decodeSolverBridgeResponse(responseBytes);
+      if (response.payload.case === 'failure') {
+        throw new Error(response.payload.value.message);
+      }
+      if (response.payload.case !== 'cancelled' ||
+          response.payload.value.targetRequestId !== targetRequestId) {
+        throw new Error(`${this.codec.label} worker returned an invalid cancellation acknowledgement.`);
+      }
+    } catch (error) {
+      await options.onEvent(createSolverFailureEvent(
+        this.solver,
+        requestId,
+        error instanceof Error ? error.message : String(error),
+        SolverFailureKind.WORKER_CRASH,
+        error instanceof Error ? error.stack ?? '' : '',
+        true,
+      ));
+      throw error;
+    }
+  }
 }

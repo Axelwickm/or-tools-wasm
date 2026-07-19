@@ -1,5 +1,5 @@
-import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
+import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import { assertServerExecutorIsRunning, fixtureModes, passedCase, serverExecutorConfiguration, solverJobStates } from './shared_case.ts';
 
 type PdlpApi = {
   initPdlp(): Promise<void>;
@@ -7,13 +7,12 @@ type PdlpApi = {
     QuadraticProgram: new (input?: Record<string, unknown>) => QuadraticProgramLike;
     PrimalAndDualSolution: new (input?: Record<string, unknown>) => PrimalAndDualSolutionLike;
     validate_quadratic_program_dimensions(qp: QuadraticProgramLike): Promise<void>;
-    is_linear_program(qp: QuadraticProgramLike): Promise<boolean>;
+    is_linear_program(qp: QuadraticProgramLike, options?: { onEvent?: (event: { type: string; status?: { state: number } }) => void }): Promise<boolean>;
     qp_from_mpmodel_proto(proto: Uint8Array, relaxIntegerVariables?: boolean, includeNames?: boolean): Promise<QuadraticProgramLike>;
     qp_to_mpmodel_proto(qp: QuadraticProgramLike): Promise<Uint8Array>;
     primal_dual_hybrid_gradient(qp: QuadraticProgramLike, params?: PdlpParams, initialSolution?: PrimalAndDualSolutionLike): Promise<PdlpResultLike>;
   };
-  setWorkerBridgeEnabled: (enabled: boolean) => void;
-  isWorkerBridgeEnabled: () => boolean;
+  setExecutor(configuration: { type: 'auto' | 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
 type QuadraticProgramLike = {
@@ -64,9 +63,9 @@ export type PdlpCaseResult = {
   source?: string;
   upstream?: string;
   tags?: string[];
-  mode?: FixtureMode;
+  mode?: ExecutorFixtureMode;
   ok: boolean;
-} & SharedCaseResult;
+} & SharedCaseResult<ExecutorFixtureMode>;
 
 type MPVariableProto = {
   lowerBound?: number;
@@ -495,7 +494,7 @@ type RawPdlpCase = {
   run(api: PdlpApi): Promise<void>;
 };
 
-type PdlpCase = SharedCase<PdlpApi, Record<string, never>>;
+type PdlpCase = SharedCase<PdlpApi, Record<string, never>, ExecutorFixtureMode>;
 
 const pdlpCaseDefinitions: RawPdlpCase[] = [
   {
@@ -644,16 +643,31 @@ const pdlpCases: PdlpCase[] = pdlpCaseDefinitions.map((testCase) => ({
   },
 }));
 
-export async function runPdlpCases(api: PdlpApi): Promise<PdlpCaseResult[]> {
-  await api.initPdlp();
+export async function runPdlpCases(
+  api: PdlpApi,
+  options: { modes?: readonly ExecutorFixtureMode[] } = {},
+): Promise<PdlpCaseResult[]> {
   const results: PdlpCaseResult[] = [];
-  for (const mode of fixtureModes) {
-    await withWorkerBridgeMode(api, mode, 'PDLP', async () => {
+  const modes = options.modes ?? fixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
+  for (const mode of modes) {
+    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
+    try {
+      await api.initPdlp();
+      const states: number[] = [];
+      await api.Pdlp.is_linear_program(new api.Pdlp.QuadraticProgram(), {
+        onEvent: (event) => { if (event.type === 'status' && event.status) states.push(event.status.state); },
+      });
+      if (!states.includes(solverJobStates.RUNNING) || !states.includes(solverJobStates.SUCCEEDED)) {
+        throw new Error(`PDLP (${mode}) did not emit the complete job lifecycle.`);
+      }
       for (const testCase of pdlpCases) {
         const result = await testCase.run(api, { mode });
         results.push(passedCase(testCase, { mode }, result));
       }
-    });
+    } finally {
+      api.setExecutor({ type: 'direct' });
+    }
   }
   return results;
 }

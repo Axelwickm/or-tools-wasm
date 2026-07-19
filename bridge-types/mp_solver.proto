@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package ortools_wasm.bridge.v1;
+
+// The nested payloads retain their existing OR-Tools protobuf types:
+// request_proto is operations_research.MPModelRequest and response_proto is
+// operations_research.MPSolutionResponse.
+message MpSolverSolveRequest {
+  bytes request_proto = 1;
+  int32 num_threads = 2;
+}
+
+message MpSolverSchemaRequest {}
+
+message MpSolverSchemaResult {
+  string linear_solver_proto_schema = 1;
+  string optional_boolean_proto_schema = 2;
+}
+
+message MpSolverBridgeRequest {
+  oneof payload {
+    MpSolverSolveRequest solve = 1;
+    MpSolverSchemaRequest schema = 2;
+  }
+}
+
+message MpSolverBridgeResponse {
+  oneof payload {
+    bytes response_proto = 1;
+    MpSolverSchemaResult schema = 2;
+  }
+}

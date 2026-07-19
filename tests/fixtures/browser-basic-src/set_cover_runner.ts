@@ -1,10 +1,16 @@
-import type { FixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
-import { fixtureModes, passedCase, withWorkerBridgeMode } from './shared_case.ts';
+import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from './shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  fixtureModes,
+  passedCase,
+  serverExecutorConfiguration,
+  solverJobStates,
+} from './shared_case.ts';
 
 export type SetCoverCaseResult = {
   cost: number;
   numUncoveredElements: number;
-} & SharedCaseResult;
+} & SharedCaseResult<ExecutorFixtureMode>;
 
 type SetCoverCaseData = {
   cost: number;
@@ -37,7 +43,9 @@ type SetCoverInvariantLike = {
 };
 
 type SetCoverGeneratorLike = {
-  next_solution(): Promise<boolean>;
+  next_solution(focus?: number[] | boolean[], options?: {
+    onEvent?: (event: { type: string; status?: { state: number } }) => void;
+  }): Promise<boolean>;
   set_max_iterations(maxIterations: number): void;
 };
 
@@ -55,8 +63,7 @@ export type SetCoverApi = {
     COST_AND_COVERAGE: number;
     FREE_AND_UNCOVERED: number;
   };
-  setWorkerBridgeEnabled: (enabled: boolean) => void;
-  isWorkerBridgeEnabled: () => boolean;
+  setExecutor(configuration: { type: 'auto' | 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -113,7 +120,7 @@ function createKnightsCoverModel(api: SetCoverApi, numRows: number, numCols: num
   return model;
 }
 
-async function runSaveReload(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runSaveReload(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_save_reload assertion-by-assertion.
   const model = createKnightsCoverModel(api, 10, 10);
@@ -132,7 +139,7 @@ async function runSaveReload(api: SetCoverApi, mode: FixtureMode): Promise<SetCo
   return { cost: 0, numUncoveredElements: 0 };
 }
 
-async function runSaveReloadTwice(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runSaveReloadTwice(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_save_reload_twice assertion-by-assertion.
   const model = createKnightsCoverModel(api, 3, 3);
@@ -161,7 +168,7 @@ async function runSaveReloadTwice(api: SetCoverApi, mode: FixtureMode): Promise<
   return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runInitialValues(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runInitialValues(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_initial_values assertion-by-assertion.
   const model = createInitialCoverModel(api);
@@ -169,7 +176,14 @@ async function runInitialValues(api: SetCoverApi, mode: FixtureMode): Promise<Se
 
   const inv = new api.SetCoverInvariant(model);
   const trivial = new api.TrivialSolutionGenerator(inv);
-  assert(await trivial.next_solution(), `SetCoverTest.test_initial_values (${mode}) trivial next_solution`);
+  const states: number[] = [];
+  assert(await trivial.next_solution(undefined, {
+    onEvent(event) {
+      if (event.type === 'status' && event.status) states.push(event.status.state);
+    },
+  }), `SetCoverTest.test_initial_values (${mode}) trivial next_solution`);
+  assert(states.includes(solverJobStates.RUNNING), `Set Cover (${mode}) did not emit RUNNING status`);
+  assert(states.includes(solverJobStates.SUCCEEDED), `Set Cover (${mode}) did not emit SUCCEEDED status`);
   assert(inv.check_consistency(api.consistency_level.COST_AND_COVERAGE), `SetCoverTest.test_initial_values (${mode}) trivial consistency`);
 
   const greedy = new api.GreedySolutionGenerator(inv);
@@ -184,7 +198,7 @@ async function runInitialValues(api: SetCoverApi, mode: FixtureMode): Promise<Se
   return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runInfeasible(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runInfeasible(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_infeasible assertion-by-assertion.
   const model = new api.SetCoverModel();
@@ -196,7 +210,7 @@ async function runInfeasible(api: SetCoverApi, mode: FixtureMode): Promise<SetCo
   return { cost: 0, numUncoveredElements: 0 };
 }
 
-async function runKnightsCoverCreation(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runKnightsCoverCreation(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_creation assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -204,7 +218,7 @@ async function runKnightsCoverCreation(api: SetCoverApi, mode: FixtureMode): Pro
   return { cost: 0, numUncoveredElements: 0 };
 }
 
-async function runKnightsCoverGreedy(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runKnightsCoverGreedy(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_greedy assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -222,7 +236,7 @@ async function runKnightsCoverGreedy(api: SetCoverApi, mode: FixtureMode): Promi
   return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverDegree(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runKnightsCoverDegree(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_degree assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -240,7 +254,7 @@ async function runKnightsCoverDegree(api: SetCoverApi, mode: FixtureMode): Promi
   return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverGls(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runKnightsCoverGls(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_gls assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -258,7 +272,7 @@ async function runKnightsCoverGls(api: SetCoverApi, mode: FixtureMode): Promise<
   return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverRandom(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runKnightsCoverRandom(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_random assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -276,7 +290,7 @@ async function runKnightsCoverRandom(api: SetCoverApi, mode: FixtureMode): Promi
   return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-async function runKnightsCoverTrivial(api: SetCoverApi, mode: FixtureMode): Promise<SetCoverCaseData> {
+async function runKnightsCoverTrivial(api: SetCoverApi, mode: ExecutorFixtureMode): Promise<SetCoverCaseData> {
   // TEMP: parity - mirrors ortools/set_cover/python/set_cover_test.py
   // SetCoverTest.test_knights_cover_trivial assertion-by-assertion.
   const model = createKnightsCoverModel(api, 16, 16);
@@ -294,7 +308,7 @@ async function runKnightsCoverTrivial(api: SetCoverApi, mode: FixtureMode): Prom
   return { cost: inv.cost(), numUncoveredElements: inv.num_uncovered_elements() };
 }
 
-type SetCoverCase = SharedCase<SetCoverApi, SetCoverCaseData>;
+type SetCoverCase = SharedCase<SetCoverApi, SetCoverCaseData, ExecutorFixtureMode>;
 
 const setCoverSource = 'ortools/set_cover/python/set_cover_test.py';
 
@@ -391,16 +405,24 @@ export const setCoverCases: SetCoverCase[] = [
   },
 ];
 
-export async function runSetCoverCases(api: SetCoverApi): Promise<SetCoverCaseResult[]> {
-  await api.initSetCover();
+export async function runSetCoverCases(
+  api: SetCoverApi,
+  options: { modes?: readonly ExecutorFixtureMode[] } = {},
+): Promise<SetCoverCaseResult[]> {
   const results: SetCoverCaseResult[] = [];
-  for (const mode of fixtureModes) {
-    await withWorkerBridgeMode(api, mode, 'Set Cover', async () => {
+  const modes = options.modes ?? fixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
+  for (const mode of modes) {
+    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
+    try {
+      await api.initSetCover();
       for (const testCase of setCoverCases) {
         const result = await testCase.run(api, { mode });
         results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
       }
-    });
+    } finally {
+      api.setExecutor({ type: 'auto' });
+    }
   }
   return results;
 }

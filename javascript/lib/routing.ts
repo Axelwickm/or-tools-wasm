@@ -8,26 +8,14 @@ export {
   DefaultRoutingSearchParameters,
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
-  isRoutingWorkerBridgeEnabled,
   initRouting,
   LocalSearchMetaheuristic,
   RoutingDimension,
   RoutingIndexManager,
   RoutingModel,
   RoutingSearchStatus,
-  setRoutingWorkerBridgeEnabled,
+  setRoutingExecutor as setExecutor,
 } from './routing_api.js';
-export type { RoutingModelParameters, RoutingSearchParameters } from './routing_api.js';
-export {
-  configureServerBridge,
-  getServerBridgeUrl,
-  isServerBridgeEnabled,
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setServerBridgeEnabled,
-  setServerBridgeUrl,
-  setWorkerBridgeEnabled,
-  terminateWorkerBridge,
-  type ServerBridgeOptions,
-} from './worker_bridge.js';
+export type { RoutingEvent, RoutingModelParameters, RoutingSearchParameters, RoutingSolveOptions } from './routing_api.js';
+export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

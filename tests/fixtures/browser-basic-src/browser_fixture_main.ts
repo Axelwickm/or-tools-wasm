@@ -45,19 +45,9 @@ type RunResult = {
 type WorkerStats = {
   total: number;
   pthread: number;
-  bridge: number;
-  bridgeTerminated: number;
-  activeBridge: number;
   executorWorkers: Record<string, number>;
   activeExecutorWorkers: Record<string, number>;
   executorWorkerRequests: Record<string, number>;
-  cpSatSolve: number;
-  routingSolve: number;
-  mpSolverSolve: number;
-  mathOptSolve: number;
-  graphSolve: number;
-  setCoverSolve: number;
-  pdlpSolve: number;
 };
 
 function setStatus(value: unknown) {
@@ -170,11 +160,10 @@ function installWorkerSpy() {
     id: number;
     url: string;
     name?: string;
-    bridge: boolean;
     executor?: string;
   }> = [];
-  const terminations: Array<{ id: number; bridge: boolean; executor?: string }> = [];
-  const messages: Array<{ type?: string; executor?: string }> = [];
+  const terminations: Array<{ id: number; executor?: string }> = [];
+  const executorRequests: string[] = [];
   let nextWorkerId = 1;
 
   window.Worker = function WorkerSpy(scriptURL: string | URL, options?: WorkerOptions) {
@@ -183,27 +172,23 @@ function installWorkerSpy() {
     const executor = name?.startsWith('ortools-executor-')
       ? name.slice('ortools-executor-'.length)
       : undefined;
-    const bridge = !executor && !name?.startsWith('em-pthread-');
     const id = nextWorkerId++;
     creations.push({
       id,
       url: String(scriptURL),
       name,
-      bridge,
       executor,
     });
     const originalPostMessage = worker.postMessage.bind(worker);
     worker.postMessage = ((message: unknown, transferOrOptions?: StructuredSerializeOptions | Transferable[]) => {
       if (executor && message instanceof Uint8Array) {
-        messages.push({ executor });
-      } else if (message && typeof message === 'object' && 'type' in message) {
-        messages.push({ type: String((message as { type: unknown }).type) });
+        executorRequests.push(executor);
       }
       return originalPostMessage(message, transferOrOptions as StructuredSerializeOptions);
     }) as Worker['postMessage'];
     const originalTerminate = worker.terminate.bind(worker);
     worker.terminate = (() => {
-      terminations.push({ id, bridge, executor });
+      terminations.push({ id, executor });
       return originalTerminate();
     }) as Worker['terminate'];
     return worker;
@@ -225,25 +210,14 @@ function installWorkerSpy() {
       ]));
       const executorWorkerRequests = Object.fromEntries([...executorNames].map((executor) => [
         executor,
-        messages.filter((message) => message.executor === executor).length,
+        executorRequests.filter((requestExecutor) => requestExecutor === executor).length,
       ]));
       return {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
-        bridge: creations.filter((creation) => creation.bridge).length,
-        bridgeTerminated: terminations.filter((termination) => termination.bridge).length,
-        activeBridge: creations.filter((creation) => creation.bridge).length
-          - terminations.filter((termination) => termination.bridge).length,
         executorWorkers,
         activeExecutorWorkers,
         executorWorkerRequests,
-        cpSatSolve: messages.filter((message) => message.type === 'solve').length,
-        routingSolve: messages.filter((message) => message.type === 'routingSolve').length,
-        mpSolverSolve: messages.filter((message) => message.type === 'mpSolverSolve').length,
-        mathOptSolve: messages.filter((message) => message.type === 'mathOptSolve').length,
-        graphSolve: messages.filter((message) => message.type === 'graphSolve').length,
-        setCoverSolve: messages.filter((message) => message.type === 'setCover').length,
-        pdlpSolve: messages.filter((message) => message.type === 'pdlp').length,
       };
     },
   };
@@ -292,11 +266,10 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     FindErrorInRoutingSearchParameters: RoutingApiModule.FindErrorInRoutingSearchParameters,
     FirstSolutionStrategy: RoutingApiModule.FirstSolutionStrategy,
     initRouting: RoutingApiModule.initRouting,
-    isWorkerBridgeEnabled: RoutingApiModule.isWorkerBridgeEnabled,
     LocalSearchMetaheuristic: RoutingApiModule.LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingApiModule.RoutingIndexManager,
     RoutingModel: RoutingApiModule.RoutingModel,
-    setWorkerBridgeEnabled: RoutingApiModule.setWorkerBridgeEnabled,
+    setExecutor: RoutingApiModule.setExecutor,
   };
   setStatus({ ok: false, phase: 'cp-sat-high-level' });
   const highLevelCpSat = await runWithWorkerStats(workerSpy, () =>
@@ -310,6 +283,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   );
   setStatus({ ok: false, phase: 'routing' });
   const routing = await runWithWorkerStats(workerSpy, () => runRoutingCases(routingApi as never, {
+    modes: executorFixtureModes,
     onProgress: (caseName, mode) => setStatus({
       ok: false,
       phase: 'routing',
@@ -322,10 +296,9 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     initMPSolver: MPSolverApi.initMPSolver,
     MPSolver: MPSolverApi.MPSolver,
     MPSolverParameters: MPSolverApi.MPSolverParameters,
-    setWorkerBridgeEnabled: MPSolverApi.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: MPSolverApi.isWorkerBridgeEnabled,
-    isWorkerBridgeAvailable: MPSolverApi.isWorkerBridgeAvailable,
+    setExecutor: MPSolverApi.setExecutor,
   }, {
+    modes: executorFixtureModes,
     onProgress: (caseName, context) => setStatus({
       ok: false,
       phase: 'mp-solver',
@@ -346,11 +319,13 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     SimpleMaxFlow: NetworkFlowApi.SimpleMaxFlow,
     SimpleMinCostFlow: NetworkFlowApi.SimpleMinCostFlow,
     SimpleLinearSumAssignment: NetworkFlowApi.SimpleLinearSumAssignment,
-    setWorkerBridgeEnabled: NetworkFlowApi.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: NetworkFlowApi.isWorkerBridgeEnabled,
-  }));
+    setExecutor: NetworkFlowApi.setExecutor,
+  }, { modes: executorFixtureModes }));
   setStatus({ ok: false, phase: 'set-cover' });
-  const setCover = await runWithWorkerStats(workerSpy, () => runSetCoverCases(SetCoverApi as never));
+  const setCover = await runWithWorkerStats(workerSpy, () => runSetCoverCases(
+    SetCoverApi as never,
+    { modes: executorFixtureModes },
+  ));
   setStatus({ ok: false, phase: 'rcpsp' });
   const rcpsp = await runWithWorkerStats(workerSpy, () => runRcpspCases(
     RcpspApi as never,
@@ -361,6 +336,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     initMathOpt: MathOptApi.initMathOpt,
     MathOpt: MathOptApi.MathOpt,
   }, {
+    modes: executorFixtureModes,
     onProgress: (caseName, mode, threads) => setStatus({
       ok: false,
       phase: 'mathopt',
@@ -373,9 +349,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   const pdlp = await runWithWorkerStats(workerSpy, () => runPdlpCases({
     initPdlp: PdlpApi.initPdlp,
     Pdlp: PdlpApi.Pdlp,
-    setWorkerBridgeEnabled: PdlpApi.setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: PdlpApi.isWorkerBridgeEnabled,
-  }));
+    setExecutor: PdlpApi.setExecutor,
+  }, { modes: executorFixtureModes }));
   setStatus({ ok: false, phase: 'cp-sat-solver-structure' });
   const cpSatSolverStructure = await runWithWorkerStats(workerSpy, () =>
     runCpSatSolverStructureCases(CpSatApi as never)

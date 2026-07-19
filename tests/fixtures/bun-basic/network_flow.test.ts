@@ -1,7 +1,6 @@
 import {
   initNetworkFlow,
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
+  setExecutor,
   SimpleLinearSumAssignment,
   SimpleMaxFlow,
   SimpleMinCostFlow,
@@ -16,12 +15,11 @@ await runBunFixture(async () => {
     SimpleMaxFlow,
     SimpleMinCostFlow,
     SimpleLinearSumAssignment,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
+    setExecutor,
   });
   assertAllCases('bun Network Flow', networkFlowResults);
   console.log(`bun ran ${networkFlowResults.length} Network Flow cases`);
 }, async () => {
-  setWorkerBridgeEnabled(false);
+  setExecutor({ type: 'direct' });
   await terminateLoadedRuntimeThreads();
 });

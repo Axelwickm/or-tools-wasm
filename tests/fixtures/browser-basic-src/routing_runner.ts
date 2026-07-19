@@ -1,5 +1,10 @@
 import { routingContractCases } from './cases/ortools/routing/index.ts';
-import { fixtureModes, withWorkerBridgeMode } from './shared_case.ts';
+import type { ExecutorFixtureMode } from './shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  executorFixtureModes,
+  serverExecutorConfiguration,
+} from './shared_case.ts';
 
 export type RoutingCaseResult = {
   id: string;
@@ -8,6 +13,7 @@ export type RoutingCaseResult = {
   source?: string;
   upstream?: string;
   tags?: string[];
+  mode?: ExecutorFixtureMode;
   ok: boolean;
   objective: number;
   route: number[];
@@ -109,8 +115,7 @@ export type RoutingApi = {
     maybeEnds?: number[],
   ) => RoutingIndexManagerLike;
   RoutingModel: new (manager: never, parameters?: unknown) => RoutingModelLike;
-  setWorkerBridgeEnabled(enabled: boolean): void;
-  isWorkerBridgeEnabled(): boolean;
+  setExecutor(configuration: { type: 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -121,32 +126,37 @@ function assert(condition: unknown, message: string): asserts condition {
 
 export async function runRoutingCases(
   routingApi: RoutingApi,
-  options: { onProgress?: (caseName: string, mode: string) => void } = {},
+  options: {
+    modes?: readonly ExecutorFixtureMode[];
+    onProgress?: (caseName: string, mode: string) => void;
+  } = {},
 ): Promise<RoutingCaseResult[]> {
   const results: RoutingCaseResult[] = [];
+  const modes = options.modes ?? executorFixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
 
-  for (const mode of fixtureModes) {
-    await withWorkerBridgeMode(routingApi, mode, 'Routing', async () => {
-      await routingApi.initRouting();
-      for (const routingCase of routingContractCases) {
-        options.onProgress?.(routingCase.name, mode);
-        const message = await routingCase.run(routingApi as never);
-        assert(!message.startsWith('TODO:'), message);
-        assert(message.endsWith('PASS'), `${routingCase.name} (${mode}) failed: ${message}`);
-        results.push({
-          id: routingCase.id,
-          name: `${routingCase.name} (${mode})`,
-          solver: routingCase.solver,
-          source: routingCase.source,
-          upstream: routingCase.upstream,
-          tags: routingCase.tags,
-          ok: true,
-          objective: 0,
-          route: [],
-          routeDistance: 0,
-        });
-      }
-    });
+  for (const mode of modes) {
+    routingApi.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
+    await routingApi.initRouting();
+    for (const routingCase of routingContractCases) {
+      options.onProgress?.(routingCase.name, mode);
+      const message = await routingCase.run(routingApi as never);
+      assert(!message.startsWith('TODO:'), message);
+      assert(message.endsWith('PASS'), `${routingCase.name} (${mode}) failed: ${message}`);
+      results.push({
+        id: routingCase.id,
+        name: `${routingCase.name} (${mode})`,
+        solver: routingCase.solver,
+        source: routingCase.source,
+        upstream: routingCase.upstream,
+        tags: routingCase.tags,
+        mode,
+        ok: true,
+        objective: 0,
+        route: [],
+        routeDistance: 0,
+      });
+    }
   }
   return results;
 }

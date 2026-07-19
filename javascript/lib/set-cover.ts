@@ -20,6 +20,7 @@ export {
   SetCoverInvariant,
   SetCoverModel,
   SetCoverModelStats,
+  setSetCoverExecutor as setExecutor,
   SteepestSearch,
   TabuList,
   TrivialSolutionGenerator,
@@ -30,19 +31,10 @@ export {
   write_set_cover_solution_text,
 } from './set_cover_api.js';
 export type {
+  SetCoverEvent,
   SetCoverModelProto,
+  SetCoverSolveOptions,
   SetCoverSolutionResponse,
 } from './set_cover_api.js';
-export {
-  configureServerBridge,
-  getServerBridgeUrl,
-  isServerBridgeEnabled,
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setServerBridgeEnabled,
-  setServerBridgeUrl,
-  setWorkerBridgeEnabled,
-  terminateWorkerBridge,
-  type ServerBridgeOptions,
-} from './worker_bridge.js';
+export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

@@ -135,6 +135,19 @@ uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
   return buffer;
 }
 
+uint8_t* CopyStringToBuffer(const std::string& data, size_t* out_len) {
+  if (out_len == nullptr) return nullptr;
+  auto* buffer =
+      static_cast<uint8_t*>(std::malloc(sizeof(uint8_t) * data.size()));
+  if (buffer == nullptr) {
+    *out_len = 0;
+    return nullptr;
+  }
+  std::memcpy(buffer, data.data(), data.size());
+  *out_len = data.size();
+  return buffer;
+}
+
 uint8_t* SolveModelRequestWithThreads(const MPModelRequest& request,
                                       int num_threads, size_t* out_len) {
   MPSolutionResponse response;
@@ -207,16 +220,16 @@ EMSCRIPTEN_KEEPALIVE const char* get_optional_boolean_schema() {
   return kOptionalBooleanProtoSchema;
 }
 
-EMSCRIPTEN_KEEPALIVE const char* knapsack_solve_serialized(
+EMSCRIPTEN_KEEPALIVE uint8_t* knapsack_solve_serialized(
     int solver_type, const char* name, int use_reduction,
     double time_limit_seconds, const double* profits_data, int num_items,
     const double* weights_data, int num_dimensions,
-    const double* capacities_data) {
+    const double* capacities_data, size_t* out_len) {
   if (name == nullptr || profits_data == nullptr || weights_data == nullptr ||
       capacities_data == nullptr || num_items < 0 || num_dimensions < 0) {
-    return StoreString(
+    return CopyStringToBuffer(
         "{\"ok\":false,\"error\":\"KnapsackSolver: invalid input pointers or "
-        "dimensions.\"}");
+        "dimensions.\"}", out_len);
   }
 
   std::vector<int64_t> profits(num_items);
@@ -257,14 +270,15 @@ EMSCRIPTEN_KEEPALIVE const char* knapsack_solve_serialized(
       out << (solver.BestSolutionContains(item) ? "true" : "false");
     }
     out << "]}";
-    return StoreString(out.str());
+    return CopyStringToBuffer(out.str(), out_len);
   } catch (const std::exception& e) {
     std::ostringstream out;
     out << "{\"ok\":false,\"error\":\"" << JsonEscape(e.what()) << "\"}";
-    return StoreString(out.str());
+    return CopyStringToBuffer(out.str(), out_len);
   } catch (...) {
-    return StoreString(
-        "{\"ok\":false,\"error\":\"KnapsackSolver: unknown native error.\"}");
+    return CopyStringToBuffer(
+        "{\"ok\":false,\"error\":\"KnapsackSolver: unknown native error.\"}",
+        out_len);
   }
 }
 

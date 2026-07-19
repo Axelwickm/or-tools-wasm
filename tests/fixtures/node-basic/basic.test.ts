@@ -3,14 +3,10 @@ import {
 } from 'or-tools-wasm/cp-sat';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import {
-  isWorkerBridgeAvailable,
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
-} from 'or-tools-wasm/mp-solver';
-import {
   initMPSolver,
   MPSolver,
   MPSolverParameters,
+  setExecutor as setMPSolverExecutor,
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
@@ -20,8 +16,7 @@ import {
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
-  isWorkerBridgeEnabled as isNetworkFlowWorkerBridgeEnabled,
-  setWorkerBridgeEnabled as setNetworkFlowWorkerBridgeEnabled,
+  setExecutor as setNetworkFlowExecutor,
   SimpleLinearSumAssignment,
   SimpleMaxFlow,
   SimpleMinCostFlow,
@@ -32,11 +27,10 @@ import {
   GreedySolutionGenerator,
   GuidedLocalSearch,
   initSetCover,
-  isWorkerBridgeEnabled as isSetCoverWorkerBridgeEnabled,
   RandomSolutionGenerator,
   SetCoverInvariant,
   SetCoverModel,
-  setWorkerBridgeEnabled as setSetCoverWorkerBridgeEnabled,
+  setExecutor as setSetCoverExecutor,
   SteepestSearch,
   TrivialSolutionGenerator,
 } from 'or-tools-wasm/set-cover';
@@ -46,9 +40,8 @@ import {
 } from 'or-tools-wasm/mathopt';
 import {
   initPdlp,
-  isWorkerBridgeEnabled as isPdlpWorkerBridgeEnabled,
   Pdlp,
-  setWorkerBridgeEnabled as setPdlpWorkerBridgeEnabled,
+  setExecutor as setPdlpExecutor,
 } from 'or-tools-wasm/pdlp';
 import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import {
@@ -60,12 +53,12 @@ import {
   FindErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   initRouting,
-  isWorkerBridgeEnabled as isRoutingWorkerBridgeEnabled,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
-  setWorkerBridgeEnabled as setRoutingWorkerBridgeEnabled,
+  setExecutor as setRoutingExecutor,
 } from 'or-tools-wasm/routing';
+import { fixtureModes } from '../browser-basic-src/shared_case.ts';
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
@@ -128,9 +121,8 @@ test('runs the shared Routing cases in Node', async (t) => {
     LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
-    setWorkerBridgeEnabled: setRoutingWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isRoutingWorkerBridgeEnabled,
-  });
+    setExecutor: setRoutingExecutor,
+  }, { modes: fixtureModes });
   await assertCaseResults(t, 'node routing', routingResults);
 });
 
@@ -139,10 +131,8 @@ test('runs the shared MPSolver cases in Node', async (t) => {
     initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setWorkerBridgeEnabled,
-    isWorkerBridgeEnabled,
-    isWorkerBridgeAvailable,
-  });
+    setExecutor: setMPSolverExecutor,
+  }, { modes: fixtureModes });
   await assertCaseResults(t, 'node MPSolver', mpSolverResults);
 });
 
@@ -162,8 +152,7 @@ test('runs the shared Network Flow cases in Node', async (t) => {
     SimpleMaxFlow,
     SimpleMinCostFlow,
     SimpleLinearSumAssignment,
-    setWorkerBridgeEnabled: setNetworkFlowWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isNetworkFlowWorkerBridgeEnabled,
+    setExecutor: setNetworkFlowExecutor,
   });
   await assertCaseResults(t, 'node Network Flow', networkFlowResults);
 });
@@ -180,8 +169,7 @@ test('runs the shared Set Cover cases in Node', async (t) => {
     SteepestSearch: SteepestSearch as never,
     GuidedLocalSearch: GuidedLocalSearch as never,
     consistency_level,
-    setWorkerBridgeEnabled: setSetCoverWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isSetCoverWorkerBridgeEnabled,
+    setExecutor: setSetCoverExecutor,
   });
   await assertCaseResults(t, 'node Set Cover', setCoverResults);
 });
@@ -195,7 +183,7 @@ test('runs the shared MathOpt cases in Node', async (t) => {
   const mathOptResults = await runMathOptCases({
     initMathOpt,
     MathOpt,
-  });
+  }, { modes: fixtureModes });
   await assertCaseResults(t, 'node MathOpt', mathOptResults);
 });
 
@@ -203,8 +191,7 @@ test('runs the shared PDLP cases in Node', async (t) => {
   const pdlpResults = await runPdlpCases({
     initPdlp,
     Pdlp,
-    setWorkerBridgeEnabled: setPdlpWorkerBridgeEnabled,
-    isWorkerBridgeEnabled: isPdlpWorkerBridgeEnabled,
+    setExecutor: setPdlpExecutor,
   });
   await assertCaseResults(t, 'node PDLP', pdlpResults);
 });
