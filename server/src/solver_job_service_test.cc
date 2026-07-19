@@ -252,6 +252,30 @@ void ResultIsIndependentFromEvents() {
          "fast job retains succeeded status in event log");
 }
 
+void ExecutorFailureMetadataIsPreserved() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&,
+         const SolverEventSink&) {
+        return SolverExecutorResult{
+            false, {}, "invalid fake request",
+            SolverExecutionFailureKind::kInvalidRequest, "fake trace", true};
+      }));
+
+  const auto submitted = SubmitJob(&service);
+  const auto result = WaitForResult(&service, submitted.job_id());
+  ExpectEq(result.payload_case(), bridge::SolverBridgeResponse::kFailure,
+           "executor failure returns failure payload");
+  ExpectEq(result.failure().message(), std::string("invalid fake request"),
+           "executor failure message is preserved");
+  ExpectEq(result.failure().kind(), bridge::SOLVER_FAILURE_KIND_INVALID_REQUEST,
+           "executor failure kind is preserved");
+  ExpectEq(result.failure().trace(), std::string("fake trace"),
+           "executor failure trace is preserved");
+  Expect(result.failure().retryable(), "executor retryability is preserved");
+}
+
 void CancellationUsesGenericProtocolAndInterruptsExecutor() {
   JobScheduler scheduler({1, 8});
   SolverJobService service(scheduler);
@@ -329,6 +353,7 @@ int RunAllTests() {
       {"StatusIsSnapshotAndDoesNotConsumeEvents", StatusIsSnapshotAndDoesNotConsumeEvents},
       {"EventsAreOrderedAndCursorBased", EventsAreOrderedAndCursorBased},
       {"ResultIsIndependentFromEvents", ResultIsIndependentFromEvents},
+      {"ExecutorFailureMetadataIsPreserved", ExecutorFailureMetadataIsPreserved},
       {"CancellationUsesGenericProtocolAndInterruptsExecutor",
        CancellationUsesGenericProtocolAndInterruptsExecutor},
       {"CompletedJobsCanBeReleased", CompletedJobsCanBeReleased},

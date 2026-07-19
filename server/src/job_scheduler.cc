@@ -90,6 +90,7 @@ struct JobScheduler::JobRecord {
   std::promise<JobResult> promise;
   std::shared_future<JobResult> future;
   JobFunction job;
+  std::mutex status_callback_mutex;
   StatusCallback on_status;
 };
 
@@ -103,10 +104,10 @@ struct JobScheduler::State {
   uint64_t next_job_id = 1;
   int total_threads = 0;
   int available_threads = 0;
+  int active_jobs = 0;
   int max_queue_size = 0;
   bool shutting_down = false;
   std::deque<std::shared_ptr<JobRecord>> queue;
-  std::unordered_map<uint64_t, std::shared_ptr<JobRecord>> jobs;
   std::vector<std::future<void>> workers;
 };
 
@@ -211,7 +212,6 @@ JobHandle JobScheduler::Submit(JobSpec spec, JobFunction job, StatusCallback on_
       throw JobQueueFullError("JobScheduler queue is full.");
     }
     record->id = state_->next_job_id++;
-    state_->jobs.emplace(record->id, record);
     state_->queue.push_back(record);
   }
 
@@ -225,23 +225,12 @@ JobHandle JobScheduler::Submit(JobSpec spec, JobFunction job, StatusCallback on_
       [state, record] { return JobScheduler::CancelRecord(state, record); });
 }
 
-bool JobScheduler::Cancel(uint64_t job_id) {
-  std::shared_ptr<JobRecord> record;
-  {
-    std::lock_guard lock(state_->mutex);
-    const auto it = state_->jobs.find(job_id);
-    if (it == state_->jobs.end()) return false;
-    record = it->second;
-  }
-  return CancelRecord(state_, record);
-}
-
 SchedulerStats JobScheduler::Stats() const {
   std::lock_guard lock(state_->mutex);
   return SchedulerStats{
       state_->total_threads,
       state_->available_threads,
-      static_cast<int>(state_->jobs.size() - state_->queue.size()),
+      state_->active_jobs,
       static_cast<int>(state_->queue.size()),
   };
 }
@@ -260,7 +249,6 @@ void JobScheduler::Shutdown() {
       record->completed_at_ms = NowMs();
       record->message = "Server scheduler is shutting down.";
       record->promise.set_value(JobResult::Cancelled(record->message));
-      state_->jobs.erase(record->id);
     }
     workers = std::move(state_->workers);
   }
@@ -328,7 +316,6 @@ bool JobScheduler::CancelRecord(const std::shared_ptr<State>& state,
       record->completed_at_ms = NowMs();
       record->message = "Job cancelled before it started.";
       record->promise.set_value(JobResult::Cancelled(record->message));
-      state->jobs.erase(record->id);
       dispatch_after_cancel = true;
     } else {
       record->state = JobState::kCancelling;
@@ -357,6 +344,7 @@ void JobScheduler::Dispatch(const std::shared_ptr<State>& state) {
       const auto& record = state->queue.front();
       if (record->allocated_threads > state->available_threads) break;
       state->available_threads -= record->allocated_threads;
+      ++state->active_jobs;
       record->state = JobState::kStarting;
       record->started_at_ms = NowMs();
       ready.push_back(record);
@@ -407,18 +395,29 @@ void JobScheduler::Run(const std::shared_ptr<State>& state,
     record->message = result.message;
     record->completed_at_ms = NowMs();
     state->available_threads += record->allocated_threads;
-    state->jobs.erase(record->id);
+    --state->active_jobs;
   }
 
   record->promise.set_value(result);
   EmitStatus(record, StatusForState(state, record));
-  record->on_status = {};
+  ClearStatusCallback(record);
   Dispatch(state);
 }
 
 void JobScheduler::EmitStatus(const std::shared_ptr<JobRecord>& record,
                               const JobStatus& status) {
-  if (record->on_status) record->on_status(status);
+  StatusCallback callback;
+  {
+    std::lock_guard lock(record->status_callback_mutex);
+    callback = record->on_status;
+  }
+  if (callback) callback(status);
+}
+
+void JobScheduler::ClearStatusCallback(
+    const std::shared_ptr<JobRecord>& record) {
+  std::lock_guard lock(record->status_callback_mutex);
+  record->on_status = {};
 }
 
 const char* JobStateName(JobState state) {

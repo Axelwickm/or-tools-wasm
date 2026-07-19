@@ -135,17 +135,18 @@ class EventLog {
   std::vector<bridge::SolverBridgeResponse> responses_;
 };
 
+struct JobOutput {
+  EventLog events;
+  SolverExecutorResult execution;
+};
+
 }  // namespace
 
 struct SolverJobService::JobEntry {
   uint32_t request_id = 0;
   std::string solver;
   JobHandle handle;
-  std::shared_ptr<EventLog> events = std::make_shared<EventLog>();
-  std::shared_ptr<std::string> result_payload = std::make_shared<std::string>();
-  std::shared_ptr<std::string> error_message = std::make_shared<std::string>();
-  std::shared_ptr<SolverExecutorResult> execution_failure =
-      std::make_shared<SolverExecutorResult>();
+  std::shared_ptr<JobOutput> output = std::make_shared<JobOutput>();
 };
 
 SolverJobService::SolverJobService(JobScheduler& scheduler) : scheduler_(scheduler) {}
@@ -194,34 +195,28 @@ HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
   auto entry = std::make_shared<JobEntry>();
   entry->request_id = bridge_request.request_id();
   entry->solver = bridge_request.solver();
-  auto events = entry->events;
-  auto result_payload = entry->result_payload;
-  auto error_message = entry->error_message;
-  auto execution_failure = entry->execution_failure;
+  auto output = entry->output;
 
   try {
     entry->handle = scheduler_.Submit(
         JobSpec{bridge_request.solver(), requested_threads},
-        [executor, executor_request = std::move(executor_request), events,
-         result_payload, error_message, execution_failure](JobContext& context) {
-          SolverExecutorResult result = executor->Execute(
+        [executor, executor_request = std::move(executor_request),
+         output](JobContext& context) {
+          output->execution = executor->Execute(
               executor_request, context,
-              [events, request_id = executor_request.request_id,
+              [output, request_id = executor_request.request_id,
                solver = executor_request.solver,
                job_id = context.job_id()](std::string payload) {
-                events->Append(EventBridgeResponse(request_id, solver, job_id,
-                                                   std::move(payload)));
+                output->events.Append(EventBridgeResponse(
+                    request_id, solver, job_id, std::move(payload)));
               });
-          if (!result.ok) {
-            *error_message = result.error_message;
-            *execution_failure = result;
-            return JobResult::Failed(result.error_message);
+          if (!output->execution.ok) {
+            return JobResult::Failed(output->execution.error_message);
           }
-          *result_payload = std::move(result.payload);
           return JobResult::Succeeded();
         },
-        [events, request_id = entry->request_id](const JobStatus& status) {
-          events->Append(StatusBridgeResponse(request_id, status));
+        [output, request_id = entry->request_id](const JobStatus& status) {
+          output->events.Append(StatusBridgeResponse(request_id, status));
         });
   } catch (const JobQueueFullError& error) {
     return FailureResponse(bridge_request.request_id(), bridge_request.solver(), 0,
@@ -237,7 +232,9 @@ HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
     std::lock_guard lock(mutex_);
     jobs_[entry->handle.job_id()] = entry;
   }
-  if (auto response = entry->events->Last()) return ProtoResponse(kJobAccepted, *response);
+  if (auto response = entry->output->events.Last()) {
+    return ProtoResponse(kJobAccepted, *response);
+  }
   return StatusResponse(entry->request_id, entry->handle.status(), kJobAccepted);
 }
 
@@ -258,7 +255,8 @@ HttpBinaryResponse SolverJobService::Events(const HttpBinaryRequest& request) {
     const auto entry = EntryFor(JobIdFromRequest(request));
     if (!entry) return TextResponse(404, "Job not found.\n");
     bridge::SolverEventBatch batch;
-    for (const auto& response : entry->events->After(EventCursorFromRequest(request))) {
+    for (const auto& response :
+         entry->output->events.After(EventCursorFromRequest(request))) {
       *batch.add_responses() = response;
     }
     return ProtoResponse(200, batch);
@@ -280,7 +278,7 @@ HttpBinaryResponse SolverJobService::Result(const HttpBinaryRequest& request) {
     const JobResult result = future.get();
     if (result.state == JobState::kSucceeded) {
       return ResultResponse(entry->request_id, entry->solver, job_id,
-                            *entry->result_payload);
+                            entry->output->execution.payload);
     }
     if (result.state == JobState::kCancelled) {
       return FailureResponse(entry->request_id, entry->solver, job_id,
@@ -289,9 +287,11 @@ HttpBinaryResponse SolverJobService::Result(const HttpBinaryRequest& request) {
     }
     return FailureResponse(
         entry->request_id, entry->solver, job_id,
-        entry->error_message->empty() ? result.message : *entry->error_message,
-        200, ToBridgeFailureKind(entry->execution_failure->failure_kind),
-        entry->execution_failure->retryable, entry->execution_failure->trace);
+        entry->output->execution.error_message.empty()
+            ? result.message
+            : entry->output->execution.error_message,
+        200, ToBridgeFailureKind(entry->output->execution.failure_kind),
+        entry->output->execution.retryable, entry->output->execution.trace);
   } catch (const std::exception& error) {
     return TextResponse(400, std::string(error.what()) + "\n");
   }

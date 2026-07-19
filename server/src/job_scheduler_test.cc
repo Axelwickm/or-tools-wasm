@@ -187,6 +187,47 @@ void LargerJobWaitsForEnoughTokens() {
   ExpectEq(large.result().get().state, JobState::kSucceeded, "large result");
 }
 
+void QueueHeadCannotBeSkippedBySmallerJob() {
+  JobScheduler scheduler({8, 8});
+  ManualEvent occupying_started;
+  ManualEvent release_occupying;
+  ManualEvent head_started;
+  ManualEvent release_head;
+  ManualEvent tail_started;
+
+  auto occupying = scheduler.Submit(Spec("cp-sat", 4), [&](JobContext&) {
+    occupying_started.Set();
+    release_occupying.Wait();
+    return JobResult::Succeeded("occupying");
+  });
+  occupying_started.Wait();
+
+  auto head = scheduler.Submit(Spec("cp-sat", 5), [&](JobContext&) {
+    head_started.Set();
+    release_head.Wait();
+    return JobResult::Succeeded("head");
+  });
+  auto tail = scheduler.Submit(Spec("cp-sat", 1), [&](JobContext&) {
+    tail_started.Set();
+    return JobResult::Succeeded("tail");
+  });
+
+  ExpectEq(head.status().queue_position, 1, "large job is queue head");
+  ExpectEq(tail.status().queue_position, 2, "small job is behind queue head");
+  Expect(!head_started.WaitFor(30ms), "queue head waits for five threads");
+  Expect(!tail_started.WaitFor(30ms), "small job does not skip queue head");
+
+  release_occupying.Set();
+  Expect(head_started.WaitFor(2s), "queue head starts when it fits");
+  Expect(tail_started.WaitFor(2s), "following job starts after queue head is admitted");
+  release_head.Set();
+
+  ExpectEq(occupying.result().get().state, JobState::kSucceeded,
+           "occupying result");
+  ExpectEq(head.result().get().state, JobState::kSucceeded, "head result");
+  ExpectEq(tail.result().get().state, JobState::kSucceeded, "tail result");
+}
+
 void CancelsQueuedJob() {
   JobScheduler scheduler({1, 8});
   ManualEvent running_started;
@@ -308,6 +349,7 @@ int RunAllTests() {
       {"QueuesWhenThreadBudgetIsExhausted", QueuesWhenThreadBudgetIsExhausted},
       {"RunsJobsConcurrentlyWhenTokensAreAvailable", RunsJobsConcurrentlyWhenTokensAreAvailable},
       {"LargerJobWaitsForEnoughTokens", LargerJobWaitsForEnoughTokens},
+      {"QueueHeadCannotBeSkippedBySmallerJob", QueueHeadCannotBeSkippedBySmallerJob},
       {"CancelsQueuedJob", CancelsQueuedJob},
       {"RequestsCooperativeCancellationForRunningJob", RequestsCooperativeCancellationForRunningJob},
       {"InvokesScopedCancellationHandler", InvokesScopedCancellationHandler},

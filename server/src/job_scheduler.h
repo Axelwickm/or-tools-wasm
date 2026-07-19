@@ -10,7 +10,6 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 
 namespace ortools_wasm::server {
 
@@ -149,7 +148,6 @@ class JobScheduler {
   JobScheduler& operator=(const JobScheduler&) = delete;
 
   JobHandle Submit(JobSpec spec, JobFunction job, StatusCallback on_status = {});
-  bool Cancel(uint64_t job_id);
   SchedulerStats Stats() const;
   void Shutdown();
 
@@ -169,6 +167,7 @@ class JobScheduler {
                   const std::shared_ptr<JobRecord>& record);
   static void EmitStatus(const std::shared_ptr<JobRecord>& record,
                          const JobStatus& status);
+  static void ClearStatusCallback(const std::shared_ptr<JobRecord>& record);
 
   std::shared_ptr<State> state_;
 };
