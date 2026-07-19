@@ -4,8 +4,10 @@ import {
   initRouting,
   RoutingIndexManager,
   RoutingModel,
+  setExecutor,
 } from 'or-tools-wasm/routing';
-import { appendStatus, configureWorkerBridge, extractRoutes, setRunning, type RouteSummary } from './routing_helpers.js';
+import { appendStatus, extractRoutes, setRunning, type RouteSummary } from './routing_helpers.js';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 type Priority = 'standard' | 'express' | 'critical';
 
@@ -34,7 +36,7 @@ const routeOutput = document.getElementById('route-output');
 const summaryOutput = document.getElementById('dispatch-summary');
 const statusEl = document.getElementById('status');
 const routeMap = document.getElementById('dispatch-map') as SVGSVGElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const deliveryCountInput = document.getElementById('delivery-count') as HTMLInputElement | null;
 const vehicleCountInput = document.getElementById('vehicle-count') as HTMLInputElement | null;
 const vehicleCapacityInput = document.getElementById('vehicle-capacity') as HTMLInputElement | null;
@@ -55,7 +57,7 @@ const priorityPenalty = {
 let stops: Stop[] = [];
 let vehicles: Vehicle[] = [];
 
-configureWorkerBridge(workerBridgeToggle);
+configureSolverExecutorSelector({ setExecutor }, executorSelector);
 
 const deliveryCount = () => {
   const value = Number.parseInt(deliveryCountInput?.value ?? '60', 10);

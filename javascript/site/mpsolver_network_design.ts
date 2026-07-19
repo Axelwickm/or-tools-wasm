@@ -1,9 +1,10 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
-  configureWorkerBridge,
+  configureMPSolverExecutor,
+  currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
   setRunning,
@@ -100,11 +101,11 @@ const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const clearSolutionButton = document.getElementById('clear-solution') as HTMLButtonElement | null;
 const solverSelect = document.getElementById('solver-id') as HTMLSelectElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
-configureWorkerBridge(workerBridgeToggle);
+configureMPSolverExecutor(executorSelector);
 configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 let currentSolution: Solution | null = null;
@@ -259,7 +260,7 @@ function renderSolutionText(solution: Solution | null) {
     <table>
       <tbody>
         <tr><th>Status</th><td>${solution.status}</td></tr>
-        <tr><th>Worker bridge</th><td>${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}</td></tr>
+        <tr><th>Executor</th><td>${currentMPSolverExecutor()}</td></tr>
         <tr><th>Requested solver threads</th><td>${solution.solverThreads}</td></tr>
         <tr><th>Thread request accepted</th><td>${solution.solverThreadsAccepted ? 'yes' : 'no'}</td></tr>
         <tr><th>Active solver threads</th><td>${solution.activeSolverThreads}</td></tr>
@@ -293,7 +294,6 @@ async function solveNetworkDesign() {
   setRunning(runButton, true);
   if (statusEl) statusEl.textContent = '';
   try {
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
     await initMPSolver();
     const solverId = solverSelect?.value || 'SCIP';

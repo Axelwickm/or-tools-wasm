@@ -1,4 +1,5 @@
-import { initMathOpt, MathOpt, setWorkerBridgeEnabled, type MathOptVariable } from 'or-tools-wasm/mathopt';
+import { initMathOpt, MathOpt, setExecutor, type MathOptVariable } from 'or-tools-wasm/mathopt';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Grid = number[];
@@ -13,7 +14,7 @@ const targetInput = document.getElementById('target-clues') as HTMLInputElement 
 const seedInput = document.getElementById('seed') as HTMLInputElement | null;
 const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const generateButton = document.getElementById('generate') as HTMLButtonElement | null;
 const solveButton = document.getElementById('solve') as HTMLButtonElement | null;
 const clearButton = document.getElementById('clear') as HTMLButtonElement | null;
@@ -115,7 +116,6 @@ function configureMathOpt() {
     workerInput.max = String(maxWorkerCount);
     workerInput.value = String(workers);
   }
-  setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
   return { backend, workers: backend === 'GLPK' ? 1 : workers };
 }
 
@@ -445,12 +445,7 @@ clearBoard();
 if (workerInput) workerInput.value = String(Math.min(maxWorkerCount, 4));
 solverSelect?.addEventListener('change', updateBackendControls);
 updateBackendControls();
-if (workerBridgeToggle) {
-  workerBridgeToggle.checked = true;
-  workerBridgeToggle.addEventListener('change', () => {
-    setWorkerBridgeEnabled(workerBridgeToggle.checked);
-  });
-}
+configureSolverExecutorSelector({ setExecutor }, executorSelector);
 
 generateButton?.addEventListener('click', () => {
   void generatePuzzle();

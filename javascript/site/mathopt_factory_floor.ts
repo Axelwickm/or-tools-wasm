@@ -1,12 +1,13 @@
 import {
   initMathOpt,
   MathOpt,
-  setWorkerBridgeEnabled,
+  setExecutor,
   type MathOptIncrementalSolver,
   type MathOptLinearConstraint,
   type MathOptModel,
   type MathOptVariable,
 } from 'or-tools-wasm/mathopt';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Direction = 'up' | 'right' | 'down' | 'left';
@@ -461,7 +462,7 @@ const storefrontEl = document.getElementById('storefront');
 const orderPanelEl = document.getElementById('order-panel');
 const toggleRunningButton = document.getElementById('toggle-running') as HTMLButtonElement | null;
 const resetFloorButton = document.getElementById('reset-floor') as HTMLButtonElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const workerThreadsInput = document.getElementById('worker-threads') as HTMLInputElement | null;
 
 let running = false;
@@ -499,10 +500,7 @@ if (workerThreadsInput) {
   workerThreadsInput.value = String(initialThreads);
   workerThreadsInput.title = `Available worker threads: ${maxWorkerCount}`;
 }
-if (workerBridgeToggle) {
-  workerBridgeToggle.checked = true;
-  setWorkerBridgeEnabled(true);
-}
+configureSolverExecutorSelector({ setExecutor }, executorSelector);
 
 function zeroProductRecord(): Record<ProductType, number> {
   return Object.fromEntries(productTypes.map((product) => [product, 0])) as Record<ProductType, number>;
@@ -764,7 +762,6 @@ async function solvePlan(): Promise<void> {
       await initMathOpt();
       initialized = true;
     }
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     const hadPlanner = planner !== null;
     const nextPlanner = await ensurePlanner();
     const solveKind: PlanSolveKind = hadPlanner ? 'partial' : 'full';
@@ -2251,9 +2248,7 @@ function resetSimulation(): void {
   plan = null;
   planner = null;
   lastError = '';
-  if (workerBridgeToggle) workerBridgeToggle.checked = true;
   if (workerThreadsInput) workerThreadsInput.value = String(Math.min(4, maxWorkerCount));
-  setWorkerBridgeEnabled(true);
   renderAll();
 }
 
@@ -2311,8 +2306,7 @@ toggleRunningButton?.addEventListener('click', () => {
 
 resetFloorButton?.addEventListener('click', resetSimulation);
 
-workerBridgeToggle?.addEventListener('change', () => {
-  setWorkerBridgeEnabled(workerBridgeToggle.checked);
+executorSelector?.addEventListener('change', () => {
   planner = null;
   requestPlanSoon();
   renderMetrics();

@@ -91,10 +91,10 @@
   initRouting,
   RoutingIndexManager,
   RoutingModel,
-  setWorkerBridgeEnabled,
+  setExecutor,
 } from 'or-tools-wasm/routing';
 
-setWorkerBridgeEnabled(true);
+setExecutor({ type: 'worker' });
 await initRouting();
 
 const starts = [0, 1, 2, 3];
@@ -131,7 +131,7 @@ const assignment = await routing.SolveWithParameters(params);</code></pre>
 			<li>Before solving, the map shows generated depots and deliveries; after solving, each color is one truck route.</li>
 		</ul>
 		<div class="controls">
-			<label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+			<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
 			<label>Deliveries <input id="delivery-count" class="short-number" type="number" min="1" value="60"></label>
 			<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
 			<label>Capacity <input id="vehicle-capacity" class="short-number" type="number" min="1" value="100"></label>

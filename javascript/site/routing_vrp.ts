@@ -4,8 +4,10 @@ import {
   initRouting,
   RoutingIndexManager,
   RoutingModel,
+  setExecutor,
 } from 'or-tools-wasm/routing';
-import { appendStatus, configureWorkerBridge, extractRoutes, renderRouteList, setRunning, type RouteSummary } from './routing_helpers.js';
+import { appendStatus, extractRoutes, renderRouteList, setRunning, type RouteSummary } from './routing_helpers.js';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 type Location = {
   name: string;
@@ -16,7 +18,7 @@ type Location = {
 const routeOutput = document.getElementById('route-output');
 const statusEl = document.getElementById('status');
 const routeMap = document.getElementById('route-map') as SVGSVGElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const destinationCountInput = document.getElementById('destination-count') as HTMLInputElement | null;
 const vehicleCountInput = document.getElementById('vehicle-count') as HTMLInputElement | null;
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
@@ -29,7 +31,7 @@ const routeColors = ['#0969da', '#cf222e', '#1a7f37', '#8250df', '#bf8700', '#d1
 const routeRevealSeconds = 2;
 let locations: Location[] = [];
 
-configureWorkerBridge(workerBridgeToggle);
+configureSolverExecutorSelector({ setExecutor }, executorSelector);
 
 const destinationCount = () => {
   const value = Number.parseInt(destinationCountInput?.value ?? '60', 10);

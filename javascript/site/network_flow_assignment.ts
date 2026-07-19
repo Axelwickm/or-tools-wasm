@@ -1,14 +1,14 @@
 import {
   initNetworkFlow,
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
+  setExecutor,
   SimpleLinearSumAssignment,
 } from 'or-tools-wasm/network-flow';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const graphEl = document.getElementById('assignment-graph') as SVGSVGElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const sizeInput = document.getElementById('assignment-size') as HTMLInputElement | null;
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
@@ -142,7 +142,6 @@ async function runAssignment() {
   setRunning(true);
   if (statusEl) statusEl.textContent = '';
   try {
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     appendStatus('Initializing Network Flow runtime...');
     await initNetworkFlow();
 
@@ -150,7 +149,7 @@ async function runAssignment() {
     const assignment = new SimpleLinearSumAssignment();
     assignment.add_arcs_with_cost(leftNodes, rightNodes, arcCosts);
 
-    appendStatus(`Solving with worker bridge ${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}...`);
+    appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
     const status = await assignment.solve();
     appendStatus(`Done. Status ${status}.`);
     renderSolution(assignment);
@@ -178,3 +177,4 @@ sizeInput?.addEventListener('change', () => {
   resetView();
 });
 resetView();
+configureSolverExecutorSelector({ setExecutor }, executorSelector);

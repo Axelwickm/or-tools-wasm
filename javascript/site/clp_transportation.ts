@@ -1,9 +1,10 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
-  configureWorkerBridge,
+  configureMPSolverExecutor,
+  currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
   setRunning,
@@ -46,11 +47,11 @@ const transportEditor = document.getElementById('transport-editor');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const resetButton = document.getElementById('reset') as HTMLButtonElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
-configureWorkerBridge(workerBridgeToggle);
+configureMPSolverExecutor(executorSelector);
 configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 const plantColors = ['#0969da', '#8250df', '#1a7f37'];
@@ -339,7 +340,7 @@ function renderTransportationResult(
     <table>
       <tbody>
         <tr><th>Total cost</th><td>${formatNumber(objective)}</td></tr>
-        <tr><th>Worker bridge</th><td>${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}</td></tr>
+        <tr><th>Executor</th><td>${currentMPSolverExecutor()}</td></tr>
         <tr><th>Requested solver threads</th><td>${threadConfig.requested}</td></tr>
         <tr><th>Thread request accepted</th><td>${threadConfig.accepted ? 'yes' : 'no'}</td></tr>
         <tr><th>Active solver threads</th><td>${threadConfig.active}</td></tr>

@@ -1,9 +1,10 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver } from 'or-tools-wasm/mp-solver';
+import { initMPSolver, MPSolver } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
-  configureWorkerBridge,
+  configureMPSolverExecutor,
+  currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
   renderSimpleMpResult,
@@ -14,7 +15,7 @@ import { getMaxWorkerCount } from './worker_limits.js';
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 const solverId = document.body.dataset.solverId === 'GLPK'
@@ -27,7 +28,7 @@ const solverId = document.body.dataset.solverId === 'GLPK'
 
 configureSolverThreadsInput(workerInput, maxWorkerCount);
 
-configureWorkerBridge(workerBridgeToggle);
+configureMPSolverExecutor(executorSelector);
 
 async function runSimpleMip() {
   setRunning(runButton, true);
@@ -79,7 +80,7 @@ async function runSimpleMip() {
         wallTime: solver.WallTime(),
         iterations: solver.Iterations(),
         nodes: solver.nodes(),
-        usedWorkerBridge: isWorkerBridgeEnabled(),
+        executor: currentMPSolverExecutor(),
         solverThreads: threadConfig.requested,
         solverThreadsAccepted: threadConfig.accepted,
         activeSolverThreads: threadConfig.active,

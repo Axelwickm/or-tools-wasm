@@ -1,4 +1,4 @@
-import { setWorkerBridgeEnabled, type Assignment, type RoutingIndexManager, type RoutingModel } from 'or-tools-wasm/routing';
+import { type Assignment, type RoutingIndexManager, type RoutingModel } from 'or-tools-wasm/routing';
 
 export type RouteSummary = {
   vehicle: number;
@@ -6,15 +6,6 @@ export type RouteSummary = {
   distance: number;
   used: boolean;
 };
-
-export function configureWorkerBridge(toggle: HTMLInputElement | null) {
-  if (!toggle) return;
-  toggle.checked = true;
-  setWorkerBridgeEnabled(true);
-  toggle.addEventListener('change', () => {
-    setWorkerBridgeEnabled(toggle.checked);
-  });
-}
 
 export function appendStatus(statusEl: HTMLElement | null, text: string) {
   if (statusEl) {

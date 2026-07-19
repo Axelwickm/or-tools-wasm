@@ -1,9 +1,9 @@
 import {
   initNetworkFlow,
-  isWorkerBridgeEnabled,
-  setWorkerBridgeEnabled,
+  setExecutor,
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 type Node = { id: number; label: string; x: number; y: number; supply: number };
 type Arc = { from: number; to: number; capacity: number; unitCost: number; flow?: number };
@@ -11,7 +11,7 @@ type Arc = { from: number; to: number; capacity: number; unitCost: number; flow?
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const graphEl = document.getElementById('flow-graph') as SVGSVGElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const supplyCountInput = document.getElementById('supply-count') as HTMLInputElement | null;
 const transitCountInput = document.getElementById('transit-count') as HTMLInputElement | null;
 const demandCountInput = document.getElementById('demand-count') as HTMLInputElement | null;
@@ -183,7 +183,6 @@ async function runMinCostFlow() {
   setRunning(true);
   if (statusEl) statusEl.textContent = '';
   try {
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     appendStatus('Initializing Network Flow runtime...');
     await initNetworkFlow();
 
@@ -196,7 +195,7 @@ async function runMinCostFlow() {
     );
     minCostFlow.set_nodes_supplies(nodes.map((node) => node.id), nodes.map((node) => node.supply));
 
-    appendStatus(`Solving with worker bridge ${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}...`);
+    appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
     const status = await minCostFlow.solve();
     appendStatus(`Done. Status ${status}.`);
     arcs = allArcs.map((arc) => ({
@@ -239,3 +238,4 @@ demandCountInput?.addEventListener('change', () => {
 
 generateGraph();
 resetView();
+configureSolverExecutorSelector({ setExecutor }, executorSelector);

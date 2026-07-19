@@ -20,9 +20,9 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt, setWorkerBridgeEnabled } from 'or-tools-wasm/mathopt';
+        <pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt, setExecutor } from 'or-tools-wasm/mathopt';
 
-setWorkerBridgeEnabled(true);
+setExecutor({ type: 'worker' });
 await initMathOpt();
 
 const model = MathOpt.Model('basic');
@@ -73,7 +73,7 @@ console.log(result.objectiveValue, result.variableValues);</code></pre>
           <option value="CP_SAT">CP-SAT</option>
         </select>
       </label>
-      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
       <label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>
       <button id="run" data-idle-label="Solve model">Solve model</button>
     </div>

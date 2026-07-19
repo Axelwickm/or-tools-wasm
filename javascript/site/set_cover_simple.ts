@@ -1,11 +1,11 @@
 import {
   GreedySolutionGenerator,
   initSetCover,
-  isWorkerBridgeEnabled,
+  setExecutor,
   SetCoverInvariant,
   SetCoverModel,
-  setWorkerBridgeEnabled,
 } from 'or-tools-wasm/set-cover';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 type ElementPoint = {
   id: number;
@@ -129,7 +129,7 @@ const coverageMap = document.getElementById('coverage-map');
 const coverageLegend = document.getElementById('coverage-legend');
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const clearButton = document.getElementById('clear') as HTMLButtonElement | null;
 
@@ -268,7 +268,6 @@ async function runSetCover() {
     renderMap();
     renderSolution();
 
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     appendStatus('Initializing Set Cover runtime...');
     await initSetCover();
 
@@ -276,7 +275,7 @@ async function runSetCover() {
     const inv = new SetCoverInvariant(model);
     const greedy = new GreedySolutionGenerator(inv);
 
-    appendStatus(`Solving with worker bridge ${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}...`);
+    appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
     const hasFound = await greedy.next_solution();
     if (!hasFound) {
       appendStatus('No solution found by the greedy heuristic.');
@@ -333,3 +332,4 @@ coverageLegend?.addEventListener('pointerout', (event) => {
 
 renderMap();
 renderSolution();
+configureSolverExecutorSelector({ setExecutor }, executorSelector);

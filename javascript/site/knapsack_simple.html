@@ -101,10 +101,10 @@
   initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
-  setWorkerBridgeEnabled,
+  setExecutor,
 } from 'or-tools-wasm/knapsack';
 
-setWorkerBridgeEnabled(true);
+setExecutor({ type: 'worker' });
 await initKnapsack();
 
 const values = [

@@ -28,9 +28,9 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleMinCostFlow, setWorkerBridgeEnabled } from 'or-tools-wasm/network-flow';
+        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleMinCostFlow, setExecutor } from 'or-tools-wasm/network-flow';
 
-setWorkerBridgeEnabled(true);
+setExecutor({ type: 'worker' });
 await initNetworkFlow();
 
 const startNodes = [0, 0, 1, 1, 1, 2, 2, 3, 4];
@@ -72,7 +72,7 @@ if (status === SimpleMinCostFlow.OPTIMAL) {
       </ul>
     </div>
     <div class="controls">
-      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
       <label>Supply nodes <input id="supply-count" class="short-number" type="number" min="1" value="2"></label>
       <label>Transit nodes <input id="transit-count" class="short-number" type="number" min="1" value="6"></label>
       <label>Demand nodes <input id="demand-count" class="short-number" type="number" min="1" value="3"></label>

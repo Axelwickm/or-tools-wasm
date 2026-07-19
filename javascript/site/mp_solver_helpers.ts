@@ -1,4 +1,5 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { initMPSolver, MPSolver, setExecutor, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 type VariableKind = 'continuous' | 'integer';
 
@@ -20,7 +21,7 @@ type SimpleMpResult = {
   wallTime: number;
   iterations: number;
   nodes: number;
-  usedWorkerBridge: boolean;
+  executor: 'direct' | 'worker' | 'server';
   workerCount?: number;
   solverThreads?: number;
   solverThreadsAccepted?: boolean;
@@ -38,13 +39,13 @@ export function appendStatus(element: HTMLElement | null, message: string): void
   element.textContent += `${message}\n`;
 }
 
-export function configureWorkerBridge(toggle: HTMLInputElement | null): void {
-  if (!toggle) return;
-  toggle.checked = true;
-  setWorkerBridgeEnabled(true);
-  toggle.addEventListener('change', () => {
-    setWorkerBridgeEnabled(toggle.checked);
-  });
+export function configureMPSolverExecutor(selector: HTMLSelectElement | null): void {
+  configureSolverExecutorSelector({ setExecutor }, selector);
+}
+
+export function currentMPSolverExecutor(): 'direct' | 'worker' | 'server' {
+  const selector = document.getElementById('solver-executor') as HTMLSelectElement | null;
+  return (selector?.value as 'direct' | 'worker' | 'server' | undefined) ?? 'worker';
 }
 
 export function configureSolverThreadsInput(input: HTMLInputElement | null, maxThreads = 8): void {
@@ -132,7 +133,7 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       wallTime: solver.WallTime(),
       iterations: solver.Iterations(),
       nodes: solver.nodes(),
-      usedWorkerBridge: isWorkerBridgeEnabled(),
+      executor: currentMPSolverExecutor(),
       workerCount,
       solverThreads: threadConfig?.requested,
       solverThreadsAccepted: threadConfig?.accepted,
@@ -154,7 +155,7 @@ export function renderSimpleMpResult(element: HTMLElement | null, result: Simple
     <table>
       <tbody>
         <tr><th>Status</th><td>${status}</td></tr>
-        <tr><th>Worker bridge</th><td>${result.usedWorkerBridge ? 'enabled' : 'disabled'}</td></tr>
+        <tr><th>Executor</th><td>${result.executor}</td></tr>
         ${result.solverThreads ? `<tr><th>Requested solver threads</th><td>${result.solverThreads}</td></tr>` : ''}
         ${result.solverThreads ? `<tr><th>Thread request accepted</th><td>${result.solverThreadsAccepted ? 'yes' : 'no'}</td></tr>` : ''}
         ${result.activeSolverThreads ? `<tr><th>Active solver threads</th><td>${result.activeSolverThreads}</td></tr>` : ''}

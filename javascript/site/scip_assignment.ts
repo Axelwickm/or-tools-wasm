@@ -1,9 +1,10 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, setWorkerBridgeEnabled, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
-  configureWorkerBridge,
+  configureMPSolverExecutor,
+  currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
   setRunning,
@@ -27,19 +28,18 @@ const totalSizeMax = 15;
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
-configureWorkerBridge(workerBridgeToggle);
+configureMPSolverExecutor(executorSelector);
 configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 async function runAssignment() {
   setRunning(runButton, true);
   if (statusEl) statusEl.textContent = '';
   try {
-    setWorkerBridgeEnabled(workerBridgeToggle?.checked ?? true);
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
     await initMPSolver();
     const solver = MPSolver.CreateSolver('SCIP');
@@ -100,7 +100,7 @@ async function runAssignment() {
           <table>
             <tbody>
               <tr><th>Status</th><td>${status === MPSolver.OPTIMAL ? 'OPTIMAL' : 'FEASIBLE'}</td></tr>
-              <tr><th>Worker bridge</th><td>${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}</td></tr>
+              <tr><th>Executor</th><td>${currentMPSolverExecutor()}</td></tr>
               <tr><th>Requested solver threads</th><td>${threadConfig.requested}</td></tr>
               <tr><th>Thread request accepted</th><td>${threadConfig.accepted ? 'yes' : 'no'}</td></tr>
               <tr><th>Active solver threads</th><td>${threadConfig.active}</td></tr>

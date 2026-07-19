@@ -1,6 +1,8 @@
-import type { ExecutorConfiguration } from 'or-tools-wasm/cp-sat';
-
 type ExecutorMode = 'direct' | 'worker' | 'server';
+type ExecutorConfiguration =
+  | { type: 'direct' }
+  | { type: 'worker' }
+  | { type: 'server'; host: string };
 type ExecutorApi = {
   setExecutor(configuration: ExecutorConfiguration): void;
 };

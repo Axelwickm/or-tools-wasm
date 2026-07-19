@@ -1,9 +1,10 @@
-import { initMPSolver, isWorkerBridgeEnabled, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
-  configureWorkerBridge,
+  configureMPSolverExecutor,
+  currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
   setRunning,
@@ -45,12 +46,12 @@ let hoveredProject: string | null = null;
 const appEl = document.getElementById('portfolio-app');
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
-configureWorkerBridge(workerBridgeToggle);
+configureMPSolverExecutor(executorSelector);
 configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 function selectionTotals(selection: Set<string>) {
@@ -220,7 +221,7 @@ function render() {
 function renderResult(result: {
   objective: number;
   selected: Set<string>;
-  usedWorkerBridge: boolean;
+  executor: 'direct' | 'worker' | 'server';
   solverThreads: number;
   solverThreadsAccepted: boolean;
   activeSolverThreads: number;
@@ -233,7 +234,7 @@ function renderResult(result: {
     <table>
       <tbody>
         <tr><th>Status</th><td>OPTIMAL</td></tr>
-        <tr><th>Worker bridge</th><td>${result.usedWorkerBridge ? 'enabled' : 'disabled'}</td></tr>
+        <tr><th>Executor</th><td>${result.executor}</td></tr>
         <tr><th>Requested solver threads</th><td>${result.solverThreads}</td></tr>
         <tr><th>Thread request accepted</th><td>${result.solverThreadsAccepted ? 'yes' : 'no'}</td></tr>
         <tr><th>Active solver threads</th><td>${result.activeSolverThreads}</td></tr>
@@ -281,7 +282,7 @@ async function runBopProjectSelection() {
       }
       objective.SetMaximization();
 
-      appendStatus(statusEl, `Solving with BOP, worker bridge=${isWorkerBridgeEnabled() ? 'enabled' : 'disabled'}, requested solver threads=${solverThreads}...`);
+      appendStatus(statusEl, `Solving with BOP via ${currentMPSolverExecutor()}, requested solver threads=${solverThreads}...`);
       const status = await solver.Solve();
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
       if (!solver.VerifySolution(1e-7, true)) throw new Error('solution verification failed');
@@ -294,7 +295,7 @@ async function runBopProjectSelection() {
       renderResult({
         objective: objective.Value(),
         selected: optimalSelection,
-        usedWorkerBridge: isWorkerBridgeEnabled(),
+        executor: currentMPSolverExecutor(),
         solverThreads: threadConfig.requested,
         solverThreadsAccepted: threadConfig.accepted,
         activeSolverThreads: threadConfig.active,

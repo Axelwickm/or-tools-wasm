@@ -29,9 +29,9 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleMaxFlow, setWorkerBridgeEnabled } from 'or-tools-wasm/network-flow';
+        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleMaxFlow, setExecutor } from 'or-tools-wasm/network-flow';
 
-setWorkerBridgeEnabled(true);
+setExecutor({ type: 'worker' });
 await initNetworkFlow();
 
 const maxFlow = new SimpleMaxFlow();
@@ -47,7 +47,7 @@ const status = await maxFlow.solve(sourceNode, sinkNode);</code></pre>
       <li>The min cut identifies the bottleneck separating source-side and sink-side nodes.</li>
     </ul>
     <div class="controls">
-      <label><input id="use-worker-bridge" type="checkbox" checked> Use worker bridge</label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
       <label>Transit nodes <input id="middle-count" class="short-number" type="number" min="3" value="8"></label>
       <button id="randomize" type="button">Randomize</button>
       <button id="run" data-idle-label="Solve Max Flow">Solve Max Flow</button>

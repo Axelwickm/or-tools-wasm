@@ -3,7 +3,7 @@ import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
-  configureWorkerBridge,
+  configureMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
   setRunning,
@@ -114,7 +114,7 @@ let data: Food[] = defaultData.map(cloneFood);
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const dietSummary = document.getElementById('diet-summary');
 const foodCatalog = document.getElementById('food-catalog');
@@ -126,7 +126,7 @@ const resetFoodsButton = document.getElementById('reset-foods') as HTMLButtonEle
 const solverId = document.body.dataset.solverId === 'CLP' ? 'CLP' : 'GLOP';
 const maxWorkerCount = getMaxWorkerCount();
 
-configureWorkerBridge(workerBridgeToggle);
+configureMPSolverExecutor(executorSelector);
 configureSolverThreadsInput(workerInput, maxWorkerCount);
 
 const escapeHtml = (value: string) =>

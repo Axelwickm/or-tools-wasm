@@ -4,13 +4,15 @@ import {
   initRouting,
   RoutingIndexManager,
   RoutingModel,
+  setExecutor,
 } from 'or-tools-wasm/routing';
-import { appendStatus, configureWorkerBridge, extractRoutes, renderRouteList, setRunning } from './routing_helpers.js';
+import { appendStatus, extractRoutes, renderRouteList, setRunning } from './routing_helpers.js';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 const routeOutput = document.getElementById('route-output');
 const statusEl = document.getElementById('status');
 const routeMap = document.getElementById('route-map') as SVGSVGElement | null;
-const workerBridgeToggle = document.getElementById('use-worker-bridge') as HTMLInputElement | null;
+const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const nodeCountInput = document.getElementById('node-count') as HTMLInputElement | null;
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
@@ -26,7 +28,7 @@ const mapHeight = 620;
 const depotLocation: Location = { name: 'Depot', x: mapWidth / 2, y: mapHeight / 2 };
 let locations: Location[] = [];
 
-configureWorkerBridge(workerBridgeToggle);
+configureSolverExecutorSelector({ setExecutor }, executorSelector);
 
 const destinationCount = () => {
   const value = Number.parseInt(nodeCountInput?.value ?? '20', 10);
