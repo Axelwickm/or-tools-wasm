@@ -1,6 +1,6 @@
 import { create, toBinary } from '@bufbuild/protobuf';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
-import { resolveExecutorConfiguration } from './executor_configuration.js';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
+import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
   PdlpBridgeRequestSchema,
   PdlpOperation,
@@ -8,11 +8,11 @@ import {
   PdlpSolveParametersSchema,
   type PdlpBridgeResponse,
   type PdlpQuadraticProgram,
-} from './generated/bridge/pdlp_pb.js';
-import type { SolverJobEvent } from './solver_executor.js';
-import { PdlpExecutor, type PdlpExecutorLike } from './pdlp/executor.js';
-import { PdlpServerExecutor } from './pdlp/server_executor.js';
-import { PdlpWorkerExecutor } from './pdlp/worker_executor.js';
+} from '../generated/bridge/pdlp_pb.js';
+import type { SolverJobEvent } from '../solver_executor.js';
+import { PdlpExecutor, type PdlpExecutorLike } from './executor.js';
+import { PdlpServerExecutor } from './server_executor.js';
+import { PdlpWorkerExecutor } from './worker_executor.js';
 
 export type SparseMatrixEntry = {
   row: number;

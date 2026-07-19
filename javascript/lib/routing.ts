@@ -15,7 +15,7 @@ export {
   RoutingModel,
   RoutingSearchStatus,
   setRoutingExecutor as setExecutor,
-} from './routing_api.js';
-export type { RoutingEvent, RoutingModelParameters, RoutingSearchParameters, RoutingSolveOptions } from './routing_api.js';
+} from './routing/api.js';
+export type { RoutingEvent, RoutingModelParameters, RoutingSearchParameters, RoutingSolveOptions } from './routing/api.js';
 export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

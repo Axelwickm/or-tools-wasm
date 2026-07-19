@@ -29,12 +29,12 @@ export {
   write_set_cover_proto,
   write_set_cover_solution_proto,
   write_set_cover_solution_text,
-} from './set_cover_api.js';
+} from './set_cover/api.js';
 export type {
   SetCoverEvent,
   SetCoverModelProto,
   SetCoverSolveOptions,
   SetCoverSolutionResponse,
-} from './set_cover_api.js';
+} from './set_cover/api.js';
 export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

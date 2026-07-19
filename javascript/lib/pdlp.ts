@@ -4,7 +4,7 @@ export {
   PrimalAndDualSolution,
   QuadraticProgram,
   setPdlpExecutor as setExecutor,
-} from './pdlp_api.js';
+} from './pdlp/api.js';
 export type {
   PdlpEvent,
   PdlpExecutionOptions,
@@ -15,6 +15,6 @@ export type {
   QuadraticProgramInput,
   SparseMatrixEntry,
   SparseMatrixInput,
-} from './pdlp_api.js';
+} from './pdlp/api.js';
 export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

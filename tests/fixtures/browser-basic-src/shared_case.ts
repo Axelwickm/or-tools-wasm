@@ -4,7 +4,12 @@ export const fixtureModes: readonly FixtureMode[] = ['direct', 'worker'];
 
 export type ExecutorFixtureMode = FixtureMode | 'server';
 
-export const executorFixtureModes: readonly ExecutorFixtureMode[] = ['direct', 'worker', 'server'];
+const serverModeRequested = typeof globalThis.location !== 'undefined'
+  && new URLSearchParams(globalThis.location.search).get('server') === '1';
+
+export const executorFixtureModes: readonly ExecutorFixtureMode[] = serverModeRequested
+  ? ['direct', 'worker', 'server']
+  : fixtureModes;
 
 export const solverJobStates = {
   RUNNING: 3,

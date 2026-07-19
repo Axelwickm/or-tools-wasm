@@ -21,7 +21,7 @@ import {
   solveRoutingInWorker,
   type RoutingModelOperation,
   type RoutingSolveRequest,
-} from '../worker_routing.js';
+} from './native_runtime.js';
 
 export type RoutingExecutorLike = SolverExecutor<RoutingBridgeRequest, RoutingBridgeResponse, never>;
 export type RoutingExecutorJob = SolverJob<RoutingBridgeResponse>;

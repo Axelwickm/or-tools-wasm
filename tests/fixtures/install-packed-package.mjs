@@ -64,7 +64,15 @@ async function installTarball(tarballPath) {
   });
   const install = spawnSync(
     'npm',
-    ['install', tarballPath, '--force', '--no-audit', '--no-fund', '--no-package-lock'],
+    [
+      'install',
+      tarballPath,
+      '--force',
+      '--no-audit',
+      '--no-fund',
+      '--no-package-lock',
+      '--install-strategy=nested',
+    ],
     {
       cwd: fixtureDir,
       stdio: 'inherit',

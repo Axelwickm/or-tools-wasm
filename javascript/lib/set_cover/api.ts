@@ -1,15 +1,15 @@
 import { create } from '@bufbuild/protobuf';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
-import { resolveExecutorConfiguration } from './executor_configuration.js';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
+import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
   SetCoverBridgeRequestSchema,
   SetCoverOperation,
   type SetCoverBridgeResponse,
-} from './generated/bridge/set_cover_pb.js';
-import type { SolverJobEvent } from './solver_executor.js';
-import { SetCoverExecutor, type SetCoverExecutorLike } from './set_cover/executor.js';
-import { SetCoverServerExecutor } from './set_cover/server_executor.js';
-import { SetCoverWorkerExecutor } from './set_cover/worker_executor.js';
+} from '../generated/bridge/set_cover_pb.js';
+import type { SolverJobEvent } from '../solver_executor.js';
+import { SetCoverExecutor, type SetCoverExecutorLike } from './executor.js';
+import { SetCoverServerExecutor } from './server_executor.js';
+import { SetCoverWorkerExecutor } from './worker_executor.js';
 
 export enum ConsistencyLevel {
   COST_AND_COVERAGE = 1,

@@ -1,16 +1,16 @@
-import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadMPSolverNativeModule } from './mp_solver/native_runtime.js';
+import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { loadMPSolverNativeModule } from './native_runtime.js';
 import { create } from '@bufbuild/protobuf';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
-import { resolveExecutorConfiguration } from './executor_configuration.js';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
+import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
   MpSolverSchemaRequestSchema,
   MpSolverSolveRequestSchema,
-} from './generated/bridge/mp_solver_pb.js';
-import type { SolverJobEvent } from './solver_executor.js';
-import { MpSolverExecutor, type MpSolverExecutorLike } from './mp_solver/executor.js';
-import { MpSolverServerExecutor } from './mp_solver/server_executor.js';
-import { MpSolverWorkerExecutor } from './mp_solver/worker_executor.js';
+} from '../generated/bridge/mp_solver_pb.js';
+import type { SolverJobEvent } from '../solver_executor.js';
+import { MpSolverExecutor, type MpSolverExecutorLike } from './executor.js';
+import { MpSolverServerExecutor } from './server_executor.js';
+import { MpSolverWorkerExecutor } from './worker_executor.js';
 import * as protobufModule from 'protobufjs';
 
 let mpSolverModule: OrToolsWasmModule | null = null;

@@ -24,7 +24,7 @@ export {
   PdlpParameters,
   PdlpRestartStrategy,
   PdlpSchedulerType,
-} from './mathopt_api.js';
+} from './mathopt/api.js';
 export type {
   GlopParametersOptions,
   GlpkParametersOptions,
@@ -51,6 +51,6 @@ export type {
   MathOptVariable,
   MathOptVariableOptions,
   PdlpParametersOptions,
-} from './mathopt_api.js';
+} from './mathopt/api.js';
 export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

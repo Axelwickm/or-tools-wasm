@@ -4,16 +4,16 @@ import {
   MaxFlowRequestSchema,
   MinCostFlowRequestSchema,
   type NetworkFlowBridgeResponse,
-} from './generated/bridge/network_flow_pb.js';
+} from '../generated/bridge/network_flow_pb.js';
 import {
   resolveExecutorConfiguration,
   type ExecutorConfiguration,
   type ResolvedExecutorConfiguration,
-} from './executor_configuration.js';
-import { NetworkFlowExecutor, type NetworkFlowExecutorLike } from './network_flow/executor.js';
-import { NetworkFlowWorkerExecutor } from './network_flow/worker_executor.js';
-import { NetworkFlowServerExecutor } from './network_flow/server_executor.js';
-import type { SolverJobEvent } from './solver_executor.js';
+} from '../executor_configuration.js';
+import { NetworkFlowExecutor, type NetworkFlowExecutorLike } from './executor.js';
+import { NetworkFlowWorkerExecutor } from './worker_executor.js';
+import { NetworkFlowServerExecutor } from './server_executor.js';
+import type { SolverJobEvent } from '../solver_executor.js';
 
 export type NetworkFlowEvent = SolverJobEvent;
 export type NetworkFlowSolveOptions = {

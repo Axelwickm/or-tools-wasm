@@ -14,7 +14,7 @@ export {
   PresolveValues,
   ScalingValues,
   setMPSolverExecutor as setExecutor,
-} from './mp_solver_api.js';
+} from './mp_solver/api.js';
 export type {
   LinearSolverSchemas,
   MPSolverModelRequest,
@@ -23,6 +23,6 @@ export type {
   MPSolverSolutionResponse,
   MPSolverEvent,
   MPSolverExecutionOptions,
-} from './mp_solver_api.js';
+} from './mp_solver/api.js';
 export type { ExecutorConfiguration } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

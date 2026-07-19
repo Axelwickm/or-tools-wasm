@@ -20,6 +20,16 @@ const publicEntryNames = [
   'set-cover',
   'rcpsp',
 ];
+const solverBuilds = [
+  { directory: 'cp_sat', publicEntries: ['cp-sat', 'rcpsp'] },
+  { directory: 'knapsack', publicEntries: ['knapsack'] },
+  { directory: 'mathopt', publicEntries: ['mathopt'] },
+  { directory: 'mp_solver', publicEntries: ['mp-solver'] },
+  { directory: 'network_flow', publicEntries: ['network-flow'] },
+  { directory: 'pdlp', publicEntries: ['pdlp'] },
+  { directory: 'routing', publicEntries: ['routing'] },
+  { directory: 'set_cover', publicEntries: ['set-cover'] },
+];
 
 async function* listTypeScriptFiles(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -57,9 +67,6 @@ async function transpileSource(sourcePath) {
     loader: 'ts',
     format: 'esm',
     target: 'es2020',
-    define: {
-      __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
-    },
     minifySyntax: true,
     sourcemap: false,
   });
@@ -93,8 +100,8 @@ const externalRuntimeLoaderPlugin = {
   },
 };
 
-const externalWorkerRuntimeLoaderPlugin = {
-  name: 'external-worker-runtime-loader',
+const workerBundlePlugin = {
+  name: 'worker-bundle',
   setup(buildContext) {
     buildContext.onResolve({ filter: /^node:/ }, (args) => ({
       path: args.path,
@@ -105,10 +112,6 @@ const externalWorkerRuntimeLoaderPlugin = {
     }));
     buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
       path: require.resolve('protobufjs'),
-    }));
-    buildContext.onResolve({ filter: /^(?:\.\.?\/)+runtime_loader\.js$/ }, (args) => ({
-      path: `../${path.basename(args.path)}`,
-      external: true,
     }));
   },
 };
@@ -122,9 +125,6 @@ async function bundleBrowserEntry() {
       format: 'esm',
       platform: 'browser',
       target: 'es2020',
-      define: {
-        __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
-      },
       minifySyntax: true,
       sourcemap: false,
       plugins: [externalRuntimeLoaderPlugin],
@@ -133,81 +133,47 @@ async function bundleBrowserEntry() {
 }
 
 async function bundleSolverWorkers() {
-  for (const solver of ['cp_sat', 'knapsack', 'mathopt', 'mp_solver', 'network_flow', 'pdlp', 'routing', 'set_cover']) {
+  for (const { directory } of solverBuilds) {
+    const outfile = path.join(outDir, directory, 'worker.js');
     await build({
-      entryPoints: [path.join(sourceDir, `${solver}/worker.ts`)],
-      outfile: path.join(outDir, `${solver}/worker.js`),
+      entryPoints: [path.join(sourceDir, directory, 'worker.ts')],
+      outfile,
       bundle: true,
       format: 'esm',
       platform: 'browser',
       target: 'es2020',
-      define: {
-        __ORTOOLS_WASM_BROWSER_BUILD__: 'true',
-      },
       minifySyntax: true,
       sourcemap: false,
-      plugins: [externalWorkerRuntimeLoaderPlugin],
+      plugins: [workerBundlePlugin],
     });
+
+    const source = await readFile(outfile, 'utf8');
+    await writeFile(
+      outfile,
+      source
+        .replaceAll('#internal-wasm/', '../../wasm/')
+        .replaceAll('?no-inline', ''),
+    );
   }
 }
 
 async function patchBundledSolverWorkerUrls() {
-  for (const entryName of ['cp-sat', 'rcpsp']) {
-    const entryPath = path.join(outDir, `${entryName}.js`);
-    const source = await readFile(entryPath, 'utf8');
-    const patchedSource = source
-      .replaceAll(
-        'new URL("./worker.js", import.meta.url)',
-        'new URL("./cp_sat/worker.js", import.meta.url)',
-      )
-      .replaceAll('#internal-wasm/', '../wasm/')
-      .replaceAll('?no-inline', '');
-    if (patchedSource !== source) {
-      await writeFile(entryPath, patchedSource);
+  for (const { directory, publicEntries } of solverBuilds) {
+    for (const entryName of publicEntries) {
+      const entryPath = path.join(outDir, `${entryName}.js`);
+      const source = await readFile(entryPath, 'utf8');
+      const patchedSource = source
+        .replaceAll(
+          'new URL("./worker.js", import.meta.url)',
+          `new URL("./${directory}/worker.js", import.meta.url)`,
+        )
+        .replaceAll('#internal-wasm/', '../wasm/')
+        .replaceAll('?no-inline', '');
+      if (patchedSource !== source) {
+        await writeFile(entryPath, patchedSource);
+      }
     }
   }
-  const knapsackPath = path.join(outDir, 'knapsack.js');
-  const knapsackSource = await readFile(knapsackPath, 'utf8');
-  await writeFile(knapsackPath, knapsackSource
-    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./knapsack/worker.js", import.meta.url)')
-    .replaceAll('#internal-wasm/', '../wasm/')
-    .replaceAll('?no-inline', ''));
-  const networkFlowPath = path.join(outDir, 'network-flow.js');
-  const networkFlowSource = await readFile(networkFlowPath, 'utf8');
-  await writeFile(networkFlowPath, networkFlowSource
-    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./network_flow/worker.js", import.meta.url)')
-    .replaceAll('#internal-wasm/', '../wasm/')
-    .replaceAll('?no-inline', ''));
-  const mpSolverPath = path.join(outDir, 'mp-solver.js');
-  const mpSolverSource = await readFile(mpSolverPath, 'utf8');
-  await writeFile(mpSolverPath, mpSolverSource
-    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./mp_solver/worker.js", import.meta.url)')
-    .replaceAll('#internal-wasm/', '../wasm/')
-    .replaceAll('?no-inline', ''));
-  const mathOptPath = path.join(outDir, 'mathopt.js');
-  const mathOptSource = await readFile(mathOptPath, 'utf8');
-  await writeFile(mathOptPath, mathOptSource
-    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./mathopt/worker.js", import.meta.url)')
-    .replaceAll('#internal-wasm/', '../wasm/')
-    .replaceAll('?no-inline', ''));
-  const setCoverPath = path.join(outDir, 'set-cover.js');
-  const setCoverSource = await readFile(setCoverPath, 'utf8');
-  await writeFile(setCoverPath, setCoverSource
-    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./set_cover/worker.js", import.meta.url)')
-    .replaceAll('#internal-wasm/', '../wasm/')
-    .replaceAll('?no-inline', ''));
-  const pdlpPath = path.join(outDir, 'pdlp.js');
-  const pdlpSource = await readFile(pdlpPath, 'utf8');
-  await writeFile(pdlpPath, pdlpSource
-    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./pdlp/worker.js", import.meta.url)')
-    .replaceAll('#internal-wasm/', '../wasm/')
-    .replaceAll('?no-inline', ''));
-  const routingPath = path.join(outDir, 'routing.js');
-  const routingSource = await readFile(routingPath, 'utf8');
-  await writeFile(routingPath, routingSource
-    .replaceAll('new URL("./worker.js", import.meta.url)', 'new URL("./routing/worker.js", import.meta.url)')
-    .replaceAll('#internal-wasm/', '../wasm/')
-    .replaceAll('?no-inline', ''));
 }
 
 await rm(outDir, { recursive: true, force: true });

@@ -9,6 +9,7 @@ type WorkerStats = {
 };
 
 test('runs the shared solver fixture cases across executor modes', async ({ page }) => {
+  const includeServer = process.env.ORTOOLS_TEST_SERVER === '1';
   const browserErrors: string[] = [];
   let failOnPageError: (error: Error) => void = () => {};
   const pageErrorPromise = new Promise<never>((_, reject) => {
@@ -33,7 +34,7 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }
   });
 
-  await page.goto('/');
+  await page.goto(includeServer ? '/?server=1' : '/');
 
   const status = page.locator('#status');
   try {
@@ -177,8 +178,7 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     'direct/4 workers/4',
     'worker/1 worker/1',
     'worker/4 workers/4',
-    'server/1 worker/1',
-    'server/4 workers/4',
+    ...(includeServer ? ['server/1 worker/1', 'server/4 workers/4'] : []),
   ].sort();
   const highLevelCpSatProfileKey = (result: {
     mode?: string;
@@ -222,13 +222,13 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       statusStates: expect.arrayContaining([2, 3, 6]),
       ok: true,
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       id: 'cp_sat.solver_structure.solve_server',
       executor: 'server',
       responseBytesLength: expect.any(Number),
       statusStates: expect.arrayContaining([2, 3, 6]),
       ok: true,
-    }),
+    })] : []),
   ]));
   for (const result of parsedStatus.cpSatSolverStructureResults ?? []) {
     if (result.responseBytesLength !== undefined) {
@@ -241,14 +241,16 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   expect(parsedStatus.cpSatSolverStructureWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBe(
     parsedStatus.cpSatSolverStructureWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'],
   );
-  expect(parsedStatus.results).toHaveLength(6);
+  expect(parsedStatus.results).toHaveLength(includeServer ? 6 : 4);
   expect(parsedStatus.results).toEqual([
     expect.objectContaining({ mode: 'direct', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
     expect.objectContaining({ mode: 'direct', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
     expect.objectContaining({ mode: 'worker', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
     expect.objectContaining({ mode: 'worker', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
-    expect.objectContaining({ mode: 'server', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
-    expect.objectContaining({ mode: 'server', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
+    ...(includeServer ? [
+      expect.objectContaining({ mode: 'server', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
+      expect.objectContaining({ mode: 'server', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
+    ] : []),
   ]);
   const [directResult] = parsedStatus.results ?? [];
   expect(directResult?.cases?.length).toBeGreaterThan(0);
@@ -337,12 +339,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       objective: 25,
       values: expect.objectContaining({ x: 0, y: 2.5 }),
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       name: 'MPSolver: simple_lp_program.py (server)',
       ok: true,
       objective: 25,
       values: expect.objectContaining({ x: 0, y: 2.5 }),
-    }),
+    })] : []),
     expect.objectContaining({
       name: 'MPSolver: simple_mip_program.py (direct)',
       ok: true,
@@ -355,12 +357,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       objective: 23,
       values: expect.objectContaining({ x: 3, y: 2 }),
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       name: 'MPSolver: simple_mip_program.py (server)',
       ok: true,
       objective: 23,
       values: expect.objectContaining({ x: 3, y: 2 }),
-    }),
+    })] : []),
     expect.objectContaining({
       name: 'MPSolver: BOP binary project selection (direct)',
       ok: true,
@@ -373,12 +375,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       objective: 13,
       values: expect.objectContaining({ analytics: 1, dashboard: 0, alerts: 1 }),
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       name: 'MPSolver: BOP binary project selection (server)',
       ok: true,
       objective: 13,
       values: expect.objectContaining({ analytics: 1, dashboard: 0, alerts: 1 }),
-    }),
+    })] : []),
     expect.objectContaining({
       name: 'MPSolver: BOP integer production (direct)',
       ok: true,
@@ -391,12 +393,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       objective: 19,
       values: expect.objectContaining({ x: 3, y: 2 }),
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       name: 'MPSolver: BOP integer production (server)',
       ok: true,
       objective: 19,
       values: expect.objectContaining({ x: 3, y: 2 }),
-    }),
+    })] : []),
     expect.objectContaining({
       name: 'MPSolver: lp_test.py testBopInfeasible',
       ok: true,
@@ -429,12 +431,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       profit: 7534,
       optimal: true,
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       name: 'PyWrapAlgorithmsKnapsackSolverTest.testSolveOneDimension (server)',
       ok: true,
       profit: 34,
       optimal: true,
-    }),
+    })] : []),
   ]));
   expectStableCaseIds(parsedStatus.knapsackResults, 'Knapsack');
   expect(parsedStatus.networkFlowWorkerStatsAfter?.executorWorkerRequests?.['network-flow']).toBeGreaterThan(
@@ -456,11 +458,11 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       ok: true,
       objectiveValue: 265,
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       name: 'simple_max_flow_program.py (server)',
       ok: true,
       objectiveValue: 60,
-    }),
+    })] : []),
   ]));
   expectStableCaseIds(parsedStatus.networkFlowResults, 'Network Flow');
   expect(parsedStatus.setCoverWorkerStatsAfter?.executorWorkerRequests?.['set-cover']).toBeGreaterThan(
@@ -488,12 +490,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       makespan: 8,
       statusName: 'OPTIMAL',
     }),
-    expect.objectContaining({
+    ...(includeServer ? [expect.objectContaining({
       name: 'RcpspCpSatSample.house_project (server)',
       ok: true,
       makespan: 8,
       statusName: 'OPTIMAL',
-    }),
+    })] : []),
   ]));
   expectStableCaseIds(parsedStatus.rcpspResults, 'RCPSP');
   expect(parsedStatus.mathOptWorkerStatsAfter?.executorWorkerRequests?.mathopt).toBeGreaterThan(

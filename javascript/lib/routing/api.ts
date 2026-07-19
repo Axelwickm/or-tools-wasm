@@ -1,8 +1,8 @@
 import { create } from '@bufbuild/protobuf';
-import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadRoutingRuntime } from './runtime_loader.js';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
-import { resolveExecutorConfiguration } from './executor_configuration.js';
+import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { loadRoutingRuntime } from '../runtime_loader.js';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
+import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
   RoutingAddConstantDimensionSchema,
   RoutingAddDimensionSchema,
@@ -16,12 +16,12 @@ import {
   RoutingMatrixSchema,
   RoutingModelOperationSchema,
   type RoutingModelOperation as BridgeRoutingOperation,
-} from './generated/bridge/routing_pb.js';
-import type { SolverJobEvent } from './solver_executor.js';
-import { RoutingExecutor, type RoutingExecutorLike } from './routing/executor.js';
-import { RoutingServerExecutor } from './routing/server_executor.js';
-import { RoutingWorkerExecutor } from './routing/worker_executor.js';
-import type { RoutingModelOperation, RoutingSolveResult } from './worker_routing.js';
+} from '../generated/bridge/routing_pb.js';
+import type { SolverJobEvent } from '../solver_executor.js';
+import { RoutingExecutor, type RoutingExecutorLike } from './executor.js';
+import { RoutingServerExecutor } from './server_executor.js';
+import { RoutingWorkerExecutor } from './worker_executor.js';
+import type { RoutingModelOperation, RoutingSolveResult } from './native_runtime.js';
 
 type RoutingTransitCallback = (fromIndex: number, toIndex: number) => number;
 

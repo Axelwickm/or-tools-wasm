@@ -17,6 +17,8 @@ env:
   NODE_VERSION: 24.12.0
   DENO_VERSION: 2.8.1
   BUN_VERSION: 1.3.14
+  ORTOOLS_SERVER_IMAGE: ortools-wasm-native-server:ci
+  ORTOOLS_WASM_SKIP_PACKAGE_BUILD: '1'
 
 jobs:
   package:
@@ -31,6 +33,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Node
+        if: ${{ !env.ACT }}
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -38,6 +41,7 @@ jobs:
           cache-dependency-path: package/package-lock.json
 
       - name: Cache Emscripten and CMake build
+        if: ${{ !env.ACT }}
         uses: actions/cache@v4
         with:
           path: |
@@ -52,9 +56,11 @@ jobs:
             wasm-build-${{ runner.os }}-
 
       - name: Install dependencies
+        if: ${{ !env.ACT }}
         run: npm ci --prefix package
 
       - name: Install native build tools
+        if: ${{ !env.ACT }}
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
 
       - name: Prepare package README for release tag
@@ -62,7 +68,12 @@ jobs:
         run: node scripts/prepare_package_readme.mjs "$GITHUB_REF_NAME"
 
       - name: Build and pack library
+        if: ${{ !env.ACT }}
         run: npm --prefix package run pack:lib
+
+      - name: Require locally packed library
+        if: ${{ env.ACT }}
+        run: test -n "$(find package/build/javascript/lib -maxdepth 1 -name '*.tgz' -print -quit)"
 
       - name: Upload package artifact
         if: ${{ !env.ACT }}
@@ -125,7 +136,7 @@ jobs:
 
       - name: Run Vite fixture
         working-directory: package
-        run: NODE_PATH=./node_modules FIXTURE_GROUP=vite npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=vite npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
 
   webpack-fixture:
     name: Webpack 5 / ${{ matrix.mode }} / ${{ matrix.browser }}
@@ -179,7 +190,7 @@ jobs:
 
       - name: Run Webpack fixture
         working-directory: package
-        run: NODE_PATH=./node_modules FIXTURE_GROUP=webpack npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=webpack npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
 
   rollup-fixture:
     name: Rollup 4 / static / ${{ matrix.browser }}
@@ -225,7 +236,7 @@ jobs:
 
       - name: Run Rollup fixture
         working-directory: package
-        run: NODE_PATH=./node_modules FIXTURE_GROUP=rollup npx playwright test --config ../tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=rollup npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
 
   deno-fixture:
     name: Deno 2.8.1 / solve
@@ -327,6 +338,87 @@ jobs:
       - name: Run Bun fixture
         run: npm --prefix package run test:fixture:bun
 
+  server-fixture:
+    name: Native server / JavaScript client
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix package
+
+      - name: Download package artifact
+        if: ${{ !env.ACT }}
+        uses: actions/download-artifact@v8
+        with:
+          name: npm-package
+          path: package/build/javascript/lib
+
+      - name: Setup Docker Buildx
+        if: ${{ !env.ACT }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build native server image
+        if: ${{ !env.ACT }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          tags: ${{ env.ORTOOLS_SERVER_IMAGE }}
+          load: true
+          cache-from: type=gha,scope=native-server
+          cache-to: type=gha,mode=max,scope=native-server
+
+      - name: Build native server image with local cache
+        if: ${{ env.ACT }}
+        run: docker build --file server/Dockerfile --tag "${ORTOOLS_SERVER_IMAGE}" .
+
+      - name: Start native server
+        run: docker compose -f server/docker-compose.yml up -d --no-build ortools-native
+
+      - name: Require healthy native server
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:17827/healthz; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Native server did not become healthy." >&2
+          exit 1
+
+      - name: Build Vite fixture
+        run: npm --prefix package run test:fixture:vite:build
+
+      - name: Install Chromium
+        working-directory: package
+        run: npx playwright install --with-deps chromium
+
+      - name: Run fixture against native server
+        working-directory: package
+        run: ORTOOLS_TEST_SERVER=1 NODE_PATH=./node_modules FIXTURE_GROUP=vite npx playwright test --config tests/playwright.config.ts --project=vite-static-chromium
+
+      - name: Show native server logs
+        if: ${{ always() }}
+        run: docker compose -f server/docker-compose.yml logs --no-color ortools-native
+
+      - name: Stop native server
+        if: ${{ always() }}
+        run: docker compose -f server/docker-compose.yml down --remove-orphans
+
   publish:
     name: Publish release
     needs:
@@ -337,6 +429,7 @@ jobs:
       - deno-fixture
       - node-fixture
       - bun-fixture
+      - server-fixture
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     if: ${{ startsWith(github.ref, 'refs/tags/v') && github.actor != 'nektos/act' }}

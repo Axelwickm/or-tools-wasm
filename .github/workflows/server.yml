@@ -27,6 +27,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Docker Buildx
+        if: ${{ !env.ACT }}
         uses: docker/setup-buildx-action@v3
 
       - name: Build native server image
@@ -42,16 +43,7 @@ jobs:
 
       - name: Build native server image with local cache
         if: ${{ env.ACT }}
-        run: |
-          docker buildx build \
-            --file server/Dockerfile \
-            --tag "${ORTOOLS_SERVER_IMAGE}" \
-            --load \
-            --cache-from type=local,src=/tmp/ortools-wasm-native-server-cache \
-            --cache-to type=local,dest=/tmp/ortools-wasm-native-server-cache-next,mode=max \
-            .
-          rm -rf /tmp/ortools-wasm-native-server-cache
-          mv /tmp/ortools-wasm-native-server-cache-next /tmp/ortools-wasm-native-server-cache
+        run: docker build --file server/Dockerfile --tag "${ORTOOLS_SERVER_IMAGE}" .
 
       - name: Run native server tests
         run: docker compose -f server/docker-compose.yml run --rm ortools-native-test

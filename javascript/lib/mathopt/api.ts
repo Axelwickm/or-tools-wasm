@@ -1,17 +1,17 @@
 import { create } from '@bufbuild/protobuf';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from './executor_configuration.js';
-import { resolveExecutorConfiguration } from './executor_configuration.js';
+import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
+import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
   MathOptIncrementalCreateRequestSchema,
   MathOptIncrementalDeleteRequestSchema,
   MathOptIncrementalSolveRequestSchema,
   MathOptSolveRequestSchema,
-} from './generated/bridge/mathopt_pb.js';
-import type { SolverJobEvent } from './solver_executor.js';
-import { MathOptExecutor, type MathOptExecutorLike, type MathOptExecutorRequest } from './mathopt/executor.js';
-import { MathOptServerExecutor } from './mathopt/server_executor.js';
-import { MathOptWorkerExecutor } from './mathopt/worker_executor.js';
-import type { SatParameters } from './generated/sat_parameters.js';
+} from '../generated/bridge/mathopt_pb.js';
+import type { SolverJobEvent } from '../solver_executor.js';
+import { MathOptExecutor, type MathOptExecutorLike, type MathOptExecutorRequest } from './executor.js';
+import { MathOptServerExecutor } from './server_executor.js';
+import { MathOptWorkerExecutor } from './worker_executor.js';
+import type { SatParameters } from '../generated/sat_parameters.js';
 
 type WireValue = Uint8Array;
 

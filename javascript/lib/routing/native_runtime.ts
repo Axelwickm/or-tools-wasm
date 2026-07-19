@@ -1,5 +1,5 @@
-import type { OrToolsWasmModule } from './wasm_module_types.js';
-import { loadRoutingRuntime } from './runtime_loader.js';
+import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { loadRoutingRuntime } from '../runtime_loader.js';
 
 export type RoutingModelOperation =
   | { type: 'addDimension'; transitMatrix: BigInt64Array; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }

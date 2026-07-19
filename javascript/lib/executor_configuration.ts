@@ -31,10 +31,7 @@ export type ExecutorConfiguration =
 export type ResolvedExecutorConfiguration = Exclude<ExecutorConfiguration, AutoExecutorConfiguration>;
 
 const isBrowserMainThread = typeof window !== 'undefined' && typeof document !== 'undefined';
-const isDeno = 'Deno' in globalThis;
-const isBun = 'Bun' in globalThis;
-const isNode = typeof process !== 'undefined' && typeof process.versions?.node === 'string' && !isDeno && !isBun;
-const isWorkerAvailable = ((isBrowserMainThread || isDeno || isBun) && typeof Worker !== 'undefined') || isNode;
+const isWorkerAvailable = typeof Worker !== 'undefined';
 
 export function resolveExecutorConfiguration(
   configuration: ExecutorConfiguration = { type: 'auto' },
