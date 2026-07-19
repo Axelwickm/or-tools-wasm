@@ -38,7 +38,7 @@ concurrency. A numeric value sets the scheduler's total thread-token budget.
 `ORTOOLS_SERVER_BEARER_TOKEN` enables bearer-token auth when set. If it is
 unset, the server warns loudly and accepts unauthenticated requests.
 
-The default executable is `server_cp_sat_hello`, built from
+The default executable is `ortools_server`, built from
 `server/src/main.cc`. It starts the native HTTP server and exposes:
 
 ```text
@@ -48,7 +48,11 @@ GET  /jobs/:id
 GET  /jobs/:id/events?after=:sequence
 GET  /jobs/:id/result
 POST /jobs/:id/cancel
+DELETE /jobs/:id
 ```
+
+Clients release completed job state with `DELETE /jobs/:id` after receiving a
+terminal result. Active jobs cannot be released.
 
 The job API carries generic `SolverBridgeRequest` / `SolverBridgeResponse`
 protobuf bytes. Solver-specific payloads, events, and results are nested as
@@ -65,10 +69,9 @@ Event reads are non-destructive. Each retained status transition and solver
 event has a monotonically increasing sequence ID, so clients can poll without
 losing or duplicating callbacks.
 
-The native server currently registers CP-SAT and Knapsack executors. CP-SAT
-supports schema, validate, solve, callbacks, and native search interruption.
-Knapsack jobs reserve one scheduler thread and return the same typed result as
-the direct and worker executors. Cancellation uses the same generic protobuf
+The native server registers CP-SAT, Knapsack, MathOpt, MPSolver, Network Flow,
+PDLP, Routing, and Set Cover executors. Each returns the same typed payload used
+by its direct and worker executors. Cancellation uses the same generic protobuf
 command for every solver; queued cancellation is immediate.
 
 The server path is native C++. JavaScript remains only on the client/package

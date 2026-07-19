@@ -329,6 +329,24 @@ HttpBinaryResponse SolverJobService::Cancel(const HttpBinaryRequest& request) {
   }
 }
 
+HttpBinaryResponse SolverJobService::Release(const HttpBinaryRequest& request) {
+  try {
+    const uint64_t job_id = JobIdFromRequest(request);
+    const auto entry = EntryFor(job_id);
+    if (!entry) return TextResponse(404, "Job not found.\n");
+    if (!IsTerminal(entry->handle.status().state)) {
+      return TextResponse(409, "Job is not complete.\n");
+    }
+
+    std::lock_guard lock(mutex_);
+    const auto it = jobs_.find(job_id);
+    if (it != jobs_.end() && it->second == entry) jobs_.erase(it);
+    return HttpBinaryResponse{204, {}, kProtobufContentType, {}};
+  } catch (const std::exception& error) {
+    return TextResponse(400, std::string(error.what()) + "\n");
+  }
+}
+
 SolverExecutor* SolverJobService::ExecutorFor(const std::string& solver) const {
   std::lock_guard lock(mutex_);
   const auto it = executors_.find(solver);

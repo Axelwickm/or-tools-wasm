@@ -27,6 +27,7 @@ class SolverJobService {
   HttpBinaryResponse Events(const HttpBinaryRequest& request);
   HttpBinaryResponse Result(const HttpBinaryRequest& request);
   HttpBinaryResponse Cancel(const HttpBinaryRequest& request);
+  HttpBinaryResponse Release(const HttpBinaryRequest& request);
 
  private:
   struct JobEntry;

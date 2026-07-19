@@ -14,7 +14,7 @@ constexpr const char* kPlainTextContentType = "text/plain; charset=utf-8";
 void AddCorsHeaders(httplib::Response& response) {
   response.set_header("Access-Control-Allow-Origin", "*");
   response.set_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept");
-  response.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.set_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
 }
 
 std::map<std::string, std::string> HeadersFromRequest(const httplib::Request& request) {
@@ -97,6 +97,20 @@ class HttpServer::Impl {
     });
   }
 
+  void AddDeleteRoute(const std::string& path, HttpBinaryHandler handler) {
+    AddOptionsRoute(path);
+    server_.Delete(path, [this, handler = std::move(handler)](
+                             const httplib::Request& request,
+                             httplib::Response& response) {
+      if (!Authorize(request, response)) return;
+
+      HttpBinaryRequest binary_request;
+      binary_request.headers = HeadersFromRequest(request);
+      binary_request.path_matches = PathMatchesFromRequest(request);
+      WriteResponse(handler(binary_request), response);
+    });
+  }
+
   bool Listen() { return server_.listen(config_.host, config_.port); }
 
   void Stop() { server_.stop(); }
@@ -151,6 +165,10 @@ void HttpServer::AddGetRoute(const std::string& path, HttpBinaryHandler handler)
 
 void HttpServer::AddPostRoute(const std::string& path, HttpBinaryHandler handler) {
   impl_->AddPostRoute(path, std::move(handler));
+}
+
+void HttpServer::AddDeleteRoute(const std::string& path, HttpBinaryHandler handler) {
+  impl_->AddDeleteRoute(path, std::move(handler));
 }
 
 bool HttpServer::Listen() { return impl_->Listen(); }

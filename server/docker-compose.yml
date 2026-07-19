@@ -19,4 +19,4 @@ services:
     command:
       - /bin/sh
       - -c
-      - /build/server/server_job_scheduler_test && /build/server/server_cp_sat_executor_test && /build/server/server_knapsack_executor_test && /build/server/server_solver_job_service_test && /build/server/server_config_test
+      - /build/server/server_job_scheduler_test && /build/server/server_cp_sat_executor_test && /build/server/server_knapsack_executor_test && /build/server/server_mathopt_executor_test && /build/server/server_mp_solver_executor_test && /build/server/server_network_flow_executor_test && /build/server/server_pdlp_executor_test && /build/server/server_routing_executor_test && /build/server/server_set_cover_executor_test && /build/server/server_solver_job_service_test && /build/server/server_config_test

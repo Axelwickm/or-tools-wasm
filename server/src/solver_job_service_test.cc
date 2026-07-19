@@ -284,6 +284,44 @@ void CancellationUsesGenericProtocolAndInterruptsExecutor() {
            "cancelled job remains distinct from solver result semantics");
 }
 
+void CompletedJobsCanBeReleased() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&,
+         const SolverEventSink&) {
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  const auto submitted = SubmitJob(&service);
+  WaitForResult(&service, submitted.job_id());
+  ExpectEq(service.Release(JobRequest(submitted.job_id())).status, 204,
+           "completed job release succeeds");
+  ExpectEq(service.Status(JobRequest(submitted.job_id())).status, 404,
+           "released job state is discarded");
+}
+
+void RunningJobsCannotBeReleased() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler);
+  ManualEvent started;
+  ManualEvent release;
+  service.Register(std::make_unique<FakeExecutor>(
+      [&](const SolverExecutorRequest&, const JobContext&,
+          const SolverEventSink&) {
+        started.Set();
+        release.Wait();
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  const auto submitted = SubmitJob(&service);
+  Expect(started.WaitFor(2s), "fake executor starts");
+  ExpectEq(service.Release(JobRequest(submitted.job_id())).status, 409,
+           "running job release is rejected");
+  release.Set();
+  WaitForResult(&service, submitted.job_id());
+}
+
 using TestFn = void (*)();
 
 int RunAllTests() {
@@ -293,6 +331,8 @@ int RunAllTests() {
       {"ResultIsIndependentFromEvents", ResultIsIndependentFromEvents},
       {"CancellationUsesGenericProtocolAndInterruptsExecutor",
        CancellationUsesGenericProtocolAndInterruptsExecutor},
+      {"CompletedJobsCanBeReleased", CompletedJobsCanBeReleased},
+      {"RunningJobsCannotBeReleased", RunningJobsCannotBeReleased},
   };
   for (const auto& [name, test] : tests) {
     try {

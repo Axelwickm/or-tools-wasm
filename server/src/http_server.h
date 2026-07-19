@@ -38,6 +38,7 @@ class HttpServer {
   void AddHealthRoute();
   void AddGetRoute(const std::string& path, HttpBinaryHandler handler);
   void AddPostRoute(const std::string& path, HttpBinaryHandler handler);
+  void AddDeleteRoute(const std::string& path, HttpBinaryHandler handler);
   bool Listen();
   void Stop();
 

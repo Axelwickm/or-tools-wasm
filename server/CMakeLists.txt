@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ortools_native_server LANGUAGES CXX)
+project(ortools_native_server LANGUAGES C CXX)
 
 include(CTest)
 include(FetchContent)
@@ -29,15 +29,16 @@ endif()
 set(BUILD_CXX ON CACHE BOOL "Build OR-Tools C++ library" FORCE)
 set(BUILD_PYTHON OFF CACHE BOOL "Build Python wrapper" FORCE)
 set(BUILD_FLATZINC OFF CACHE BOOL "Build FlatZinc" FORCE)
-set(BUILD_MATH_OPT OFF CACHE BOOL "Build MathOpt" FORCE)
+set(BUILD_MATH_OPT ON CACHE BOOL "Build MathOpt" FORCE)
 set(BUILD_SAMPLES OFF CACHE BOOL "Build OR-Tools samples" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "Build OR-Tools examples" FORCE)
-set(USE_COINOR OFF CACHE BOOL "Use COIN-OR solver" FORCE)
+set(USE_BOP ON CACHE BOOL "Use BOP solver" FORCE)
+set(USE_COINOR ON CACHE BOOL "Use COIN-OR solver" FORCE)
 set(USE_CPLEX OFF CACHE BOOL "Use CPLEX solver" FORCE)
 set(USE_GUROBI OFF CACHE BOOL "Use Gurobi solver" FORCE)
-set(USE_GLPK OFF CACHE BOOL "Use GLPK solver" FORCE)
+set(USE_GLPK ON CACHE BOOL "Use GLPK solver" FORCE)
 set(USE_HIGHS OFF CACHE BOOL "Use HiGHS solver" FORCE)
-set(USE_PDLP OFF CACHE BOOL "Use PDLP solver" FORCE)
+set(USE_PDLP ON CACHE BOOL "Use PDLP solver" FORCE)
 set(USE_SCIP ON CACHE BOOL "Use SCIP solver" FORCE)
 set(USE_XPRESS OFF CACHE BOOL "Use Xpress solver" FORCE)
 
@@ -55,11 +56,23 @@ set(SERVER_PROTO_SCHEMA_TEMPLATE "${REPO_ROOT}/javascript/generated_proto_schema
 set(BRIDGE_PROTO_SRCS
   "${BRIDGE_PROTO_OUT_DIR}/job.pb.cc"
   "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.cc"
-  "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.cc")
+  "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/mp_solver.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/network_flow.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/pdlp.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/routing.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/set_cover.pb.cc")
 set(BRIDGE_PROTO_HDRS
   "${BRIDGE_PROTO_OUT_DIR}/job.pb.h"
   "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.h"
-  "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.h")
+  "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/mp_solver.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/network_flow.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/pdlp.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/routing.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/set_cover.pb.h")
 
 add_custom_command(
   OUTPUT ${BRIDGE_PROTO_SRCS} ${BRIDGE_PROTO_HDRS}
@@ -70,10 +83,22 @@ add_custom_command(
     "job.proto"
     "cp_sat.proto"
     "knapsack.proto"
+    "mathopt.proto"
+    "mp_solver.proto"
+    "network_flow.proto"
+    "pdlp.proto"
+    "routing.proto"
+    "set_cover.proto"
   DEPENDS
     "${REPO_ROOT}/bridge-types/job.proto"
     "${REPO_ROOT}/bridge-types/cp_sat.proto"
     "${REPO_ROOT}/bridge-types/knapsack.proto"
+    "${REPO_ROOT}/bridge-types/mathopt.proto"
+    "${REPO_ROOT}/bridge-types/mp_solver.proto"
+    "${REPO_ROOT}/bridge-types/network_flow.proto"
+    "${REPO_ROOT}/bridge-types/pdlp.proto"
+    "${REPO_ROOT}/bridge-types/routing.proto"
+    "${REPO_ROOT}/bridge-types/set_cover.proto"
     protobuf::protoc
   COMMENT "Generate C++ protobufs for server bridge types"
   VERBATIM)
@@ -105,27 +130,38 @@ add_custom_command(
 add_custom_target(server_proto_schemas DEPENDS "${PROTO_SCHEMA_HEADER}")
 
 add_library(server_ortools_link_shims OBJECT
+  "${REPO_ROOT}/ortools/linear_solver/knapsack_interface.cc"
   "${REPO_ROOT}/ortools/linear_solver/proto_solver/glop_proto_solver.cc"
+  "${REPO_ROOT}/ortools/linear_solver/proto_solver/pdlp_proto_solver.cc"
   "${REPO_ROOT}/ortools/linear_solver/proto_solver/preprocessor.cc"
   "${REPO_ROOT}/ortools/linear_solver/proto_solver/sat_proto_solver.cc"
   "${REPO_ROOT}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
+  "${REPO_ROOT}/ortools/linear_solver/proto_solver/scip_params.cc"
+  "${REPO_ROOT}/ortools/linear_solver/proto_solver/scip_proto_solver.cc"
   "${REPO_ROOT}/ortools/third_party_solvers/gurobi_environment.cc")
 target_link_libraries(server_ortools_link_shims PRIVATE ortools::ortools)
 
-add_executable(server_cp_sat_hello
+add_executable(ortools_server
   src/cp_sat_executor.cc
   src/http_server.cc
   src/job_scheduler.cc
   src/knapsack_executor.cc
+  src/mathopt_executor.cc
+  src/mp_solver_executor.cc
   src/main.cc
+  src/network_flow_executor.cc
+  src/pdlp_executor.cc
+  src/routing_executor.cc
+  src/set_cover_executor.cc
   src/server_config.cc
   src/solver_job_service.cc)
-add_dependencies(server_cp_sat_hello server_proto_schemas)
-target_include_directories(server_cp_sat_hello PRIVATE
+add_dependencies(ortools_server server_proto_schemas)
+target_include_directories(ortools_server PRIVATE
   "${REPO_ROOT}"
   "${BRIDGE_PROTO_OUT_DIR}"
   "${CMAKE_BINARY_DIR}/server_proto_schemas")
-target_link_libraries(server_cp_sat_hello PRIVATE
+target_link_libraries(ortools_server PRIVATE
+  Eigen3::Eigen
   ortools::ortools
   protobuf::libprotobuf
   server_cpp_httplib
@@ -178,10 +214,92 @@ target_link_libraries(server_knapsack_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
+add_executable(server_network_flow_executor_test
+  src/job_scheduler.cc
+  src/network_flow_executor.cc
+  src/network_flow_executor_test.cc)
+target_include_directories(server_network_flow_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_network_flow_executor_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
+add_executable(server_mp_solver_executor_test
+  src/job_scheduler.cc
+  src/mp_solver_executor.cc
+  src/mp_solver_executor_test.cc)
+add_dependencies(server_mp_solver_executor_test server_proto_schemas)
+target_include_directories(server_mp_solver_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}"
+  "${CMAKE_BINARY_DIR}/server_proto_schemas")
+target_link_libraries(server_mp_solver_executor_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
+add_executable(server_mathopt_executor_test
+  src/job_scheduler.cc
+  src/mathopt_executor.cc
+  src/mathopt_executor_test.cc)
+target_include_directories(server_mathopt_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_mathopt_executor_test PRIVATE
+  Eigen3::Eigen
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
+add_executable(server_set_cover_executor_test
+  src/job_scheduler.cc
+  src/set_cover_executor.cc
+  src/set_cover_executor_test.cc)
+target_include_directories(server_set_cover_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_set_cover_executor_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
+add_executable(server_pdlp_executor_test
+  src/job_scheduler.cc
+  src/pdlp_executor.cc
+  src/pdlp_executor_test.cc)
+target_include_directories(server_pdlp_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_pdlp_executor_test PRIVATE
+  Eigen3::Eigen
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
+add_executable(server_routing_executor_test
+  src/job_scheduler.cc
+  src/routing_executor.cc
+  src/routing_executor_test.cc)
+target_include_directories(server_routing_executor_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_routing_executor_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
 if(BUILD_TESTING)
   add_test(NAME server_job_scheduler_test COMMAND server_job_scheduler_test)
   add_test(NAME server_config_test COMMAND server_config_test)
   add_test(NAME server_solver_job_service_test COMMAND server_solver_job_service_test)
   add_test(NAME server_cp_sat_executor_test COMMAND server_cp_sat_executor_test)
   add_test(NAME server_knapsack_executor_test COMMAND server_knapsack_executor_test)
+  add_test(NAME server_network_flow_executor_test COMMAND server_network_flow_executor_test)
+  add_test(NAME server_mp_solver_executor_test COMMAND server_mp_solver_executor_test)
+  add_test(NAME server_mathopt_executor_test COMMAND server_mathopt_executor_test)
+  add_test(NAME server_set_cover_executor_test COMMAND server_set_cover_executor_test)
+  add_test(NAME server_pdlp_executor_test COMMAND server_pdlp_executor_test)
+  add_test(NAME server_routing_executor_test COMMAND server_routing_executor_test)
 endif()

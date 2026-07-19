@@ -54,4 +54,4 @@ jobs:
           mv /tmp/ortools-wasm-native-server-cache-next /tmp/ortools-wasm-native-server-cache
 
       - name: Run native server tests
-        run: docker compose -f server/docker-compose.yml run --rm --no-build ortools-native-test
+        run: docker compose -f server/docker-compose.yml run --rm ortools-native-test

@@ -345,6 +345,14 @@ void JobScheduler::Dispatch(const std::shared_ptr<State>& state) {
   std::vector<std::shared_ptr<JobRecord>> ready;
   {
     std::lock_guard lock(state->mutex);
+    state->workers.erase(
+        std::remove_if(state->workers.begin(), state->workers.end(),
+                       [](std::future<void>& worker) {
+                         return worker.valid() &&
+                                worker.wait_for(std::chrono::seconds(0)) ==
+                                    std::future_status::ready;
+                       }),
+        state->workers.end());
     while (!state->shutting_down && !state->queue.empty()) {
       const auto& record = state->queue.front();
       if (record->allocated_threads > state->available_threads) break;
@@ -377,7 +385,12 @@ void JobScheduler::Run(const std::shared_ptr<State>& state,
   try {
     JobContext context(record->id, record->spec.solver, record->spec.requested_threads,
                        record->allocated_threads, record->cancellation);
-    result = record->job(context);
+    JobFunction job;
+    {
+      std::lock_guard lock(state->mutex);
+      job = std::move(record->job);
+    }
+    result = job(context);
     if (record->cancellation->requested() &&
         result.state == JobState::kSucceeded) {
       result = JobResult::Cancelled("Job cancelled.");
@@ -399,6 +412,7 @@ void JobScheduler::Run(const std::shared_ptr<State>& state,
 
   record->promise.set_value(result);
   EmitStatus(record, StatusForState(state, record));
+  record->on_status = {};
   Dispatch(state);
 }
 
