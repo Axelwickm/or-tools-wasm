@@ -2,7 +2,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
-const packageBuildRoot = path.join(repoRoot, 'package/build/javascript');
+const packageBuildRoot = path.join(repoRoot, 'javascript/build/javascript');
 const runtimeNames = [
   'cp_sat_runtime',
   'cp_sat_runtime_asyncify',

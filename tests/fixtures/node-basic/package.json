@@ -3,9 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "../../../package/node_modules/.bin/tsc --noEmit && node --experimental-strip-types --test basic.test.ts"
+    "test": "tsc --noEmit && node --experimental-strip-types --test basic.test.ts"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../package/build/javascript/lib/or-tools-wasm-local.tgz"
+    "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-local.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "typescript": "^5.9.3"
   }
 }

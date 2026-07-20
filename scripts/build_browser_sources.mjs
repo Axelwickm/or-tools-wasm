@@ -3,10 +3,10 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
-const require = createRequire(new URL('../package/package.json', import.meta.url));
+const require = createRequire(new URL('../javascript/package.json', import.meta.url));
 const { build, transform } = require('esbuild');
 const sourceDir = path.join(rootDir, 'javascript/lib');
-const packageBuildDir = path.join(rootDir, 'package/build/javascript');
+const packageBuildDir = path.join(rootDir, 'javascript/build/javascript');
 const outDir = path.join(packageBuildDir, 'browser');
 const publicEntryNames = [
   'index',
@@ -191,9 +191,7 @@ try {
   for await (const declarationPath of listDeclarationFiles(path.join(packageBuildDir, 'lib'))) {
     const declaration = await readFile(declarationPath, 'utf8');
     const patchedDeclaration = declaration
-      .replaceAll('../../build/javascript/wasm/', '../wasm/')
-      .replaceAll('../../../../package/node_modules/@bufbuild/protobuf/dist/esm/index.js', '@bufbuild/protobuf')
-      .replaceAll('../../../../package/node_modules/@bufbuild/protobuf/dist/esm/codegenv2/index.js', '@bufbuild/protobuf/codegenv2');
+      .replaceAll('../../build/javascript/wasm/', '../wasm/');
     if (patchedDeclaration !== declaration) {
       await writeFile(declarationPath, patchedDeclaration);
     }

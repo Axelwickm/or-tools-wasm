@@ -7,7 +7,7 @@ import dts from 'vite-plugin-dts';
 
 const rootDir = path.resolve(__dirname, '..');
 const packageDir = __dirname;
-const libRoot = path.resolve(rootDir, 'javascript/lib');
+const libRoot = path.resolve(packageDir, 'lib');
 const wasmBuildDir = path.resolve(packageDir, 'build/javascript/wasm');
 const outDir = path.resolve(packageDir, 'build/javascript/lib');
 const libEntries = {
@@ -113,9 +113,6 @@ export default defineConfig({
   resolve: {
     alias: {
       './runtime_loader.js': path.join(libRoot, 'runtime_loader.ts'),
-      '@bufbuild/protobuf/codegenv2': path.join(packageDir, 'node_modules/@bufbuild/protobuf/dist/esm/codegenv2/index.js'),
-      '@bufbuild/protobuf': path.join(packageDir, 'node_modules/@bufbuild/protobuf/dist/esm/index.js'),
-      protobufjs: path.join(packageDir, 'node_modules/protobufjs/index.js'),
       '#internal-wasm': wasmBuildDir,
       '@internal-wasm': wasmBuildDir
     }
@@ -127,7 +124,7 @@ export default defineConfig({
     dts({
       tsconfigPath: path.resolve(packageDir, 'tsconfig.json'),
       rollupTypes: true,
-      entryRoot: path.resolve(rootDir, 'javascript/lib'),
+      entryRoot: libRoot,
     }),
   ],
   worker: {

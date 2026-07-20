@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "../../../package/node_modules/.bin/tsc --noEmit && bun cp_sat.test.ts && bun routing.test.ts && bun mp_solver.test.ts && bun knapsack.test.ts && bun network_flow.test.ts && bun set_cover.test.ts && bun rcpsp.test.ts && bun mathopt.test.ts && bun pdlp.test.ts && bun mixed_runtime.test.ts"
+    "test": "tsc --noEmit && bun cp_sat.test.ts && bun routing.test.ts && bun mp_solver.test.ts && bun knapsack.test.ts && bun network_flow.test.ts && bun set_cover.test.ts && bun rcpsp.test.ts && bun mathopt.test.ts && bun pdlp.test.ts && bun mixed_runtime.test.ts"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../package/build/javascript/lib/or-tools-wasm-local.tgz"
+    "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-local.tgz"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

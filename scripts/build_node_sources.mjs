@@ -3,10 +3,10 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
-const require = createRequire(new URL('../package/package.json', import.meta.url));
+const require = createRequire(new URL('../javascript/package.json', import.meta.url));
 const { build } = require('esbuild');
 const sourceDir = path.join(rootDir, 'javascript/lib');
-const outDir = path.join(rootDir, 'package/build/javascript/node');
+const outDir = path.join(rootDir, 'javascript/build/javascript/node');
 const publicEntryNames = [
   'index',
   'cp-sat',

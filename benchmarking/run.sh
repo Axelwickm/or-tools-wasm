@@ -75,13 +75,13 @@ trap 'exit 143' TERM
 cleanup_containers
 
 for required_dir in \
-  "${ROOT}/package/build/javascript/node" \
-  "${ROOT}/package/build/javascript/node-wasm" \
-  "${ROOT}/package/build/javascript/browser" \
-  "${ROOT}/package/build/javascript/wasm"
+  "${ROOT}/javascript/build/javascript/node" \
+  "${ROOT}/javascript/build/javascript/node-wasm" \
+  "${ROOT}/javascript/build/javascript/browser" \
+  "${ROOT}/javascript/build/javascript/wasm"
 do
   if [[ ! -d "${required_dir}" ]]; then
-    fail "Missing ${required_dir}. Run npm --prefix package run build:lib before benchmarking."
+    fail "Missing ${required_dir}. Run npm --prefix javascript run build:lib before benchmarking."
   fi
 done
 

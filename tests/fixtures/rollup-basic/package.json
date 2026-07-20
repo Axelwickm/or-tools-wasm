@@ -11,7 +11,7 @@
     "@surma/rollup-plugin-off-main-thread": "^2.2.3",
     "@web/rollup-plugin-import-meta-assets": "^2.3.3",
     "esbuild": "^0.27.7",
-    "or-tools-wasm": "file:../../../package/build/javascript/lib/or-tools-wasm-local.tgz",
+    "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-local.tgz",
     "rollup": "^4.53.3",
     "typescript": "^5.9.3"
   }

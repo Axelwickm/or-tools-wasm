@@ -12,7 +12,7 @@ if (!fixtureName) {
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const fixtureDir = path.join(repoRoot, 'tests/fixtures', fixtureName);
-const packageRoot = path.join(repoRoot, 'package');
+const packageRoot = path.join(repoRoot, 'javascript');
 const packageDir = path.join(packageRoot, 'build/javascript/lib');
 const stableTarballPath = path.join(packageDir, 'or-tools-wasm-local.tgz');
 const npmCacheDir = path.join(repoRoot, '.npm-cache');

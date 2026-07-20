@@ -31,14 +31,14 @@ fi
 
 if [[ "${ORTOOLS_WASM_CLEAN:-0}" == "1" ]]; then
   rm -rf build/javascript/wasm build/javascript/node-wasm
-  rm -rf package/build/javascript/wasm package/build/javascript/node-wasm
+  rm -rf javascript/build/javascript/wasm javascript/build/javascript/node-wasm
 fi
 
 mkdir -p build/javascript/wasm build/javascript/node-wasm
 cmake --build build --target cp_sat_runtime_site --parallel "${build_parallel_level}"
 node scripts/prune_wasm_outputs.mjs
 
-rm -rf package/build/javascript/wasm package/build/javascript/node-wasm
-mkdir -p package/build/javascript
-cp -a build/javascript/wasm package/build/javascript/
-cp -a build/javascript/node-wasm package/build/javascript/
+rm -rf javascript/build/javascript/wasm javascript/build/javascript/node-wasm
+mkdir -p javascript/build/javascript
+cp -a build/javascript/wasm javascript/build/javascript/
+cp -a build/javascript/node-wasm javascript/build/javascript/

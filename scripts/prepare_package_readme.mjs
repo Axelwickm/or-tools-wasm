@@ -2,7 +2,7 @@ import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
-const packageDir = path.join(repoRoot, 'package');
+const packageDir = path.join(repoRoot, 'javascript');
 const releaseRef = process.argv[2]
   ?? (process.env.GITHUB_REF?.startsWith('refs/tags/v') ? process.env.GITHUB_REF_NAME : undefined);
 

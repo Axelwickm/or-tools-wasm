@@ -38,17 +38,17 @@ Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_
 
 ## Usage
 
-Run the local test site:
-
-```sh
-npm --prefix package install
-npm --prefix package run dev
-```
-
 Install from npm:
 
 ```sh
 npm install or-tools-wasm
+```
+
+Run the local test site:
+
+```sh
+npm --prefix javascript install
+npm --prefix javascript run dev
 ```
 
 > [!WARNING]
@@ -163,7 +163,7 @@ imports, with no manual copying into `public/` or `static/` required.
 Run the full fixture matrix:
 
 ```sh
-npm --prefix package run test:fixtures
+npm --prefix javascript run test:fixtures
 ```
 
 This runs the shared solver cases through Vite, Webpack, Rollup, Deno, Node,
@@ -174,9 +174,9 @@ worker bridge, and solver thread settings where supported.
 For focused iteration:
 
 ```sh
-npm --prefix package run test:fixtures:browser
-npm --prefix package run test:fixtures:runtime
-npm --prefix package run test:fixture:node
+npm --prefix javascript run test:fixtures:browser
+npm --prefix javascript run test:fixtures:runtime
+npm --prefix javascript run test:fixture:node
 ```
 
 Run the full matrix before landing solver API, worker bridge, threading, or

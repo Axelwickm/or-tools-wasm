@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "WebWorker"],
+    "paths": {
+      "@internal-wasm/*": ["build/javascript/wasm/*"],
+      "#internal-wasm/*": ["build/javascript/wasm/*"]
+    }
+  },
+  "include": [
+    "lib/**/*.ts",
+    "lib/**/*.d.ts",
+    "build/javascript/wasm/**/*.d.ts"
+  ]
+}

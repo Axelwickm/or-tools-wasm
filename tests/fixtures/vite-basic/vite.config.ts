@@ -16,8 +16,8 @@ export default defineConfig({
     fs: {
       allow: [
         fixtureDir,
-        resolve(fixtureDir, '../../../package/build/javascript/browser'),
-        resolve(fixtureDir, '../../../package/build/javascript/wasm'),
+        resolve(fixtureDir, '../../../javascript/build/javascript/browser'),
+        resolve(fixtureDir, '../../../javascript/build/javascript/wasm'),
       ],
     },
     headers: {
