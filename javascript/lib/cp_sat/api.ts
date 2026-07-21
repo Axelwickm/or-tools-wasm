@@ -22,7 +22,11 @@ import {
 import type { SolverJobEvent } from '../solver_executor.js';
 import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
+import Long from 'long';
 import * as protobufModule from 'protobufjs';
+
+protobufModule.util.Long = Long;
+protobufModule.configure();
 
 export {
   CpSolverStatus,
