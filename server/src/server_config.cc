@@ -58,6 +58,8 @@ ServerConfig LoadServerConfig(EnvLookup env) {
       RequiredPortEnv(env, "ORTOOLS_SERVER_PORT"),
       RequiredThreadBudgetEnv(env, "ORTOOLS_SERVER_TOTAL_THREADS"),
       RequiredPositiveEnv(env, "ORTOOLS_SERVER_MAX_QUEUE_SIZE"),
+      RequiredPositiveEnv(env,
+                          "ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS"),
       OptionalStringEnv(env, "ORTOOLS_SERVER_BEARER_TOKEN"),
   };
 }

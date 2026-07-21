@@ -12,6 +12,7 @@ struct ServerConfig {
   int port = 0;
   int total_threads = 0;
   int max_queue_size = 0;
+  int completed_job_retention_seconds = 0;
   std::string bearer_token;
 };
 

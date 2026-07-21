@@ -11,6 +11,7 @@ services:
       ORTOOLS_SERVER_PORT: ${ORTOOLS_SERVER_PORT:-17827}
       ORTOOLS_SERVER_TOTAL_THREADS: ${ORTOOLS_SERVER_TOTAL_THREADS:-auto}
       ORTOOLS_SERVER_MAX_QUEUE_SIZE: ${ORTOOLS_SERVER_MAX_QUEUE_SIZE:-100000}
+      ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS: ${ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS:-3600}
       ORTOOLS_SERVER_BEARER_TOKEN: ${ORTOOLS_SERVER_BEARER_TOKEN:-}
 
   ortools-native-test:
@@ -19,4 +20,4 @@ services:
     command:
       - /bin/sh
       - -c
-      - /build/server/server_job_scheduler_test && /build/server/server_cp_sat_executor_test && /build/server/server_knapsack_executor_test && /build/server/server_mathopt_executor_test && /build/server/server_mp_solver_executor_test && /build/server/server_network_flow_executor_test && /build/server/server_pdlp_executor_test && /build/server/server_routing_executor_test && /build/server/server_set_cover_executor_test && /build/server/server_solver_job_service_test && /build/server/server_config_test
+      - /build/server/server_job_scheduler_test && /build/server/server_cp_sat_executor_test && /build/server/server_knapsack_executor_test && /build/server/server_mathopt_executor_test && /build/server/server_mp_solver_executor_test && /build/server/server_network_flow_executor_test && /build/server/server_pdlp_executor_test && /build/server/server_routing_executor_test && /build/server/server_set_cover_executor_test && /build/server/server_solver_job_service_test && /build/server/server_http_integration_test && /build/server/server_config_test

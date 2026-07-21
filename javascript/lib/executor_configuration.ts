@@ -10,12 +10,9 @@ export type WorkerExecutorConfiguration = {
   type: 'worker';
 };
 
-type ServerEndpointConfiguration =
-  | { host: string | URL; url?: never }
-  | { host?: never; url: string | URL };
-
-export type ServerExecutorConfiguration = ServerEndpointConfiguration & {
+export type ServerExecutorConfiguration = {
   type: 'server';
+  url: string | URL;
   authToken?: string;
   headers?: Record<string, string>;
   fetch?: typeof fetch;

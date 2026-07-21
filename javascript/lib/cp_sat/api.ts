@@ -22,11 +22,7 @@ import {
 import type { SolverJobEvent } from '../solver_executor.js';
 import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
-import Long from 'long';
 import * as protobufModule from 'protobufjs';
-
-protobufModule.util.Long = Long;
-protobufModule.configure();
 
 export {
   CpSolverStatus,
@@ -278,7 +274,11 @@ type ProtobufLong = {
 };
 
 function isProtobufLong(value: unknown): value is ProtobufLong {
-  return Long.isLong(value);
+  return value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Partial<ProtobufLong>).low === 'number' &&
+    typeof (value as Partial<ProtobufLong>).high === 'number' &&
+    typeof (value as Partial<ProtobufLong>).unsigned === 'boolean';
 }
 
 function exactLongValue(value: ProtobufLong) {

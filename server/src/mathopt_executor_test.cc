@@ -83,9 +83,24 @@ void ReservesNestedThreadCount() {
   Expect(executor.RequestedThreads(outer, 1, 4) == 1, "MathOpt reserves nested thread count");
 }
 
+void ReservesOneThreadForIncrementalSessionCreation() {
+  MathOptExecutor executor;
+  auto inner = InnerRequest();
+  inner.mutable_parameters()->set_threads(2);
+  bridge::MathOptBridgeRequest request;
+  request.mutable_incremental_create()->set_solve_request_proto(inner.SerializeAsString());
+  const SolverExecutorRequest outer{1, "mathopt", request.SerializeAsString()};
+  Expect(executor.RequestedThreads(outer, 1, 4) == 1,
+         "MathOpt incremental creation reserves one control thread");
+}
+
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
-      {"SolvesNestedProto", SolvesNestedProto}, {"CreatesAndDeletesIncrementalSession", CreatesAndDeletesIncrementalSession}, {"ReservesNestedThreadCount", ReservesNestedThreadCount}};
+      {"SolvesNestedProto", SolvesNestedProto},
+      {"CreatesAndDeletesIncrementalSession", CreatesAndDeletesIncrementalSession},
+      {"ReservesNestedThreadCount", ReservesNestedThreadCount},
+      {"ReservesOneThreadForIncrementalSessionCreation",
+       ReservesOneThreadForIncrementalSessionCreation}};
   for (const auto& [name, test] : tests) {
     try { test(); std::cout << "[PASS] " << name << '\n'; }
     catch (const std::exception& error) { std::cerr << "[FAIL] " << name << ": " << error.what() << '\n'; return EXIT_FAILURE; }

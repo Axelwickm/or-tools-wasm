@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -17,6 +18,7 @@
 #include "server/src/routing_executor.h"
 #include "server/src/set_cover_executor.h"
 #include "server/src/server_config.h"
+#include "server/src/solver_job_routes.h"
 #include "server/src/solver_job_service.h"
 
 namespace {
@@ -26,7 +28,9 @@ int RunHttpServer(const ortools_wasm::server::ServerConfig& config) {
   options.total_threads = config.total_threads;
   options.max_queue_size = config.max_queue_size;
   ortools_wasm::server::JobScheduler scheduler(options);
-  ortools_wasm::server::SolverJobService job_service(scheduler);
+  ortools_wasm::server::SolverJobService job_service(
+      scheduler,
+      std::chrono::seconds(config.completed_job_retention_seconds));
   job_service.Register(std::make_unique<ortools_wasm::server::CpSatExecutor>());
   job_service.Register(std::make_unique<ortools_wasm::server::KnapsackExecutor>());
   job_service.Register(std::make_unique<ortools_wasm::server::MathOptExecutor>());
@@ -44,28 +48,13 @@ int RunHttpServer(const ortools_wasm::server::ServerConfig& config) {
     std::cout << "server bearer_auth=enabled" << '\n';
   }
   std::cout << "scheduler total_threads=" << scheduler.Stats().total_threads
-            << " max_queue_size=" << options.max_queue_size << '\n';
+            << " max_queue_size=" << options.max_queue_size
+            << " completed_job_retention_seconds="
+            << config.completed_job_retention_seconds << '\n';
 
   ortools_wasm::server::HttpServer server(config);
   server.AddHealthRoute();
-  server.AddPostRoute("/jobs", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
-    return job_service.Submit(request);
-  });
-  server.AddGetRoute(R"(/jobs/(\d+))", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
-    return job_service.Status(request);
-  });
-  server.AddGetRoute(R"(/jobs/(\d+)/events)", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
-    return job_service.Events(request);
-  });
-  server.AddGetRoute(R"(/jobs/(\d+)/result)", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
-    return job_service.Result(request);
-  });
-  server.AddPostRoute(R"(/jobs/(\d+)/cancel)", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
-    return job_service.Cancel(request);
-  });
-  server.AddDeleteRoute(R"(/jobs/(\d+))", [&job_service](const ortools_wasm::server::HttpBinaryRequest& request) {
-    return job_service.Release(request);
-  });
+  ortools_wasm::server::AddSolverJobRoutes(server, job_service);
 
   std::cout << "server listening" << '\n';
   if (!server.Listen()) {

@@ -66,7 +66,6 @@ async function runSimpleGlop() {
         constraints: solver.NumConstraints(),
         wallTime: solver.WallTime(),
         iterations: solver.Iterations(),
-        nodes: solver.nodes(),
         executor: currentMPSolverExecutor(),
         solverThreads: threadConfig.requested,
         solverThreadsAccepted: threadConfig.accepted,

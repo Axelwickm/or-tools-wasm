@@ -1,5 +1,6 @@
 #include "server/src/job_scheduler.h"
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdlib>
@@ -7,6 +8,7 @@
 #include <functional>
 #include <iostream>
 #include <mutex>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -307,6 +309,117 @@ void CapturesJobExceptionsAsFailures() {
   ExpectEq(handle.status().state, JobState::kFailed, "exception final status");
 }
 
+void StatusObserverFailuresDoNotAffectExecution() {
+  JobScheduler scheduler({1, 8});
+  auto handle = scheduler.Submit(
+      Spec(), [](JobContext&) { return JobResult::Succeeded(); },
+      [](const JobStatus& status) {
+        if (status.state == JobState::kStarting ||
+            status.state == JobState::kRunning) {
+          throw std::runtime_error("observer failed");
+        }
+      });
+
+  ExpectEq(handle.result().get().state, JobState::kSucceeded,
+           "observer failure does not fail job");
+  const SchedulerStats stats = scheduler.Stats();
+  ExpectEq(stats.available_threads, stats.total_threads,
+           "observer failure releases thread capacity");
+  ExpectEq(stats.active_jobs, 0, "observer failure leaves no active job");
+  ExpectEq(stats.queued_jobs, 0, "observer failure leaves no queued job");
+}
+
+void ConcurrentSubmissionsRespectThreadBudget() {
+  constexpr int kTotalThreads = 8;
+  constexpr int kProducerCount = 8;
+  constexpr int kJobsPerProducer = 32;
+  JobScheduler scheduler({kTotalThreads, kProducerCount * kJobsPerProducer});
+  std::atomic<int> allocated_threads{0};
+  std::atomic<int> maximum_allocated_threads{0};
+  std::mutex handles_mutex;
+  std::vector<JobHandle> handles;
+  handles.reserve(kProducerCount * kJobsPerProducer);
+
+  std::vector<std::thread> producers;
+  producers.reserve(kProducerCount);
+  for (int producer = 0; producer < kProducerCount; ++producer) {
+    producers.emplace_back([&, producer] {
+      for (int index = 0; index < kJobsPerProducer; ++index) {
+        const int requested_threads = 1 + ((producer + index) % 4);
+        auto handle = scheduler.Submit(
+            Spec("cp-sat", requested_threads),
+            [&](JobContext& context) {
+              const int current =
+                  allocated_threads.fetch_add(context.allocated_threads()) +
+                  context.allocated_threads();
+              int previous_maximum = maximum_allocated_threads.load();
+              while (current > previous_maximum &&
+                     !maximum_allocated_threads.compare_exchange_weak(
+                         previous_maximum, current)) {
+              }
+              std::this_thread::sleep_for(1ms);
+              allocated_threads.fetch_sub(context.allocated_threads());
+              return JobResult::Succeeded();
+            });
+        std::lock_guard lock(handles_mutex);
+        handles.push_back(std::move(handle));
+      }
+    });
+  }
+  for (auto& producer : producers) producer.join();
+
+  std::set<uint64_t> job_ids;
+  for (const auto& handle : handles) {
+    job_ids.insert(handle.job_id());
+    ExpectEq(handle.result().get().state, JobState::kSucceeded,
+             "concurrent job succeeds");
+  }
+
+  ExpectEq(handles.size(),
+           static_cast<size_t>(kProducerCount * kJobsPerProducer),
+           "all concurrent submissions return handles");
+  ExpectEq(job_ids.size(), handles.size(), "concurrent job ids are unique");
+  Expect(maximum_allocated_threads.load() <= kTotalThreads,
+         "concurrent jobs stay within thread budget");
+  Expect(maximum_allocated_threads.load() > 1,
+         "stress test observes parallel execution");
+  ExpectEq(allocated_threads.load(), 0,
+           "all stress-test thread capacity is returned");
+  const SchedulerStats stats = scheduler.Stats();
+  ExpectEq(stats.available_threads, stats.total_threads,
+           "stress test restores scheduler capacity");
+  ExpectEq(stats.active_jobs, 0, "stress test leaves no active jobs");
+  ExpectEq(stats.queued_jobs, 0, "stress test drains the queue");
+}
+
+void RejectsSubmissionsWhenQueueIsFull() {
+  JobScheduler scheduler({1, 1});
+  ManualEvent first_started;
+  ManualEvent release_first;
+  auto first = scheduler.Submit(Spec(), [&](JobContext&) {
+    first_started.Set();
+    release_first.Wait();
+    return JobResult::Succeeded();
+  });
+  Expect(first_started.WaitFor(2s), "first queue-capacity job starts");
+  auto queued = scheduler.Submit(
+      Spec(), [](JobContext&) { return JobResult::Succeeded(); });
+
+  bool threw = false;
+  try {
+    scheduler.Submit(Spec(), [](JobContext&) { return JobResult::Succeeded(); });
+  } catch (const JobQueueFullError&) {
+    threw = true;
+  }
+  Expect(threw, "submission fails when the waiting queue is full");
+
+  release_first.Set();
+  ExpectEq(first.result().get().state, JobState::kSucceeded,
+           "running job completes after queue-full rejection");
+  ExpectEq(queued.result().get().state, JobState::kSucceeded,
+           "queued job completes after queue-full rejection");
+}
+
 void RejectsSubmissionsAfterShutdown() {
   JobScheduler scheduler({1, 8});
   scheduler.Shutdown();
@@ -354,6 +467,12 @@ int RunAllTests() {
       {"RequestsCooperativeCancellationForRunningJob", RequestsCooperativeCancellationForRunningJob},
       {"InvokesScopedCancellationHandler", InvokesScopedCancellationHandler},
       {"CapturesJobExceptionsAsFailures", CapturesJobExceptionsAsFailures},
+      {"StatusObserverFailuresDoNotAffectExecution",
+       StatusObserverFailuresDoNotAffectExecution},
+      {"ConcurrentSubmissionsRespectThreadBudget",
+       ConcurrentSubmissionsRespectThreadBudget},
+      {"RejectsSubmissionsWhenQueueIsFull",
+       RejectsSubmissionsWhenQueueIsFull},
       {"RejectsSubmissionsAfterShutdown", RejectsSubmissionsAfterShutdown},
       {"RejectsInvalidSchedulerOptions", RejectsInvalidSchedulerOptions},
   };

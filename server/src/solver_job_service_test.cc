@@ -21,6 +21,8 @@ namespace {
 using namespace std::chrono_literals;
 namespace bridge = ::ortools_wasm::bridge::v1;
 
+constexpr auto kTestCompletedJobRetention = 1h;
+
 class ManualEvent {
  public:
   void Set() {
@@ -173,7 +175,7 @@ bool ContainsState(const bridge::SolverEventBatch& batch,
 
 void StatusIsSnapshotAndDoesNotConsumeEvents() {
   JobScheduler scheduler({1, 8});
-  SolverJobService service(scheduler);
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
   ManualEvent started;
   ManualEvent release;
   service.Register(std::make_unique<FakeExecutor>(
@@ -201,7 +203,7 @@ void StatusIsSnapshotAndDoesNotConsumeEvents() {
 
 void EventsAreOrderedAndCursorBased() {
   JobScheduler scheduler({1, 8});
-  SolverJobService service(scheduler);
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
   ManualEvent emitted;
   ManualEvent release;
   service.Register(std::make_unique<FakeExecutor>(
@@ -231,7 +233,7 @@ void EventsAreOrderedAndCursorBased() {
 
 void ResultIsIndependentFromEvents() {
   JobScheduler scheduler({1, 8});
-  SolverJobService service(scheduler);
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
   service.Register(std::make_unique<FakeExecutor>(
       [](const SolverExecutorRequest&, const JobContext&,
          const SolverEventSink& emit_event) {
@@ -252,9 +254,85 @@ void ResultIsIndependentFromEvents() {
          "fast job retains succeeded status in event log");
 }
 
+void EventStreamEndsWithSequencedResultAndResumes() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&,
+         const SolverEventSink& emit_event) {
+        emit_event("event-one");
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  const auto submitted = SubmitJob(&service);
+  HttpEventStreamResponse stream =
+      service.StreamEvents(EventsRequest(submitted.job_id(), submitted.sequence_id()));
+  ExpectEq(stream.status, 200, "event stream opens");
+  Expect(static_cast<bool>(stream.next), "event stream has a source");
+
+  uint64_t previous = submitted.sequence_id();
+  bool received_result = false;
+  for (int attempt = 0; attempt < 10 && !received_result; ++attempt) {
+    const auto event = stream.next();
+    Expect(event.has_value(), "event stream remains open before terminal result");
+    if (event->event.empty()) continue;
+    bridge::SolverBridgeResponse response;
+    Expect(response.ParseFromString(event->data), "stream event contains protobuf response");
+    Expect(response.sequence_id() > previous, "stream sequence is strictly increasing");
+    previous = response.sequence_id();
+    received_result = response.payload_case() ==
+                      bridge::SolverBridgeResponse::kResultPayload;
+    if (received_result) {
+      ExpectEq(response.result_payload(), std::string("result-one"),
+               "stream preserves terminal result");
+      Expect(event->close, "terminal result closes stream");
+    }
+  }
+  Expect(received_result, "event stream emits terminal result");
+
+  HttpEventStreamResponse resumed =
+      service.StreamEvents(EventsRequest(submitted.job_id(), previous));
+  Expect(!resumed.next().has_value(),
+         "resuming after terminal sequence closes immediately");
+}
+
+void QueuedJobsUsePollingInsteadOfHoldingEventStreams() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
+  ManualEvent first_started;
+  ManualEvent release_first;
+  service.Register(std::make_unique<FakeExecutor>(
+      [&](const SolverExecutorRequest& request, const JobContext&,
+          const SolverEventSink&) {
+        if (request.request_id == 7) {
+          first_started.Set();
+          release_first.Wait();
+        }
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  const auto running = SubmitJob(&service);
+  Expect(first_started.WaitFor(2s), "first fake job starts");
+  const auto queued = DecodeResponse(service.Submit(SubmitRequest(9)));
+  ExpectEq(queued.payload_case(), bridge::SolverBridgeResponse::kStatus,
+           "queued submission returns status");
+  ExpectEq(queued.status().state(), bridge::SOLVER_JOB_STATE_QUEUED,
+           "second fake job is queued");
+
+  const HttpEventStreamResponse stream =
+      service.StreamEvents(EventsRequest(queued.job_id(), queued.sequence_id()));
+  ExpectEq(stream.status, 409,
+           "queued job does not consume an HTTP event-stream worker");
+  Expect(!stream.next, "queued job stream has no blocking event source");
+
+  release_first.Set();
+  WaitForResult(&service, running.job_id());
+  WaitForResult(&service, queued.job_id());
+}
+
 void ExecutorFailureMetadataIsPreserved() {
   JobScheduler scheduler({1, 8});
-  SolverJobService service(scheduler);
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
   service.Register(std::make_unique<FakeExecutor>(
       [](const SolverExecutorRequest&, const JobContext&,
          const SolverEventSink&) {
@@ -278,7 +356,7 @@ void ExecutorFailureMetadataIsPreserved() {
 
 void CancellationUsesGenericProtocolAndInterruptsExecutor() {
   JobScheduler scheduler({1, 8});
-  SolverJobService service(scheduler);
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
   ManualEvent handler_registered;
   ManualEvent interrupted;
   service.Register(std::make_unique<FakeExecutor>(
@@ -310,7 +388,7 @@ void CancellationUsesGenericProtocolAndInterruptsExecutor() {
 
 void CompletedJobsCanBeReleased() {
   JobScheduler scheduler({1, 8});
-  SolverJobService service(scheduler);
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
   service.Register(std::make_unique<FakeExecutor>(
       [](const SolverExecutorRequest&, const JobContext&,
          const SolverEventSink&) {
@@ -327,7 +405,7 @@ void CompletedJobsCanBeReleased() {
 
 void RunningJobsCannotBeReleased() {
   JobScheduler scheduler({1, 8});
-  SolverJobService service(scheduler);
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
   ManualEvent started;
   ManualEvent release;
   service.Register(std::make_unique<FakeExecutor>(
@@ -346,6 +424,51 @@ void RunningJobsCannotBeReleased() {
   WaitForResult(&service, submitted.job_id());
 }
 
+void CompletedJobsExpireWithoutExplicitRelease() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, 50ms);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&,
+         const SolverEventSink&) {
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  const auto submitted = SubmitJob(&service);
+  WaitForResult(&service, submitted.job_id());
+
+  const auto deadline = std::chrono::steady_clock::now() + 2s;
+  while (std::chrono::steady_clock::now() < deadline &&
+         service.Status(JobRequest(submitted.job_id())).status != 404) {
+    std::this_thread::sleep_for(10ms);
+  }
+  ExpectEq(service.Status(JobRequest(submitted.job_id())).status, 404,
+           "completed job expires without release");
+  ExpectEq(service.Events(EventsRequest(submitted.job_id())).status, 404,
+           "expired job event history is discarded");
+}
+
+void RunningJobsDoNotExpire() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, 20ms);
+  ManualEvent started;
+  ManualEvent release;
+  service.Register(std::make_unique<FakeExecutor>(
+      [&](const SolverExecutorRequest&, const JobContext&,
+          const SolverEventSink&) {
+        started.Set();
+        release.Wait();
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  const auto submitted = SubmitJob(&service);
+  Expect(started.WaitFor(2s), "fake executor starts");
+  std::this_thread::sleep_for(60ms);
+  ExpectEq(service.Status(JobRequest(submitted.job_id())).status, 202,
+           "running job remains retained");
+  release.Set();
+  WaitForResult(&service, submitted.job_id());
+}
+
 using TestFn = void (*)();
 
 int RunAllTests() {
@@ -353,11 +476,18 @@ int RunAllTests() {
       {"StatusIsSnapshotAndDoesNotConsumeEvents", StatusIsSnapshotAndDoesNotConsumeEvents},
       {"EventsAreOrderedAndCursorBased", EventsAreOrderedAndCursorBased},
       {"ResultIsIndependentFromEvents", ResultIsIndependentFromEvents},
+      {"EventStreamEndsWithSequencedResultAndResumes",
+       EventStreamEndsWithSequencedResultAndResumes},
+      {"QueuedJobsUsePollingInsteadOfHoldingEventStreams",
+       QueuedJobsUsePollingInsteadOfHoldingEventStreams},
       {"ExecutorFailureMetadataIsPreserved", ExecutorFailureMetadataIsPreserved},
       {"CancellationUsesGenericProtocolAndInterruptsExecutor",
        CancellationUsesGenericProtocolAndInterruptsExecutor},
       {"CompletedJobsCanBeReleased", CompletedJobsCanBeReleased},
       {"RunningJobsCannotBeReleased", RunningJobsCannotBeReleased},
+      {"CompletedJobsExpireWithoutExplicitRelease",
+       CompletedJobsExpireWithoutExplicitRelease},
+      {"RunningJobsDoNotExpire", RunningJobsDoNotExpire},
   };
   for (const auto& [name, test] : tests) {
     try {

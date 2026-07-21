@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,23 @@ struct HttpBinaryResponse {
 
 using HttpBinaryHandler = std::function<HttpBinaryResponse(const HttpBinaryRequest&)>;
 
+struct HttpServerSentEvent {
+  std::string id;
+  std::string event;
+  std::string data;
+  bool close = false;
+};
+
+struct HttpEventStreamResponse {
+  int status = 200;
+  std::string body;
+  std::map<std::string, std::string> headers;
+  std::function<std::optional<HttpServerSentEvent>()> next;
+};
+
+using HttpEventStreamHandler =
+    std::function<HttpEventStreamResponse(const HttpBinaryRequest&)>;
+
 class HttpServer {
  public:
   explicit HttpServer(ServerConfig config);
@@ -37,6 +55,8 @@ class HttpServer {
 
   void AddHealthRoute();
   void AddGetRoute(const std::string& path, HttpBinaryHandler handler);
+  void AddEventStreamRoute(const std::string& path,
+                           HttpEventStreamHandler handler);
   void AddPostRoute(const std::string& path, HttpBinaryHandler handler);
   void AddDeleteRoute(const std::string& path, HttpBinaryHandler handler);
   bool Listen();

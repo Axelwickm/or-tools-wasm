@@ -21,8 +21,10 @@ import {
 } from './generated/bridge/job_pb.js';
 
 const PROTOBUF_CONTENT_TYPE = 'application/x-protobuf';
+const EVENT_STREAM_CONTENT_TYPE = 'text/event-stream';
 const JOB_ACCEPTED_STATUS = 202;
 const JOB_NOT_READY_STATUS = 204;
+const JOB_STREAM_NOT_READY_STATUS = 409;
 
 class RemoteSolverError extends Error {
   constructor(readonly failure: SolverJobFailure, readonly emitted = false) {
@@ -30,6 +32,10 @@ class RemoteSolverError extends Error {
     if (failure.trace) this.stack = failure.trace;
   }
 }
+
+type StreamResult<Response> =
+  | { complete: true; result: Response }
+  | { complete: false; sequenceId: bigint };
 
 function bytesBody(bytes: Uint8Array): ArrayBuffer {
   return bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
@@ -39,6 +45,44 @@ function bytesBody(bytes: Uint8Array): ArrayBuffer {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function decodeBase64Bytes(value: string): Uint8Array {
+  const binary = globalThis.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function* serverSentEventData(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      buffer = buffer.replace(/\r\n/g, '\n');
+      let separator = buffer.indexOf('\n\n');
+      while (separator >= 0) {
+        const frame = buffer.slice(0, separator);
+        buffer = buffer.slice(separator + 2);
+        const data = frame.split('\n')
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.slice(5).trimStart())
+          .join('\n');
+        if (data) yield data;
+        separator = buffer.indexOf('\n\n');
+      }
+      if (chunk.done) return;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export class SolverServerExecutor<Request, Response, Event>
@@ -55,9 +99,7 @@ implements SolverExecutor<Request, Response, Event> {
     configuration: ServerExecutorConfiguration,
   ) {
     this.solver = codec.solver;
-    const endpoint = configuration.host ?? configuration.url;
-    if (!endpoint) throw new Error(`${codec.label} server executor requires a server host.`);
-    const value = String(endpoint);
+    const value = String(configuration.url);
     this.baseUrl = value.endsWith('/') ? value : `${value}/`;
     this.headers = { ...configuration.headers };
     if (configuration.authToken) this.headers.Authorization = `Bearer ${configuration.authToken}`;
@@ -69,11 +111,7 @@ implements SolverExecutor<Request, Response, Event> {
 
   execute(request: Request, options: SolverExecutionOptions<Event>): SolverJob<Response> {
     const requestId = this.nextRequestId++;
-    const submitted = this.submit(
-      requestId,
-      request,
-      options.requestedThreads ?? this.codec.defaultRequestedThreads ?? 0,
-    );
+    const submitted = this.submit(requestId, request);
     return {
       requestId,
       result: this.run(requestId, submitted, options),
@@ -93,13 +131,11 @@ implements SolverExecutor<Request, Response, Event> {
   private async submit(
     requestId: number,
     request: Request,
-    requestedThreads: number,
   ): Promise<SolverBridgeResponse> {
     const bytes = encodeSolverBridgeRequest({
       requestId,
       solver: this.solver,
       payload: this.codec.encodeRequest(request),
-      requestedThreads,
     });
     const response = await this.fetchImpl(new URL('jobs', this.baseUrl), {
       method: 'POST',
@@ -120,7 +156,13 @@ implements SolverExecutor<Request, Response, Event> {
       const immediate = await this.handleResponse(accepted, options);
       if (immediate !== null) return immediate;
       if (accepted.jobId === 0n) throw new Error(`${this.codec.label} server did not return a job id.`);
-      return await this.pollResult(accepted.jobId, accepted.sequenceId, options);
+      const streamed = await this.streamResult(
+        accepted.jobId,
+        accepted.sequenceId,
+        options,
+      );
+      if (streamed.complete) return streamed.result;
+      return await this.pollResult(accepted.jobId, streamed.sequenceId, options);
     } catch (error) {
       if (error instanceof RemoteSolverError) {
         if (!error.emitted) await options.onEvent({ type: 'failure', failure: error.failure });
@@ -138,14 +180,58 @@ implements SolverExecutor<Request, Response, Event> {
     }
   }
 
+  private async streamResult(
+    jobId: bigint,
+    initialSequenceId: bigint,
+    options: SolverExecutionOptions<Event>,
+  ): Promise<StreamResult<Response>> {
+    let sequenceId = initialSequenceId;
+    let response: globalThis.Response;
+    try {
+      response = await this.fetchImpl(
+        new URL(`jobs/${jobId}/stream?after=${initialSequenceId}`, this.baseUrl),
+        { headers: { accept: EVENT_STREAM_CONTENT_TYPE, ...this.headers } },
+      );
+    } catch {
+      return { complete: false, sequenceId };
+    }
+    if (response.status === 404 || response.status === JOB_STREAM_NOT_READY_STATUS) {
+      return { complete: false, sequenceId };
+    }
+    if (!response.ok) await this.throwHttpError('event stream', response);
+    if (!response.headers.get('content-type')?.includes(EVENT_STREAM_CONTENT_TYPE) || !response.body) {
+      return { complete: false, sequenceId };
+    }
+
+    try {
+      for await (const data of serverSentEventData(response.body)) {
+        const outer = decodeSolverBridgeResponse(decodeBase64Bytes(data));
+        if (outer.sequenceId > sequenceId) sequenceId = outer.sequenceId;
+        const terminal = outer.payload.case === 'resultPayload' || outer.payload.case === 'failure';
+        try {
+          const result = await this.handleResponse(outer, options);
+          if (result !== null) return { complete: true, result };
+        } finally {
+          if (terminal) await this.release(jobId);
+        }
+      }
+    } catch (error) {
+      if (error instanceof RemoteSolverError) throw error;
+      return { complete: false, sequenceId };
+    }
+    return { complete: false, sequenceId };
+  }
+
   private async pollResult(
     jobId: bigint,
     initialSequenceId: bigint,
     options: SolverExecutionOptions<Event>,
   ): Promise<Response> {
     let sequenceId = initialSequenceId;
+    let firstRequest = true;
     for (;;) {
-      await delay(this.statusIntervalMs);
+      if (!firstRequest) await delay(this.statusIntervalMs);
+      firstRequest = false;
       const eventsResponse = await this.fetchImpl(
         new URL(`jobs/${jobId}/events?after=${sequenceId}`, this.baseUrl),
         { headers: { accept: PROTOBUF_CONTENT_TYPE, ...this.headers } },
@@ -156,8 +242,13 @@ implements SolverExecutor<Request, Response, Event> {
         const batch = fromBinary(SolverEventBatchSchema, eventBytes);
         for (const outer of batch.responses) {
           if (outer.sequenceId > sequenceId) sequenceId = outer.sequenceId;
-          const result = await this.handleResponse(outer, options);
-          if (result !== null) return result;
+          const terminal = outer.payload.case === 'resultPayload' || outer.payload.case === 'failure';
+          try {
+            const result = await this.handleResponse(outer, options);
+            if (result !== null) return result;
+          } finally {
+            if (terminal) await this.release(jobId);
+          }
         }
       }
 

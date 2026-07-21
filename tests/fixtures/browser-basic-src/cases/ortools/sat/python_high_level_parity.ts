@@ -52,7 +52,7 @@ type HighLevelApi = {
   rebuildFromLinearExpressionProto?: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
   setExecutor(configuration:
     | { type: 'auto' | 'direct' | 'worker' }
-    | { type: 'server'; host: string | URL; authToken?: string; statusIntervalMs?: number }
+    | { type: 'server'; url: string | URL; authToken?: string; statusIntervalMs?: number }
   ): void;
   DecisionStrategyProto_VariableSelectionStrategy: {
     CHOOSE_MIN_DOMAIN_SIZE: unknown;

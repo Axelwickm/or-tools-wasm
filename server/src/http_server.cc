@@ -1,7 +1,12 @@
 #include "server/src/http_server.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <string>
 #include <utility>
 
+#include "absl/strings/escaping.h"
 #include <httplib.h>
 #include "job.pb.h"
 
@@ -10,6 +15,8 @@ namespace {
 
 constexpr const char* kBinaryContentType = "application/octet-stream";
 constexpr const char* kPlainTextContentType = "text/plain; charset=utf-8";
+constexpr const char* kEventStreamContentType = "text/event-stream";
+constexpr size_t kHttpControlThreads = 4;
 
 void AddCorsHeaders(httplib::Response& response) {
   response.set_header("Access-Control-Allow-Origin", "*");
@@ -52,11 +59,26 @@ void WriteResponse(const HttpBinaryResponse& source, httplib::Response& target) 
                                                              : source.content_type);
 }
 
+std::string FormatServerSentEvent(const HttpServerSentEvent& event) {
+  std::string encoded;
+  absl::Base64Escape(event.data, &encoded);
+  return "id: " + event.id + "\nevent: " + event.event + "\ndata: " +
+         encoded + "\n\n";
+}
+
 }  // namespace
 
 class HttpServer::Impl {
  public:
-  explicit Impl(ServerConfig config) : config_(std::move(config)) {}
+  explicit Impl(ServerConfig config) : config_(std::move(config)) {
+    const size_t solver_threads =
+        static_cast<size_t>(std::max(1, config_.total_threads));
+    const size_t worker_count =
+        std::max<size_t>(8, solver_threads + kHttpControlThreads);
+    server_.new_task_queue = [worker_count] {
+      return new httplib::ThreadPool(worker_count);
+    };
+  }
 
   void AddHealthRoute() {
     server_.Get("/healthz", [](const httplib::Request&, httplib::Response& response) {
@@ -80,6 +102,55 @@ class HttpServer::Impl {
       binary_request.query_parameters = QueryParametersFromRequest(request);
       binary_request.path_matches = PathMatchesFromRequest(request);
       WriteResponse(handler(binary_request), response);
+    });
+  }
+
+  void AddEventStreamRoute(const std::string& path,
+                           HttpEventStreamHandler handler) {
+    AddOptionsRoute(path);
+    server_.Get(path, [this, handler = std::move(handler)](
+                          const httplib::Request& request,
+                          httplib::Response& response) {
+      if (!Authorize(request, response)) return;
+
+      HttpBinaryRequest binary_request;
+      binary_request.headers = HeadersFromRequest(request);
+      binary_request.query_parameters = QueryParametersFromRequest(request);
+      binary_request.path_matches = PathMatchesFromRequest(request);
+      HttpEventStreamResponse stream = handler(binary_request);
+      AddCorsHeaders(response);
+      for (const auto& header : stream.headers) {
+        response.set_header(header.first, header.second);
+      }
+      if (stream.status != 200 || !stream.next) {
+        response.status = stream.status;
+        response.set_content(stream.body, kPlainTextContentType);
+        return;
+      }
+
+      response.set_header("Cache-Control", "no-cache");
+      response.set_header("X-Accel-Buffering", "no");
+      auto next = std::make_shared<
+          std::function<std::optional<HttpServerSentEvent>()>>(
+          std::move(stream.next));
+      response.set_chunked_content_provider(
+          kEventStreamContentType,
+          [next](size_t, httplib::DataSink& sink) {
+            const std::optional<HttpServerSentEvent> event = (*next)();
+            if (!event.has_value()) {
+              sink.done();
+              return true;
+            }
+            if (event->event.empty()) {
+              static constexpr char kHeartbeat[] = ": keepalive\n\n";
+              sink.write(kHeartbeat, sizeof(kHeartbeat) - 1);
+              return sink.is_writable();
+            }
+            const std::string chunk = FormatServerSentEvent(*event);
+            sink.write(chunk.data(), chunk.size());
+            if (event->close) sink.done();
+            return sink.is_writable();
+          });
     });
   }
 
@@ -161,6 +232,11 @@ void HttpServer::AddHealthRoute() { impl_->AddHealthRoute(); }
 
 void HttpServer::AddGetRoute(const std::string& path, HttpBinaryHandler handler) {
   impl_->AddGetRoute(path, std::move(handler));
+}
+
+void HttpServer::AddEventStreamRoute(const std::string& path,
+                                     HttpEventStreamHandler handler) {
+  impl_->AddEventStreamRoute(path, std::move(handler));
 }
 
 void HttpServer::AddPostRoute(const std::string& path, HttpBinaryHandler handler) {

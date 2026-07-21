@@ -16,13 +16,13 @@ export const solverJobStates = {
   SUCCEEDED: 6,
 } as const;
 
-export const serverExecutorHost = 'http://127.0.0.1:17827/';
+export const serverExecutorUrl = 'http://127.0.0.1:17827/';
 export const serverExecutorAuthToken: string | undefined = undefined;
 
 export function serverExecutorConfiguration() {
   return {
     type: 'server',
-    host: serverExecutorHost,
+    url: serverExecutorUrl,
     authToken: serverExecutorAuthToken,
     statusIntervalMs: 20,
   } as const;
@@ -32,21 +32,21 @@ export async function assertServerExecutorIsRunning() {
   const configuration = serverExecutorConfiguration();
   let response: Response;
   try {
-    response = await fetch(new URL('healthz', configuration.host), {
+    response = await fetch(new URL('healthz', configuration.url), {
       headers: configuration.authToken
         ? { Authorization: `Bearer ${configuration.authToken}` }
         : undefined,
     });
   } catch (error) {
     throw new Error(
-      `Server executor fixture expected a running server at ${serverExecutorHost}: ${
+      `Server executor fixture expected a running server at ${serverExecutorUrl}: ${
         error instanceof Error ? error.message : String(error)
       }`,
     );
   }
   if (!response.ok) {
     throw new Error(
-      `Server executor fixture health check failed at ${serverExecutorHost} (${response.status} ${response.statusText})`,
+      `Server executor fixture health check failed at ${serverExecutorUrl} (${response.status} ${response.statusText})`,
     );
   }
 }

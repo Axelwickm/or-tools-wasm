@@ -406,12 +406,16 @@ void JobScheduler::Run(const std::shared_ptr<State>& state,
 
 void JobScheduler::EmitStatus(const std::shared_ptr<JobRecord>& record,
                               const JobStatus& status) {
-  StatusCallback callback;
-  {
-    std::lock_guard lock(record->status_callback_mutex);
-    callback = record->on_status;
+  try {
+    StatusCallback callback;
+    {
+      std::lock_guard lock(record->status_callback_mutex);
+      callback = record->on_status;
+    }
+    if (callback) callback(status);
+  } catch (...) {
+    // Status observation must never consume scheduler capacity or stop dispatch.
   }
-  if (callback) callback(status);
 }
 
 void JobScheduler::ClearStatusCallback(

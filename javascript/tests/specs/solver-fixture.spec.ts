@@ -11,6 +11,7 @@ type WorkerStats = {
 test('runs the shared solver fixture cases across executor modes', async ({ page }) => {
   const includeServer = process.env.ORTOOLS_TEST_SERVER === '1';
   const browserErrors: string[] = [];
+  let serverStreamRequests = 0;
   let failOnPageError: (error: Error) => void = () => {};
   const pageErrorPromise = new Promise<never>((_, reject) => {
     failOnPageError = reject;
@@ -27,6 +28,11 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   });
   page.on('requestfailed', (request) => {
     browserErrors.push(`request failed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`);
+  });
+  page.on('request', (request) => {
+    if (includeServer && new URL(request.url()).pathname.endsWith('/stream')) {
+      serverStreamRequests += 1;
+    }
   });
   page.on('response', (response) => {
     if (response.status() >= 400) {
@@ -173,6 +179,7 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     expect(results?.every((result) => typeof result.id === 'string' && result.id.length > 0), `${label} stable case IDs`).toBe(true);
     expect(results?.every((result) => result.ok === true), `${label} ok results`).toBe(true);
   };
+  if (includeServer) expect(serverStreamRequests, 'native server SSE requests').toBeGreaterThan(0);
   const expectedHighLevelCpSatProfiles = [
     'direct/1 worker/1',
     'direct/4 workers/4',

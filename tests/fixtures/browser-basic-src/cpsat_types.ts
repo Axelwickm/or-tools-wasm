@@ -84,16 +84,14 @@ export type CpSatExecutorConfiguration =
   | { type: 'auto' }
   | { type: 'direct' }
   | { type: 'worker' }
-  | ({
+  | {
       type: 'server';
+      url: string | URL;
       authToken?: string;
       headers?: Record<string, string>;
       fetch?: typeof fetch;
       statusIntervalMs?: number;
-    } & (
-      | { host: string | URL; url?: never }
-      | { host?: never; url: string | URL }
-    ));
+    };
 
 export type CpSatLike = {
   solve(model: Uint8Array, options?: CpSatSolveOptions): Promise<{

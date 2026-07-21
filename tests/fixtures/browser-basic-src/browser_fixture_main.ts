@@ -8,7 +8,7 @@ import { runMPSolverCases } from './mp_solver_runner.ts';
 import { runNetworkFlowCases } from './network_flow_runner.ts';
 import { runPdlpCases } from './pdlp_runner.ts';
 import { runRcpspCases } from './rcpsp_runner.ts';
-import { executorFixtureModes, serverExecutorHost } from './shared_case.ts';
+import { executorFixtureModes, serverExecutorUrl } from './shared_case.ts';
 import { runRoutingCases } from './routing_runner.ts';
 import { runSetCoverCases } from './set_cover_runner.ts';
 
@@ -57,11 +57,11 @@ function setStatus(value: unknown) {
 }
 
 function installCpSatExecutorSwitcher(CpSat: PackageModule) {
-  const host = document.createElement('input');
-  host.id = 'cp-sat-server-host';
-  host.type = 'url';
-  host.value = serverExecutorHost;
-  host.placeholder = 'Server host';
+  const url = document.createElement('input');
+  url.id = 'cp-sat-server-url';
+  url.type = 'url';
+  url.value = serverExecutorUrl;
+  url.placeholder = 'Server URL';
 
   const authToken = document.createElement('input');
   authToken.id = 'cp-sat-server-auth-token';
@@ -94,9 +94,9 @@ function installCpSatExecutorSwitcher(CpSat: PackageModule) {
   controls.style.alignItems = 'center';
   controls.addEventListener('submit', (event) => {
     event.preventDefault();
-    void runManualCpSatSolve(CpSat, executor.value as ManualExecutorMode, host.value, authToken.value, result, run);
+    void runManualCpSatSolve(CpSat, executor.value as ManualExecutorMode, url.value, authToken.value, result, run);
   });
-  controls.append(executor, host, authToken, run);
+  controls.append(executor, url, authToken, run);
 
   statusEl?.before(controls, result);
 }
@@ -104,7 +104,7 @@ function installCpSatExecutorSwitcher(CpSat: PackageModule) {
 async function runManualCpSatSolve(
   CpSat: PackageModule,
   mode: ManualExecutorMode,
-  host: string,
+  url: string,
   authToken: string,
   output: HTMLElement,
   button: HTMLButtonElement,
@@ -115,10 +115,10 @@ async function runManualCpSatSolve(
 
   try {
     if (mode === 'server') {
-      await assertManualServerHealth(host, authToken);
+      await assertManualServerHealth(url, authToken);
       CpSat.setExecutor({
         type: 'server',
-        host,
+        url,
         authToken: authToken || undefined,
         statusIntervalMs: 20,
       });
@@ -145,8 +145,8 @@ async function runManualCpSatSolve(
   }
 }
 
-async function assertManualServerHealth(host: string, authToken: string) {
-  const response = await fetch(new URL('healthz', host), {
+async function assertManualServerHealth(url: string, authToken: string) {
+  const response = await fetch(new URL('healthz', url), {
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
   });
   if (!response.ok) {

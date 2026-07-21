@@ -28,6 +28,7 @@ ORTOOLS_SERVER_HOST=0.0.0.0
 ORTOOLS_SERVER_PORT=17827
 ORTOOLS_SERVER_TOTAL_THREADS=auto
 ORTOOLS_SERVER_MAX_QUEUE_SIZE=100000
+ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS=3600
 # ORTOOLS_SERVER_BEARER_TOKEN=
 ```
 
@@ -35,6 +36,8 @@ ORTOOLS_SERVER_MAX_QUEUE_SIZE=100000
 `ORTOOLS_SERVER_TOTAL_THREADS=auto` uses the container's reported hardware
 concurrency. A numeric value sets the scheduler's total thread-token budget.
 `ORTOOLS_SERVER_MAX_QUEUE_SIZE` must be a positive integer.
+`ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS` controls how long terminal job
+results and event histories remain available when clients do not release them.
 `ORTOOLS_SERVER_BEARER_TOKEN` enables bearer-token auth when set. If it is
 unset, the server warns loudly and accepts unauthenticated requests.
 
@@ -46,13 +49,17 @@ GET  /healthz
 POST /jobs
 GET  /jobs/:id
 GET  /jobs/:id/events?after=:sequence
+GET  /jobs/:id/stream?after=:sequence
 GET  /jobs/:id/result
 POST /jobs/:id/cancel
 DELETE /jobs/:id
 ```
 
 Clients release completed job state with `DELETE /jobs/:id` after receiving a
-terminal result. Active jobs cannot be released.
+terminal result. The server also removes terminal jobs after the configured
+retention period if clients do not release them. Queued and running jobs never
+expire. Cleanup runs periodically, so removal can occur up to 30 seconds after
+the retention period ends.
 
 The job API carries generic `SolverBridgeRequest` / `SolverBridgeResponse`
 protobuf bytes. Solver-specific payloads, events, and results are nested as
@@ -62,12 +69,21 @@ separate responsibilities:
 ```text
 GET /jobs/:id         current SolverJobStatus snapshot
 GET /jobs/:id/events?after=N   SolverEventBatch after sequence N
+GET /jobs/:id/stream?after=N   server-sent SolverBridgeResponse events
 GET /jobs/:id/result           final result or execution failure; 204 while pending
 ```
 
-Event reads are non-destructive. Each retained status transition and solver
-event has a monotonically increasing sequence ID, so clients can poll without
-losing or duplicating callbacks.
+The server-sent event stream is the primary transport after a job acquires
+scheduler capacity. Queued jobs use the polling endpoints instead of occupying
+an HTTP worker with an idle stream. Each SSE `data` field is a base64-encoded
+`SolverBridgeResponse`, so status, solver events, and terminal results retain
+the same protobuf contract as direct execution and the worker bridge. The
+stream closes after its terminal result or failure.
+
+Event reads are non-destructive. Each retained response has a monotonically
+increasing sequence ID, so clients can resume a stream or poll without losing
+or duplicating callbacks. The protobuf event and result endpoints remain
+available as a fallback when streaming is unavailable.
 
 The native server registers CP-SAT, Knapsack, MathOpt, MPSolver, Network Flow,
 PDLP, Routing, and Set Cover executors. Each returns the same typed payload used

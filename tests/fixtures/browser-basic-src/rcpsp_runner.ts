@@ -68,7 +68,7 @@ export type RcpspApi = {
   RcpspModelBuilder: { new(name?: string): RcpspModelBuilderLike };
   setExecutor(configuration:
     | { type: 'auto' | 'direct' | 'worker' }
-    | { type: 'server'; host: string; authToken?: string; statusIntervalMs?: number }
+    | { type: 'server'; url: string; authToken?: string; statusIntervalMs?: number }
   ): void;
 };
 

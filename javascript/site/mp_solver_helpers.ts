@@ -20,7 +20,7 @@ type SimpleMpResult = {
   constraints: number;
   wallTime: number;
   iterations: number;
-  nodes: number;
+  nodes?: number;
   executor: 'direct' | 'worker' | 'server';
   workerCount?: number;
   solverThreads?: number;
@@ -79,6 +79,10 @@ export function applySolverThreads(solver: MPSolver, threads: number): {
   };
 }
 
+function supportsNodeCount(solverId: SimpleMpConfig['solverId']): boolean {
+  return solverId !== 'GLOP' && solverId !== 'CLP' && solverId !== 'GLPK_LP';
+}
+
 export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<SimpleMpResult> {
   await initMPSolver();
 
@@ -132,7 +136,7 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       constraints: solver.NumConstraints(),
       wallTime: solver.WallTime(),
       iterations: solver.Iterations(),
-      nodes: solver.nodes(),
+      nodes: supportsNodeCount(config.solverId) ? solver.nodes() : undefined,
       executor: currentMPSolverExecutor(),
       workerCount,
       solverThreads: threadConfig?.requested,
@@ -166,7 +170,9 @@ export function renderSimpleMpResult(element: HTMLElement | null, result: Simple
         <tr><th>Constraints</th><td>${result.constraints}</td></tr>
         <tr><th>Wall time</th><td>${result.wallTime} ms</td></tr>
         <tr><th>Iterations</th><td>${result.iterations}</td></tr>
-        <tr><th>Branch-and-bound nodes</th><td>${result.nodes}</td></tr>
+        ${result.nodes !== undefined
+          ? `<tr><th>Branch-and-bound nodes</th><td>${result.nodes}</td></tr>`
+          : ''}
       </tbody>
     </table>
   `;

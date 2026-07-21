@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "CbcModel.hpp"
 #include "absl/time/time.h"
 #include "generated_proto_schemas.h"
 #include "mp_solver.pb.h"
@@ -28,6 +29,15 @@ SolverExecutorResult Response(const bridge::MpSolverBridgeResponse& response) {
   return SolverExecutorResult{true, std::move(payload), {}};
 }
 
+int EffectiveThreads(const MPModelRequest& request, int requested_threads) {
+  requested_threads = requested_threads > 0 ? requested_threads : 1;
+  if (request.solver_type() == MPModelRequest::CBC_MIXED_INTEGER_PROGRAMMING &&
+      !CbcModel::haveMultiThreadSupport()) {
+    return 1;
+  }
+  return requested_threads;
+}
+
 SolverExecutorResult Solve(const bridge::MpSolverSolveRequest& solve_request,
                            const JobContext& context) {
   MPModelRequest request;
@@ -48,8 +58,9 @@ SolverExecutorResult Solve(const bridge::MpSolverSolveRequest& solve_request,
   bool rejected = false;
   MPSolver solver(request.model().name(), problem_type);
   if (request.enable_internal_solver_output()) solver.EnableOutput();
-  if (solve_request.num_threads() > 1) {
-    const auto status = solver.SetNumThreads(solve_request.num_threads());
+  const int num_threads = EffectiveThreads(request, solve_request.num_threads());
+  if (num_threads > 1) {
+    const auto status = solver.SetNumThreads(num_threads);
     if (!status.ok()) {
       solution.set_status(operations_research::MPSOLVER_INCOMPATIBLE_OPTIONS);
       solution.set_status_str(std::string(status.message()));
@@ -100,8 +111,13 @@ int MpSolverExecutor::RequestedThreads(const SolverExecutorRequest& request,
   if (parsed.payload_case() != bridge::MpSolverBridgeRequest::kSolve) return 1;
   const int payload_threads = parsed.solve().num_threads() > 0 ? parsed.solve().num_threads() : 1;
   if (client_requested_threads > 0 && client_requested_threads != payload_threads) throw std::invalid_argument("MP Solver thread counts do not match.");
-  if (payload_threads > server_total_threads) throw std::invalid_argument("MP Solver requests more threads than server capacity.");
-  return payload_threads;
+  MPModelRequest model_request;
+  if (!model_request.ParseFromString(parsed.solve().request_proto())) {
+    throw std::invalid_argument("Failed to parse MPModelRequest.");
+  }
+  const int effective_threads = EffectiveThreads(model_request, payload_threads);
+  if (effective_threads > server_total_threads) throw std::invalid_argument("MP Solver requests more threads than server capacity.");
+  return effective_threads;
 }
 
 SolverExecutorResult MpSolverExecutor::Execute(const SolverExecutorRequest& request,

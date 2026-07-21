@@ -154,6 +154,7 @@ add_executable(ortools_server
   src/routing_executor.cc
   src/set_cover_executor.cc
   src/server_config.cc
+  src/solver_job_routes.cc
   src/solver_job_service.cc)
 add_dependencies(ortools_server server_proto_schemas)
 target_include_directories(ortools_server PRIVATE
@@ -188,6 +189,20 @@ target_include_directories(server_solver_job_service_test PRIVATE
 target_link_libraries(server_solver_job_service_test PRIVATE
   protobuf::libprotobuf
   server_bridge_proto)
+
+add_executable(server_http_integration_test
+  src/http_server.cc
+  src/http_server_integration_test.cc
+  src/job_scheduler.cc
+  src/solver_job_routes.cc
+  src/solver_job_service.cc)
+target_include_directories(server_http_integration_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_http_integration_test PRIVATE
+  protobuf::libprotobuf
+  server_bridge_proto
+  server_cpp_httplib)
 
 add_executable(server_cp_sat_executor_test
   src/cp_sat_executor.cc
@@ -294,6 +309,7 @@ if(BUILD_TESTING)
   add_test(NAME server_job_scheduler_test COMMAND server_job_scheduler_test)
   add_test(NAME server_config_test COMMAND server_config_test)
   add_test(NAME server_solver_job_service_test COMMAND server_solver_job_service_test)
+  add_test(NAME server_http_integration_test COMMAND server_http_integration_test)
   add_test(NAME server_cp_sat_executor_test COMMAND server_cp_sat_executor_test)
   add_test(NAME server_knapsack_executor_test COMMAND server_knapsack_executor_test)
   add_test(NAME server_network_flow_executor_test COMMAND server_network_flow_executor_test)

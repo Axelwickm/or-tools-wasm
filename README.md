@@ -51,6 +51,12 @@ npm --prefix javascript install
 npm --prefix javascript run dev
 ```
 
+Run the native server:
+
+```sh
+docker compose -f server/docker-compose.yml up --build
+```
+
 > [!WARNING]
 > Browser builds require cross-origin isolation headers for WebAssembly threads.
 > See [Browser requirements](#browser-requirements) below.

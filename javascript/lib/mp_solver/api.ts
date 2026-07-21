@@ -852,12 +852,17 @@ function applyWorkerSolutionResponse(state: MpWorkerSolverState, response: MPSol
   state.objective.bestBound = workerProblemIsMip(state.problemType) && typeof response.bestObjectiveBound === 'number'
     ? response.bestObjectiveBound
     : state.objective.value;
-  const solveInfo = response.solveInfo as { solveWallTimeSeconds?: number } | undefined;
-  if (typeof solveInfo?.solveWallTimeSeconds === 'number') {
-    state.wallTimeMs = Math.round(solveInfo.solveWallTimeSeconds * 1000);
-  }
+  const reportedWallTime = workerSolveWallTimeMs(response);
+  if (reportedWallTime !== undefined) state.wallTimeMs = reportedWallTime;
   state.solutionLoaded = loaded;
   return loaded;
+}
+
+function workerSolveWallTimeMs(response: MPSolverSolutionResponse): number | undefined {
+  const solveInfo = response.solveInfo as { solveWallTimeSeconds?: number } | undefined;
+  return typeof solveInfo?.solveWallTimeSeconds === 'number'
+    ? Math.round(solveInfo.solveWallTimeSeconds * 1000)
+    : undefined;
 }
 
 function resetWorkerSolution(state: MpWorkerSolverState): void {
@@ -1796,7 +1801,9 @@ class SerializedMPSolverBackend implements MPSolverBackend {
       { numThreads: this.state.numThreads },
     );
     applyWorkerSolutionResponse(this.state, result.response);
-    this.state.wallTimeMs = Math.max(this.state.wallTimeMs, Date.now() - started);
+    if (workerSolveWallTimeMs(result.response) === undefined) {
+      this.state.wallTimeMs = Date.now() - started;
+    }
     return workerStatusToResultStatus(result.response.status);
   }
 

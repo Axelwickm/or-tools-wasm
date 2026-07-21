@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "CbcModel.hpp"
 #include "mp_solver.pb.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
 #include "server/src/job_scheduler.h"
@@ -62,6 +63,24 @@ void ReservesRequestedThreads() {
   parsed.mutable_solve()->set_num_threads(2);
   request.payload = parsed.SerializeAsString();
   Expect(executor.RequestedThreads(request, 2, 4) == 2, "MP Solver reserves requested threads");
+}
+
+void UsesCbcBuildThreadCapability() {
+  MpSolverExecutor executor;
+  auto request = Request();
+  bridge::MpSolverBridgeRequest outer;
+  linear::MPModelRequest inner;
+  Expect(outer.ParseFromString(request.payload), "MP Solver request parses");
+  Expect(inner.ParseFromString(outer.solve().request_proto()), "MPModelRequest parses");
+  inner.set_solver_type(linear::MPModelRequest::CBC_MIXED_INTEGER_PROGRAMMING);
+  outer.mutable_solve()->set_request_proto(inner.SerializeAsString());
+  outer.mutable_solve()->set_num_threads(2);
+  request.payload = outer.SerializeAsString();
+
+  const int expected_threads = CbcModel::haveMultiThreadSupport() ? 2 : 1;
+  Expect(executor.RequestedThreads(request, 2, 4) == expected_threads,
+         "MP Solver uses the CBC build's thread capability");
+  Expect(Execute(request).ok, "CBC solve succeeds when multiple threads are requested");
 }
 
 void ReturnsSchemas() {
@@ -122,6 +141,7 @@ int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
       {"SolvesNestedProto", SolvesNestedProto},
       {"ReservesRequestedThreads", ReservesRequestedThreads},
+      {"UsesCbcBuildThreadCapability", UsesCbcBuildThreadCapability},
       {"ReturnsSchemas", ReturnsSchemas},
       {"SupportsKnapsackBackend", SupportsKnapsackBackend},
       {"ReturnsUnavailableForUnsupportedBackend", ReturnsUnavailableForUnsupportedBackend}};

@@ -59,6 +59,7 @@ RUN --mount=type=cache,id=ortools-native-cmake-build,target=/build/server,sharin
     server_routing_executor_test \
     server_set_cover_executor_test \
     server_solver_job_service_test \
+    server_http_integration_test \
     server_config_test; \
   rm -rf /opt/ortools-server; \
   mkdir -p /opt; \

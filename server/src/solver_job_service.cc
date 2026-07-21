@@ -1,12 +1,15 @@
 #include "server/src/solver_job_service.h"
 
+#include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <future>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -20,6 +23,8 @@ namespace bridge = ::ortools_wasm::bridge::v1;
 constexpr const char* kProtobufContentType = "application/x-protobuf";
 constexpr const char* kPlainTextContentType = "text/plain; charset=utf-8";
 constexpr int kJobAccepted = 202;
+constexpr auto kEventStreamHeartbeatInterval = std::chrono::seconds(15);
+constexpr auto kMaximumCleanupInterval = std::chrono::seconds(30);
 
 bridge::SolverJobState ToBridgeState(JobState state) {
   switch (state) {
@@ -105,12 +110,50 @@ bridge::SolverBridgeResponse EventBridgeResponse(uint32_t request_id,
   return response;
 }
 
+bridge::SolverBridgeResponse TerminalBridgeResponse(
+    uint32_t request_id, const JobStatus& status,
+    const SolverExecutorResult& execution) {
+  bridge::SolverBridgeResponse response;
+  response.set_request_id(request_id);
+  response.set_solver(status.solver);
+  response.set_job_id(status.job_id);
+  if (status.state == JobState::kSucceeded) {
+    response.set_result_payload(execution.payload);
+    return response;
+  }
+
+  auto* failure = response.mutable_failure();
+  failure->set_request_id(request_id);
+  failure->set_solver(status.solver);
+  if (status.state == JobState::kCancelled) {
+    failure->set_kind(bridge::SOLVER_FAILURE_KIND_CANCELLED);
+    failure->set_message(status.message.empty() ? "Job cancelled." : status.message);
+    return response;
+  }
+  failure->set_kind(ToBridgeFailureKind(execution.failure_kind));
+  failure->set_message(execution.error_message.empty() ? status.message
+                                                        : execution.error_message);
+  failure->set_trace(execution.trace);
+  failure->set_retryable(execution.retryable);
+  return response;
+}
+
+bool IsTerminalResponse(const bridge::SolverBridgeResponse& response) {
+  return response.payload_case() == bridge::SolverBridgeResponse::kResultPayload ||
+         response.payload_case() == bridge::SolverBridgeResponse::kFailure;
+}
+
 class EventLog {
  public:
-  bridge::SolverBridgeResponse Append(bridge::SolverBridgeResponse response) {
-    std::lock_guard lock(mutex_);
-    response.set_sequence_id(next_sequence_id_++);
-    responses_.push_back(response);
+  bridge::SolverBridgeResponse Append(bridge::SolverBridgeResponse response,
+                                      bool close = false) {
+    {
+      std::lock_guard lock(mutex_);
+      response.set_sequence_id(next_sequence_id_++);
+      responses_.push_back(response);
+      if (close) closed_at_ = std::chrono::steady_clock::now();
+    }
+    changed_.notify_all();
     return response;
   }
 
@@ -129,10 +172,38 @@ class EventLog {
     return responses_.back();
   }
 
+  struct ReadResult {
+    std::optional<bridge::SolverBridgeResponse> response;
+    bool closed = false;
+  };
+
+  ReadResult WaitAfter(uint64_t sequence_id,
+                       std::chrono::milliseconds timeout) const {
+    std::unique_lock lock(mutex_);
+    changed_.wait_for(lock, timeout, [&] {
+      return closed_at_.has_value() ||
+             (!responses_.empty() &&
+              responses_.back().sequence_id() > sequence_id);
+    });
+    for (const auto& response : responses_) {
+      if (response.sequence_id() > sequence_id) {
+        return {response, closed_at_.has_value()};
+      }
+    }
+    return {std::nullopt, closed_at_.has_value()};
+  }
+
+  std::optional<std::chrono::steady_clock::time_point> ClosedAt() const {
+    std::lock_guard lock(mutex_);
+    return closed_at_;
+  }
+
  private:
   mutable std::mutex mutex_;
+  mutable std::condition_variable changed_;
   uint64_t next_sequence_id_ = 1;
   std::vector<bridge::SolverBridgeResponse> responses_;
+  std::optional<std::chrono::steady_clock::time_point> closed_at_;
 };
 
 struct JobOutput {
@@ -149,7 +220,26 @@ struct SolverJobService::JobEntry {
   std::shared_ptr<JobOutput> output = std::make_shared<JobOutput>();
 };
 
-SolverJobService::SolverJobService(JobScheduler& scheduler) : scheduler_(scheduler) {}
+SolverJobService::SolverJobService(
+    JobScheduler& scheduler,
+    std::chrono::milliseconds completed_job_retention)
+    : scheduler_(scheduler),
+      completed_job_retention_(completed_job_retention) {
+  if (completed_job_retention_ <= std::chrono::milliseconds::zero()) {
+    throw std::invalid_argument(
+        "SolverJobService completed-job retention must be positive.");
+  }
+  cleanup_thread_ = std::thread([this] { CleanupExpiredJobs(); });
+}
+
+SolverJobService::~SolverJobService() {
+  {
+    std::lock_guard lock(cleanup_mutex_);
+    stop_cleanup_ = true;
+  }
+  cleanup_cv_.notify_one();
+  if (cleanup_thread_.joinable()) cleanup_thread_.join();
+}
 
 void SolverJobService::Register(std::unique_ptr<SolverExecutor> executor) {
   if (!executor) throw std::invalid_argument("SolverJobService::Register requires an executor.");
@@ -217,6 +307,11 @@ HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
         },
         [output, request_id = entry->request_id](const JobStatus& status) {
           output->events.Append(StatusBridgeResponse(request_id, status));
+          if (IsTerminal(status.state)) {
+            output->events.Append(
+                TerminalBridgeResponse(request_id, status, output->execution),
+                true);
+          }
         });
   } catch (const JobQueueFullError& error) {
     return FailureResponse(bridge_request.request_id(), bridge_request.solver(), 0,
@@ -262,6 +357,43 @@ HttpBinaryResponse SolverJobService::Events(const HttpBinaryRequest& request) {
     return ProtoResponse(200, batch);
   } catch (const std::exception& error) {
     return TextResponse(400, std::string(error.what()) + "\n");
+  }
+}
+
+HttpEventStreamResponse SolverJobService::StreamEvents(
+    const HttpBinaryRequest& request) {
+  try {
+    const auto entry = EntryFor(JobIdFromRequest(request));
+    if (!entry) return HttpEventStreamResponse{404, "Job not found.\n", {}, {}};
+    if (entry->handle.status().state == JobState::kQueued) {
+      return HttpEventStreamResponse{
+          409, "Job is queued; poll until scheduler capacity is allocated.\n",
+          {}, {}};
+    }
+    const uint64_t initial_sequence_id = EventCursorFromRequest(request);
+    return HttpEventStreamResponse{
+        200,
+        {},
+        {},
+        [entry, sequence_id = initial_sequence_id]() mutable
+            -> std::optional<HttpServerSentEvent> {
+          const EventLog::ReadResult read = entry->output->events.WaitAfter(
+              sequence_id, kEventStreamHeartbeatInterval);
+          if (!read.response.has_value()) {
+            if (read.closed) return std::nullopt;
+            return HttpServerSentEvent{};
+          }
+          sequence_id = read.response->sequence_id();
+          std::string bytes;
+          if (!read.response->SerializeToString(&bytes)) {
+            throw std::runtime_error("Failed to serialize streamed protobuf response.");
+          }
+          return HttpServerSentEvent{
+              std::to_string(sequence_id), "solver", std::move(bytes),
+              IsTerminalResponse(*read.response)};
+        }};
+  } catch (const std::exception& error) {
+    return HttpEventStreamResponse{400, std::string(error.what()) + "\n", {}, {}};
   }
 }
 
@@ -358,6 +490,34 @@ std::shared_ptr<SolverJobService::JobEntry> SolverJobService::EntryFor(
   std::lock_guard lock(mutex_);
   const auto it = jobs_.find(job_id);
   return it == jobs_.end() ? nullptr : it->second;
+}
+
+void SolverJobService::CleanupExpiredJobs() {
+  const auto cleanup_interval =
+      std::min(completed_job_retention_,
+               std::chrono::duration_cast<std::chrono::milliseconds>(
+                   kMaximumCleanupInterval));
+  std::unique_lock cleanup_lock(cleanup_mutex_);
+  while (!cleanup_cv_.wait_for(
+      cleanup_lock, cleanup_interval,
+      [this] { return stop_cleanup_; })) {
+    cleanup_lock.unlock();
+
+    const auto now = std::chrono::steady_clock::now();
+    {
+      std::lock_guard jobs_lock(mutex_);
+      for (auto it = jobs_.begin(); it != jobs_.end();) {
+        const auto closed_at = it->second->output->events.ClosedAt();
+        if (closed_at.has_value() &&
+            *closed_at + completed_job_retention_ <= now) {
+          it = jobs_.erase(it);
+          continue;
+        }
+        ++it;
+      }
+    }
+    cleanup_lock.lock();
+  }
 }
 
 HttpBinaryResponse SolverJobService::StatusResponse(uint32_t request_id,

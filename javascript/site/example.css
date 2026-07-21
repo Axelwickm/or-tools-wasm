@@ -134,6 +134,45 @@ pre,
 	margin-bottom: 0.5rem;
 }
 
+.server-executor-settings {
+	display: grid;
+	grid-template-columns: minmax(18rem, 1fr) auto;
+	gap: 0.4rem 0.75rem;
+	align-items: center;
+	max-width: 900px;
+	margin: 0 0 0.75rem;
+	padding: 0.65rem 0.75rem;
+	border-left: 3px solid #0b57d0;
+	background: #f6f8fa;
+}
+
+.server-executor-settings[hidden] {
+	display: none;
+}
+
+.server-executor-settings label {
+	min-width: 0;
+}
+
+.server-endpoint-input {
+	box-sizing: border-box;
+	width: min(30rem, 65vw);
+	min-width: 12rem;
+}
+
+.server-endpoint-target {
+	color: #555;
+	font-size: 0.9rem;
+}
+
+.server-start-command {
+	padding: 0.2rem 0.4rem;
+	overflow-wrap: anywhere;
+	background: #fff;
+	border: 1px solid #d0d7de;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .spaced {
 	margin-bottom: 0.75rem;
 }
@@ -194,5 +233,13 @@ th {
 
 	.two-column {
 		grid-template-columns: 1fr;
+	}
+
+	.server-executor-settings {
+		grid-template-columns: 1fr;
+	}
+
+	.server-endpoint-input {
+		width: 100%;
 	}
 }

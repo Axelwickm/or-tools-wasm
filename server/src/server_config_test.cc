@@ -41,6 +41,7 @@ std::unordered_map<std::string, std::string> ValidEnv() {
       {"ORTOOLS_SERVER_PORT", "17827"},
       {"ORTOOLS_SERVER_TOTAL_THREADS", "4"},
       {"ORTOOLS_SERVER_MAX_QUEUE_SIZE", "100000"},
+      {"ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS", "3600"},
       {"ORTOOLS_SERVER_BEARER_TOKEN", "secret"},
   };
 }
@@ -52,6 +53,8 @@ void LoadsValidConfig() {
   ExpectEq(config.port, 17827, "port");
   ExpectEq(config.total_threads, 4, "total threads");
   ExpectEq(config.max_queue_size, 100000, "max queue size");
+  ExpectEq(config.completed_job_retention_seconds, 3600,
+           "completed job retention");
   ExpectEq(config.bearer_token, std::string("secret"), "bearer token");
 }
 
@@ -97,6 +100,21 @@ void RejectsInvalidPositiveInteger() {
   Expect(threw, "invalid max queue size throws");
 }
 
+void RejectsMissingCompletedJobRetention() {
+  auto values = ValidEnv();
+  values.erase("ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS");
+
+  bool threw = false;
+  try {
+    LoadServerConfig(MapEnv(std::move(values)));
+  } catch (const std::runtime_error& error) {
+    threw = std::string(error.what()).find(
+                "ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS") !=
+            std::string::npos;
+  }
+  Expect(threw, "missing completed job retention throws");
+}
+
 void RejectsOutOfRangePort() {
   auto values = ValidEnv();
   values["ORTOOLS_SERVER_PORT"] = "70000";
@@ -122,6 +140,8 @@ int RunAllTests() {
       {"ResolvesAutoThreads", ResolvesAutoThreads},
       {"RejectsMissingRequiredValue", RejectsMissingRequiredValue},
       {"RejectsInvalidPositiveInteger", RejectsInvalidPositiveInteger},
+      {"RejectsMissingCompletedJobRetention",
+       RejectsMissingCompletedJobRetention},
       {"RejectsOutOfRangePort", RejectsOutOfRangePort},
   };
 
