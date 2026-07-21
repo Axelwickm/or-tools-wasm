@@ -16,19 +16,19 @@ export function assertAllCases(runtime: string, results: NamedCaseResult[]) {
 }
 
 export async function runBunFixture(run: () => Promise<void>, cleanup?: () => Promise<void> | void) {
-  let exitCode = 0;
+  let runError: unknown;
   try {
     await run();
   } catch (error) {
-    exitCode = 1;
-    console.error(error);
-  } finally {
-    try {
-      await cleanup?.();
-    } catch (error) {
-      exitCode = 1;
-      console.error(error);
-    }
+    runError = error;
   }
-  process.exit(exitCode);
+
+  try {
+    await cleanup?.();
+  } catch (cleanupError) {
+    if (runError !== undefined) console.error(runError);
+    throw cleanupError;
+  }
+
+  if (runError !== undefined) throw runError;
 }

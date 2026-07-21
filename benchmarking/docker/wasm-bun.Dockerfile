@@ -1,4 +1,4 @@
-FROM oven/bun:1
+FROM oven/bun:1.3.14
 
 USER root
 WORKDIR /bench
@@ -11,6 +11,6 @@ COPY Version.txt ./Version.txt
 COPY benchmarking ./benchmarking
 
 ENV BENCH_IMPLEMENTATION=wasm-bun
-ENV BENCH_ENVIRONMENT=bun-local
+ENV BENCH_ENVIRONMENT=bun-1.3.14
 
 ENTRYPOINT ["bun", "/bench/benchmarking/runners/node/run.mjs"]

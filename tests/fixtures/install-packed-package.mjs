@@ -68,6 +68,7 @@ async function installTarball(tarballPath) {
       'install',
       tarballPath,
       '--force',
+      '--no-save',
       '--no-audit',
       '--no-fund',
       '--no-package-lock',
@@ -110,5 +111,5 @@ if (!tarballs.length) {
 const tarball = tarballs[0];
 const tarballPath = tarball.path;
 await copyFile(tarballPath, stableTarballPath);
-console.log(`Installing ${stableTarballPath} into ${fixtureDir}`);
-await installTarball(stableTarballPath);
+console.log(`Installing ${tarballPath} into ${fixtureDir}`);
+await installTarball(tarballPath);
