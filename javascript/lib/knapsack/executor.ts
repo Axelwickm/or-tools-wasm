@@ -1,5 +1,5 @@
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
-import { executeKnapsackNative, loadMPSolverNativeModule } from '../mp_solver/native_runtime.js';
+import { executeKnapsackNative, loadKnapsackNativeModule } from './native_runtime.js';
 import type { SolverBridgeCodec } from '../solver_bridge.js';
 import {
   createSolverFailureEvent,
@@ -45,7 +45,7 @@ export class KnapsackExecutor implements KnapsackExecutorLike {
   private readonly cancelledRequests = new Set<number>();
 
   async load(): Promise<void> {
-    await loadMPSolverNativeModule();
+    await loadKnapsackNativeModule();
   }
 
   execute(

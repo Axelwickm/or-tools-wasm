@@ -190,6 +190,10 @@ implements SolverExecutor<Request, Response, Event> {
     this.solver = codec.solver;
     this.worker = new ManagedWorker({
       createWorker,
+      isReady: (bytes) => {
+        const response = decodeSolverBridgeResponse(bytes);
+        return response.solver === this.solver && response.payload.case === 'ready';
+      },
       getRequestId: (bytes) => decodeSolverBridgeRequest(bytes).requestId,
       getResponseId: (bytes) => decodeSolverBridgeResponse(bytes).requestId,
       isEvent: (bytes) => {

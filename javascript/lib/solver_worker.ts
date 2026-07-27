@@ -4,6 +4,7 @@ import {
   encodeSolverBridgeCancelled,
   encodeSolverBridgeEvent,
   encodeSolverBridgeFailure,
+  encodeSolverBridgeReady,
   encodeSolverBridgeResult,
   encodeSolverBridgeStatus,
   type SolverBridgeCodec,
@@ -91,4 +92,6 @@ export function installSolverWorker<Request, Response, Event>(
       post(encodeSolverBridgeFailure(requestId, codec.solver, failure));
     }
   };
+
+  post(encodeSolverBridgeReady(codec.solver));
 }

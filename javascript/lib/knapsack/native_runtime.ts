@@ -1,9 +1,10 @@
 import { loadMPSolverRuntime } from '../runtime_loader.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { readWasmResult, withWasmCString } from '../wasm_memory.js';
 
 let modulePromise: Promise<OrToolsWasmModule> | null = null;
 
-export function loadMPSolverNativeModule(): Promise<OrToolsWasmModule> {
+export function loadKnapsackNativeModule(): Promise<OrToolsWasmModule> {
   return modulePromise ??= loadMPSolverRuntime();
 }
 
@@ -34,17 +35,6 @@ function flattenKnapsackWeights(weights: number[][], itemCount: number): number[
   return flattened;
 }
 
-function withCString<T>(module: OrToolsWasmModule, value: string, fn: (ptr: number) => T): T {
-  const bytes = new TextEncoder().encode(`${value}\0`);
-  const ptr = module._malloc(bytes.byteLength);
-  module.HEAPU8.set(bytes, ptr);
-  try {
-    return fn(ptr);
-  } finally {
-    module._free(ptr);
-  }
-}
-
 export async function executeKnapsackNative(
   solverType: number,
   name: string,
@@ -54,16 +44,15 @@ export async function executeKnapsackNative(
   weights: number[][],
   capacities: number[],
 ): Promise<NativeKnapsackResult> {
-  const module = await loadMPSolverNativeModule();
+  const module = await loadKnapsackNativeModule();
   const flattenedWeights = flattenKnapsackWeights(weights, profits.length);
   const profitsPtr = copyFloat64ToHeap(module, profits);
   const weightsPtr = copyFloat64ToHeap(module, flattenedWeights);
   const capacitiesPtr = copyFloat64ToHeap(module, capacities);
-  const lengthPtr = module._malloc(4);
-  let resultPtr = 0;
   try {
-    const bytes = await withCString(module, name, async (namePtr) => {
-      resultPtr = await module.ccall(
+    const bytes = await withWasmCString(module, name, (namePtr) => readWasmResult(
+      module,
+      (lengthPtr) => module.ccall(
         'knapsack_solve_serialized',
         'number',
         ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
@@ -80,22 +69,17 @@ export async function executeKnapsackNative(
           lengthPtr,
         ],
         { async: true },
-      ) as number;
-      const length = new DataView(module.HEAPU8.buffer, lengthPtr, 4).getUint32(0, true);
-      return resultPtr && length
-        ? module.HEAPU8.slice(resultPtr, resultPtr + length)
-        : new Uint8Array();
-    });
+      ) as Promise<number>,
+      (pointer) => module.ccall('free_buffer', undefined, ['number'], [pointer]),
+    ));
     const result = JSON.parse(new TextDecoder().decode(bytes)) as NativeKnapsackResult;
     if (!result.ok) {
       throw new Error(result.error || 'KnapsackSolver.solve: native solve failed.');
     }
     return result;
   } finally {
-    if (resultPtr) module.ccall('free_buffer', undefined, ['number'], [resultPtr]);
     if (profitsPtr) module._free(profitsPtr);
     if (weightsPtr) module._free(weightsPtr);
     if (capacitiesPtr) module._free(capacitiesPtr);
-    module._free(lengthPtr);
   }
 }

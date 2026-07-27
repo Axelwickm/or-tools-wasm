@@ -19,6 +19,7 @@ import {
   type SolverJobEvent,
 } from '../solver_executor.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
 
 export type MpSolverExecutorRequest = MpSolverBridgeRequest['payload'];
 export type MpSolverExecutorLike = SolverExecutor<MpSolverExecutorRequest, MpSolverBridgeResponse, never>;
@@ -33,13 +34,6 @@ export const mpSolverBridgeCodec: SolverBridgeCodec<MpSolverExecutorRequest, MpS
   decodeResult: (payload) => fromBinary(MpSolverBridgeResponseSchema, payload),
   defaultRequestedThreads: 1,
 };
-
-function copyBytes(module: OrToolsWasmModule, bytes: Uint8Array) {
-  if (!bytes.length) return 0;
-  const ptr = module._malloc(bytes.length);
-  module.HEAPU8.set(bytes, ptr);
-  return ptr;
-}
 
 export class MpSolverExecutor implements MpSolverExecutorLike {
   readonly solver = 'mp-solver';
@@ -102,23 +96,23 @@ export class MpSolverExecutor implements MpSolverExecutorLike {
   }
 
   private async solve(module: OrToolsWasmModule, bytes: Uint8Array, numThreads: number) {
-    const requestPtr = copyBytes(module, bytes);
-    const lenPtr = module._malloc(4);
-    let responsePtr = 0;
+    const requestPtr = allocateWasmBytes(module, bytes);
     try {
-      responsePtr = await module.ccall(
-        numThreads > 1 ? 'mp_solver_solve_model_request_with_threads' : 'mp_solver_solve_model_request',
+      return await readWasmResult(module, (lengthPointer) => module.ccall(
+        numThreads > 1
+          ? 'mp_solver_solve_model_request_with_threads'
+          : 'mp_solver_solve_model_request',
         'number',
-        numThreads > 1 ? ['number', 'number', 'number', 'number'] : ['number', 'number', 'number'],
-        numThreads > 1 ? [requestPtr, bytes.length, numThreads, lenPtr] : [requestPtr, bytes.length, lenPtr],
+        numThreads > 1
+          ? ['number', 'number', 'number', 'number']
+          : ['number', 'number', 'number'],
+        numThreads > 1
+          ? [requestPtr, bytes.length, numThreads, lengthPointer]
+          : [requestPtr, bytes.length, lengthPointer],
         { async: true },
-      ) as number;
-      const length = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
-      return responsePtr && length ? module.HEAPU8.slice(responsePtr, responsePtr + length) : new Uint8Array();
+      ) as number | Promise<number>);
     } finally {
-      if (responsePtr) module._free(responsePtr);
       if (requestPtr) module._free(requestPtr);
-      module._free(lenPtr);
     }
   }
 }

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file job.proto.
  */
 export const file_job: GenFile = /*@__PURE__*/
-  fileDesc("Cglqb2IucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi4wEKE1NvbHZlckJyaWRnZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSQQoIc2V0dGluZ3MYAyABKAsyLy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckV4ZWN1dGlvblNldHRpbmdzEhkKD2V4ZWN1dGVfcGF5bG9hZBgKIAEoDEgAEj0KBmNhbmNlbBgLIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyQ2FuY2VsUmVxdWVzdEgAQgsKCW9wZXJhdGlvbiI0ChdTb2x2ZXJFeGVjdXRpb25TZXR0aW5ncxIZChFyZXF1ZXN0ZWRfdGhyZWFkcxgBIAEoDSIwChNTb2x2ZXJDYW5jZWxSZXF1ZXN0EhkKEXRhcmdldF9yZXF1ZXN0X2lkGAEgASgNItYCChRTb2x2ZXJCcmlkZ2VSZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRIOCgZqb2JfaWQYAyABKAQSEwoLc2VxdWVuY2VfaWQYBCABKAQSOQoGc3RhdHVzGAogASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JTdGF0dXNIABI7CgdmYWlsdXJlGAsgASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JGYWlsdXJlSAASFwoNZXZlbnRfcGF5bG9hZBgMIAEoDEgAEhgKDnJlc3VsdF9wYXlsb2FkGA0gASgMSAASPwoJY2FuY2VsbGVkGA4gASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JDYW5jZWxsZWRIAEIJCgdwYXlsb2FkIi8KElNvbHZlckpvYkNhbmNlbGxlZBIZChF0YXJnZXRfcmVxdWVzdF9pZBgBIAEoDSJTChBTb2x2ZXJFdmVudEJhdGNoEj8KCXJlc3BvbnNlcxgBIAMoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyQnJpZGdlUmVzcG9uc2UizQEKD1NvbHZlckpvYlN0YXR1cxISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRI1CgVzdGF0ZRgDIAEoDjImLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVySm9iU3RhdGUSFQoNY3JlYXRlZF9hdF9tcxgEIAEoBBIVCg1zdGFydGVkX2F0X21zGAUgASgEEhkKEWFsbG9jYXRlZF90aHJlYWRzGAYgASgNEhYKDnF1ZXVlX3Bvc2l0aW9uGAcgASgNIqIBChBTb2x2ZXJKb2JGYWlsdXJlEhIKCnJlcXVlc3RfaWQYASABKA0SDgoGc29sdmVyGAIgASgJEjcKBGtpbmQYAyABKA4yKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckZhaWx1cmVLaW5kEg8KB21lc3NhZ2UYBCABKAkSDQoFdHJhY2UYBSABKAkSEQoJcmV0cnlhYmxlGAYgASgIKooCCg5Tb2x2ZXJKb2JTdGF0ZRIgChxTT0xWRVJfSk9CX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXU09MVkVSX0pPQl9TVEFURV9RVUVVRUQQARIdChlTT0xWRVJfSk9CX1NUQVRFX1NUQVJUSU5HEAISHAoYU09MVkVSX0pPQl9TVEFURV9SVU5OSU5HEAMSHwobU09MVkVSX0pPQl9TVEFURV9DQU5DRUxMSU5HEAQSHgoaU09MVkVSX0pPQl9TVEFURV9DQU5DRUxMRUQQBRIeChpTT0xWRVJfSk9CX1NUQVRFX1NVQ0NFRURFRBAGEhsKF1NPTFZFUl9KT0JfU1RBVEVfRkFJTEVEEAcq5wMKEVNvbHZlckZhaWx1cmVLaW5kEiMKH1NPTFZFUl9GQUlMVVJFX0tJTkRfVU5TUEVDSUZJRUQQABImCiJTT0xWRVJfRkFJTFVSRV9LSU5EX0VYRUNVVE9SX0VSUk9SEAESKgomU09MVkVSX0ZBSUxVUkVfS0lORF9SVU5USU1FX0xPQURfRVJST1IQAhIkCiBTT0xWRVJfRkFJTFVSRV9LSU5EX1dPUktFUl9DUkFTSBADEisKJ1NPTFZFUl9GQUlMVVJFX0tJTkRfU0VSVkVSX0RJU0NPTk5FQ1RFRBAEEh8KG1NPTFZFUl9GQUlMVVJFX0tJTkRfVElNRU9VVBAFEiEKHVNPTFZFUl9GQUlMVVJFX0tJTkRfQ0FOQ0VMTEVEEAYSIAocU09MVkVSX0ZBSUxVUkVfS0lORF9JTlRFUk5BTBAHEicKI1NPTFZFUl9GQUlMVVJFX0tJTkRfSU5WQUxJRF9SRVFVRVNUEAgSJwojU09MVkVSX0ZBSUxVUkVfS0lORF9VTkFVVEhFTlRJQ0FURUQQCRIiCh5TT0xWRVJfRkFJTFVSRV9LSU5EX1FVRVVFX0ZVTEwQChIqCiZTT0xWRVJfRkFJTFVSRV9LSU5EX1VOU1VQUE9SVEVEX1NPTFZFUhALYgZwcm90bzM");
+  fileDesc("Cglqb2IucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi4wEKE1NvbHZlckJyaWRnZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSQQoIc2V0dGluZ3MYAyABKAsyLy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckV4ZWN1dGlvblNldHRpbmdzEhkKD2V4ZWN1dGVfcGF5bG9hZBgKIAEoDEgAEj0KBmNhbmNlbBgLIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyQ2FuY2VsUmVxdWVzdEgAQgsKCW9wZXJhdGlvbiI0ChdTb2x2ZXJFeGVjdXRpb25TZXR0aW5ncxIZChFyZXF1ZXN0ZWRfdGhyZWFkcxgBIAEoDSIwChNTb2x2ZXJDYW5jZWxSZXF1ZXN0EhkKEXRhcmdldF9yZXF1ZXN0X2lkGAEgASgNIpIDChRTb2x2ZXJCcmlkZ2VSZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRIOCgZqb2JfaWQYAyABKAQSEwoLc2VxdWVuY2VfaWQYBCABKAQSOQoGc3RhdHVzGAogASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JTdGF0dXNIABI7CgdmYWlsdXJlGAsgASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JGYWlsdXJlSAASFwoNZXZlbnRfcGF5bG9hZBgMIAEoDEgAEhgKDnJlc3VsdF9wYXlsb2FkGA0gASgMSAASPwoJY2FuY2VsbGVkGA4gASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JDYW5jZWxsZWRIABI6CgVyZWFkeRgPIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyV29ya2VyUmVhZHlIAEIJCgdwYXlsb2FkIhMKEVNvbHZlcldvcmtlclJlYWR5Ii8KElNvbHZlckpvYkNhbmNlbGxlZBIZChF0YXJnZXRfcmVxdWVzdF9pZBgBIAEoDSJTChBTb2x2ZXJFdmVudEJhdGNoEj8KCXJlc3BvbnNlcxgBIAMoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyQnJpZGdlUmVzcG9uc2UizQEKD1NvbHZlckpvYlN0YXR1cxISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRI1CgVzdGF0ZRgDIAEoDjImLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVySm9iU3RhdGUSFQoNY3JlYXRlZF9hdF9tcxgEIAEoBBIVCg1zdGFydGVkX2F0X21zGAUgASgEEhkKEWFsbG9jYXRlZF90aHJlYWRzGAYgASgNEhYKDnF1ZXVlX3Bvc2l0aW9uGAcgASgNIqIBChBTb2x2ZXJKb2JGYWlsdXJlEhIKCnJlcXVlc3RfaWQYASABKA0SDgoGc29sdmVyGAIgASgJEjcKBGtpbmQYAyABKA4yKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckZhaWx1cmVLaW5kEg8KB21lc3NhZ2UYBCABKAkSDQoFdHJhY2UYBSABKAkSEQoJcmV0cnlhYmxlGAYgASgIKooCCg5Tb2x2ZXJKb2JTdGF0ZRIgChxTT0xWRVJfSk9CX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXU09MVkVSX0pPQl9TVEFURV9RVUVVRUQQARIdChlTT0xWRVJfSk9CX1NUQVRFX1NUQVJUSU5HEAISHAoYU09MVkVSX0pPQl9TVEFURV9SVU5OSU5HEAMSHwobU09MVkVSX0pPQl9TVEFURV9DQU5DRUxMSU5HEAQSHgoaU09MVkVSX0pPQl9TVEFURV9DQU5DRUxMRUQQBRIeChpTT0xWRVJfSk9CX1NUQVRFX1NVQ0NFRURFRBAGEhsKF1NPTFZFUl9KT0JfU1RBVEVfRkFJTEVEEAcq5wMKEVNvbHZlckZhaWx1cmVLaW5kEiMKH1NPTFZFUl9GQUlMVVJFX0tJTkRfVU5TUEVDSUZJRUQQABImCiJTT0xWRVJfRkFJTFVSRV9LSU5EX0VYRUNVVE9SX0VSUk9SEAESKgomU09MVkVSX0ZBSUxVUkVfS0lORF9SVU5USU1FX0xPQURfRVJST1IQAhIkCiBTT0xWRVJfRkFJTFVSRV9LSU5EX1dPUktFUl9DUkFTSBADEisKJ1NPTFZFUl9GQUlMVVJFX0tJTkRfU0VSVkVSX0RJU0NPTk5FQ1RFRBAEEh8KG1NPTFZFUl9GQUlMVVJFX0tJTkRfVElNRU9VVBAFEiEKHVNPTFZFUl9GQUlMVVJFX0tJTkRfQ0FOQ0VMTEVEEAYSIAocU09MVkVSX0ZBSUxVUkVfS0lORF9JTlRFUk5BTBAHEicKI1NPTFZFUl9GQUlMVVJFX0tJTkRfSU5WQUxJRF9SRVFVRVNUEAgSJwojU09MVkVSX0ZBSUxVUkVfS0lORF9VTkFVVEhFTlRJQ0FURUQQCRIiCh5TT0xWRVJfRkFJTFVSRV9LSU5EX1FVRVVFX0ZVTEwQChIqCiZTT0xWRVJfRkFJTFVSRV9LSU5EX1VOU1VQUE9SVEVEX1NPTFZFUhALYgZwcm90bzM");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverBridgeRequest
@@ -212,6 +212,12 @@ export type SolverBridgeResponse = Message<"ortools_wasm.bridge.v1.SolverBridgeR
      */
     value: SolverJobCancelled;
     case: "cancelled";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.SolverWorkerReady ready = 15;
+     */
+    value: SolverWorkerReady;
+    case: "ready";
   } | { case: undefined; value?: undefined };
 };
 
@@ -268,6 +274,11 @@ export type SolverBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.SolverJobCancelled cancelled = 14;
    */
   cancelled?: SolverJobCancelledJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SolverWorkerReady ready = 15;
+   */
+  ready?: SolverWorkerReadyJson;
 };
 
 export type SolverBridgeResponseValid = SolverBridgeResponse;
@@ -278,6 +289,27 @@ export type SolverBridgeResponseValid = SolverBridgeResponse;
  */
 export const SolverBridgeResponseSchema: GenMessage<SolverBridgeResponse, {jsonType: SolverBridgeResponseJson, validType: SolverBridgeResponseValid}> = /*@__PURE__*/
   messageDesc(file_job, 3);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverWorkerReady
+ */
+export type SolverWorkerReady = Message<"ortools_wasm.bridge.v1.SolverWorkerReady"> & {
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverWorkerReady
+ */
+export type SolverWorkerReadyJson = {
+};
+
+export type SolverWorkerReadyValid = SolverWorkerReady;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverWorkerReady.
+ * Use `create(SolverWorkerReadySchema)` to create a new message.
+ */
+export const SolverWorkerReadySchema: GenMessage<SolverWorkerReady, {jsonType: SolverWorkerReadyJson, validType: SolverWorkerReadyValid}> = /*@__PURE__*/
+  messageDesc(file_job, 4);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobCancelled
@@ -306,7 +338,7 @@ export type SolverJobCancelledValid = SolverJobCancelled;
  * Use `create(SolverJobCancelledSchema)` to create a new message.
  */
 export const SolverJobCancelledSchema: GenMessage<SolverJobCancelled, {jsonType: SolverJobCancelledJson, validType: SolverJobCancelledValid}> = /*@__PURE__*/
-  messageDesc(file_job, 4);
+  messageDesc(file_job, 5);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverEventBatch
@@ -335,7 +367,7 @@ export type SolverEventBatchValid = SolverEventBatch;
  * Use `create(SolverEventBatchSchema)` to create a new message.
  */
 export const SolverEventBatchSchema: GenMessage<SolverEventBatch, {jsonType: SolverEventBatchJson, validType: SolverEventBatchValid}> = /*@__PURE__*/
-  messageDesc(file_job, 5);
+  messageDesc(file_job, 6);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobStatus
@@ -424,7 +456,7 @@ export type SolverJobStatusValid = SolverJobStatus;
  * Use `create(SolverJobStatusSchema)` to create a new message.
  */
 export const SolverJobStatusSchema: GenMessage<SolverJobStatus, {jsonType: SolverJobStatusJson, validType: SolverJobStatusValid}> = /*@__PURE__*/
-  messageDesc(file_job, 6);
+  messageDesc(file_job, 7);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobFailure
@@ -503,7 +535,7 @@ export type SolverJobFailureValid = SolverJobFailure;
  * Use `create(SolverJobFailureSchema)` to create a new message.
  */
 export const SolverJobFailureSchema: GenMessage<SolverJobFailure, {jsonType: SolverJobFailureJson, validType: SolverJobFailureValid}> = /*@__PURE__*/
-  messageDesc(file_job, 7);
+  messageDesc(file_job, 8);
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SolverJobState

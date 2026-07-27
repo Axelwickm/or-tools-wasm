@@ -1,5 +1,6 @@
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { loadRoutingRuntime } from '../runtime_loader.js';
+import { withWasmCString } from '../wasm_memory.js';
 
 export type RoutingModelOperation =
   | { type: 'addDimension'; transitMatrix: BigInt64Array; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }
@@ -9,7 +10,11 @@ export type RoutingModelOperation =
   | { type: 'addVectorDimension'; values: number[]; capacity: number; fixStartCumulToZero: boolean; name: string }
   | { type: 'addMatrixDimension'; matrix: number[][]; capacity: number; fixStartCumulToZero: boolean; name: string }
   | { type: 'addDisjunction'; indices: number[]; penalty?: number }
-  | { type: 'addPickupAndDelivery'; pickup: number; delivery: number };
+  | { type: 'addPickupAndDelivery'; pickup: number; delivery: number }
+  | { type: 'addVehicleEqualityConstraint'; left: number; right: number }
+  | { type: 'addCumulLessOrEqualConstraint'; dimensionName: string; left: number; right: number }
+  | { type: 'setSoftSpanUpperBound'; dimensionName: string; bound: number; cost: number; vehicle: number }
+  | { type: 'setQuadraticCostSoftSpanUpperBound'; dimensionName: string; bound: number; cost: number; vehicle: number };
 
 export type RoutingSolveRequest = {
   numLocations: number;
@@ -22,6 +27,10 @@ export type RoutingSolveRequest = {
   transitMatrixDimension: number;
   operations: RoutingModelOperation[];
   dimensionNames: string[];
+  initialAssignment?: {
+    routes: number[][];
+    ignoreInactiveIndices: boolean;
+  };
 };
 
 export type RoutingSolveResult = {
@@ -64,22 +73,6 @@ function copyInt64Array(module: OrToolsWasmModule, values: BigInt64Array | numbe
   return { ptr, length: array.length };
 }
 
-function copyString(module: OrToolsWasmModule, value: string): number {
-  const bytes = new TextEncoder().encode(`${value}\0`);
-  const ptr = module._malloc(bytes.byteLength);
-  module.HEAPU8.set(bytes, ptr);
-  return ptr;
-}
-
-async function withStringAsync<T>(module: OrToolsWasmModule, value: string, fn: (ptr: number) => T | Promise<T>): Promise<T> {
-  const ptr = copyString(module, value);
-  try {
-    return await fn(ptr);
-  } finally {
-    module._free(ptr);
-  }
-}
-
 async function ccallNumber(
   module: OrToolsWasmModule,
   name: string,
@@ -98,6 +91,15 @@ async function ccallBigInt(
   return await module.ccall(name, 'bigint', argTypes, args, { async: true }) as bigint;
 }
 
+async function ccallVoid(
+  module: OrToolsWasmModule,
+  name: string,
+  argTypes: string[],
+  args: unknown[],
+): Promise<void> {
+  await module.ccall(name, undefined, argTypes, args, { async: true });
+}
+
 async function registerTransitMatrix(
   module: OrToolsWasmModule,
   modelHandle: number,
@@ -113,7 +115,7 @@ async function registerTransitMatrix(
       [modelHandle, ptr, length, dimension],
     );
     if (evaluatorIndex < 0) {
-      throw new Error('Routing worker failed to register transit matrix.');
+      throw new Error('Routing executor failed to register transit matrix.');
     }
     return evaluatorIndex;
   } finally {
@@ -150,7 +152,7 @@ async function solveRoutingWithModule(
     for (const operation of message.operations) {
       if (operation.type === 'addDimension') {
         const index = await registerTransitMatrix(module, modelHandle, operation.transitMatrix, message.transitMatrixDimension);
-        await withStringAsync(module, operation.name, async (namePtr) => {
+        await withWasmCString(module, operation.name, async (namePtr) => {
           await ccallNumber(
             module,
             'routing_add_dimension',
@@ -162,7 +164,7 @@ async function solveRoutingWithModule(
         const index = await registerTransitMatrix(module, modelHandle, operation.transitMatrix, message.transitMatrixDimension);
         const capacities = copyInt64Array(module, operation.capacities);
         try {
-          await withStringAsync(module, operation.name, async (namePtr) => {
+          await withWasmCString(module, operation.name, async (namePtr) => {
             await ccallNumber(
               module,
               'routing_add_dimension_with_vehicle_capacity',
@@ -180,7 +182,7 @@ async function solveRoutingWithModule(
         }
         const evaluatorsPtr = copyInt32Array(module, evaluatorIndices);
         try {
-          await withStringAsync(module, operation.name, async (namePtr) => {
+          await withWasmCString(module, operation.name, async (namePtr) => {
             await ccallNumber(
               module,
               'routing_add_dimension_with_vehicle_transits',
@@ -192,7 +194,7 @@ async function solveRoutingWithModule(
           module._free(evaluatorsPtr);
         }
       } else if (operation.type === 'addConstantDimension') {
-        await withStringAsync(module, operation.name, async (namePtr) => {
+        await withWasmCString(module, operation.name, async (namePtr) => {
           await ccallNumber(
             module,
             'routing_add_constant_dimension',
@@ -203,7 +205,7 @@ async function solveRoutingWithModule(
       } else if (operation.type === 'addVectorDimension') {
         const values = copyInt64Array(module, operation.values);
         try {
-          await withStringAsync(module, operation.name, async (namePtr) => {
+          await withWasmCString(module, operation.name, async (namePtr) => {
             await ccallNumber(
               module,
               'routing_add_vector_dimension',
@@ -218,7 +220,7 @@ async function solveRoutingWithModule(
         const flat = operation.matrix.flat();
         const matrix = copyInt64Array(module, flat);
         try {
-          await withStringAsync(module, operation.name, async (namePtr) => {
+          await withWasmCString(module, operation.name, async (namePtr) => {
             await ccallNumber(
               module,
               'routing_add_matrix_dimension',
@@ -248,14 +250,76 @@ async function solveRoutingWithModule(
           ['number', 'bigint', 'bigint'],
           [modelHandle, toInt64(operation.pickup), toInt64(operation.delivery)],
         );
+      } else if (operation.type === 'addVehicleEqualityConstraint') {
+        const ok = await ccallNumber(
+          module,
+          'routing_add_vehicle_equality_constraint',
+          ['number', 'bigint', 'bigint'],
+          [modelHandle, toInt64(operation.left), toInt64(operation.right)],
+        );
+        if (ok !== 1) throw new Error('Routing failed to add a vehicle equality constraint.');
+      } else if (operation.type === 'addCumulLessOrEqualConstraint') {
+        const ok = await withWasmCString(module, operation.dimensionName, (namePtr) => ccallNumber(
+          module,
+          'routing_add_dimension_cumul_less_or_equal_constraint',
+          ['number', 'number', 'bigint', 'bigint'],
+          [modelHandle, namePtr, toInt64(operation.left), toInt64(operation.right)],
+        ));
+        if (ok !== 1) throw new Error('Routing failed to add a cumul precedence constraint.');
+      } else if (operation.type === 'setSoftSpanUpperBound') {
+        await withWasmCString(module, operation.dimensionName, (namePtr) => ccallVoid(
+          module,
+          'routing_dimension_set_soft_span_upper_bound',
+          ['number', 'number', 'bigint', 'bigint', 'number'],
+          [modelHandle, namePtr, toInt64(operation.bound), toInt64(operation.cost), operation.vehicle],
+        ));
+      } else if (operation.type === 'setQuadraticCostSoftSpanUpperBound') {
+        await withWasmCString(module, operation.dimensionName, (namePtr) => ccallVoid(
+          module,
+          'routing_dimension_set_quadratic_cost_soft_span_upper_bound',
+          ['number', 'number', 'bigint', 'bigint', 'number'],
+          [modelHandle, namePtr, toInt64(operation.bound), toInt64(operation.cost), operation.vehicle],
+        ));
       }
     }
-    const ok = await ccallNumber(
-      module,
-      'routing_solve_with_parameters_ext',
-      ['number', 'number', 'number'],
-      [modelHandle, message.firstSolutionStrategy, message.solutionLimit],
-    );
+    let ok: number;
+    if (message.initialAssignment) {
+      const routes = message.initialAssignment.routes;
+      const values = copyInt64Array(module, routes.flat());
+      const routeLengthsPtr = copyInt32Array(module, routes.map((route) => route.length));
+      try {
+        const read = await ccallNumber(
+          module,
+          'routing_read_assignment_from_routes',
+          ['number', 'number', 'number', 'number', 'number'],
+          [
+            modelHandle,
+            values.ptr,
+            routeLengthsPtr,
+            routes.length,
+            message.initialAssignment.ignoreInactiveIndices ? 1 : 0,
+          ],
+        );
+        ok = read === 1
+          ? await ccallNumber(
+              module,
+              'routing_solve_from_assignment_with_parameters',
+              ['number', 'number', 'number'],
+              [modelHandle, message.firstSolutionStrategy, message.solutionLimit],
+            )
+          : 0;
+      } finally {
+        module._free(values.ptr);
+        module._free(routeLengthsPtr);
+      }
+    } else {
+      ok = await ccallNumber(
+        module,
+        'routing_solve_with_parameters_ext',
+        ['number', 'number', 'number'],
+        [modelHandle, message.firstSolutionStrategy, message.solutionLimit],
+      );
+    }
     if (ok !== 1) {
       return null;
     }
@@ -278,7 +342,7 @@ async function solveRoutingWithModule(
 
     for (const dimensionName of message.dimensionNames) {
       dimensionCumulValues[dimensionName] = [];
-      await withStringAsync(module, dimensionName, async (namePtr) => {
+      await withWasmCString(module, dimensionName, async (namePtr) => {
         for (let index = 0; index < message.transitMatrixDimension; index++) {
           dimensionCumulValues[dimensionName][index] = toNumber(
             await ccallBigInt(
@@ -301,12 +365,17 @@ async function solveRoutingWithModule(
       dimensionCumulValues,
     };
   } finally {
-    // OR-Tools currently aborts when deleting solved routing models in this
-    // wasm worker path. Chromium can also abort on post-solve heap frees, so
-    // the bridge keeps these small buffers with the retained native handles.
+    if (modelHandle) {
+      await ccallVoid(module, 'routing_delete_model', ['number'], [modelHandle]);
+    }
+    if (managerHandle) {
+      await ccallVoid(module, 'routing_delete_index_manager', ['number'], [managerHandle]);
+    }
+    if (startsPtr) module._free(startsPtr);
+    if (endsPtr) module._free(endsPtr);
   }
 }
 
-export async function solveRoutingInWorker(message: RoutingSolveRequest): Promise<RoutingSolveResult | null> {
+export async function solveRoutingNative(message: RoutingSolveRequest): Promise<RoutingSolveResult | null> {
   return await solveRoutingWithModule(await loadModule(), message);
 }

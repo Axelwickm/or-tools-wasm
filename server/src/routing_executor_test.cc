@@ -68,11 +68,76 @@ void RejectsInvalidDimensions() {
          "Invalid Routing dimensions fail");
 }
 
+void AppliesSerializedModelOperations() {
+  const auto base = Request();
+  bridge::RoutingBridgeRequest request;
+  Expect(request.ParseFromString(base.payload), "Routing request parses");
+
+  auto* dimension = request.add_operations()->mutable_add_dimension();
+  *dimension->mutable_transit_matrix() = request.transit_matrix();
+  dimension->set_capacity(100);
+  dimension->set_fix_start_cumul_to_zero(true);
+  dimension->set_name("distance");
+
+  auto* vehicle_equality =
+      request.add_operations()->mutable_add_vehicle_equality_constraint();
+  vehicle_equality->set_left(1);
+  vehicle_equality->set_right(2);
+
+  auto* precedence =
+      request.add_operations()->mutable_add_cumul_less_or_equal_constraint();
+  precedence->set_dimension_name("distance");
+  precedence->set_left(1);
+  precedence->set_right(2);
+
+  auto* soft_bound =
+      request.add_operations()->mutable_set_soft_span_upper_bound();
+  soft_bound->set_dimension_name("distance");
+  soft_bound->set_bound(10);
+  soft_bound->set_cost(2);
+  soft_bound->set_vehicle(0);
+
+  auto* quadratic_bound =
+      request.add_operations()->mutable_set_quadratic_cost_soft_span_upper_bound();
+  quadratic_bound->set_dimension_name("distance");
+  quadratic_bound->set_bound(10);
+  quadratic_bound->set_cost(2);
+  quadratic_bound->set_vehicle(0);
+
+  const auto execution = Execute(
+      SolverExecutorRequest{1, "routing", request.SerializeAsString()});
+  Expect(execution.ok, execution.error_message);
+}
+
+void RefinesSerializedInitialAssignment() {
+  const auto base = Request();
+  bridge::RoutingBridgeRequest request;
+  Expect(request.ParseFromString(base.payload), "Routing request parses");
+  request.set_solution_limit(1);
+  auto* route = request.mutable_initial_assignment()->add_routes();
+  route->add_indices(1);
+  route->add_indices(3);
+  route->add_indices(2);
+
+  const auto execution = Execute(
+      SolverExecutorRequest{1, "routing", request.SerializeAsString()});
+  Expect(execution.ok, execution.error_message);
+  bridge::RoutingBridgeResponse response;
+  Expect(response.ParseFromString(execution.payload),
+         "Routing initial-assignment response parses");
+  Expect(response.has_solution(), "Routing initial assignment finds a solution");
+  Expect(response.next_values(0) == 1 && response.next_values(1) == 3 &&
+             response.next_values(3) == 2,
+         "Routing preserves the initial route with solution_limit=1");
+}
+
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
       {"SolvesAndSerializesResult", SolvesAndSerializesResult},
       {"ReservesOneThread", ReservesOneThread},
       {"RejectsInvalidDimensions", RejectsInvalidDimensions},
+      {"AppliesSerializedModelOperations", AppliesSerializedModelOperations},
+      {"RefinesSerializedInitialAssignment", RefinesSerializedInitialAssignment},
   };
   for (const auto& [name, test] : tests) {
     try { test(); std::cout << "[PASS] " << name << '\n'; }

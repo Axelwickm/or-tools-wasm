@@ -5,6 +5,7 @@ import {
   SolverCancelRequestSchema,
   SolverExecutionSettingsSchema,
   SolverJobCancelledSchema,
+  SolverWorkerReadySchema,
   type SolverBridgeRequest,
   type SolverBridgeResponse,
   type SolverJobFailure,
@@ -139,6 +140,16 @@ export function encodeSolverBridgeCancelled(
     payload: {
       case: 'cancelled',
       value: create(SolverJobCancelledSchema, { targetRequestId }),
+    },
+  }));
+}
+
+export function encodeSolverBridgeReady(solver: string): Uint8Array {
+  return toBinary(SolverBridgeResponseSchema, create(SolverBridgeResponseSchema, {
+    solver,
+    payload: {
+      case: 'ready',
+      value: create(SolverWorkerReadySchema),
     },
   }));
 }

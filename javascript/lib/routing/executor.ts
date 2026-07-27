@@ -18,7 +18,7 @@ import {
   type SolverJobEvent,
 } from '../solver_executor.js';
 import {
-  solveRoutingInWorker,
+  solveRoutingNative,
   type RoutingModelOperation,
   type RoutingSolveRequest,
 } from './native_runtime.js';
@@ -53,6 +53,10 @@ function operation(input: BridgeOperation): RoutingModelOperation {
     case 'addMatrixDimension': { const value = input.operation.value; return { type: 'addMatrixDimension', matrix: matrix(value.matrix?.values ?? [], value.matrix?.dimension ?? 0), capacity: Number(value.capacity), fixStartCumulToZero: value.fixStartCumulToZero, name: value.name }; }
     case 'addDisjunction': { const value = input.operation.value; return { type: 'addDisjunction', indices: numbers(value.indices), penalty: value.penalty === undefined ? undefined : Number(value.penalty) }; }
     case 'addPickupAndDelivery': { const value = input.operation.value; return { type: 'addPickupAndDelivery', pickup: Number(value.pickup), delivery: Number(value.delivery) }; }
+    case 'addVehicleEqualityConstraint': { const value = input.operation.value; return { type: 'addVehicleEqualityConstraint', left: Number(value.left), right: Number(value.right) }; }
+    case 'addCumulLessOrEqualConstraint': { const value = input.operation.value; return { type: 'addCumulLessOrEqualConstraint', dimensionName: value.dimensionName, left: Number(value.left), right: Number(value.right) }; }
+    case 'setSoftSpanUpperBound': { const value = input.operation.value; return { type: 'setSoftSpanUpperBound', dimensionName: value.dimensionName, bound: Number(value.bound), cost: Number(value.cost), vehicle: value.vehicle }; }
+    case 'setQuadraticCostSoftSpanUpperBound': { const value = input.operation.value; return { type: 'setQuadraticCostSoftSpanUpperBound', dimensionName: value.dimensionName, bound: Number(value.bound), cost: Number(value.cost), vehicle: value.vehicle }; }
     default: throw new Error('Routing request contains an empty model operation.');
   }
 }
@@ -65,6 +69,12 @@ function legacyRequest(request: RoutingBridgeRequest): RoutingSolveRequest {
     solutionLimit: Number(request.solutionLimit), transitMatrix: new BigInt64Array(request.transitMatrix.values),
     transitMatrixDimension: request.transitMatrix.dimension, operations: request.operations.map(operation),
     dimensionNames: request.dimensionNames,
+    initialAssignment: request.initialAssignment
+      ? {
+          routes: request.initialAssignment.routes.map((route) => route.indices.map(Number)),
+          ignoreInactiveIndices: request.initialAssignment.ignoreInactiveIndices,
+        }
+      : undefined,
   };
 }
 
@@ -82,7 +92,7 @@ export class RoutingExecutor implements RoutingExecutorLike {
     try {
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.STARTING, createdAtMs));
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()), 1));
-      const result = await solveRoutingInWorker(legacyRequest(request));
+      const result = await solveRoutingNative(legacyRequest(request));
       const response = create(RoutingBridgeResponseSchema, result ? {
         hasSolution: true, status: result.status, objectiveValue: BigInt(result.objectiveValue),
         nextValues: result.nextValues.map(BigInt), starts: result.starts.map(BigInt), ends: result.ends.map(BigInt),

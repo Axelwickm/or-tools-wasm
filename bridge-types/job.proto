@@ -37,8 +37,11 @@ message SolverBridgeResponse {
     bytes event_payload = 12;
     bytes result_payload = 13;
     SolverJobCancelled cancelled = 14;
+    SolverWorkerReady ready = 15;
   }
 }
+
+message SolverWorkerReady {}
 
 message SolverJobCancelled {
   uint32 target_request_id = 1;

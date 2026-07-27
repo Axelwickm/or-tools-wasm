@@ -1,5 +1,6 @@
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
 import { loadPdlpRuntime } from '../runtime_loader.js';
 import type { SolverBridgeCodec } from '../solver_bridge.js';
 import {
@@ -146,23 +147,6 @@ function decodeSolverResult(bytes: Uint8Array) {
     terminationReason: reader.u32(), iterationCount: reader.u32() };
 }
 
-function copyBytes(module: OrToolsWasmModule, bytes: Uint8Array) {
-  if (!bytes.length) return 0;
-  const ptr = module._malloc(bytes.length); module.HEAPU8.set(bytes, ptr); return ptr;
-}
-
-async function nativeBytes(module: OrToolsWasmModule, fn: (lenPtr: number) => Promise<number>) {
-  const lenPtr = module._malloc(4); let responsePtr = 0;
-  try {
-    responsePtr = await fn(lenPtr);
-    const len = new DataView(module.HEAPU8.buffer, lenPtr, 4).getUint32(0, true);
-    return responsePtr && len ? module.HEAPU8.slice(responsePtr, responsePtr + len) : new Uint8Array();
-  } finally {
-    if (responsePtr) module.ccall('free_buffer', undefined, ['number'], [responsePtr]);
-    module._free(lenPtr);
-  }
-}
-
 export class PdlpExecutor implements PdlpExecutorLike {
   readonly solver = 'pdlp';
   private modulePromise: Promise<OrToolsWasmModule> | null = null;
@@ -192,7 +176,7 @@ export class PdlpExecutor implements PdlpExecutorLike {
     const qpBytes = request.quadraticProgram ? encodeQuadraticProgram(request.quadraticProgram) : new Uint8Array();
     const input = request.operation === PdlpOperation.FROM_MP_MODEL ? request.mpModelProto
       : request.operation === PdlpOperation.SOLVE ? encodeSolveRequest(request) : qpBytes;
-    const ptr = copyBytes(module, input);
+    const ptr = allocateWasmBytes(module, input);
     try {
       switch (request.operation) {
         case PdlpOperation.IS_LINEAR: {
@@ -200,21 +184,21 @@ export class PdlpExecutor implements PdlpExecutorLike {
           return create(PdlpBridgeResponseSchema, { isLinear: value === 1 });
         }
         case PdlpOperation.VALIDATE: {
-          const bytes = await nativeBytes(module, async (lenPtr) => await module.ccall('pdlp_validate_quadratic_program', 'number', ['number', 'number', 'number'], [ptr, input.length, lenPtr], { async: true }) as number);
+          const bytes = await readWasmResult(module, async (lenPtr) => await module.ccall('pdlp_validate_quadratic_program', 'number', ['number', 'number', 'number'], [ptr, input.length, lenPtr], { async: true }) as number, (pointer) => module.ccall('free_buffer', undefined, ['number'], [pointer]));
           return create(PdlpBridgeResponseSchema, { validationError: new TextDecoder().decode(bytes) });
         }
         case PdlpOperation.FROM_MP_MODEL: {
-          const bytes = await nativeBytes(module, async (lenPtr) => await module.ccall('pdlp_qp_from_mpmodel_proto', 'number', ['number', 'number', 'number', 'number', 'number'], [ptr, input.length, request.relaxIntegerVariables ? 1 : 0, request.includeNames ? 1 : 0, lenPtr], { async: true }) as number);
+          const bytes = await readWasmResult(module, async (lenPtr) => await module.ccall('pdlp_qp_from_mpmodel_proto', 'number', ['number', 'number', 'number', 'number', 'number'], [ptr, input.length, request.relaxIntegerVariables ? 1 : 0, request.includeNames ? 1 : 0, lenPtr], { async: true }) as number, (pointer) => module.ccall('free_buffer', undefined, ['number'], [pointer]));
           if (!bytes.length) throw new Error('PDLP could not convert MPModelProto to QuadraticProgram.');
           return create(PdlpBridgeResponseSchema, { quadraticProgram: decodeQuadraticProgram(bytes) });
         }
         case PdlpOperation.TO_MP_MODEL: {
-          const bytes = await nativeBytes(module, async (lenPtr) => await module.ccall('pdlp_qp_to_mpmodel_proto', 'number', ['number', 'number', 'number'], [ptr, input.length, lenPtr], { async: true }) as number);
+          const bytes = await readWasmResult(module, async (lenPtr) => await module.ccall('pdlp_qp_to_mpmodel_proto', 'number', ['number', 'number', 'number'], [ptr, input.length, lenPtr], { async: true }) as number, (pointer) => module.ccall('free_buffer', undefined, ['number'], [pointer]));
           if (!bytes.length) throw new Error('PDLP could not convert QuadraticProgram to MPModelProto.');
           return create(PdlpBridgeResponseSchema, { mpModelProto: bytes });
         }
         case PdlpOperation.SOLVE: {
-          const bytes = await nativeBytes(module, async (lenPtr) => await module.ccall('pdlp_primal_dual_hybrid_gradient', 'number', ['number', 'number', 'number'], [ptr, input.length, lenPtr], { async: true }) as number);
+          const bytes = await readWasmResult(module, async (lenPtr) => await module.ccall('pdlp_primal_dual_hybrid_gradient', 'number', ['number', 'number', 'number'], [ptr, input.length, lenPtr], { async: true }) as number, (pointer) => module.ccall('free_buffer', undefined, ['number'], [pointer]));
           if (!bytes.length) throw new Error('PDLP solve failed.');
           return create(PdlpBridgeResponseSchema, { solverResult: decodeSolverResult(bytes) });
         }

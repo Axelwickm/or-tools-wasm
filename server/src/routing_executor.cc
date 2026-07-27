@@ -115,6 +115,49 @@ void ApplyOperation(RoutingModel* model, const bridge::RoutingModelOperation& op
       model->AddPickupAndDelivery(operation.add_pickup_and_delivery().pickup(),
                                   operation.add_pickup_and_delivery().delivery());
       return;
+    case bridge::RoutingModelOperation::kAddVehicleEqualityConstraint: {
+      const auto& value = operation.add_vehicle_equality_constraint();
+      model->solver()->AddConstraint(model->solver()->MakeEquality(
+          model->VehicleVar(value.left()), model->VehicleVar(value.right())));
+      return;
+    }
+    case bridge::RoutingModelOperation::kAddCumulLessOrEqualConstraint: {
+      const auto& value = operation.add_cumul_less_or_equal_constraint();
+      auto* dimension = model->GetMutableDimension(value.dimension_name());
+      if (dimension == nullptr) {
+        throw std::invalid_argument("Unknown Routing dimension: " +
+                                    value.dimension_name());
+      }
+      model->solver()->AddConstraint(model->solver()->MakeLessOrEqual(
+          dimension->CumulVar(value.left()),
+          dimension->CumulVar(value.right())));
+      return;
+    }
+    case bridge::RoutingModelOperation::kSetSoftSpanUpperBound: {
+      const auto& value = operation.set_soft_span_upper_bound();
+      auto* dimension = model->GetMutableDimension(value.dimension_name());
+      if (dimension == nullptr) {
+        throw std::invalid_argument("Unknown Routing dimension: " +
+                                    value.dimension_name());
+      }
+      dimension->SetSoftSpanUpperBoundForVehicle(
+          operations_research::BoundCost(value.bound(), value.cost()),
+          value.vehicle());
+      return;
+    }
+    case bridge::RoutingModelOperation::kSetQuadraticCostSoftSpanUpperBound: {
+      const auto& value =
+          operation.set_quadratic_cost_soft_span_upper_bound();
+      auto* dimension = model->GetMutableDimension(value.dimension_name());
+      if (dimension == nullptr) {
+        throw std::invalid_argument("Unknown Routing dimension: " +
+                                    value.dimension_name());
+      }
+      dimension->SetQuadraticCostSoftSpanUpperBoundForVehicle(
+          operations_research::BoundCost(value.bound(), value.cost()),
+          value.vehicle());
+      return;
+    }
     case bridge::RoutingModelOperation::OPERATION_NOT_SET:
       throw std::invalid_argument("Routing model operation is empty.");
   }
@@ -171,7 +214,22 @@ SolverExecutorResult RoutingExecutor::Execute(const SolverExecutorRequest& reque
       parameters.set_first_solution_strategy(static_cast<FirstSolutionStrategy::Value>(parsed.first_solution_strategy()));
     }
     if (parsed.solution_limit() > 0) parameters.set_solution_limit(parsed.solution_limit());
-    const Assignment* assignment = model.SolveWithParameters(parameters);
+    const Assignment* assignment = nullptr;
+    if (parsed.has_initial_assignment()) {
+      std::vector<std::vector<int64_t>> routes;
+      routes.reserve(parsed.initial_assignment().routes_size());
+      for (const auto& route : parsed.initial_assignment().routes()) {
+        routes.emplace_back(route.indices().begin(), route.indices().end());
+      }
+      const Assignment* initial_assignment = model.ReadAssignmentFromRoutes(
+          routes, parsed.initial_assignment().ignore_inactive_indices());
+      if (initial_assignment != nullptr) {
+        assignment =
+            model.SolveFromAssignmentWithParameters(initial_assignment, parameters);
+      }
+    } else {
+      assignment = model.SolveWithParameters(parameters);
+    }
     if (context.cancellation_requested()) {
       auto result = Error("Routing solve was cancelled.");
       result.failure_kind = SolverExecutionFailureKind::kCancelled;

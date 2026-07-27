@@ -2,13 +2,6 @@ import type { OrToolsWasmModule } from './wasm_module_types.js';
 
 export type RuntimeModuleFactory = (moduleOverrides?: Record<string, unknown>) => Promise<OrToolsWasmModule>;
 export type RuntimeFlavor = 'jspi' | 'asyncify';
-export type RuntimePlacement =
-  | 'browser-main'
-  | 'browser-worker'
-  | 'node'
-  | 'bun'
-  | 'deno'
-  | 'other';
 export type RuntimeName =
   | 'cp_sat_runtime'
   | 'routing_runtime'
@@ -138,36 +131,7 @@ export function isJspiSupported(): boolean {
   return typeof wasm?.promising === 'function';
 }
 
-export function detectRuntimePlacement(): RuntimePlacement {
-  const hostState = globalThis as {
-    Bun?: unknown;
-    Deno?: unknown;
-    document?: unknown;
-    window?: unknown;
-  };
-  if (typeof hostState.Bun !== 'undefined') return 'bun';
-  if (typeof hostState.Deno !== 'undefined') return 'deno';
-  if (typeof hostState.window !== 'undefined' && typeof hostState.document !== 'undefined') {
-    return 'browser-main';
-  }
-  if (typeof WorkerGlobalScope !== 'undefined' && globalThis instanceof WorkerGlobalScope) {
-    return 'browser-worker';
-  }
-  if (typeof process !== 'undefined' && typeof process.versions?.node === 'string') return 'node';
-  return 'other';
-}
-
-export function selectRuntimeFlavorForPlacement(placement = detectRuntimePlacement()): RuntimeFlavor {
-  // Browser calls can cross Emscripten's JavaScript invoke trampolines. JSPI
-  // cannot suspend through those frames, regardless of which thread runs WASM.
-  if (
-    placement === 'browser-main'
-    || placement === 'browser-worker'
-    || placement === 'bun'
-    || placement === 'deno'
-  ) {
-    return 'asyncify';
-  }
+export function preferredRuntimeFlavor(): RuntimeFlavor {
   return isJspiSupported() ? 'jspi' : 'asyncify';
 }
 
@@ -179,7 +143,7 @@ export function createRuntimeLoader(adapter: RuntimeLoaderAdapter) {
     if (selectedFlavor) {
       return selectedFlavor;
     }
-    selectedFlavor = selectRuntimeFlavorForPlacement();
+    selectedFlavor = preferredRuntimeFlavor();
     if (adapter.logFlavorSelection) {
       console.log(
         selectedFlavor === 'jspi'

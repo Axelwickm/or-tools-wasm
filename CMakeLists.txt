@@ -344,12 +344,70 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-sENVIRONMENT=node"
     "-sPTHREAD_POOL_SIZE=4")
 
-  set(CP_SAT_JSPI_LINK_OPTIONS
-    "-sJSPI=2"
-    "-sJSPI_EXPORTS=['__wasm_call_ctors','solve_model','solve_model_with_callback_events','validate_model','routing_create_index_manager','routing_create_index_manager_starts_ends','routing_create_model','routing_register_matrix_transit_callback','routing_set_arc_cost_evaluator_of_all_vehicles','routing_add_dimension','routing_add_dimension_with_vehicle_capacity','routing_add_dimension_with_vehicle_transits','routing_add_constant_dimension','routing_add_vector_dimension','routing_add_matrix_dimension','routing_add_disjunction','routing_add_pickup_and_delivery','routing_solve','routing_solve_with_parameters','routing_solve_with_parameters_ext','routing_solve_from_assignment_with_parameters','routing_read_assignment_from_routes','routing_status','routing_assignment_objective_value','routing_start','routing_end','routing_is_end','routing_next_value','routing_assignment_dimension_cumul_value','mp_solver_solve','mp_solver_solve_with_parameters','mp_solver_solve_model_request','mp_solver_solve_model_request_with_threads','knapsack_solve_serialized','mathopt_solve_request','mathopt_incremental_create','mathopt_incremental_solve','mathopt_incremental_delete','pdlp_validate_quadratic_program','pdlp_is_linear_program','pdlp_qp_from_mpmodel_proto','pdlp_qp_to_mpmodel_proto','pdlp_primal_dual_hybrid_gradient','graph_max_flow_solve_serialized','graph_min_cost_flow_solve_serialized','graph_linear_sum_assignment_solve_serialized','set_cover_next_solution_serialized']")
+  set(CP_SAT_JSPI_EXPORTS
+    solve_model
+    solve_model_with_callback_events
+    validate_model)
+  set(ROUTING_JSPI_EXPORTS
+    routing_create_index_manager_starts_ends
+    routing_create_model
+    routing_delete_index_manager
+    routing_delete_model
+    routing_register_matrix_transit_callback
+    routing_read_assignment_from_routes
+    routing_solve_from_assignment_with_parameters
+    routing_set_arc_cost_evaluator_of_all_vehicles
+    routing_add_dimension
+    routing_add_dimension_with_vehicle_capacity
+    routing_add_dimension_with_vehicle_transits
+    routing_add_constant_dimension
+    routing_add_vector_dimension
+    routing_add_matrix_dimension
+    routing_add_disjunction
+    routing_add_pickup_and_delivery
+    routing_add_vehicle_equality_constraint
+    routing_add_dimension_cumul_less_or_equal_constraint
+    routing_dimension_set_soft_span_upper_bound
+    routing_dimension_set_quadratic_cost_soft_span_upper_bound
+    routing_solve_with_parameters_ext
+    routing_status
+    routing_assignment_objective_value
+    routing_start
+    routing_is_end
+    routing_next_value
+    routing_assignment_dimension_cumul_value)
+  set(MP_SOLVER_JSPI_EXPORTS
+    mp_solver_solve_model_request
+    mp_solver_solve_model_request_with_threads
+    knapsack_solve_serialized)
+  set(MATHOPT_JSPI_EXPORTS
+    mathopt_solve_request
+    mathopt_incremental_create
+    mathopt_incremental_solve
+    mathopt_incremental_delete)
+  set(PDLP_JSPI_EXPORTS
+    pdlp_validate_quadratic_program
+    pdlp_is_linear_program
+    pdlp_qp_from_mpmodel_proto
+    pdlp_qp_to_mpmodel_proto
+    pdlp_primal_dual_hybrid_gradient)
+  set(GRAPH_JSPI_EXPORTS
+    graph_max_flow_solve_serialized
+    graph_min_cost_flow_solve_serialized
+    graph_linear_sum_assignment_solve_serialized)
+  set(SET_COVER_JSPI_EXPORTS set_cover_next_solution_serialized)
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")
+
+  function(make_jspi_link_options OUTPUT_VARIABLE)
+    set(JSPI_EXPORTS __wasm_call_ctors ${ARGN})
+    list(JOIN JSPI_EXPORTS "','" JSPI_EXPORTS_ARGUMENT)
+    set(${OUTPUT_VARIABLE}
+      "-sJSPI=2"
+      "-sJSPI_EXPORTS=['${JSPI_EXPORTS_ARGUMENT}']"
+      PARENT_SCOPE)
+  endfunction()
 
   function(configure_ortools_wasm_target TARGET_NAME OUTPUT_NAME OUTPUT_DIR)
     add_dependencies(${TARGET_NAME} generate_proto_schemas)
@@ -375,21 +433,25 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(ORTOOLS_WASM_RUNTIME_TARGETS)
   foreach(RUNTIME_SPEC
-      "cp_sat_runtime;CP_SAT_BROWSER_SOURCES"
-      "routing_runtime;ROUTING_BROWSER_SOURCES"
-      "mp_solver_runtime;MP_SOLVER_BROWSER_SOURCES"
-      "mathopt_runtime;MATHOPT_BROWSER_SOURCES"
-      "pdlp_runtime;PDLP_BROWSER_SOURCES"
-      "graph_runtime;GRAPH_BROWSER_SOURCES"
-      "set_cover_runtime;SET_COVER_BROWSER_SOURCES")
+      "cp_sat_runtime;CP_SAT_BROWSER_SOURCES;CP_SAT_JSPI_EXPORTS"
+      "routing_runtime;ROUTING_BROWSER_SOURCES;ROUTING_JSPI_EXPORTS"
+      "mp_solver_runtime;MP_SOLVER_BROWSER_SOURCES;MP_SOLVER_JSPI_EXPORTS"
+      "mathopt_runtime;MATHOPT_BROWSER_SOURCES;MATHOPT_JSPI_EXPORTS"
+      "pdlp_runtime;PDLP_BROWSER_SOURCES;PDLP_JSPI_EXPORTS"
+      "graph_runtime;GRAPH_BROWSER_SOURCES;GRAPH_JSPI_EXPORTS"
+      "set_cover_runtime;SET_COVER_BROWSER_SOURCES;SET_COVER_JSPI_EXPORTS")
     list(GET RUNTIME_SPEC 0 RUNTIME_NAME)
     list(GET RUNTIME_SPEC 1 RUNTIME_SOURCES)
+    list(GET RUNTIME_SPEC 2 RUNTIME_JSPI_EXPORTS)
+    make_jspi_link_options(
+      RUNTIME_JSPI_LINK_OPTIONS
+      ${${RUNTIME_JSPI_EXPORTS}})
 
     add_ortools_wasm_runtime(
       ${RUNTIME_NAME}
       "${JS_OUTPUT_DIR}"
       CP_SAT_BROWSER_LINK_OPTIONS
-      CP_SAT_JSPI_LINK_OPTIONS
+      RUNTIME_JSPI_LINK_OPTIONS
       ${${RUNTIME_SOURCES}})
     add_ortools_wasm_runtime(
       ${RUNTIME_NAME}_asyncify
@@ -401,7 +463,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       ${RUNTIME_NAME}_node
       "${JS_NODE_OUTPUT_DIR}"
       CP_SAT_NODE_LINK_OPTIONS
-      CP_SAT_JSPI_LINK_OPTIONS
+      RUNTIME_JSPI_LINK_OPTIONS
       ${${RUNTIME_SOURCES}})
     add_ortools_wasm_runtime(
       ${RUNTIME_NAME}_node_asyncify

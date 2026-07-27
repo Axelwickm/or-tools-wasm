@@ -18,6 +18,7 @@ import {
   type SolverJobEvent,
 } from '../solver_executor.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
 
 export type MathOptExecutorRequest = MathOptBridgeRequest['payload'];
 export type MathOptExecutorLike = SolverExecutor<MathOptExecutorRequest, MathOptBridgeResponse, never>;
@@ -32,29 +33,6 @@ export const mathOptBridgeCodec: SolverBridgeCodec<MathOptExecutorRequest, MathO
   decodeResult: (payload) => fromBinary(MathOptBridgeResponseSchema, payload),
   defaultRequestedThreads: 1,
 };
-
-function copyBytes(module: OrToolsWasmModule, bytes: Uint8Array) {
-  if (!bytes.length) return 0;
-  const ptr = module._malloc(bytes.length);
-  module.HEAPU8.set(bytes, ptr);
-  return ptr;
-}
-
-async function resultBytes(
-  module: OrToolsWasmModule,
-  call: (lengthPointer: number) => Promise<number>,
-) {
-  const lengthPointer = module._malloc(4);
-  let resultPointer = 0;
-  try {
-    resultPointer = await call(lengthPointer);
-    const length = new DataView(module.HEAPU8.buffer, lengthPointer, 4).getUint32(0, true);
-    return resultPointer && length ? module.HEAPU8.slice(resultPointer, resultPointer + length) : new Uint8Array();
-  } finally {
-    if (resultPointer) module._free(resultPointer);
-    module._free(lengthPointer);
-  }
-}
 
 export class MathOptExecutor implements MathOptExecutorLike {
   readonly solver = 'mathopt';
@@ -98,24 +76,24 @@ export class MathOptExecutor implements MathOptExecutorLike {
   private async executeNative(module: OrToolsWasmModule, request: MathOptExecutorRequest) {
     switch (request.case) {
       case 'solve': {
-        const ptr = copyBytes(module, request.value.solveRequestProto);
-        try { return await resultBytes(module, async (len) => await module.ccall(
+        const ptr = allocateWasmBytes(module, request.value.solveRequestProto);
+        try { return await readWasmResult(module, async (len) => await module.ccall(
           'mathopt_solve_request', 'number', ['number', 'number', 'number', 'number', 'number'],
           [ptr, request.value.solveRequestProto.length, request.value.useInterrupter ? 1 : 0, request.value.interruptAtStart ? 1 : 0, len], { async: true },
         ) as number); } finally { if (ptr) module._free(ptr); }
       }
       case 'incrementalCreate': {
-        const ptr = copyBytes(module, request.value.solveRequestProto);
-        try { return await resultBytes(module, async (len) => await module.ccall(
+        const ptr = allocateWasmBytes(module, request.value.solveRequestProto);
+        try { return await readWasmResult(module, async (len) => await module.ccall(
           'mathopt_incremental_create', 'number', ['number', 'number', 'number'],
           [ptr, request.value.solveRequestProto.length, len], { async: true },
         ) as number); } finally { if (ptr) module._free(ptr); }
       }
       case 'incrementalSolve': {
         const value = request.value;
-        const requestPtr = copyBytes(module, value.solveRequestProto);
-        const updatePtr = value.modelUpdateProto ? copyBytes(module, value.modelUpdateProto) : 0;
-        try { return await resultBytes(module, async (len) => await module.ccall(
+        const requestPtr = allocateWasmBytes(module, value.solveRequestProto);
+        const updatePtr = value.modelUpdateProto ? allocateWasmBytes(module, value.modelUpdateProto) : 0;
+        try { return await readWasmResult(module, async (len) => await module.ccall(
           'mathopt_incremental_solve', 'number',
           ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
           [Number(value.handle), requestPtr, value.solveRequestProto.length, updatePtr, value.modelUpdateProto?.length ?? 0,

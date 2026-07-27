@@ -1,5 +1,6 @@
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
 import { loadRuntime } from '../runtime_loader.js';
 import type { SolverBridgeCodec } from '../solver_bridge.js';
 import {
@@ -64,9 +65,6 @@ export const cpSatBridgeCodec: SolverBridgeCodec<
   decodeEvent: (payload) => fromBinary(CpSatBridgeResponseSchema, payload),
 };
 
-const readUint32LE = (buffer: ArrayBufferLike, ptr: number) =>
-  new DataView(buffer, ptr, 4).getUint32(0, true);
-
 function callbackFlags(mask?: CpSatCallbackMask) {
   let flags = 0;
   if (mask?.solution) flags |= SOLUTION_CALLBACK_FLAG;
@@ -108,13 +106,6 @@ function cpSatCallbackEvent(eventType: number, payload: Uint8Array): CpSatBridge
       value: create(CpSatSolveEventSchema, { payload: eventPayload }),
     },
   });
-}
-
-function copyBytesToHeap(module: OrToolsWasmModule, bytes: Uint8Array | null | undefined) {
-  if (!bytes?.length) return 0;
-  const ptr = module._malloc(bytes.length);
-  module.HEAPU8.set(bytes, ptr);
-  return ptr;
 }
 
 function nowMs() {
@@ -270,16 +261,23 @@ export class CpSatExecutor implements CpSatExecutorLike {
     const modelBytes = solveRequest.cpModelProto;
     const paramsBytes = solveRequest.satParametersProto;
     const flags = callbackFlags(solveRequest.callbackMask);
-    const lenPtr = module._malloc(4);
-    const modelPtr = copyBytesToHeap(module, modelBytes);
-    const paramsPtr = copyBytesToHeap(module, paramsBytes);
-    let responsePtr = 0;
+    const modelPtr = allocateWasmBytes(module, modelBytes);
+    const paramsPtr = allocateWasmBytes(module, paramsBytes);
     let callbackId = 0;
     let callbackError: unknown = null;
     const pendingCallbacks: Promise<void>[] = [];
 
     try {
-      if (flags) {
+      const bytes = await readWasmResult(module, async (lengthPointer) => {
+        if (!flags) {
+          return await module.ccall(
+            'solve_model',
+            'number',
+            ['number', 'number', 'number', 'number', 'number'],
+            [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, lengthPointer],
+            { async: true },
+          ) as number;
+        }
         const callbacks = cpSatWasmCallbacks(module);
         callbackId = callbacks.nextId++;
         callbacks.sinks.set(callbackId, (eventType, payload) => {
@@ -296,27 +294,14 @@ export class CpSatExecutor implements CpSatExecutorLike {
             callbackError ??= error;
           }
         });
-        responsePtr = await module.ccall(
+        return await module.ccall(
           'solve_model_with_callback_events',
           'number',
           ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
-          [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, flags, callbackId, lenPtr],
+          [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, flags, callbackId, lengthPointer],
           { async: true },
         ) as number;
-      } else {
-        responsePtr = await module.ccall(
-          'solve_model',
-          'number',
-          ['number', 'number', 'number', 'number', 'number'],
-          [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, lenPtr],
-          { async: true },
-        ) as number;
-      }
-
-      const len = readUint32LE(module.HEAPU8.buffer, lenPtr);
-      const bytes = responsePtr && len
-        ? module.HEAPU8.slice(responsePtr, responsePtr + len)
-        : new Uint8Array();
+      }, (pointer) => module._free_buffer(pointer));
       await Promise.all(pendingCallbacks);
       if (callbackError) throw callbackError;
       return create(CpSatBridgeResponseSchema, {
@@ -331,8 +316,6 @@ export class CpSatExecutor implements CpSatExecutorLike {
       if (callbackId) cpSatWasmCallbacks(module).sinks.delete(callbackId);
       if (modelPtr) module._free(modelPtr);
       if (paramsPtr) module._free(paramsPtr);
-      if (lenPtr) module._free(lenPtr);
-      if (responsePtr) module._free_buffer(responsePtr);
     }
   }
 
@@ -351,23 +334,21 @@ export class CpSatExecutor implements CpSatExecutorLike {
       startedAtMs,
     ));
     const modelBytes = validateRequest.cpModelProto;
-    const lenPtr = module._malloc(4);
-    const modelPtr = copyBytesToHeap(module, modelBytes);
-    let msgPtr = 0;
+    const modelPtr = allocateWasmBytes(module, modelBytes);
 
     try {
-      msgPtr = await module.ccall(
-        'validate_model',
-        'number',
-        ['number', 'number', 'number'],
-        [modelPtr, modelBytes.length, lenPtr],
-        { async: true },
-      ) as number;
-
-      const len = readUint32LE(module.HEAPU8.buffer, lenPtr);
-      const message = msgPtr && len
-        ? new TextDecoder().decode(module.HEAPU8.slice(msgPtr, msgPtr + len))
-        : '';
+      const bytes = await readWasmResult(
+        module,
+        (lengthPointer) => module.ccall(
+          'validate_model',
+          'number',
+          ['number', 'number', 'number'],
+          [modelPtr, modelBytes.length, lengthPointer],
+          { async: true },
+        ) as number | Promise<number>,
+        (pointer) => module._free_buffer(pointer),
+      );
+      const message = new TextDecoder().decode(bytes);
 
       return create(CpSatBridgeResponseSchema, {
         payload: {
@@ -377,8 +358,6 @@ export class CpSatExecutor implements CpSatExecutorLike {
       });
     } finally {
       if (modelPtr) module._free(modelPtr);
-      if (lenPtr) module._free(lenPtr);
-      if (msgPtr) module._free_buffer(msgPtr);
     }
   }
 
