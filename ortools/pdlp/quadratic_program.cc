@@ -35,6 +35,42 @@ namespace operations_research::pdlp {
 
 using ::Eigen::VectorXd;
 
+#ifdef __EMSCRIPTEN__
+QuadraticProgram::QuadraticProgram(const QuadraticProgram& other)
+    : objective_vector(other.objective_vector),
+      objective_matrix(other.objective_matrix),
+      constraint_lower_bounds(other.constraint_lower_bounds),
+      constraint_upper_bounds(other.constraint_upper_bounds),
+      variable_lower_bounds(other.variable_lower_bounds),
+      variable_upper_bounds(other.variable_upper_bounds),
+      problem_name(other.problem_name),
+      variable_names(other.variable_names),
+      constraint_names(other.constraint_names),
+      objective_offset(other.objective_offset),
+      objective_scaling_factor(other.objective_scaling_factor) {
+  std::vector<Eigen::Triplet<double, int64_t>> triplets;
+  triplets.reserve(other.constraint_matrix.nonZeros());
+  for (int64_t col = 0; col < other.constraint_matrix.outerSize(); ++col) {
+    for (Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>::InnerIterator
+             it(other.constraint_matrix, col);
+         it; ++it) {
+      triplets.emplace_back(it.row(), it.col(), it.value());
+    }
+  }
+  constraint_matrix.resize(other.constraint_matrix.rows(),
+                           other.constraint_matrix.cols());
+  SetEigenMatrixFromTriplets(std::move(triplets), constraint_matrix);
+}
+
+QuadraticProgram& QuadraticProgram::operator=(const QuadraticProgram& other) {
+  if (this != &other) {
+    QuadraticProgram copy(other);
+    *this = std::move(copy);
+  }
+  return *this;
+}
+#endif
+
 absl::Status ValidateQuadraticProgramDimensions(const QuadraticProgram& qp) {
   const int64_t var_lb_size = qp.variable_lower_bounds.size();
   const int64_t con_lb_size = qp.constraint_lower_bounds.size();
@@ -148,7 +184,16 @@ absl::StatusOr<QuadraticProgram> QpFromMpModelProto(
   // The non-zeros in each input constraint may not be sorted so this is only
   // efficient with column major format.
   static_assert(qp.constraint_matrix.IsRowMajor == 0, "See comment.");
+#ifdef __EMSCRIPTEN__
+  std::vector<Eigen::Triplet<double, int64_t>> constraint_triplets;
+  int64_t num_nonzeros = 0;
+  for (const int count : nonzeros_by_column) {
+    num_nonzeros += count;
+  }
+  constraint_triplets.reserve(num_nonzeros);
+#else
   qp.constraint_matrix.reserve(nonzeros_by_column);
+#endif
   for (int i = 0; i < dual_size; ++i) {
     const auto& con = proto.constraint(i);
     CHECK_EQ(con.var_index_size(), con.coefficient_size())
@@ -160,12 +205,22 @@ absl::StatusOr<QuadraticProgram> QpFromMpModelProto(
     }
 
     for (int j = 0; j < con.var_index_size(); ++j) {
+#ifdef __EMSCRIPTEN__
+      constraint_triplets.emplace_back(i, con.var_index(j),
+                                       con.coefficient(j));
+#else
       qp.constraint_matrix.insert(i, con.var_index(j)) = con.coefficient(j);
+#endif
     }
   }
+#ifdef __EMSCRIPTEN__
+  SetEigenMatrixFromTriplets(std::move(constraint_triplets),
+                             qp.constraint_matrix);
+#else
   if (qp.constraint_matrix.outerSize() > 0) {
     qp.constraint_matrix.makeCompressed();
   }
+#endif
   // We use triplets-based initialization for the objective matrix because the
   // objective non-zeros may be in arbitrary order in the input.
   std::vector<Eigen::Triplet<double, int64_t>> triplets;
@@ -371,8 +426,25 @@ std::string ToString(const QuadraticProgram& qp, int64_t max_size) {
   // Closes the objective scaling factor expression.
   result.append(")\n");
 
+#ifdef __EMSCRIPTEN__
+  std::vector<Eigen::Triplet<double, int64_t>> transpose_triplets;
+  transpose_triplets.reserve(qp.constraint_matrix.nonZeros());
+  for (int64_t col = 0; col < qp.constraint_matrix.outerSize(); ++col) {
+    for (Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>::InnerIterator
+             it(qp.constraint_matrix, col);
+         it; ++it) {
+      transpose_triplets.emplace_back(it.col(), it.row(), it.value());
+    }
+  }
+  Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>
+      constraint_matrix_transpose(qp.constraint_matrix.cols(),
+                                  qp.constraint_matrix.rows());
+  SetEigenMatrixFromTriplets(std::move(transpose_triplets),
+                             constraint_matrix_transpose);
+#else
   Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>
       constraint_matrix_transpose = qp.constraint_matrix.transpose();
+#endif
   for (int64_t constraint_idx = 0;
        constraint_idx < constraint_matrix_transpose.outerSize();
        ++constraint_idx) {
@@ -443,19 +515,21 @@ void SetEigenMatrixFromTriplets(
   // reserve, merge the duplicates first.
   internal::CombineRepeatedTripletsInPlace(triplets);
 
-  std::vector<int64_t> num_column_entries(matrix.cols());
+  Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t> empty_matrix(
+      matrix.rows(), matrix.cols());
+  matrix.swap(empty_matrix);
+  matrix.reserve(triplets.size());
+  int64_t next_column = 0;
   for (const Triplet& triplet : triplets) {
-    ++num_column_entries[triplet.col()];
+    while (next_column <= triplet.col()) {
+      matrix.startVec(next_column++);
+    }
+    matrix.insertBack(triplet.row(), triplet.col()) = triplet.value();
   }
-  // NOTE: `reserve()` takes column counts because matrix is in column major
-  // order.
-  matrix.reserve(num_column_entries);
-  for (const Triplet& triplet : triplets) {
-    matrix.insert(triplet.row(), triplet.col()) = triplet.value();
+  while (next_column < matrix.cols()) {
+    matrix.startVec(next_column++);
   }
-  if (matrix.outerSize() > 0) {
-    matrix.makeCompressed();
-  }
+  matrix.finalize();
 }
 
 namespace internal {

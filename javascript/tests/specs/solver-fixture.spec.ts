@@ -93,6 +93,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }>;
     cpSatSolverStructureWorkerStatsBefore?: WorkerStats;
     cpSatSolverStructureWorkerStatsAfter?: WorkerStats;
+    cpSatSubsolverResults?: Array<{
+      id?: string;
+      mode?: string;
+      searchWorkers?: number;
+      selectedSubsolvers?: string[];
+      numLpIterations?: number;
+      ok?: boolean;
+    }>;
     highLevelCpSatResults?: Array<{
       id?: string;
       name?: string;
@@ -193,6 +201,53 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     params?: Record<string, unknown>;
   }) => `${result.mode}/${result.workerProfile}/${String(result.params?.numWorkers)}`;
   expectStableCaseIds(parsedStatus.cpSatSolverStructureResults, 'CP-SAT solver structure');
+  expectStableCaseIds(parsedStatus.cpSatSubsolverResults, 'CP-SAT subsolver selection');
+  expect(parsedStatus.cpSatSubsolverResults).toHaveLength(includeServer ? 6 : 4);
+  expect(parsedStatus.cpSatSubsolverResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      mode: 'direct',
+      searchWorkers: 1,
+      selectedSubsolvers: ['no_lp'],
+      numLpIterations: 0,
+      ok: true,
+    }),
+    expect.objectContaining({
+      mode: 'worker',
+      searchWorkers: 1,
+      selectedSubsolvers: ['no_lp'],
+      numLpIterations: 0,
+      ok: true,
+    }),
+    expect.objectContaining({
+      mode: 'direct',
+      searchWorkers: 4,
+      ok: true,
+    }),
+    expect.objectContaining({
+      mode: 'worker',
+      searchWorkers: 4,
+      ok: true,
+    }),
+    ...(includeServer ? [
+      expect.objectContaining({
+        mode: 'server',
+        searchWorkers: 1,
+        selectedSubsolvers: ['no_lp'],
+        numLpIterations: 0,
+        ok: true,
+      }),
+      expect.objectContaining({
+        mode: 'server',
+        searchWorkers: 4,
+        ok: true,
+      }),
+    ] : []),
+  ]));
+  for (const result of parsedStatus.cpSatSubsolverResults ?? []) {
+    if (result.searchWorkers === 4) {
+      expect(result.selectedSubsolvers?.length).toBeGreaterThan(1);
+    }
+  }
   expect(parsedStatus.cpSatSolverStructureResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
       id: 'cp_sat.solver_structure.package_contract',

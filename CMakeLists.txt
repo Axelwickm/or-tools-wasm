@@ -338,11 +338,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(CP_SAT_BROWSER_LINK_OPTIONS
     "-sENVIRONMENT=web,worker"
-    "-sPTHREAD_POOL_SIZE=4")
+    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
 
   set(CP_SAT_NODE_LINK_OPTIONS
     "-sENVIRONMENT=node"
-    "-sPTHREAD_POOL_SIZE=4")
+    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
 
   set(CP_SAT_JSPI_EXPORTS
     solve_model

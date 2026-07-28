@@ -32,8 +32,9 @@ SolverExecutorResult Response(const bridge::MpSolverBridgeResponse& response) {
 int EffectiveThreads(const MPModelRequest& request, int requested_threads) {
   requested_threads = requested_threads > 0 ? requested_threads : 1;
   if (request.solver_type() == MPModelRequest::CBC_MIXED_INTEGER_PROGRAMMING &&
-      !CbcModel::haveMultiThreadSupport()) {
-    return 1;
+      requested_threads > 1 && !CbcModel::haveMultiThreadSupport()) {
+    throw std::invalid_argument(
+        "CBC was built without multi-thread support.");
   }
   return requested_threads;
 }

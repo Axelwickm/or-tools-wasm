@@ -603,8 +603,16 @@ TEST(SetEigenMatrixFromTriplets, HandlesEmptyMatrix) {
   std::vector<Eigen::Triplet<double, int64_t>> triplets;
   Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t> matrix(2, 2);
   SetEigenMatrixFromTriplets(std::move(triplets), matrix);
+  EXPECT_TRUE(matrix.isCompressed());
   EXPECT_THAT(ToDense(matrix), EigenArrayEq<double>({{0, 0},  //
                                                      {0, 0}}));
+}
+
+TEST(SetEigenMatrixFromTriplets, CompressesZeroByZeroMatrix) {
+  std::vector<Eigen::Triplet<double, int64_t>> triplets;
+  Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t> matrix(0, 0);
+  SetEigenMatrixFromTriplets(std::move(triplets), matrix);
+  EXPECT_TRUE(matrix.isCompressed());
 }
 
 TEST(SetEigenMatrixFromTriplets, CorrectForTinyMatrix) {

@@ -6,9 +6,13 @@ import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runCpSatSolverStructureCases } from '../browser-basic-src/cpsat_solver_structure_runner.ts';
+import { runCpSatSubsolverCases } from '../browser-basic-src/cpsat_subsolver_runner.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
+  const subsolverResults = await runCpSatSubsolverCases(CpSat as never);
+  assertAllCases('bun CP-SAT execution semantics', subsolverResults);
+
   const structureResults = await runCpSatSolverStructureCases(CpSatApi as never);
   assertAllCases('bun CP-SAT solver structure', structureResults);
 

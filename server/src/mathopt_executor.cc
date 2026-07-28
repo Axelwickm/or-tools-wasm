@@ -113,6 +113,11 @@ int MathOptExecutor::RequestedThreads(const SolverExecutorRequest& request,
     math_opt::SolveRequest parsed;
     if (!parsed.ParseFromString(*solve_bytes)) throw std::invalid_argument("Failed to parse MathOpt SolveRequest.");
     if (parsed.parameters().has_threads()) requested = parsed.parameters().threads();
+    if (requested > 1 &&
+        parsed.solver_type() == math_opt::SOLVER_TYPE_GLPK) {
+      throw std::invalid_argument(
+          "The selected MathOpt backend does not support multiple threads.");
+    }
   }
   if (client_requested_threads > 0 && client_requested_threads != requested) throw std::invalid_argument("MathOpt thread counts do not match.");
   if (requested < 1 || requested > server_total_threads) throw std::invalid_argument("MathOpt thread count is outside server capacity.");

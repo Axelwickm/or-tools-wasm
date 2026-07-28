@@ -501,6 +501,15 @@ if(BUILD_Cbc)
     PATCH_COMMAND git apply --ignore-whitespace
     "${CMAKE_CURRENT_LIST_DIR}/../../patches/cbc-2.10.patch")
   FetchContent_MakeAvailable(Cbc)
+  if(CMAKE_USE_PTHREADS_INIT)
+    # The CMake build does not enable CBC's parallel branch automatically even
+    # when pthreads are available. Keep this in our build configuration so the
+    # fetched source remains unchanged.
+    target_compile_definitions(Cbc PUBLIC CBC_THREAD)
+    target_compile_definitions(CbcSolver PUBLIC CBC_THREAD)
+    target_link_libraries(Cbc PUBLIC Threads::Threads)
+    target_link_libraries(CbcSolver PUBLIC Threads::Threads)
+  endif()
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
 endif()

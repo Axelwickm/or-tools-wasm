@@ -278,9 +278,14 @@ async function runSimpleProgram(
   createX: (solver: MPSolverLike, infinity: number) => MPVariableLike,
   createY: (solver: MPSolverLike, infinity: number) => MPVariableLike,
   expected: { objective: number; x: number; y: number },
+  numThreads = 1,
 ): Promise<MpSolverCaseResult> {
   const solver = createSolver(api, solverId, name);
   try {
+    if (numThreads > 1) {
+      assert(solver.SetNumThreads(numThreads), `${name}: SetNumThreads(${numThreads}) failed`);
+      assert(solver.GetNumThreads() === numThreads, `${name}: expected ${numThreads} configured threads`);
+    }
     const infinity = solver.infinity();
     const x = createX(solver, infinity);
     const y = createY(solver, infinity);
@@ -415,11 +420,12 @@ async function runCbcMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseRes
 async function runCbcExecutorCase(api: MPSolverApi, mode: ExecutorFixtureMode): Promise<MpSolverCaseResult[]> {
   return [await runSimpleProgram(
     api,
-    `MPSolver: CBC simple_mip_program.py (${mode})`,
+    `MPSolver: CBC threaded execution (${mode})`,
     'CBC',
     (solver, infinity) => solver.IntVar(0, infinity, 'x'),
     (solver, infinity) => solver.IntVar(0, infinity, 'y'),
     { objective: 23, x: 3, y: 2 },
+    4,
   )];
 }
 

@@ -50,6 +50,7 @@ import { fixtureModes } from '../browser-basic-src/shared_case.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
 import { runCpSatSolverStructureCases } from '../browser-basic-src/cpsat_solver_structure_runner.ts';
+import { runCpSatSubsolverCases } from '../browser-basic-src/cpsat_subsolver_runner.ts';
 import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
 import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
 import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
@@ -78,6 +79,11 @@ async function assertCaseSteps(t: Deno.TestContext, runtime: string, results: Na
     });
   }
 }
+
+Deno.test('validates CP-SAT execution semantics in Deno', async (t) => {
+  const results = await runCpSatSubsolverCases(CpSat as never);
+  await assertCaseSteps(t, 'deno CP-SAT execution semantics', results);
+});
 
 Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   const structureResults = await runCpSatSolverStructureCases(CpSatApi as never);

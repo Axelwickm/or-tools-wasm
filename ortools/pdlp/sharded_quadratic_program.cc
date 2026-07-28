@@ -74,9 +74,10 @@ void WarnIfMatrixUnbalanced(
   }
 }
 
-Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t> TransposeConstraintMatrix(
-    const Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>& matrix) {
 #ifdef __EMSCRIPTEN__
+std::unique_ptr<Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>>
+TransposeConstraintMatrix(
+    const Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>& matrix) {
   // Eigen's sparse transpose path narrows int64_t StorageIndex limits through
   // Eigen::Index, which is 32-bit on wasm32, and can throw bad_alloc.
   std::vector<Eigen::Triplet<double, int64_t>> triplets;
@@ -88,14 +89,18 @@ Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t> TransposeConstraintMatrix(
       triplets.emplace_back(it.col(), it.row(), it.value());
     }
   }
-  Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t> transpose(matrix.cols(),
-                                                                 matrix.rows());
-  SetEigenMatrixFromTriplets(std::move(triplets), transpose);
+  auto transpose = std::make_unique<
+      Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>>(
+      matrix.cols(), matrix.rows());
+  SetEigenMatrixFromTriplets(std::move(triplets), *transpose);
   return transpose;
-#else
-  return matrix.transpose();
-#endif
 }
+#else
+Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t> TransposeConstraintMatrix(
+    const Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>& matrix) {
+  return matrix.transpose();
+}
+#endif
 
 }  // namespace
 
@@ -109,7 +114,7 @@ ShardedQuadraticProgram::ShardedQuadraticProgram(
                                   : MakeScheduler(scheduler_type, num_threads)),
       constraint_matrix_sharder_(qp_.constraint_matrix, num_shards,
                                  scheduler_.get()),
-      transposed_constraint_matrix_sharder_(transposed_constraint_matrix_,
+      transposed_constraint_matrix_sharder_(TransposedConstraintMatrix(),
                                             num_shards, scheduler_.get()),
       primal_sharder_(qp_.variable_lower_bounds.size(), num_shards,
                       scheduler_.get()),
@@ -124,7 +129,7 @@ ShardedQuadraticProgram::ShardedQuadraticProgram(
     const int64_t column_density_limit = work_per_iteration / num_threads;
     WarnIfMatrixUnbalanced(qp_.constraint_matrix, "constraint matrix",
                            column_density_limit, logger);
-    WarnIfMatrixUnbalanced(transposed_constraint_matrix_,
+    WarnIfMatrixUnbalanced(TransposedConstraintMatrix(),
                            "transposed constraint matrix", column_density_limit,
                            logger);
   }
@@ -201,7 +206,7 @@ void ShardedQuadraticProgram::RescaleQuadraticProgram(
               qp_.constraint_matrix);
   ScaleMatrix(row_scaling_vec, col_scaling_vec,
               transposed_constraint_matrix_sharder_,
-              transposed_constraint_matrix_);
+              MutableTransposedConstraintMatrix());
 }
 
 void ShardedQuadraticProgram::ReplaceLargeConstraintBoundsWithInfinity(

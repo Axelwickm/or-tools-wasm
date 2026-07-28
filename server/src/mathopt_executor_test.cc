@@ -35,10 +35,14 @@ math_opt::SolveRequest InnerRequest() {
 }
 
 SolverExecutorResult Execute(MathOptExecutor* executor, const bridge::MathOptBridgeRequest& request) {
-  JobScheduler scheduler({2, 8});
+  constexpr int kServerThreads = 8;
+  const SolverExecutorRequest outer{1, "mathopt", request.SerializeAsString()};
+  const int requested_threads =
+      executor->RequestedThreads(outer, 0, kServerThreads);
+  JobScheduler scheduler({kServerThreads, 8});
   SolverExecutorResult execution;
-  auto handle = scheduler.Submit(JobSpec{"mathopt", 1}, [&](JobContext& context) {
-    execution = executor->Execute(SolverExecutorRequest{1, "mathopt", request.SerializeAsString()}, context, [](std::string) {});
+  auto handle = scheduler.Submit(JobSpec{"mathopt", requested_threads}, [&](JobContext& context) {
+    execution = executor->Execute(outer, context, [](std::string) {});
     return execution.ok ? JobResult::Succeeded() : JobResult::Failed(execution.error_message);
   });
   handle.result().get();
@@ -83,6 +87,71 @@ void ReservesNestedThreadCount() {
   Expect(executor.RequestedThreads(outer, 1, 4) == 1, "MathOpt reserves nested thread count");
 }
 
+void AcceptsGlopThreads() {
+  MathOptExecutor executor;
+  auto inner = InnerRequest();
+  inner.mutable_parameters()->set_threads(2);
+  bridge::MathOptBridgeRequest request;
+  request.mutable_solve()->set_solve_request_proto(inner.SerializeAsString());
+  Expect(
+      executor.RequestedThreads(
+          SolverExecutorRequest{1, "mathopt", request.SerializeAsString()}, 2,
+          4) == 2,
+      "MathOpt reserves the requested GLOP threads");
+}
+
+void RejectsUnsupportedGlpkThreads() {
+  MathOptExecutor executor;
+  auto inner = InnerRequest();
+  inner.set_solver_type(math_opt::SOLVER_TYPE_GLPK);
+  inner.mutable_parameters()->set_threads(2);
+  bridge::MathOptBridgeRequest request;
+  request.mutable_solve()->set_solve_request_proto(inner.SerializeAsString());
+  bool rejected = false;
+  try {
+    executor.RequestedThreads(
+        SolverExecutorRequest{1, "mathopt", request.SerializeAsString()}, 2, 4);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  Expect(rejected, "MathOpt rejects unsupported GLPK parallelism");
+}
+
+void UsesPdlpThreadSelection() {
+  MathOptExecutor executor;
+  auto inner = InnerRequest();
+  inner.set_solver_type(math_opt::SOLVER_TYPE_PDLP);
+  inner.mutable_parameters()->set_threads(4);
+  inner.mutable_parameters()->set_enable_output(true);
+  bridge::MathOptBridgeRequest request;
+  request.mutable_solve()->set_solve_request_proto(inner.SerializeAsString());
+  const auto response = InnerResponse(Execute(&executor, request));
+  std::string messages;
+  for (const auto& message : response.messages()) messages += message;
+  Expect(messages.find("num_threads: 4") != std::string::npos,
+         "PDLP receives the requested thread count");
+  Expect(messages.find("Reducing num_threads from 4 to 1") !=
+             std::string::npos,
+         "PDLP applies its effective-thread selection");
+}
+
+void UsesGscipConcurrentSolve() {
+  MathOptExecutor executor;
+  auto inner = InnerRequest();
+  inner.set_solver_type(math_opt::SOLVER_TYPE_GSCIP);
+  inner.mutable_model()->mutable_variables()->set_integers(0, true);
+  inner.mutable_parameters()->set_threads(4);
+  auto* gscip = inner.mutable_parameters()->mutable_gscip();
+  (*gscip->mutable_bool_params())["concurrent/presolvebefore"] = false;
+  (*gscip->mutable_int_params())["parallel/minnthreads"] = 4;
+  bridge::MathOptBridgeRequest request;
+  request.mutable_solve()->set_solve_request_proto(inner.SerializeAsString());
+  const auto response = InnerResponse(Execute(&executor, request));
+  Expect(!response.has_status(),
+         "GSCIP satisfies the required four-thread concurrent solve");
+  Expect(response.has_result(), "GSCIP concurrent solve returns a result");
+}
+
 void ReservesOneThreadForIncrementalSessionCreation() {
   MathOptExecutor executor;
   auto inner = InnerRequest();
@@ -99,6 +168,10 @@ int RunAllTests() {
       {"SolvesNestedProto", SolvesNestedProto},
       {"CreatesAndDeletesIncrementalSession", CreatesAndDeletesIncrementalSession},
       {"ReservesNestedThreadCount", ReservesNestedThreadCount},
+      {"AcceptsGlopThreads", AcceptsGlopThreads},
+      {"RejectsUnsupportedGlpkThreads", RejectsUnsupportedGlpkThreads},
+      {"UsesPdlpThreadSelection", UsesPdlpThreadSelection},
+      {"UsesGscipConcurrentSolve", UsesGscipConcurrentSolve},
       {"ReservesOneThreadForIncrementalSessionCreation",
        ReservesOneThreadForIncrementalSessionCreation}};
   for (const auto& [name, test] : tests) {

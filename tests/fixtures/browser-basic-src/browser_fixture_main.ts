@@ -1,6 +1,7 @@
 import { runCpSatHighLevelParityCasesForPackage } from './cpsat_high_level_runner.ts';
 import { cpSatCases } from './cpsat_cases.ts';
 import { runCpSatCases } from './cpsat_runner.ts';
+import { runCpSatSubsolverCases } from './cpsat_subsolver_runner.ts';
 import { runCpSatSolverStructureCases } from './cpsat_solver_structure_runner.ts';
 import { runKnapsackCases } from './knapsack_runner.ts';
 import { runMathOptCases } from './mathopt_runner.ts';
@@ -281,6 +282,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
       getWorkerStats: workerSpy.snapshot,
     }) as Promise<RunResult[]>
   );
+  setStatus({ ok: false, phase: 'cp-sat-subsolvers' });
+  const cpSatSubsolverResults = await runCpSatSubsolverCases(typedCpSat as never);
   setStatus({ ok: false, phase: 'routing' });
   const routing = await runWithWorkerStats(workerSpy, () => runRoutingCases(routingApi as never, {
     modes: executorFixtureModes,
@@ -361,6 +364,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     cpSatSolverStructureWorkerStatsBefore: cpSatSolverStructure.before,
     cpSatSolverStructureWorkerStatsAfter: cpSatSolverStructure.after,
     results: cpSat.result,
+    cpSatSubsolverResults,
     cpSatWorkerStatsBefore: cpSat.before,
     cpSatWorkerStatsAfter: cpSat.after,
     highLevelCpSatResults: highLevelCpSat.result,

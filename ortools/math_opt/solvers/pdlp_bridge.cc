@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Eigen/Core"
@@ -162,8 +163,11 @@ absl::StatusOr<PdlpBridge> PdlpBridge::FromProto(
     const double value = proto_mat.coefficients(i);
     mat_triplets.emplace_back(row_index, column_index, value);
   }
-  pdlp_lp.constraint_matrix.setFromTriplets(mat_triplets.begin(),
-                                            mat_triplets.end());
+  // Eigen's setFromTriplets() narrows int64_t StorageIndex limits through
+  // Eigen::Index on wasm32 and can attempt an invalid allocation. The PDLP
+  // loader also avoids the extra transpose/copy used by Eigen's implementation.
+  pdlp::SetEigenMatrixFromTriplets(std::move(mat_triplets),
+                                   pdlp_lp.constraint_matrix);
   return result;
 }
 

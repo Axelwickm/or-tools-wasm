@@ -15,28 +15,6 @@
 #ifndef ORTOOLS_PORT_OS_H_
 #define ORTOOLS_PORT_OS_H_
 
-#if defined(__ANDROID__)
-#define ORTOOLS_TARGET_OS_IS_ANDROID
-#endif
-
-#if (defined(__apple__) || defined(__APPLE__) || defined(__MACH__))
-// From https://stackoverflow.com/a/49560690
-#include "TargetConditionals.h"
-#if TARGET_OS_IPHONE == 1
-#define ORTOOLS_TARGET_OS_IS_IOS
-#endif
-#endif
-
-#if defined(__EMSCRIPTEN__)
-#define ORTOOLS_TARGET_OS_IS_EMSCRIPTEN
-#endif
-
-#if defined(ORTOOLS_TARGET_OS_IS_ANDROID) || \
-    defined(ORTOOLS_TARGET_OS_IS_IOS) ||     \
-    defined(ORTOOLS_TARGET_OS_IS_EMSCRIPTEN)
-#define ORTOOLS_TARGET_OS_SUPPORTS_THREADS 0
-#else
 #define ORTOOLS_TARGET_OS_SUPPORTS_THREADS 1
-#endif
 
 #endif  // ORTOOLS_PORT_OS_H_

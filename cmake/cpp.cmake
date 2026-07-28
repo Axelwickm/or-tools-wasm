@@ -878,7 +878,7 @@ function(add_cxx_example)
       "-sEXPORTED_RUNTIME_METHODS=callMain,ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8,HEAPU32"
       "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
       "-sUSE_PTHREADS=1"
-      "-sPTHREAD_POOL_SIZE=4"
+      "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency"
       "-sPTHREAD_POOL_SIZE_STRICT=2"
       "-sPTHREAD_POOL_DELAY_LOAD=1"
       "-sASSERTIONS=2"

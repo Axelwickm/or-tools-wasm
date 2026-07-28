@@ -11,6 +11,9 @@
 #include "absl/time/time.h"
 #include <emscripten/emscripten.h>
 
+#ifdef USE_CBC
+#include "CbcModel.hpp"
+#endif
 #include "generated_proto_schemas.h"
 #include "ortools/algorithms/knapsack_solver.h"
 #include "ortools/linear_solver/linear_solver.h"
@@ -157,6 +160,17 @@ uint8_t* SolveModelRequestWithThreads(const MPModelRequest& request,
         "MPSolver: threaded model-request solve requires a model field.");
     return CopyProtoToBuffer(response, out_len);
   }
+#ifdef USE_CBC
+  if (num_threads > 1 &&
+      request.solver_type() ==
+          MPModelRequest::CBC_MIXED_INTEGER_PROGRAMMING &&
+      !CbcModel::haveMultiThreadSupport()) {
+    response.set_status(operations_research::MPSOLVER_INCOMPATIBLE_OPTIONS);
+    response.set_status_str(
+        "CBC was built without multi-thread support.");
+    return CopyProtoToBuffer(response, out_len);
+  }
+#endif
 
   MPSolver solver(
       request.model().name(),
@@ -165,7 +179,8 @@ uint8_t* SolveModelRequestWithThreads(const MPModelRequest& request,
     solver.EnableOutput();
   }
 
-  if (num_threads > 1) {
+  if (num_threads > 1 ||
+      request.solver_type() == MPModelRequest::SAT_INTEGER_PROGRAMMING) {
     const absl::Status status = solver.SetNumThreads(num_threads);
     if (!status.ok()) {
       response.set_status(operations_research::MPSOLVER_INCOMPATIBLE_OPTIONS);
@@ -678,6 +693,9 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request(
     response.set_status_str("MPSolver: failed to parse MPModelRequest bytes.");
     return CopyProtoToBuffer(response, out_len);
   }
+  if (request.solver_type() == MPModelRequest::SAT_INTEGER_PROGRAMMING) {
+    return SolveModelRequestWithThreads(request, 1, out_len);
+  }
   MPSolver::SolveWithProto(request, &response);
   return CopyProtoToBuffer(response, out_len);
 }
@@ -695,6 +713,9 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request_with_threads(
     return CopyProtoToBuffer(response, out_len);
   }
   if (num_threads <= 1) {
+    if (request.solver_type() == MPModelRequest::SAT_INTEGER_PROGRAMMING) {
+      return SolveModelRequestWithThreads(request, 1, out_len);
+    }
     MPSolver::SolveWithProto(request, &response);
     return CopyProtoToBuffer(response, out_len);
   }

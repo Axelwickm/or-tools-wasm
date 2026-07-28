@@ -280,6 +280,7 @@ export type MathOptApi = {
       GLOP: number;
       GSCIP: number;
       CP_SAT: number;
+      PDLP: number;
       GLPK: number;
     };
     LPAlgorithm: Record<string, string | number>;
@@ -627,7 +628,14 @@ async function runGScipMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: 
     { variable: y, coefficient: 2 },
   ]);
 
-  const result = await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GSCIP, threads });
+  const result = await api.MathOpt.solve(model, {
+    solverType: api.MathOpt.SolverType.GSCIP,
+    threads,
+    gscip: threads > 1 ? {
+      boolParams: { 'concurrent/presolvebefore': false },
+      intParams: { 'parallel/minnthreads': threads },
+    } : undefined,
+  });
   assertOptimal('MathOpt GSCIP MIP', result);
   assert(near(result.objectiveValue, 8), `MathOpt GSCIP MIP: expected objective 8, got ${result.objectiveValue}`);
   assert(near(result.variableValues.x, 0), `MathOpt GSCIP MIP: expected x=0, got ${result.variableValues.x}`);
@@ -642,7 +650,59 @@ async function runGScipMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: 
     values: result.variableValues,
   }, {
     id: 'mathopt.backend.gscip_integer_program',
-    tags: ['backend', 'gscip', mode, `${threads}-threads`],
+    tags: ['backend', 'gscip', ...(threads > 1 ? ['execution-semantics', 'concurrent'] : []), mode, `${threads}-threads`],
+  });
+}
+
+async function runPdlpLp(api: MathOptApi, mode: ExecutorFixtureMode, threads: number): Promise<MathOptCaseResult> {
+  const model = api.MathOpt.Model('mathopt_pdlp_lp');
+  const x = model.addVariable({ lowerBound: 0, upperBound: 2, name: 'x' });
+  const y = model.addVariable({ lowerBound: 0, upperBound: 2, name: 'y' });
+  model.addLinearConstraint({
+    lowerBound: 1,
+    upperBound: 1,
+    terms: [
+      { variable: x, coefficient: 1 },
+      { variable: y, coefficient: 1 },
+    ],
+    name: 'balance',
+  });
+  model.minimize([
+    { variable: x, coefficient: 1 },
+    { variable: y, coefficient: 2 },
+  ]);
+
+  const messages: string[] = [];
+  const result = await api.MathOpt.solve(model, {
+    solverType: api.MathOpt.SolverType.PDLP,
+    threads,
+    messageCallback: (batch: string[]) => messages.push(...batch),
+  });
+  assertOptimal('MathOpt PDLP LP', result);
+  assert(near(result.objectiveValue, 1, 1e-5), `MathOpt PDLP LP: expected objective 1, got ${result.objectiveValue}`);
+  const solveLog = messages.join('\n');
+  assert(
+    solveLog.includes(`num_threads: ${threads}`),
+    `MathOpt PDLP LP (${mode}) did not receive the requested thread count:\n${solveLog}`,
+  );
+  if (threads > 2) {
+    assert(
+      solveLog.includes(`Reducing num_threads from ${threads} to 2`),
+      `MathOpt PDLP LP (${mode}) did not exercise PDLP's effective-thread selection:\n${solveLog}`,
+    );
+  }
+
+  return withMathOptMetadata({
+    name: 'MathOpt.testPdlpLinearProgram',
+    mode,
+    threads,
+    ok: true,
+    terminationReason: result.terminationReason,
+    objectiveValue: result.objectiveValue,
+    values: result.variableValues,
+  }, {
+    id: 'mathopt.backend.pdlp_linear_program',
+    tags: ['backend', 'pdlp', 'execution-semantics', mode, `${threads}-threads`],
   });
 }
 
@@ -714,6 +774,8 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
         results.push(await runCpSatMip(api, mode, threads));
         options.onProgress?.('MathOpt.testGScipIntegerProgram', mode, threads);
         results.push(await runGScipMip(api, mode, threads));
+        options.onProgress?.('MathOpt.testPdlpLinearProgram', mode, threads);
+        results.push(await runPdlpLp(api, mode, threads));
         if (threads === 1) {
           options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
           results.push(await runGlpkLp(api, mode));

@@ -56,7 +56,11 @@ class ShardedQuadraticProgram {
   // Returns a reference to the transpose of the QP's constraint matrix.
   const Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>&
   TransposedConstraintMatrix() const {
+#ifdef __EMSCRIPTEN__
+    return *transposed_constraint_matrix_;
+#else
     return transposed_constraint_matrix_;
+#endif
   }
 
   // Returns a `Sharder` intended for the columns of the QP's constraint matrix.
@@ -113,9 +117,27 @@ class ShardedQuadraticProgram {
   void ReplaceLargeConstraintBoundsWithInfinity(double threshold);
 
  private:
+  Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>&
+  MutableTransposedConstraintMatrix() {
+#ifdef __EMSCRIPTEN__
+    return *transposed_constraint_matrix_;
+#else
+    return transposed_constraint_matrix_;
+#endif
+  }
+
   QuadraticProgram qp_;
+#ifdef __EMSCRIPTEN__
+  // Eigen's SparseMatrix move operations copy compressed storage on wasm32,
+  // which narrows int64_t limits through Eigen::Index. Keep the matrix at a
+  // stable address so ShardedQuadraticProgram remains safely movable.
+  std::unique_ptr<
+      Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>>
+      transposed_constraint_matrix_;
+#else
   Eigen::SparseMatrix<double, Eigen::ColMajor, int64_t>
       transposed_constraint_matrix_;
+#endif
   std::unique_ptr<Scheduler> scheduler_;
   Sharder constraint_matrix_sharder_;
   Sharder transposed_constraint_matrix_sharder_;

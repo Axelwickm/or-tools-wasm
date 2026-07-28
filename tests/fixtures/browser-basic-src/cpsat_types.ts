@@ -15,6 +15,7 @@ export type SolverResponse = {
   numBooleans?: unknown;
   numConflicts?: unknown;
   numBranches?: unknown;
+  numLpIterations?: ProtoInt64;
 };
 
 export const SolverJobState = {

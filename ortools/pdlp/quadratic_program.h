@@ -66,7 +66,11 @@ struct QuadraticProgram {
 
   // `QuadraticProgram` may be copied or moved. `Eigen::SparseMatrix` doesn't
   // have move operations so we use custom implementations based on swap.
+#ifdef __EMSCRIPTEN__
+  QuadraticProgram(const QuadraticProgram& other);
+#else
   QuadraticProgram(const QuadraticProgram& other) = default;
+#endif
   QuadraticProgram(QuadraticProgram&& other) noexcept
       : objective_vector(std::move(other.objective_vector)),
         objective_matrix(std::move(other.objective_matrix)),
@@ -81,7 +85,11 @@ struct QuadraticProgram {
         objective_scaling_factor(other.objective_scaling_factor) {
     constraint_matrix.swap(other.constraint_matrix);
   }
+#ifdef __EMSCRIPTEN__
+  QuadraticProgram& operator=(const QuadraticProgram& other);
+#else
   QuadraticProgram& operator=(const QuadraticProgram& other) = default;
+#endif
   QuadraticProgram& operator=(QuadraticProgram&& other) {
     objective_vector = std::move(other.objective_vector);
     objective_matrix = std::move(other.objective_matrix);

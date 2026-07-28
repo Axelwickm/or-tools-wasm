@@ -77,9 +77,10 @@ void UsesCbcBuildThreadCapability() {
   outer.mutable_solve()->set_num_threads(2);
   request.payload = outer.SerializeAsString();
 
-  const int expected_threads = CbcModel::haveMultiThreadSupport() ? 2 : 1;
-  Expect(executor.RequestedThreads(request, 2, 4) == expected_threads,
-         "MP Solver uses the CBC build's thread capability");
+  Expect(CbcModel::haveMultiThreadSupport(),
+         "CBC is compiled with multi-thread support");
+  Expect(executor.RequestedThreads(request, 2, 4) == 2,
+         "MP Solver reserves CBC's requested threads");
   Expect(Execute(request).ok, "CBC solve succeeds when multiple threads are requested");
 }
 

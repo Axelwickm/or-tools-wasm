@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "tsc --noEmit && node --experimental-strip-types --test basic.test.ts"
+    "test": "tsc --noEmit && node --experimental-strip-types --test basic.test.ts && node --experimental-strip-types cp_sat_execution_semantics.test.ts"
   },
   "dependencies": {
     "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-local.tgz"
