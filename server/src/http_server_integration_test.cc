@@ -108,7 +108,7 @@ bridge::SolverBridgeResponse SubmitJob(uint32_t request_id, int threads,
   request.set_request_id(request_id);
   request.set_solver("fake");
   request.set_execute_payload(std::move(payload));
-  request.mutable_settings()->set_requested_threads(threads);
+  request.mutable_resources()->set_threads(threads);
   httplib::Client client("127.0.0.1", kPort);
   return DecodeResponse(
       client.Post("/jobs", request.SerializeAsString(), kProtobufContentType),

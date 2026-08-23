@@ -90,7 +90,7 @@ HttpBinaryRequest SubmitRequest(uint32_t request_id = 7) {
   request.set_request_id(request_id);
   request.set_solver("fake");
   request.set_execute_payload("fake-request");
-  request.mutable_settings()->set_requested_threads(1);
+  request.mutable_resources()->set_threads(1);
 
   HttpBinaryRequest http_request;
   if (!request.SerializeToString(&http_request.body)) {

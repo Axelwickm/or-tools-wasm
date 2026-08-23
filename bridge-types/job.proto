@@ -5,7 +5,7 @@ package ortools_wasm.bridge.v1;
 message SolverBridgeRequest {
   uint32 request_id = 1;
   string solver = 2;
-  SolverExecutionSettings settings = 3;
+  SolverResourceRequest resources = 3;
 
   oneof operation {
     bytes execute_payload = 10;
@@ -13,9 +13,9 @@ message SolverBridgeRequest {
   }
 }
 
-message SolverExecutionSettings {
-  // 0 means that the solver's default resource requirement is requested.
-  uint32 requested_threads = 1;
+message SolverResourceRequest {
+  // 0 means that the scheduler should use the solver's default requirement.
+  uint32 threads = 1;
 }
 
 message SolverCancelRequest {

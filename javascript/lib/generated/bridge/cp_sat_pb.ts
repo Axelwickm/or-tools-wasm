@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file cp_sat.proto.
  */
 export const file_cp_sat: GenFile = /*@__PURE__*/
-  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi2wEKEkNwU2F0QnJpZGdlUmVxdWVzdBI6CgVzb2x2ZRgKIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlcXVlc3RIABJACgh2YWxpZGF0ZRgLIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlcXVlc3RIABI8CgZzY2hlbWEYDCABKAsyKi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U2NoZW1hUmVxdWVzdEgAQgkKB3BheWxvYWQirgIKE0NwU2F0QnJpZGdlUmVzcG9uc2USQAoMc29sdmVfcmVzdWx0GAogASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlUmVzdWx0SAASPgoLc29sdmVfZXZlbnQYCyABKAsyJy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U29sdmVFdmVudEgAEkYKD3ZhbGlkYXRlX3Jlc3VsdBgMIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlc3VsdEgAEkIKDXNjaGVtYV9yZXN1bHQYDSABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U2NoZW1hUmVzdWx0SABCCQoHcGF5bG9hZCKLAQoRQ3BTYXRTb2x2ZVJlcXVlc3QSFgoOY3BfbW9kZWxfcHJvdG8YASABKAwSHAoUc2F0X3BhcmFtZXRlcnNfcHJvdG8YAiABKAwSQAoNY2FsbGJhY2tfbWFzaxgDIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRDYWxsYmFja01hc2siRgoRQ3BTYXRDYWxsYmFja01hc2sSEAoIc29sdXRpb24YASABKAgSEgoKYmVzdF9ib3VuZBgCIAEoCBILCgNsb2cYAyABKAgiNAoQQ3BTYXRTb2x2ZVJlc3VsdBIgChhjcF9zb2x2ZXJfcmVzcG9uc2VfcHJvdG8YASABKAwiWwoPQ3BTYXRTb2x2ZUV2ZW50EhgKDnNvbHV0aW9uX3Byb3RvGAEgASgMSAASFAoKYmVzdF9ib3VuZBgCIAEoAUgAEg0KA2xvZxgDIAEoCUgAQgkKB3BheWxvYWQiLgoUQ3BTYXRWYWxpZGF0ZVJlcXVlc3QSFgoOY3BfbW9kZWxfcHJvdG8YASABKAwiMgoTQ3BTYXRWYWxpZGF0ZVJlc3VsdBIKCgJvaxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIhQKEkNwU2F0U2NoZW1hUmVxdWVzdCJXChFDcFNhdFNjaGVtYVJlc3VsdBIdChVjcF9tb2RlbF9wcm90b19zY2hlbWEYASABKAkSIwobc2F0X3BhcmFtZXRlcnNfcHJvdG9fc2NoZW1hGAIgASgJYgZwcm90bzM");
+  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEinQEKEkNwU2F0QnJpZGdlUmVxdWVzdBI6CgVzb2x2ZRgKIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlcXVlc3RIABJACgh2YWxpZGF0ZRgLIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlcXVlc3RIAEIJCgdwYXlsb2FkIuoBChNDcFNhdEJyaWRnZVJlc3BvbnNlEkAKDHNvbHZlX3Jlc3VsdBgKIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlc3VsdEgAEj4KC3NvbHZlX2V2ZW50GAsgASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlRXZlbnRIABJGCg92YWxpZGF0ZV9yZXN1bHQYDCABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0VmFsaWRhdGVSZXN1bHRIAEIJCgdwYXlsb2FkIosBChFDcFNhdFNvbHZlUmVxdWVzdBIWCg5jcF9tb2RlbF9wcm90bxgBIAEoDBIcChRzYXRfcGFyYW1ldGVyc19wcm90bxgCIAEoDBJACg1jYWxsYmFja19tYXNrGAMgASgLMikub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdENhbGxiYWNrTWFzayJGChFDcFNhdENhbGxiYWNrTWFzaxIQCghzb2x1dGlvbhgBIAEoCBISCgpiZXN0X2JvdW5kGAIgASgIEgsKA2xvZxgDIAEoCCI0ChBDcFNhdFNvbHZlUmVzdWx0EiAKGGNwX3NvbHZlcl9yZXNwb25zZV9wcm90bxgBIAEoDCJbCg9DcFNhdFNvbHZlRXZlbnQSGAoOc29sdXRpb25fcHJvdG8YASABKAxIABIUCgpiZXN0X2JvdW5kGAIgASgBSAASDQoDbG9nGAMgASgJSABCCQoHcGF5bG9hZCIuChRDcFNhdFZhbGlkYXRlUmVxdWVzdBIWCg5jcF9tb2RlbF9wcm90bxgBIAEoDCIyChNDcFNhdFZhbGlkYXRlUmVzdWx0EgoKAm9rGAEgASgIEg8KB21lc3NhZ2UYAiABKAliBnByb3RvMw");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.CpSatBridgeRequest
@@ -31,12 +31,6 @@ export type CpSatBridgeRequest = Message<"ortools_wasm.bridge.v1.CpSatBridgeRequ
      */
     value: CpSatValidateRequest;
     case: "validate";
-  } | {
-    /**
-     * @generated from field: ortools_wasm.bridge.v1.CpSatSchemaRequest schema = 12;
-     */
-    value: CpSatSchemaRequest;
-    case: "schema";
   } | { case: undefined; value?: undefined };
 };
 
@@ -53,11 +47,6 @@ export type CpSatBridgeRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.CpSatValidateRequest validate = 11;
    */
   validate?: CpSatValidateRequestJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.CpSatSchemaRequest schema = 12;
-   */
-  schema?: CpSatSchemaRequestJson;
 };
 
 export type CpSatBridgeRequestValid = CpSatBridgeRequest;
@@ -94,12 +83,6 @@ export type CpSatBridgeResponse = Message<"ortools_wasm.bridge.v1.CpSatBridgeRes
      */
     value: CpSatValidateResult;
     case: "validateResult";
-  } | {
-    /**
-     * @generated from field: ortools_wasm.bridge.v1.CpSatSchemaResult schema_result = 13;
-     */
-    value: CpSatSchemaResult;
-    case: "schemaResult";
   } | { case: undefined; value?: undefined };
 };
 
@@ -121,11 +104,6 @@ export type CpSatBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.CpSatValidateResult validate_result = 12;
    */
   validateResult?: CpSatValidateResultJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.CpSatSchemaResult schema_result = 13;
-   */
-  schemaResult?: CpSatSchemaResultJson;
 };
 
 export type CpSatBridgeResponseValid = CpSatBridgeResponse;
@@ -388,64 +366,4 @@ export type CpSatValidateResultValid = CpSatValidateResult;
  */
 export const CpSatValidateResultSchema: GenMessage<CpSatValidateResult, {jsonType: CpSatValidateResultJson, validType: CpSatValidateResultValid}> = /*@__PURE__*/
   messageDesc(file_cp_sat, 7);
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatSchemaRequest
- */
-export type CpSatSchemaRequest = Message<"ortools_wasm.bridge.v1.CpSatSchemaRequest"> & {
-};
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatSchemaRequest
- */
-export type CpSatSchemaRequestJson = {
-};
-
-export type CpSatSchemaRequestValid = CpSatSchemaRequest;
-
-/**
- * Describes the message ortools_wasm.bridge.v1.CpSatSchemaRequest.
- * Use `create(CpSatSchemaRequestSchema)` to create a new message.
- */
-export const CpSatSchemaRequestSchema: GenMessage<CpSatSchemaRequest, {jsonType: CpSatSchemaRequestJson, validType: CpSatSchemaRequestValid}> = /*@__PURE__*/
-  messageDesc(file_cp_sat, 8);
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatSchemaResult
- */
-export type CpSatSchemaResult = Message<"ortools_wasm.bridge.v1.CpSatSchemaResult"> & {
-  /**
-   * @generated from field: string cp_model_proto_schema = 1;
-   */
-  cpModelProtoSchema: string;
-
-  /**
-   * @generated from field: string sat_parameters_proto_schema = 2;
-   */
-  satParametersProtoSchema: string;
-};
-
-/**
- * @generated from message ortools_wasm.bridge.v1.CpSatSchemaResult
- */
-export type CpSatSchemaResultJson = {
-  /**
-   * @generated from field: string cp_model_proto_schema = 1;
-   */
-  cpModelProtoSchema?: string;
-
-  /**
-   * @generated from field: string sat_parameters_proto_schema = 2;
-   */
-  satParametersProtoSchema?: string;
-};
-
-export type CpSatSchemaResultValid = CpSatSchemaResult;
-
-/**
- * Describes the message ortools_wasm.bridge.v1.CpSatSchemaResult.
- * Use `create(CpSatSchemaResultSchema)` to create a new message.
- */
-export const CpSatSchemaResultSchema: GenMessage<CpSatSchemaResult, {jsonType: CpSatSchemaResultJson, validType: CpSatSchemaResultValid}> = /*@__PURE__*/
-  messageDesc(file_cp_sat, 9);
 

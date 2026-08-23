@@ -467,7 +467,7 @@ async function runSportsScheduling() {
 
     append('Solving…');
     try {
-      const result = await CpSat.solve(model, { solverParameters: params });
+      const result = await CpSat.solve(model, params);
       const response = result.response;
       if (!response || !statusEl) {
         append('Solver returned no response.');

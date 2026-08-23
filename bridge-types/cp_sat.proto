@@ -22,7 +22,6 @@ message CpSatBridgeRequest {
   oneof payload {
     CpSatSolveRequest solve = 10;
     CpSatValidateRequest validate = 11;
-    CpSatSchemaRequest schema = 12;
   }
 }
 
@@ -31,7 +30,6 @@ message CpSatBridgeResponse {
     CpSatSolveResult solve_result = 10;
     CpSatSolveEvent solve_event = 11;
     CpSatValidateResult validate_result = 12;
-    CpSatSchemaResult schema_result = 13;
   }
 }
 
@@ -66,11 +64,4 @@ message CpSatValidateRequest {
 message CpSatValidateResult {
   bool ok = 1;
   string message = 2;
-}
-
-message CpSatSchemaRequest {}
-
-message CpSatSchemaResult {
-  string cp_model_proto_schema = 1;
-  string sat_parameters_proto_schema = 2;
 }

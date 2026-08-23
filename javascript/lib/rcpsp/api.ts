@@ -1,5 +1,4 @@
 import {
-  CpSat,
   CpModel,
   CpSolver,
   CpSolverStatus,
@@ -12,7 +11,12 @@ import {
   type IntervalVar,
   type SatParameters,
 } from '../cp-sat.js';
-import type { ExecutorConfiguration } from '../executor_configuration.js';
+import type {
+  ExecutorConfiguration,
+  ExecutorSelection,
+} from '../executor_configuration.js';
+
+let rcpspExecutor: ExecutorSelection = 'auto';
 
 export type RcpspResourceProto = {
   maxCapacity?: number;
@@ -360,8 +364,10 @@ export class RcpspProblem {
         intermediateSolution = solution;
       })
       : null;
-    if (solutionCallback) Object.assign(solver.parameters, params);
-    const status = await solver.solve(built.model, solutionCallback ?? params, {
+    const status = await solver.solve(built.model, {
+      ...params,
+      executor: rcpspExecutor,
+      solutionCallback: solutionCallback ?? undefined,
       signal: options.signal,
       eventMask,
       onEvent: options.onEvent
@@ -531,7 +537,7 @@ export class RcpspParser {
 export async function initRcpsp(): Promise<void> {}
 
 export function setExecutor(configuration: ExecutorConfiguration): void {
-  CpSat.setExecutor(configuration);
+  rcpspExecutor = configuration;
 }
 
 export function importRcpspProblemFromProto(proto: RcpspProblemProto) {

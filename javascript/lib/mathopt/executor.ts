@@ -31,14 +31,14 @@ export const mathOptBridgeCodec: SolverBridgeCodec<MathOptExecutorRequest, MathO
   decodeRequest: (payload) => fromBinary(MathOptBridgeRequestSchema, payload).payload,
   encodeResult: (response) => toBinary(MathOptBridgeResponseSchema, response),
   decodeResult: (payload) => fromBinary(MathOptBridgeResponseSchema, payload),
-  defaultRequestedThreads: 1,
 };
+
+type MathOptJobState = { cancelled: boolean };
 
 export class MathOptExecutor implements MathOptExecutorLike {
   readonly solver = 'mathopt';
   private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
-  private readonly cancelled = new Set<number>();
 
   async load() { await this.module(); }
   terminate(_reason?: string) {}
@@ -46,17 +46,20 @@ export class MathOptExecutor implements MathOptExecutorLike {
 
   execute(request: MathOptExecutorRequest, options: SolverExecutionOptions<never>): SolverJob<MathOptBridgeResponse> {
     const requestId = this.nextRequestId++;
-    return { requestId, result: this.run(requestId, request, options), cancel: () => this.cancel(requestId, options) };
+    const state: MathOptJobState = { cancelled: false };
+    return { requestId, result: this.run(requestId, request, options, state), cancel: () => this.cancel(requestId, options, state) };
   }
 
-  private async run(requestId: number, request: MathOptExecutorRequest, options: SolverExecutionOptions<never>) {
+  private async run(requestId: number, request: MathOptExecutorRequest, options: SolverExecutionOptions<never>, state: MathOptJobState) {
     const createdAt = BigInt(Date.now());
     try {
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.STARTING, createdAt));
-      await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.RUNNING, createdAt, BigInt(Date.now()), options.requestedThreads ?? 1));
+      await options.onEvent(createSolverJobStatusEvent(
+        this.solver, requestId, SolverJobState.RUNNING, createdAt, BigInt(Date.now()),
+      ));
       const bytes = await this.executeNative(await this.module(), request);
       await options.onEvent(createSolverJobStatusEvent(
-        this.solver, requestId, this.cancelled.has(requestId) ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED, createdAt,
+        this.solver, requestId, state.cancelled ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED, createdAt,
       ));
       return create(MathOptBridgeResponseSchema, { solveResponseProto: bytes });
     } catch (error) {
@@ -65,11 +68,11 @@ export class MathOptExecutor implements MathOptExecutorLike {
         error instanceof Error ? error.stack ?? '' : ''));
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.FAILED, createdAt));
       throw error;
-    } finally { this.cancelled.delete(requestId); }
+    }
   }
 
-  private async cancel(requestId: number, options: SolverExecutionOptions<never>) {
-    this.cancelled.add(requestId);
+  private async cancel(requestId: number, options: SolverExecutionOptions<never>, state: MathOptJobState) {
+    state.cancelled = true;
     await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.CANCELLING, BigInt(Date.now())));
   }
 

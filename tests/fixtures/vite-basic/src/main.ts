@@ -1,4 +1,5 @@
 import { runBrowserFixture } from '../../browser-basic-src/browser_fixture_main.ts';
+import * as PackageApi from 'or-tools-wasm';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import * as RoutingApiModule from 'or-tools-wasm/routing';
 import * as MPSolverApi from 'or-tools-wasm/mp-solver';
@@ -10,6 +11,7 @@ import * as MathOptApi from 'or-tools-wasm/mathopt';
 import * as PdlpApi from 'or-tools-wasm/pdlp';
 
 void runBrowserFixture({
+  PackageApi,
   CpSatApi,
   RoutingApiModule,
   MPSolverApi,

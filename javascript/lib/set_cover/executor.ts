@@ -24,6 +24,7 @@ export type SetCoverExecutorJob = SolverJob<SetCoverBridgeResponse>;
 export type SetCoverExecutorEvent = SolverJobEvent;
 
 type NativeResult = { ok: false; error: string } | ({ ok: true } & Omit<SetCoverBridgeResponse, '$typeName'>);
+type SetCoverJobState = { cancelled: boolean };
 
 export const setCoverBridgeCodec: SolverBridgeCodec<SetCoverBridgeRequest, SetCoverBridgeResponse, never> = {
   solver: 'set-cover',
@@ -32,7 +33,6 @@ export const setCoverBridgeCodec: SolverBridgeCodec<SetCoverBridgeRequest, SetCo
   decodeRequest: (payload) => fromBinary(SetCoverBridgeRequestSchema, payload),
   encodeResult: (response) => toBinary(SetCoverBridgeResponseSchema, response),
   decodeResult: (payload) => fromBinary(SetCoverBridgeResponseSchema, payload),
-  defaultRequestedThreads: 1,
 };
 
 function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
@@ -51,17 +51,17 @@ export class SetCoverExecutor implements SetCoverExecutorLike {
   readonly solver = 'set-cover';
   private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
-  private readonly cancelled = new Set<number>();
 
   async load(): Promise<void> { await this.module(); }
   terminate(_reason?: string): void {}
 
   execute(request: SetCoverBridgeRequest, options: SolverExecutionOptions<never>): SetCoverExecutorJob {
     const requestId = this.nextRequestId++;
+    const state: SetCoverJobState = { cancelled: false };
     return {
       requestId,
-      result: this.run(requestId, request, options),
-      cancel: () => this.cancel(requestId, options),
+      result: this.run(requestId, request, options, state),
+      cancel: () => this.cancel(requestId, options, state),
     };
   }
 
@@ -71,23 +71,24 @@ export class SetCoverExecutor implements SetCoverExecutorLike {
     requestId: number,
     request: SetCoverBridgeRequest,
     options: SolverExecutionOptions<never>,
+    state: SetCoverJobState,
   ): Promise<SetCoverBridgeResponse> {
     const createdAtMs = BigInt(Date.now());
     try {
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.STARTING, createdAtMs));
       await options.onEvent(createSolverJobStatusEvent(
-        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()), 1,
+        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()),
       ));
       const response = await this.solve(await this.module(), request);
       await options.onEvent(createSolverJobStatusEvent(
         this.solver,
         requestId,
-        this.cancelled.has(requestId) ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED,
+        state.cancelled ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED,
         createdAtMs,
       ));
       return response;
     } catch (error) {
-      if (this.cancelled.has(requestId)) {
+      if (state.cancelled) {
         await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.CANCELLED, createdAtMs));
         throw error;
       }
@@ -100,13 +101,11 @@ export class SetCoverExecutor implements SetCoverExecutorLike {
       ));
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.FAILED, createdAtMs));
       throw error;
-    } finally {
-      this.cancelled.delete(requestId);
     }
   }
 
-  private async cancel(requestId: number, options: SolverExecutionOptions<never>) {
-    this.cancelled.add(requestId);
+  private async cancel(requestId: number, options: SolverExecutionOptions<never>, state: SetCoverJobState) {
+    state.cancelled = true;
     await options.onEvent(createSolverJobStatusEvent(
       this.solver, requestId, SolverJobState.CANCELLING, BigInt(Date.now()),
     ));

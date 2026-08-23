@@ -33,7 +33,6 @@ export const pdlpBridgeCodec: SolverBridgeCodec<PdlpBridgeRequest, PdlpBridgeRes
   decodeRequest: (payload) => fromBinary(PdlpBridgeRequestSchema, payload),
   encodeResult: (response) => toBinary(PdlpBridgeResponseSchema, response),
   decodeResult: (payload) => fromBinary(PdlpBridgeResponseSchema, payload),
-  defaultRequestedThreads: 1,
 };
 
 class Writer {
@@ -162,7 +161,9 @@ export class PdlpExecutor implements PdlpExecutorLike {
     const createdAtMs = BigInt(Date.now());
     try {
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.STARTING, createdAtMs));
-      await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()), 1));
+      await options.onEvent(createSolverJobStatusEvent(
+        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()),
+      ));
       const response = await this.invoke(await this.module(), request);
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.SUCCEEDED, createdAtMs));
       return response;

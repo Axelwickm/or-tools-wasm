@@ -13,6 +13,7 @@ import {
   type SolverExecutionOptions,
   type SolverExecutor,
   type SolverJob,
+  type SolverResourceRequest,
 } from './solver_executor.js';
 import {
   SolverEventBatchSchema,
@@ -111,7 +112,7 @@ implements SolverExecutor<Request, Response, Event> {
 
   execute(request: Request, options: SolverExecutionOptions<Event>): SolverJob<Response> {
     const requestId = this.nextRequestId++;
-    const submitted = this.submit(requestId, request);
+    const submitted = this.submit(requestId, request, options.resources);
     return {
       requestId,
       result: this.run(requestId, submitted, options),
@@ -131,11 +132,13 @@ implements SolverExecutor<Request, Response, Event> {
   private async submit(
     requestId: number,
     request: Request,
+    resources?: SolverResourceRequest,
   ): Promise<SolverBridgeResponse> {
     const bytes = encodeSolverBridgeRequest({
       requestId,
       solver: this.solver,
       payload: this.codec.encodeRequest(request),
+      resources,
     });
     const response = await this.fetchImpl(new URL('jobs', this.baseUrl), {
       method: 'POST',

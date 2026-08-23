@@ -3,15 +3,25 @@ import {
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/cp-sat';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
-import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
-import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
-import { runCpSatSolverStructureCases } from '../browser-basic-src/cpsat_solver_structure_runner.ts';
-import { runCpSatSubsolverCases } from '../browser-basic-src/cpsat_subsolver_runner.ts';
+import { packageName, version } from 'or-tools-wasm';
+import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
+import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
+import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
+import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
+import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
+import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
+  assertAllCases('bun cloud executor', [
+    await runCloudExecutorCase(CpSatApi as never, { packageName, version }),
+  ]);
+
   const subsolverResults = await runCpSatSubsolverCases(CpSat as never);
   assertAllCases('bun CP-SAT execution semantics', subsolverResults);
+  assertAllCases('bun CP-SAT worker lifecycle', [
+    await runCpSatWorkerLifecycleCase(CpSat as never),
+  ]);
 
   const structureResults = await runCpSatSolverStructureCases(CpSatApi as never);
   assertAllCases('bun CP-SAT solver structure', structureResults);

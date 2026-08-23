@@ -17,6 +17,11 @@ const SPECS = [
   },
 ];
 
+const SCHEMA_OUTPUT_PATH = path.join(
+  ROOT,
+  'javascript/lib/generated/cp_sat_schemas.ts',
+);
+
 function stripComments(text) {
   // Keep line comments for JSDoc generation; only remove block comments.
   return text.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -550,3 +555,22 @@ for (const spec of SPECS) {
   fs.writeFileSync(spec.outputPath, output);
   console.log(`Generated ${path.relative(ROOT, spec.outputPath)}`);
 }
+
+const cpModelProtoSchema = fs.readFileSync(SPECS[1].inputPath, 'utf8');
+const satParametersProtoSchema = fs.readFileSync(SPECS[0].inputPath, 'utf8');
+const schemaOutput = [
+  '/*',
+  ' * AUTO-GENERATED FILE.',
+  ' *',
+  ' * Sources: ortools/sat/cp_model.proto, ortools/sat/sat_parameters.proto',
+  ' * Generator: scripts/generate_sat_parameters_types.mjs',
+  ' */',
+  '',
+  `export const cpModelProtoSchema = ${JSON.stringify(cpModelProtoSchema)};`,
+  '',
+  `export const satParametersProtoSchema = ${JSON.stringify(satParametersProtoSchema)};`,
+  '',
+].join('\n');
+ensureDir(path.dirname(SCHEMA_OUTPUT_PATH));
+fs.writeFileSync(SCHEMA_OUTPUT_PATH, schemaOutput);
+console.log(`Generated ${path.relative(ROOT, SCHEMA_OUTPUT_PATH)}`);

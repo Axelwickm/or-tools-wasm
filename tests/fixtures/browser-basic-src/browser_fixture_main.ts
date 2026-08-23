@@ -1,21 +1,26 @@
-import { runCpSatHighLevelParityCasesForPackage } from './cpsat_high_level_runner.ts';
-import { cpSatCases } from './cpsat_cases.ts';
-import { runCpSatCases } from './cpsat_runner.ts';
-import { runCpSatSubsolverCases } from './cpsat_subsolver_runner.ts';
-import { runCpSatSolverStructureCases } from './cpsat_solver_structure_runner.ts';
-import { runKnapsackCases } from './knapsack_runner.ts';
-import { runMathOptCases } from './mathopt_runner.ts';
-import { runMPSolverCases } from './mp_solver_runner.ts';
-import { runNetworkFlowCases } from './network_flow_runner.ts';
-import { runPdlpCases } from './pdlp_runner.ts';
-import { runRcpspCases } from './rcpsp_runner.ts';
-import { executorFixtureModes, serverExecutorUrl } from './shared_case.ts';
-import { runRoutingCases } from './routing_runner.ts';
-import { runSetCoverCases } from './set_cover_runner.ts';
+import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
+import { cpSatCases } from '../../cases/python-parity/cp_sat/cases.ts';
+import { runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
+import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
+import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
+import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
+import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
+import { withCpSatExecutor } from '../../harness/cpsat_types.ts';
+import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
+import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
+import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
+import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
+import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
+import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
+import { executorFixtureModes, serverExecutorUrl } from '../../harness/shared_case.ts';
+import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
+import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
+import type { BrowserFixtureGroup } from '../../harness/browser_groups.ts';
 
 type PackageModule = Record<string, any>;
 
 export type BrowserFixtureApis = {
+  PackageApi: PackageModule;
   CpSatApi: PackageModule;
   RoutingApiModule: PackageModule;
   MPSolverApi: PackageModule;
@@ -115,19 +120,23 @@ async function runManualCpSatSolve(
   output.textContent = JSON.stringify({ ok: false, phase: 'manual-cp-sat', executor: mode }, null, 2);
 
   try {
+    let executorSelection: Parameters<typeof withCpSatExecutor>[1];
     if (mode === 'server') {
       await assertManualServerHealth(url, authToken);
-      CpSat.setExecutor({
+      executorSelection = {
         type: 'server',
         url,
         authToken: authToken || undefined,
         statusIntervalMs: 20,
-      });
+      };
     } else {
-      CpSat.setExecutor({ type: mode });
+      executorSelection = mode;
     }
 
-    const solverStatus = await cpSatCases[0].run(CpSat as never, { numSearchWorkers: 1 });
+    const solverStatus = await cpSatCases[0].run(
+      withCpSatExecutor(CpSat as never, executorSelection),
+      { numSearchWorkers: 1 },
+    );
     output.textContent = JSON.stringify({
       ok: true,
       executor: mode,
@@ -141,7 +150,6 @@ async function runManualCpSatSolve(
       error: error instanceof Error ? error.message : String(error),
     }, null, 2);
   } finally {
-    CpSat.setExecutor({ type: 'auto' });
     button.disabled = false;
   }
 }
@@ -241,8 +249,20 @@ async function runWithWorkerStats<T>(
   return { before, result, after };
 }
 
+async function runSelectedGroup<T>(
+  selectedGroup: string | null,
+  group: BrowserFixtureGroup,
+  phase: string,
+  run: () => Promise<T>,
+): Promise<T | undefined> {
+  if (selectedGroup && selectedGroup !== group) return undefined;
+  setStatus({ ok: false, phase });
+  return run();
+}
+
 export async function runBrowserFixture(apis: BrowserFixtureApis) {
   const {
+    PackageApi,
     CpSatApi,
     RoutingApiModule,
     MPSolverApi,
@@ -257,6 +277,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   setStatus({ ok: false, phase: 'running' });
   forceSmallHardwareConcurrency();
   const workerSpy = installWorkerSpy();
+  const selectedGroup = new URLSearchParams(globalThis.location.search).get('group');
   const typedCpSat = CpSatApi.CpSat;
   const routingApi = {
     BOOL_FALSE: RoutingApiModule.BOOL_FALSE,
@@ -272,127 +293,136 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     RoutingModel: RoutingApiModule.RoutingModel,
     setExecutor: RoutingApiModule.setExecutor,
   };
-  setStatus({ ok: false, phase: 'cp-sat-high-level' });
-  const highLevelCpSat = await runWithWorkerStats(workerSpy, () =>
-    runCpSatHighLevelParityCasesForPackage(CpSatApi as never)
+  const highLevelCpSat = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat-high-level', () =>
+    runWithWorkerStats(workerSpy, () => runCpSatHighLevelParityCasesForPackage(CpSatApi as never))
   );
-  setStatus({ ok: false, phase: 'cp-sat' });
-  const cpSat = await runWithWorkerStats(workerSpy, () =>
-    runCpSatCases(typedCpSat as never, {
-      getWorkerStats: workerSpy.snapshot,
-    }) as Promise<RunResult[]>
+  const cpSat = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat', () =>
+    runWithWorkerStats(workerSpy, () =>
+      runCpSatCases(typedCpSat as never, {
+        getWorkerStats: workerSpy.snapshot,
+      }) as Promise<RunResult[]>
+    )
   );
-  setStatus({ ok: false, phase: 'cp-sat-subsolvers' });
-  const cpSatSubsolverResults = await runCpSatSubsolverCases(typedCpSat as never);
-  setStatus({ ok: false, phase: 'routing' });
-  const routing = await runWithWorkerStats(workerSpy, () => runRoutingCases(routingApi as never, {
-    modes: executorFixtureModes,
-    onProgress: (caseName, mode) => setStatus({
-      ok: false,
-      phase: 'routing',
-      caseName,
-      mode,
-    }),
-  }));
-  setStatus({ ok: false, phase: 'mp-solver' });
-  const mpSolver = await runWithWorkerStats(workerSpy, () => runMPSolverCases({
-    initMPSolver: MPSolverApi.initMPSolver,
-    MPSolver: MPSolverApi.MPSolver,
-    MPSolverParameters: MPSolverApi.MPSolverParameters,
-    setExecutor: MPSolverApi.setExecutor,
-  }, {
-    modes: executorFixtureModes,
-    onProgress: (caseName, context) => setStatus({
-      ok: false,
-      phase: 'mp-solver',
-      caseName,
-      ...context,
-    }),
-  }));
-  setStatus({ ok: false, phase: 'knapsack' });
-  const knapsack = await runWithWorkerStats(workerSpy, () => runKnapsackCases({
-    initKnapsack: KnapsackApi.initKnapsack,
-    KnapsackSolver: KnapsackApi.KnapsackSolver,
-    KnapsackSolverType: KnapsackApi.KnapsackSolverType,
-    setExecutor: KnapsackApi.setExecutor,
-  }, { modes: executorFixtureModes }));
-  setStatus({ ok: false, phase: 'network-flow' });
-  const networkFlow = await runWithWorkerStats(workerSpy, () => runNetworkFlowCases({
-    initNetworkFlow: NetworkFlowApi.initNetworkFlow,
-    SimpleMaxFlow: NetworkFlowApi.SimpleMaxFlow,
-    SimpleMinCostFlow: NetworkFlowApi.SimpleMinCostFlow,
-    SimpleLinearSumAssignment: NetworkFlowApi.SimpleLinearSumAssignment,
-    setExecutor: NetworkFlowApi.setExecutor,
-  }, { modes: executorFixtureModes }));
-  setStatus({ ok: false, phase: 'set-cover' });
-  const setCover = await runWithWorkerStats(workerSpy, () => runSetCoverCases(
-    SetCoverApi as never,
-    { modes: executorFixtureModes },
-  ));
-  setStatus({ ok: false, phase: 'rcpsp' });
-  const rcpsp = await runWithWorkerStats(workerSpy, () => runRcpspCases(
-    RcpspApi as never,
-    { modes: executorFixtureModes },
-  ));
-  setStatus({ ok: false, phase: 'mathopt' });
-  const mathOpt = await runWithWorkerStats(workerSpy, () => runMathOptCases({
-    initMathOpt: MathOptApi.initMathOpt,
-    MathOpt: MathOptApi.MathOpt,
-  }, {
-    modes: executorFixtureModes,
-    onProgress: (caseName, mode, threads) => setStatus({
-      ok: false,
-      phase: 'mathopt',
-      caseName,
-      mode,
-      threads,
-    }),
-  }));
-  setStatus({ ok: false, phase: 'pdlp' });
-  const pdlp = await runWithWorkerStats(workerSpy, () => runPdlpCases({
-    initPdlp: PdlpApi.initPdlp,
-    Pdlp: PdlpApi.Pdlp,
-    setExecutor: PdlpApi.setExecutor,
-  }, { modes: executorFixtureModes }));
-  setStatus({ ok: false, phase: 'cp-sat-solver-structure' });
-  const cpSatSolverStructure = await runWithWorkerStats(workerSpy, () =>
-    runCpSatSolverStructureCases(CpSatApi as never)
+  const cpSatSubsolverResults = await runSelectedGroup(
+    selectedGroup,
+    'cp-sat',
+    'cp-sat-subsolvers',
+    () => runCpSatSubsolverCases(typedCpSat as never),
+  );
+  const routing = await runSelectedGroup(selectedGroup, 'routing', 'routing', () =>
+    runWithWorkerStats(workerSpy, () => runRoutingCases(routingApi as never, {
+      modes: executorFixtureModes,
+      onProgress: (caseName, mode) => setStatus({ ok: false, phase: 'routing', caseName, mode }),
+    }))
+  );
+  const mpSolver = await runSelectedGroup(selectedGroup, 'mp-solver', 'mp-solver', () =>
+    runWithWorkerStats(workerSpy, () => runMPSolverCases({
+      initMPSolver: MPSolverApi.initMPSolver,
+      MPSolver: MPSolverApi.MPSolver,
+      MPSolverParameters: MPSolverApi.MPSolverParameters,
+      setExecutor: MPSolverApi.setExecutor,
+    }, {
+      modes: executorFixtureModes,
+      onProgress: (caseName, context) => setStatus({ ok: false, phase: 'mp-solver', caseName, ...context }),
+    }))
+  );
+  const knapsack = await runSelectedGroup(selectedGroup, 'knapsack', 'knapsack', () =>
+    runWithWorkerStats(workerSpy, () => runKnapsackCases({
+      initKnapsack: KnapsackApi.initKnapsack,
+      KnapsackSolver: KnapsackApi.KnapsackSolver,
+      KnapsackSolverType: KnapsackApi.KnapsackSolverType,
+      setExecutor: KnapsackApi.setExecutor,
+    }, { modes: executorFixtureModes }))
+  );
+  const networkFlow = await runSelectedGroup(selectedGroup, 'network-flow', 'network-flow', () =>
+    runWithWorkerStats(workerSpy, () => runNetworkFlowCases({
+      initNetworkFlow: NetworkFlowApi.initNetworkFlow,
+      SimpleMaxFlow: NetworkFlowApi.SimpleMaxFlow,
+      SimpleMinCostFlow: NetworkFlowApi.SimpleMinCostFlow,
+      SimpleLinearSumAssignment: NetworkFlowApi.SimpleLinearSumAssignment,
+      setExecutor: NetworkFlowApi.setExecutor,
+    }, { modes: executorFixtureModes }))
+  );
+  const setCover = await runSelectedGroup(selectedGroup, 'set-cover', 'set-cover', () =>
+    runWithWorkerStats(workerSpy, () => runSetCoverCases(SetCoverApi as never, { modes: executorFixtureModes }))
+  );
+  const rcpsp = await runSelectedGroup(selectedGroup, 'rcpsp', 'rcpsp', () =>
+    runWithWorkerStats(workerSpy, () => runRcpspCases(RcpspApi as never, { modes: executorFixtureModes }))
+  );
+  const mathOpt = await runSelectedGroup(selectedGroup, 'mathopt', 'mathopt', () =>
+    runWithWorkerStats(workerSpy, () => runMathOptCases({
+      initMathOpt: MathOptApi.initMathOpt,
+      MathOpt: MathOptApi.MathOpt,
+    }, {
+      modes: executorFixtureModes,
+      onProgress: (caseName, mode, threads) =>
+        setStatus({ ok: false, phase: 'mathopt', caseName, mode, threads }),
+    }))
+  );
+  const pdlp = await runSelectedGroup(selectedGroup, 'pdlp', 'pdlp', () =>
+    runWithWorkerStats(workerSpy, () => runPdlpCases({
+      initPdlp: PdlpApi.initPdlp,
+      Pdlp: PdlpApi.Pdlp,
+      setExecutor: PdlpApi.setExecutor,
+    }, { modes: executorFixtureModes }))
+  );
+  const cpSatSolverStructure = await runSelectedGroup(
+    selectedGroup,
+    'cp-sat',
+    'cp-sat-solver-structure',
+    () => runWithWorkerStats(workerSpy, () => runCpSatSolverStructureCases(CpSatApi as never)),
+  );
+  const cpSatWorkerLifecycle = await runSelectedGroup(
+    selectedGroup,
+    'cp-sat-worker-lifecycle',
+    'cp-sat-worker-lifecycle',
+    () => runWithWorkerStats(workerSpy, () => runCpSatWorkerLifecycleCase(typedCpSat as never)),
+  );
+  const cloudExecutorResult = await runSelectedGroup(selectedGroup, 'cp-sat', 'cloud', () =>
+    runCloudExecutorCase(CpSatApi as never, {
+      packageName: PackageApi.packageName,
+      version: PackageApi.version,
+    })
   );
   setStatus({
     ok: true,
-    cpSatSolverStructureResults: cpSatSolverStructure.result,
-    cpSatSolverStructureWorkerStatsBefore: cpSatSolverStructure.before,
-    cpSatSolverStructureWorkerStatsAfter: cpSatSolverStructure.after,
-    results: cpSat.result,
+    cloudExecutorResult,
+    cpSatSolverStructureResults: cpSatSolverStructure?.result,
+    cpSatWorkerLifecycleResult: cpSatWorkerLifecycle?.result,
+    cpSatWorkerLifecycleStatsBefore: cpSatWorkerLifecycle?.before,
+    cpSatWorkerLifecycleStatsAfter: cpSatWorkerLifecycle?.after,
+    cpSatSolverStructureWorkerStatsBefore: cpSatSolverStructure?.before,
+    cpSatSolverStructureWorkerStatsAfter: cpSatSolverStructure?.after,
+    results: cpSat?.result,
     cpSatSubsolverResults,
-    cpSatWorkerStatsBefore: cpSat.before,
-    cpSatWorkerStatsAfter: cpSat.after,
-    highLevelCpSatResults: highLevelCpSat.result,
-    highLevelCpSatWorkerStatsBefore: highLevelCpSat.before,
-    highLevelCpSatWorkerStatsAfter: highLevelCpSat.after,
-    routingResults: routing.result,
-    mpSolverResults: mpSolver.result,
-    knapsackResults: knapsack.result,
-    networkFlowResults: networkFlow.result,
-    setCoverResults: setCover.result,
-    rcpspResults: rcpsp.result,
-    mathOptResults: mathOpt.result,
-    pdlpResults: pdlp.result,
-    routingWorkerStatsBefore: routing.before,
-    routingWorkerStatsAfter: routing.after,
-    mpSolverWorkerStatsBefore: mpSolver.before,
-    mpSolverWorkerStatsAfter: mpSolver.after,
-    knapsackWorkerStatsBefore: knapsack.before,
-    knapsackWorkerStatsAfter: knapsack.after,
-    networkFlowWorkerStatsBefore: networkFlow.before,
-    networkFlowWorkerStatsAfter: networkFlow.after,
-    setCoverWorkerStatsBefore: setCover.before,
-    setCoverWorkerStatsAfter: setCover.after,
-    rcpspWorkerStatsBefore: rcpsp.before,
-    rcpspWorkerStatsAfter: rcpsp.after,
-    mathOptWorkerStatsBefore: mathOpt.before,
-    mathOptWorkerStatsAfter: mathOpt.after,
-    pdlpWorkerStatsBefore: pdlp.before,
-    pdlpWorkerStatsAfter: pdlp.after,
+    cpSatWorkerStatsBefore: cpSat?.before,
+    cpSatWorkerStatsAfter: cpSat?.after,
+    highLevelCpSatResults: highLevelCpSat?.result,
+    highLevelCpSatWorkerStatsBefore: highLevelCpSat?.before,
+    highLevelCpSatWorkerStatsAfter: highLevelCpSat?.after,
+    routingResults: routing?.result,
+    mpSolverResults: mpSolver?.result,
+    knapsackResults: knapsack?.result,
+    networkFlowResults: networkFlow?.result,
+    setCoverResults: setCover?.result,
+    rcpspResults: rcpsp?.result,
+    mathOptResults: mathOpt?.result,
+    pdlpResults: pdlp?.result,
+    routingWorkerStatsBefore: routing?.before,
+    routingWorkerStatsAfter: routing?.after,
+    mpSolverWorkerStatsBefore: mpSolver?.before,
+    mpSolverWorkerStatsAfter: mpSolver?.after,
+    knapsackWorkerStatsBefore: knapsack?.before,
+    knapsackWorkerStatsAfter: knapsack?.after,
+    networkFlowWorkerStatsBefore: networkFlow?.before,
+    networkFlowWorkerStatsAfter: networkFlow?.after,
+    setCoverWorkerStatsBefore: setCover?.before,
+    setCoverWorkerStatsAfter: setCover?.after,
+    rcpspWorkerStatsBefore: rcpsp?.before,
+    rcpspWorkerStatsAfter: rcpsp?.after,
+    mathOptWorkerStatsBefore: mathOpt?.before,
+    mathOptWorkerStatsAfter: mathOpt?.after,
+    pdlpWorkerStatsBefore: pdlp?.before,
+    pdlpWorkerStatsAfter: pdlp?.after,
   });
 }

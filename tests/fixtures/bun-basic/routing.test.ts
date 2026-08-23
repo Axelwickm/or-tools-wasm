@@ -13,8 +13,8 @@ import {
   setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/routing';
-import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
-import { fixtureModes } from '../browser-basic-src/shared_case.ts';
+import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
+import { executorFixtureModes } from '../../harness/shared_case.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -31,7 +31,7 @@ await runBunFixture(async () => {
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
     setExecutor,
-  }, { modes: fixtureModes });
+  }, { modes: executorFixtureModes });
   assertAllCases('bun routing', routingResults);
   console.log(`bun ran ${routingResults.length} routing cases`);
 }, async () => {

@@ -5,8 +5,8 @@ import {
   setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/mp-solver';
-import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
-import { fixtureModes } from '../browser-basic-src/shared_case.ts';
+import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
+import { executorFixtureModes } from '../../harness/shared_case.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -15,7 +15,7 @@ await runBunFixture(async () => {
     MPSolver,
     MPSolverParameters,
     setExecutor,
-  }, { modes: fixtureModes });
+  }, { modes: executorFixtureModes });
   assertAllCases('bun MPSolver', mpSolverResults);
   console.log(`bun ran ${mpSolverResults.length} MPSolver cases`);
 }, async () => {

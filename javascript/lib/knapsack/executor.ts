@@ -34,15 +34,17 @@ export const knapsackBridgeCodec: SolverBridgeCodec<
   decodeRequest: (payload) => fromBinary(KnapsackBridgeRequestSchema, payload),
   encodeResult: (response) => toBinary(KnapsackBridgeResponseSchema, response),
   decodeResult: (payload) => fromBinary(KnapsackBridgeResponseSchema, payload),
-  defaultRequestedThreads: 1,
 };
 
 const nowMs = () => BigInt(Date.now());
 
+type KnapsackJobState = {
+  cancelled: boolean;
+};
+
 export class KnapsackExecutor implements KnapsackExecutorLike {
   readonly solver = 'knapsack';
   private nextRequestId = 1;
-  private readonly cancelledRequests = new Set<number>();
 
   async load(): Promise<void> {
     await loadKnapsackNativeModule();
@@ -53,10 +55,11 @@ export class KnapsackExecutor implements KnapsackExecutorLike {
     options: SolverExecutionOptions<never>,
   ): KnapsackExecutorJob {
     const requestId = this.nextRequestId++;
+    const state: KnapsackJobState = { cancelled: false };
     return {
       requestId,
-      result: this.run(requestId, request, options.onEvent),
-      cancel: () => this.cancel(requestId, options.onEvent),
+      result: this.run(requestId, request, options.onEvent, state),
+      cancel: () => this.cancel(requestId, options.onEvent, state),
     };
   }
 
@@ -66,17 +69,18 @@ export class KnapsackExecutor implements KnapsackExecutorLike {
     requestId: number,
     request: KnapsackBridgeRequest,
     onEvent: KnapsackExecutorEventHandler,
+    state: KnapsackJobState,
   ): Promise<KnapsackBridgeResponse> {
     const createdAtMs = nowMs();
     try {
       await onEvent(createSolverJobStatusEvent(
         this.solver, requestId, SolverJobState.STARTING, createdAtMs,
       ));
-      if (this.cancelledRequests.has(requestId)) {
+      if (state.cancelled) {
         throw new DOMException('The Knapsack solve was aborted.', 'AbortError');
       }
       await onEvent(createSolverJobStatusEvent(
-        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, nowMs(), 1,
+        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, nowMs(),
       ));
       const result = await executeKnapsackNative(
         request.solverType,
@@ -87,17 +91,17 @@ export class KnapsackExecutor implements KnapsackExecutorLike {
         request.weights.map((dimension) => dimension.values),
         request.capacities,
       );
-      const state = this.cancelledRequests.has(requestId)
+      const terminalState = state.cancelled
         ? SolverJobState.CANCELLED
         : SolverJobState.SUCCEEDED;
-      await onEvent(createSolverJobStatusEvent(this.solver, requestId, state, createdAtMs));
+      await onEvent(createSolverJobStatusEvent(this.solver, requestId, terminalState, createdAtMs));
       return create(KnapsackBridgeResponseSchema, {
         profit: result.profit ?? 0,
         optimal: result.optimal === true,
         contains: result.contains ?? [],
       });
     } catch (error) {
-      if (this.cancelledRequests.has(requestId)) {
+      if (state.cancelled) {
         await onEvent(createSolverJobStatusEvent(
           this.solver, requestId, SolverJobState.CANCELLED, createdAtMs,
         ));
@@ -115,13 +119,15 @@ export class KnapsackExecutor implements KnapsackExecutorLike {
         this.solver, requestId, SolverJobState.FAILED, createdAtMs,
       ));
       throw error;
-    } finally {
-      this.cancelledRequests.delete(requestId);
     }
   }
 
-  private async cancel(requestId: number, onEvent: KnapsackExecutorEventHandler): Promise<void> {
-    this.cancelledRequests.add(requestId);
+  private async cancel(
+    requestId: number,
+    onEvent: KnapsackExecutorEventHandler,
+    state: KnapsackJobState,
+  ): Promise<void> {
+    state.cancelled = true;
     await onEvent(createSolverJobStatusEvent(
       this.solver, requestId, SolverJobState.CANCELLING, nowMs(),
     ));

@@ -6,7 +6,7 @@ import {
   SimpleMinCostFlow,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/network-flow';
-import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
+import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {

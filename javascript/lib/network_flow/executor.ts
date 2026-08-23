@@ -58,7 +58,6 @@ export const networkFlowBridgeCodec: SolverBridgeCodec<
   decodeRequest: (payload) => fromBinary(NetworkFlowBridgeRequestSchema, payload).payload,
   encodeResult: (response) => toBinary(NetworkFlowBridgeResponseSchema, response),
   decodeResult: (payload) => fromBinary(NetworkFlowBridgeResponseSchema, payload),
-  defaultRequestedThreads: 1,
 };
 
 function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
@@ -90,11 +89,12 @@ function response(result: NativeSuccess): NetworkFlowBridgeResponse {
   });
 }
 
+type NetworkFlowJobState = { cancelled: boolean };
+
 export class NetworkFlowExecutor implements NetworkFlowExecutorLike {
   readonly solver = 'network-flow';
   private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
-  private readonly cancelled = new Set<number>();
 
   async load(): Promise<void> { await this.module(); }
   terminate(_reason?: string): void {}
@@ -104,10 +104,11 @@ export class NetworkFlowExecutor implements NetworkFlowExecutorLike {
     options: SolverExecutionOptions<never>,
   ): NetworkFlowExecutorJob {
     const requestId = this.nextRequestId++;
+    const state: NetworkFlowJobState = { cancelled: false };
     return {
       requestId,
-      result: this.run(requestId, request, options),
-      cancel: () => this.cancel(requestId, options),
+      result: this.run(requestId, request, options, state),
+      cancel: () => this.cancel(requestId, options, state),
     };
   }
 
@@ -119,6 +120,7 @@ export class NetworkFlowExecutor implements NetworkFlowExecutorLike {
     requestId: number,
     request: NetworkFlowExecutorRequest,
     options: SolverExecutionOptions<never>,
+    state: NetworkFlowJobState,
   ): Promise<NetworkFlowBridgeResponse> {
     const createdAtMs = BigInt(Date.now());
     try {
@@ -126,7 +128,7 @@ export class NetworkFlowExecutor implements NetworkFlowExecutorLike {
         this.solver, requestId, SolverJobState.STARTING, createdAtMs,
       ));
       await options.onEvent(createSolverJobStatusEvent(
-        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()), 1,
+        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()),
       ));
       const module = await this.module();
       let result: NativeSuccess;
@@ -139,12 +141,12 @@ export class NetworkFlowExecutor implements NetworkFlowExecutorLike {
       await options.onEvent(createSolverJobStatusEvent(
         this.solver,
         requestId,
-        this.cancelled.has(requestId) ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED,
+        state.cancelled ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED,
         createdAtMs,
       ));
       return response(result);
     } catch (error) {
-      if (this.cancelled.has(requestId)) {
+      if (state.cancelled) {
         await options.onEvent(createSolverJobStatusEvent(
           this.solver, requestId, SolverJobState.CANCELLED, createdAtMs,
         ));
@@ -161,13 +163,11 @@ export class NetworkFlowExecutor implements NetworkFlowExecutorLike {
         this.solver, requestId, SolverJobState.FAILED, createdAtMs,
       ));
       throw error;
-    } finally {
-      this.cancelled.delete(requestId);
     }
   }
 
-  private async cancel(requestId: number, options: SolverExecutionOptions<never>) {
-    this.cancelled.add(requestId);
+  private async cancel(requestId: number, options: SolverExecutionOptions<never>, state: NetworkFlowJobState) {
+    state.cancelled = true;
     await options.onEvent(createSolverJobStatusEvent(
       this.solver, requestId, SolverJobState.CANCELLING, BigInt(Date.now()),
     ));

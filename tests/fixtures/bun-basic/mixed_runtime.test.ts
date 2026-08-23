@@ -1,5 +1,4 @@
 import {
-  CpSat,
   CpModel,
   CpSolver,
   terminateLoadedRuntimeThreads,
@@ -28,13 +27,15 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 async function runCpSatSmoke() {
-  CpSat.setExecutor({ type: 'worker' });
   const model = new CpModel();
   const x = model.newIntVar(0, 5, 'x');
   model.add(x.ge(3));
   model.minimize(x);
   const solver = new CpSolver();
-  const status = await solver.solve(model, { numWorkers: 1 });
+  const status = await solver.solve(model, {
+    executor: 'worker',
+    numWorkers: 1,
+  });
   assert(String(status) === 'OPTIMAL', `CP-SAT expected OPTIMAL, got ${status}`);
   assert(solver.value(x) === 3, `CP-SAT expected x=3, got ${solver.value(x)}`);
 }
@@ -90,7 +91,6 @@ await runBunFixture(async () => {
   await terminateLoadedRuntimeThreads();
   console.log('bun mixed runtime smoke passed');
 }, async () => {
-  CpSat.setExecutor({ type: 'auto' });
   setMPSolverExecutor({ type: 'direct' });
   setNetworkFlowExecutor({ type: 'auto' });
   setMathOptExecutor({ type: 'direct' });

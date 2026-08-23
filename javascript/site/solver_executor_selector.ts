@@ -1,7 +1,8 @@
-type ExecutorMode = 'direct' | 'worker' | 'server';
-type ExecutorConfiguration =
+type ExecutorMode = 'direct' | 'worker' | 'cloud' | 'server';
+export type ExecutorConfiguration =
   | { type: 'direct' }
   | { type: 'worker' }
+  | { type: 'cloud' }
   | { type: 'server'; url: string };
 type ExecutorApi = {
   setExecutor(configuration: ExecutorConfiguration): void;
@@ -78,10 +79,11 @@ function createServerSettings(selector: HTMLSelectElement) {
 }
 
 export function configureSolverExecutorSelector(
-  api: ExecutorApi,
+  api: ExecutorApi | null,
   selector: HTMLSelectElement | null,
-): void {
-  if (!selector) return;
+): () => ExecutorConfiguration {
+  let configuration: ExecutorConfiguration = { type: 'direct' };
+  if (!selector) return () => configuration;
 
   const serverSettings = createServerSettings(selector);
 
@@ -101,12 +103,16 @@ export function configureSolverExecutorSelector(
     const mode = selector.value as ExecutorMode;
     serverSettings.settings.hidden = mode !== 'server';
     if (mode !== 'server') {
-      api.setExecutor({ type: mode });
+      configuration = { type: mode };
+      api?.setExecutor(configuration);
       return;
     }
 
     const endpoint = readEndpoint();
-    if (endpoint) api.setExecutor({ type: 'server', url: endpoint });
+    if (endpoint) {
+      configuration = { type: 'server', url: endpoint };
+      api?.setExecutor(configuration);
+    }
   };
 
   apply();
@@ -120,6 +126,10 @@ export function configureSolverExecutorSelector(
     } catch {
       // Storage can be unavailable in privacy-restricted browser contexts.
     }
-    if (selector.value === 'server') api.setExecutor({ type: 'server', url: endpoint });
+    if (selector.value === 'server') {
+      configuration = { type: 'server', url: endpoint };
+      api?.setExecutor(configuration);
+    }
   });
+  return () => configuration;
 }

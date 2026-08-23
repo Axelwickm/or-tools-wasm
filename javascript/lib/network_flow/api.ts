@@ -1,4 +1,5 @@
 import { create } from '@bufbuild/protobuf';
+import { CloudExecutor } from '../cloud_executor.js';
 import {
   LinearSumAssignmentRequestSchema,
   MaxFlowRequestSchema,
@@ -76,6 +77,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): N
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
     case 'server': return new NetworkFlowServerExecutor(configuration);
+    case 'cloud': return new CloudExecutor('network-flow', { test: configuration.test });
   }
 }
 

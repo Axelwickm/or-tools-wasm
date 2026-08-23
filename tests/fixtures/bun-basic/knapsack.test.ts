@@ -5,7 +5,7 @@ import {
   setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/knapsack';
-import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
+import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {

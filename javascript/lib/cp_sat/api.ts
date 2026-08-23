@@ -1,32 +1,33 @@
-import { create } from '@bufbuild/protobuf';
 import {
-  CpSatExecutor,
-  createCpSatCallbackMask,
-  type CpSatExecutorEvent,
-  type CpSatExecutorEventHandler,
-  type CpSatExecutorLike,
-} from './executor.js';
-import { CpSatWorkerExecutor } from './worker_executor.js';
-import { CpSatServerExecutor } from './server_executor.js';
+  cpSatProtocol,
+  type CpSatExecutor,
+  type CpSatSolverEvent,
+} from './protocol.js';
+import { DirectCpSatExecutor } from './direct_executor.js';
+import { CloudExecutor } from '../cloud_executor.js';
+import { SolverServerExecutor } from '../solver_server_executor.js';
 import {
-  CpSatSchemaRequestSchema,
-  CpSatSolveRequestSchema,
-  CpSatValidateRequestSchema,
-  type CpSatBridgeResponse,
-} from '../generated/bridge/cp_sat_pb.js';
+  SolverWorkerExecutor,
+  type SolverWorkerLike,
+} from '../worker_helpers.js';
+import {
+  cpModelProtoSchema,
+  satParametersProtoSchema,
+} from '../generated/cp_sat_schemas.js';
 import {
   resolveExecutorConfiguration,
-  type ExecutorConfiguration,
+  type ExecutorSelection,
   type ResolvedExecutorConfiguration,
 } from '../executor_configuration.js';
-import type { SolverJobEvent } from '../solver_executor.js';
+import type {
+  SolverExecutorEventHandler,
+  SolverJobEvent,
+  SolverResourceRequest,
+} from '../solver_executor.js';
+import { decodeProtobufWithExactLongs } from '../protobufjs_helpers.js';
 import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
-import Long from 'long';
 import * as protobufModule from 'protobufjs';
-
-protobufModule.util.Long = Long;
-protobufModule.configure();
 
 export {
   CpSolverStatus,
@@ -60,287 +61,144 @@ export type CpSatEventMask = {
   log?: boolean;
 };
 
-export type CpSatSolverParameters = Uint8Array | SatParameters | null;
+export type CpSatSolverParameters = SatParameters;
 
-export type CpSatSolveOptions = {
-  solverParameters?: CpSatSolverParameters;
+export type CpSatSolveOptions = CpSatSolverParameters & {
+  executor?: ExecutorSelection;
   onEvent?: CpSatEventHandler;
   eventMask?: CpSatEventMask;
   signal?: AbortSignal;
 };
 
-export type CpSatRawSolveOptions = {
-  solverParameters?: Uint8Array | null;
-  onEvent?: CpSatEventHandler;
-  eventMask?: CpSatEventMask;
+export type CpSatValidateOptions = {
+  executor?: ExecutorSelection;
   signal?: AbortSignal;
 };
 
 export type CpSatApi = {
   solve(model: Uint8Array, options?: CpSatSolveOptions): Promise<CpSatSolveResult>;
-  solveRaw(model: Uint8Array, options?: CpSatRawSolveOptions): Promise<Uint8Array>;
-  validate(model: Uint8Array): Promise<{ ok: boolean; message: string }>;
+  validate(
+    model: Uint8Array,
+    options?: CpSatValidateOptions,
+  ): Promise<{ ok: boolean; message: string }>;
   modelStats(model: Uint8Array): Promise<string>;
   getSchemas(): Promise<CpSatSchemas>;
   createModel(model: CpModelProto): Promise<Uint8Array>;
   loadModule(): Promise<unknown>;
-  setExecutor(executor: ExecutorConfiguration): void;
 };
 
 export type CpSatModelInstance = Uint8Array;
 
 const isBrowserMainThread = typeof window !== 'undefined' && typeof document !== 'undefined';
 
-const directCpSatExecutor = new CpSatExecutor();
-const workerCpSatExecutor = new CpSatWorkerExecutor();
-let cpSatExecutor: CpSatExecutorLike = createCpSatExecutor();
-const ignoreCpSatProgress: CpSatExecutorEventHandler = () => {};
-
-function createCpSatExecutor(configuration: ExecutorConfiguration = { type: 'auto' }): CpSatExecutorLike {
-  return createResolvedCpSatExecutor(resolveExecutorConfiguration(configuration));
+async function createCpSatWorker(): Promise<SolverWorkerLike> {
+  return new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module', name: 'ortools-executor-cp-sat' },
+  );
 }
 
-function createResolvedCpSatExecutor(executor: ResolvedExecutorConfiguration): CpSatExecutorLike {
+const directCpSatExecutor = new DirectCpSatExecutor();
+const workerCpSatExecutor = new SolverWorkerExecutor(
+  cpSatProtocol,
+  createCpSatWorker,
+  true,
+);
+const ignoreCpSatProgress = () => {};
+
+function createCpSatExecutor(
+  selection: ExecutorSelection = 'auto',
+): CpSatExecutor {
+  return createResolvedCpSatExecutor(resolveExecutorConfiguration(selection));
+}
+
+function createResolvedCpSatExecutor(executor: ResolvedExecutorConfiguration): CpSatExecutor {
   switch (executor.type) {
     case 'direct':
       return directCpSatExecutor;
     case 'worker':
       return workerCpSatExecutor;
     case 'server':
-      return new CpSatServerExecutor(executor);
+      return new SolverServerExecutor(cpSatProtocol, executor);
+    case 'cloud':
+      return new CloudExecutor('cp-sat', { test: executor.test });
   }
 }
+
+const defaultCpSatExecutor = createCpSatExecutor();
 
 function loadModule() {
-  return cpSatExecutor.load();
+  return defaultCpSatExecutor.load();
 }
 
-function setCpSatExecutor(configuration: ExecutorConfiguration) {
-  cpSatExecutor = createCpSatExecutor(configuration);
-}
+type ProtobufType = import('protobufjs').Type;
 
-let schemaPromise: Promise<CpSatSchemas> | null = null;
+type CpSatProtobufContext = {
+  schemas: CpSatSchemas;
+  modelType: ProtobufType;
+  responseType: ProtobufType;
+  parametersType: ProtobufType;
+};
 
-async function fetchSchemas(): Promise<CpSatSchemas> {
-  const executor = cpSatExecutor;
-  const job = executor.execute({
-    case: 'schema',
-    value: create(CpSatSchemaRequestSchema),
-  }, { onEvent: ignoreCpSatProgress });
-  const response = await job.result;
-  if (response.payload.case !== 'schemaResult') {
-    throw new Error('CP-SAT executor returned the wrong schema payload.');
-  }
-  return {
-    cp_model: response.payload.value.cpModelProtoSchema,
-    sat_parameters: response.payload.value.satParametersProtoSchema,
+let protobufContext: CpSatProtobufContext | undefined;
+
+function createProtobufContext(): CpSatProtobufContext {
+  const schemas = {
+    cp_model: cpModelProtoSchema,
+    sat_parameters: satParametersProtoSchema,
   };
+
+  const modelRoot = protobufModule.parse(schemas.cp_model).root;
+  const parametersRoot = protobufModule.parse(schemas.sat_parameters).root;
+
+  return {
+    schemas,
+    modelType: modelRoot.lookupType('operations_research.sat.CpModelProto'),
+    responseType: modelRoot.lookupType('operations_research.sat.CpSolverResponse'),
+    parametersType: parametersRoot.lookupType('operations_research.sat.SatParameters'),
+  };
+}
+
+function getProtobufContext(): CpSatProtobufContext {
+  return protobufContext ??= createProtobufContext();
 }
 
 async function getSchemas(): Promise<CpSatSchemas> {
-  schemaPromise ??= fetchSchemas();
-  try {
-    return await schemaPromise;
-  } catch (error) {
-    schemaPromise = null;
-    throw error;
-  }
+  return getProtobufContext().schemas;
 }
 
-type ProtobufRoot = import('protobufjs').Root;
-type CpModelType = import('protobufjs').Type;
-type CpSolverResponseType = import('protobufjs').Type;
-
-let protobufRootPromise: Promise<ProtobufRoot> | null = null;
-let cpModelTypePromise: Promise<CpModelType> | null = null;
-let cpSolverResponseTypePromise: Promise<CpSolverResponseType> | null = null;
-let satParametersTypePromise: Promise<import('protobufjs').Type> | null = null;
-
-async function resolveProtobufRoot(): Promise<ProtobufRoot> {
-  if (!protobufRootPromise) {
-    protobufRootPromise = (async () => {
-      const schemas = await getSchemas();
-      const parsed = protobufModule.parse(schemas.cp_model);
-      return parsed.root;
-    })();
+function encodeSatParameters(
+  parametersType: ProtobufType,
+  params: SatParameters,
+): Uint8Array {
+  const unknownParameter = Object.keys(params).find(
+    (name) => parametersType.fields[name] === undefined,
+  );
+  if (unknownParameter) {
+    throw new Error(`CpSat.solve: unknown solver parameter "${unknownParameter}".`);
   }
-  try {
-    return await protobufRootPromise;
-  } catch (error) {
-    protobufRootPromise = null;
-    throw error;
-  }
-}
-
-async function resolveCpModelType(): Promise<CpModelType> {
-  if (!cpModelTypePromise) {
-    cpModelTypePromise = (async () => {
-      const root = await resolveProtobufRoot();
-      const cpModelType = root.lookupType('operations_research.sat.CpModelProto');
-      if (!cpModelType) {
-        throw new Error('CpSat.createModel: cp_model schema did not expose operations_research.sat.CpModelProto.');
-      }
-      return cpModelType;
-    })();
-  }
-  try {
-    return await cpModelTypePromise;
-  } catch (error) {
-    cpModelTypePromise = null;
-    throw error;
-  }
-}
-
-async function resolveCpSolverResponseType(): Promise<CpSolverResponseType> {
-  if (!cpSolverResponseTypePromise) {
-    cpSolverResponseTypePromise = (async () => {
-      const root = await resolveProtobufRoot();
-      const solverType = root.lookupType('operations_research.sat.CpSolverResponse');
-      if (!solverType) {
-        throw new Error('CpSat.solve: cp_model schema did not expose operations_research.sat.CpSolverResponse.');
-      }
-      return solverType;
-    })();
-  }
-  try {
-    return await cpSolverResponseTypePromise;
-  } catch (error) {
-    cpSolverResponseTypePromise = null;
-    throw error;
-  }
-}
-
-async function resolveSatParametersType(): Promise<import('protobufjs').Type> {
-  if (!satParametersTypePromise) {
-    satParametersTypePromise = (async () => {
-      const schemas = await getSchemas();
-      const parsed = protobufModule.parse(schemas.sat_parameters);
-      const root = parsed.root;
-      const paramsType = root.lookupType('operations_research.sat.SatParameters');
-      if (!paramsType) {
-        throw new Error('CpSat.solve: sat_parameters schema did not expose operations_research.sat.SatParameters.');
-      }
-      return paramsType;
-    })();
-  }
-  try {
-    return await satParametersTypePromise;
-  } catch (error) {
-    satParametersTypePromise = null;
-    throw error;
-  }
-}
-
-function normalizeSatParameters(params: SatParameters): SatParameters {
-  if (params.numSearchWorkers === undefined) {
-    return params;
-  }
-  const { numSearchWorkers, ...normalizedParams } = params;
-  if (normalizedParams.numWorkers !== undefined) {
-    return normalizedParams;
-  }
-  return {
-    ...normalizedParams,
-    numWorkers: numSearchWorkers,
-  };
-}
-
-async function encodeSatParameters(params: SatParameters): Promise<Uint8Array> {
-  const paramsType = await resolveSatParametersType();
-  const normalizedParams = normalizeSatParameters(params);
-  const validationError = paramsType.verify(normalizedParams);
+  const validationError = parametersType.verify(params);
   if (validationError) {
     throw new Error(`CpSat.solve: ${validationError}`);
   }
-  const message = paramsType.create(normalizedParams);
-  return paramsType.encode(message).finish();
+  const message = parametersType.create(params);
+  return parametersType.encode(message).finish();
 }
 
-async function resolveParamsBytes(params?: CpSatSolverParameters): Promise<Uint8Array | null> {
-  if (!params) {
-    return null;
-  }
-  if (params instanceof Uint8Array) {
-    return params;
-  }
-  return encodeSatParameters(params);
+function toCpSolverResponse(solverType: ProtobufType, bytes: Uint8Array): CpSolverResponse {
+  return decodeProtobufWithExactLongs<CpSolverResponse>(solverType, bytes);
 }
 
-async function decodeSolverResponse(bytes: Uint8Array): Promise<CpSolverResponse> {
-  const solverType = await resolveCpSolverResponseType();
-  return toCpSolverResponse(solverType, bytes);
-}
-
-type ProtobufLong = {
-  low: number;
-  high: number;
-  unsigned: boolean;
-};
-
-function isProtobufLong(value: unknown): value is ProtobufLong {
-  return value !== null &&
-    typeof value === 'object' &&
-    typeof (value as Partial<ProtobufLong>).low === 'number' &&
-    typeof (value as Partial<ProtobufLong>).high === 'number' &&
-    typeof (value as Partial<ProtobufLong>).unsigned === 'boolean';
-}
-
-function exactLongValue(value: ProtobufLong) {
-  const bigint = value.unsigned
-    ? (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0)
-    : BigInt(value.high) * 0x100000000n + BigInt(value.low >>> 0);
-  if (bigint >= BigInt(Number.MIN_SAFE_INTEGER) &&
-      bigint <= BigInt(Number.MAX_SAFE_INTEGER)) {
-    return Number(bigint);
-  }
-  return {
-    low: value.low,
-    high: value.high,
-    unsigned: value.unsigned,
-  };
-}
-
-function preserveExactLongs(value: unknown): unknown {
-  if (isProtobufLong(value)) return exactLongValue(value);
-  if (value instanceof Uint8Array) return value;
-  if (Array.isArray(value)) return value.map(preserveExactLongs);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, preserveExactLongs(entry)]),
-    );
-  }
-  return value;
-}
-
-function toCpSolverResponse(solverType: CpSolverResponseType, bytes: Uint8Array): CpSolverResponse {
-  const decoded = solverType.decode(bytes);
-  const response = solverType.toObject(decoded, {
-    enums: String,
-    defaults: true,
-    arrays: true,
-    objects: true,
-  });
-  return preserveExactLongs(response) as CpSolverResponse;
-}
-
-function mapBridgeSolveEvent(
-  solverType: CpSolverResponseType | undefined,
-  event: CpSatExecutorEvent,
-): CpSatEvent | null {
-  if ('type' in event) return event;
-  if (event.payload.case !== 'solveEvent') return null;
-  const solveEvent = event.payload.value;
-  if (solveEvent.payload.case === 'solutionProto') {
-    if (!solverType) return null;
-    const bytes = new Uint8Array(solveEvent.payload.value);
+function decodeCpSatEvent(
+  solverType: ProtobufType,
+  event: SolverJobEvent | CpSatSolverEvent,
+): CpSatEvent {
+  if (event.type === 'solution') {
+    const bytes = event.response;
     const response = toCpSolverResponse(solverType, bytes);
     return { type: 'solution', response, bytes };
-  } else if (solveEvent.payload.case === 'bestBound') {
-    return { type: 'bestBound', bound: solveEvent.payload.value };
-  } else if (solveEvent.payload.case === 'log') {
-    return { type: 'log', message: solveEvent.payload.value };
   }
-  return null;
+  return event;
 }
 
 function createAbortError(signal: AbortSignal) {
@@ -382,7 +240,7 @@ function normalizeCpModelForProtobuf(model: CpModelProto) {
 }
 
 async function createModel(model: CpModelProto): Promise<Uint8Array> {
-  const type = await resolveCpModelType();
+  const { modelType: type } = getProtobufContext();
   const protobufModel = normalizeCpModelForProtobuf(model);
   const validationError = type.verify(protobufModel);
   if (validationError) {
@@ -393,7 +251,7 @@ async function createModel(model: CpModelProto): Promise<Uint8Array> {
 }
 
 async function modelStats(model: Uint8Array): Promise<string> {
-  const type = await resolveCpModelType();
+  const { modelType: type } = getProtobufContext();
   const decoded = type.decode(model);
   const object = type.toObject(decoded, {
     enums: String,
@@ -411,8 +269,10 @@ async function modelStats(model: Uint8Array): Promise<string> {
 }
 
 type CpSatExecuteOptions = {
-  solverParametersBytes: Uint8Array | null;
-  requestedThreads: number;
+  executor: CpSatExecutor;
+  solverParametersBytes: Uint8Array;
+  solverType: ProtobufType;
+  resources?: SolverResourceRequest;
   onEvent?: CpSatEventHandler;
   eventMask?: CpSatEventMask;
   signal?: AbortSignal;
@@ -427,16 +287,14 @@ async function executeSolve(
   const eventMask = options.onEvent
     ? options.eventMask ?? { solution: true, bestBound: true, log: true }
     : {};
-  const solverType = eventMask.solution ? await resolveCpSolverResponseType() : undefined;
-  throwIfAborted(options.signal);
-
-  const executor = cpSatExecutor;
+  const executor = options.executor;
   let callbackError: unknown = null;
   let abortError: unknown = null;
-  const onEvent: CpSatExecutorEventHandler = async (event) => {
+  const onEvent: SolverExecutorEventHandler<
+    SolverJobEvent | CpSatSolverEvent
+  > = async (event) => {
     if (callbackError) return;
-    const mappedEvent = mapBridgeSolveEvent(solverType, event);
-    if (!mappedEvent) return;
+    const mappedEvent = decodeCpSatEvent(options.solverType, event);
     try {
       await options.onEvent?.(mappedEvent);
     } catch (error) {
@@ -444,17 +302,15 @@ async function executeSolve(
     }
   };
   const job = executor.execute({
-    case: 'solve',
-    value: create(CpSatSolveRequestSchema, {
-      cpModelProto: modelBytes,
-      satParametersProto: options.solverParametersBytes ?? new Uint8Array(),
-      callbackMask: createCpSatCallbackMask(
-        Boolean(eventMask.solution),
-        Boolean(eventMask.bestBound),
-        Boolean(eventMask.log),
-      ),
-    }),
-  }, { requestedThreads: options.requestedThreads, onEvent });
+    type: 'solve',
+    model: modelBytes,
+    parameters: options.solverParametersBytes,
+    callbacks: {
+      solution: Boolean(eventMask.solution),
+      bestBound: Boolean(eventMask.bestBound),
+      log: Boolean(eventMask.log),
+    },
+  }, { resources: options.resources, onEvent });
   const abortSolve = () => {
     if (!options.signal) return;
     abortError = createAbortError(options.signal);
@@ -472,84 +328,91 @@ async function executeSolve(
     if (abortError) {
       throw abortError;
     }
-    if (response.payload.case !== 'solveResult') {
+    if (response.type !== 'solve') {
       throw new Error('CP-SAT executor returned the wrong solve payload.');
     }
-    return {
-      bytes: new Uint8Array(response.payload.value.cpSolverResponseProto),
-      solverType,
-    };
+    return response.response;
   } finally {
     options.signal?.removeEventListener('abort', abortSolve);
   }
 }
 
-async function solveRaw(
-  modelBytes: Uint8Array,
-  options: CpSatRawSolveOptions = {},
-) {
-  const result = await executeSolve(modelBytes, {
-    solverParametersBytes: options.solverParameters ?? null,
-    requestedThreads: 0,
-    onEvent: options.onEvent,
-    eventMask: options.eventMask,
-    signal: options.signal,
-  });
-  return result.bytes;
-}
-
-function resolveRequestedThreads(params?: CpSatSolverParameters): number {
-  if (!params || params instanceof Uint8Array) {
-    return 0;
-  }
-  return Number(params.numWorkers ?? params.numSearchWorkers ?? 0);
+function schedulerResourcesFromParameters(
+  parameters: SatParameters,
+): SolverResourceRequest | undefined {
+  const threads = parameters.numWorkers && parameters.numWorkers > 0
+    ? parameters.numWorkers
+    : parameters.numSearchWorkers;
+  return threads !== undefined && threads > 0 ? { threads } : undefined;
 }
 
 async function solve(
   modelBytes: Uint8Array,
   options: CpSatSolveOptions = {},
 ): Promise<CpSatSolveResult> {
-  const requestedThreads = resolveRequestedThreads(options.solverParameters);
-  const paramsBytes = await resolveParamsBytes(options.solverParameters);
-  const { bytes, solverType } = await executeSolve(modelBytes, {
-    solverParametersBytes: paramsBytes,
-    onEvent: options.onEvent,
-    eventMask: options.eventMask,
-    requestedThreads,
-    signal: options.signal,
+  const {
+    executor,
+    onEvent,
+    eventMask,
+    signal,
+    ...solverParameters
+  } = options;
+  const { parametersType, responseType } = getProtobufContext();
+  const solverParametersBytes = encodeSatParameters(parametersType, solverParameters);
+  const bytes = await executeSolve(modelBytes, {
+    executor: createCpSatExecutor(executor),
+    solverParametersBytes,
+    solverType: responseType,
+    onEvent,
+    eventMask,
+    resources: schedulerResourcesFromParameters(solverParameters),
+    signal,
   });
-  let response: CpSolverResponse | null = null;
-  if (bytes.length > 0) {
-    response = solverType ? toCpSolverResponse(solverType, bytes) : await decodeSolverResponse(bytes);
-  }
+  const response = bytes.length > 0 ? toCpSolverResponse(responseType, bytes) : null;
   return { bytes, response };
 }
 
-async function validate(model: Uint8Array) {
-  const executor = cpSatExecutor;
+async function validate(
+  model: Uint8Array,
+  options: CpSatValidateOptions = {},
+) {
+  throwIfAborted(options.signal);
+  const executor = createCpSatExecutor(options.executor);
   const job = executor.execute({
-    case: 'validate',
-    value: create(CpSatValidateRequestSchema, { cpModelProto: model }),
+    type: 'validate',
+    model,
   }, { onEvent: ignoreCpSatProgress });
-  const response = await job.result;
-  if (response.payload.case !== 'validateResult') {
+  let abortError: unknown = null;
+  const abortValidation = () => {
+    if (!options.signal) return;
+    abortError = createAbortError(options.signal);
+    void job.cancel().catch(() => {});
+  };
+  options.signal?.addEventListener('abort', abortValidation, { once: true });
+  if (options.signal?.aborted) abortValidation();
+  let response;
+  try {
+    response = await job.result;
+    if (abortError) throw abortError;
+  } finally {
+    options.signal?.removeEventListener('abort', abortValidation);
+  }
+  if (response.type !== 'validate') {
     throw new Error('CP-SAT executor returned the wrong validate payload.');
   }
   return {
-    ok: response.payload.value.ok,
-    message: response.payload.value.message,
+    ok: response.ok,
+    message: response.message,
   };
 }
 
 export const CpSat: CpSatApi = {
   solve: (model, options = {}) => solve(model, options),
-  solveRaw: (model, options = {}) => solveRaw(model, options),
   validate,
   modelStats,
   getSchemas,
   createModel,
   loadModule,
-  setExecutor: (executor) => setCpSatExecutor(executor),
 };
 
 if (isBrowserMainThread) {

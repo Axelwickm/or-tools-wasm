@@ -190,7 +190,7 @@ async function solveModel() {
     const params = parseParams();
     setStatus('Solving...');
     const result = await CpSat.solve(modelBytes, {
-      solverParameters: params,
+      ...params,
       eventMask: selectedEventMask(),
       onEvent: appendEvent,
       signal: controller.signal,

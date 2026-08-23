@@ -1,5 +1,5 @@
 import * as RcpspApi from 'or-tools-wasm/rcpsp';
-import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
+import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {

@@ -3,14 +3,6 @@
 
 namespace operations_research::sat::wasm {
 
-inline constexpr const char kCpModelProtoSchema[] = R"ORTOOLS_PROTO(
-@CP_MODEL_PROTO_TEXT@
-)ORTOOLS_PROTO";
-
-inline constexpr const char kSatParametersProtoSchema[] = R"ORTOOLS_PROTO(
-@SAT_PARAMETERS_PROTO_TEXT@
-)ORTOOLS_PROTO";
-
 inline constexpr const char kLinearSolverProtoSchema[] = R"ORTOOLS_PROTO(
 @LINEAR_SOLVER_PROTO_TEXT@
 )ORTOOLS_PROTO";

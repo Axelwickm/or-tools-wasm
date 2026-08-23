@@ -34,7 +34,6 @@ export const routingBridgeCodec: SolverBridgeCodec<RoutingBridgeRequest, Routing
   decodeRequest: (payload) => fromBinary(RoutingBridgeRequestSchema, payload),
   encodeResult: (response) => toBinary(RoutingBridgeResponseSchema, response),
   decodeResult: (payload) => fromBinary(RoutingBridgeResponseSchema, payload),
-  defaultRequestedThreads: 1,
 };
 
 function numbers(values: readonly bigint[]) { return values.map(Number); }
@@ -91,7 +90,9 @@ export class RoutingExecutor implements RoutingExecutorLike {
     const createdAtMs = BigInt(Date.now());
     try {
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.STARTING, createdAtMs));
-      await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()), 1));
+      await options.onEvent(createSolverJobStatusEvent(
+        this.solver, requestId, SolverJobState.RUNNING, createdAtMs, BigInt(Date.now()),
+      ));
       const result = await solveRoutingNative(legacyRequest(request));
       const response = create(RoutingBridgeResponseSchema, result ? {
         hasSolution: true, status: result.status, objectiveValue: BigInt(result.objectiveValue),

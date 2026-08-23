@@ -9,6 +9,9 @@
   },
   "include": [
     "basic.test.ts",
+    "cloud_executor.test.ts",
+    "../../cases/**/*.ts",
+    "../../harness/**/*.ts",
     "../browser-basic-src/**/*.ts"
   ]
 }

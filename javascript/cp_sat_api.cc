@@ -1,21 +1,20 @@
 // Minimal C API surface for CP-SAT over WASM.
+#include <atomic>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <mutex>
 #include <string>
 #include <string_view>
 
-#include <emscripten/bind.h>
 #include <emscripten/em_asm.h>
 #include <emscripten/emscripten.h>
 
-#include "generated_proto_schemas.h"
 #include "ortools/sat/cp_model.h"
 #include "ortools/sat/cp_model_checker.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/model.h"
 #include "ortools/util/logging.h"
+#include "ortools/util/time_limit.h"
 
 namespace {
 
@@ -27,13 +26,22 @@ using operations_research::sat::NewFeasibleSolutionObserver;
 using operations_research::sat::NewSatParameters;
 using operations_research::sat::SatParameters;
 using operations_research::sat::SolveCpModel;
-using operations_research::sat::wasm::kCpModelProtoSchema;
-using operations_research::sat::wasm::kSatParametersProtoSchema;
-using operations_research::sat::StopSearch;
 
 constexpr int kSolutionCallbackFlag = 1 << 0;
 constexpr int kBestBoundCallbackFlag = 1 << 1;
 constexpr int kLogCallbackFlag = 1 << 2;
+
+std::atomic<bool> interrupt_requested = false;
+
+class ResetInterruptOnExit {
+ public:
+  ~ResetInterruptOnExit() { interrupt_requested.store(false); }
+};
+
+void RegisterInterrupt(Model* model) {
+  model->GetOrCreate<operations_research::TimeLimit>()
+      ->RegisterExternalBooleanAsLimit(&interrupt_requested);
+}
 
 enum class CallbackEventType : uint8_t {
   kSolution = 1,
@@ -142,10 +150,6 @@ const OriginCheckResult& CheckOriginAllowed() {
   return result;
 }
 
-// Track the in-flight model so we can interrupt it from JS.
-std::mutex g_active_model_mutex;
-Model* g_active_model = nullptr;
-
 uint8_t* SerializeResponse(const CpSolverResponse& response, size_t* out_len) {
   if (out_len == nullptr) return nullptr;
   std::string data;
@@ -206,22 +210,19 @@ std::string EncodeDouble(double value) {
 
 extern "C" {
 
+EMSCRIPTEN_KEEPALIVE uintptr_t cp_sat_interrupt_address() {
+  return reinterpret_cast<uintptr_t>(&interrupt_requested);
+}
+
 EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
     const uint8_t* model_data, size_t model_len, const uint8_t* params_data,
     size_t params_len, int callback_flags, int callback_id, size_t* out_len);
-
-EMSCRIPTEN_KEEPALIVE const char* get_cp_model_schema() {
-  return kCpModelProtoSchema;
-}
-
-EMSCRIPTEN_KEEPALIVE const char* get_sat_parameters_schema() {
-  return kSatParametersProtoSchema;
-}
 
 EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
     const uint8_t* model_data, size_t model_len, const uint8_t* params_data,
     size_t params_len, int callback_flags, int callback_id, size_t* out_len) {
   if (out_len == nullptr) return nullptr;
+  const ResetInterruptOnExit reset_interrupt;
   *out_len = 0;
 
   const OriginCheckResult& origin_check = CheckOriginAllowed();
@@ -244,6 +245,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
   }
   Model model;
   model.Add(NewSatParameters(sat_params));
+  RegisterInterrupt(&model);
   if ((callback_flags & kSolutionCallbackFlag) != 0) {
     model.Add(NewFeasibleSolutionObserver(
         [callback_id](const CpSolverResponse& response) {
@@ -266,17 +268,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
             });
   }
 
-  {
-    std::lock_guard<std::mutex> lock(g_active_model_mutex);
-    g_active_model = &model;
-  }
-
   const CpSolverResponse response = SolveCpModel(model_proto, &model);
-
-  {
-    std::lock_guard<std::mutex> lock(g_active_model_mutex);
-    g_active_model = nullptr;
-  }
   return SerializeResponse(response, out_len);
 }
 
@@ -288,6 +280,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model(const uint8_t* model_data,
                                           const uint8_t* params_data,
                                           size_t params_len, size_t* out_len) {
   if (out_len == nullptr) return nullptr;
+  const ResetInterruptOnExit reset_interrupt;
   *out_len = 0;
 
   const OriginCheckResult& origin_check = CheckOriginAllowed();
@@ -311,35 +304,15 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model(const uint8_t* model_data,
 
   Model model;
   model.Add(NewSatParameters(sat_params));
-
-  {
-    std::lock_guard<std::mutex> lock(g_active_model_mutex);
-    g_active_model = &model;
-  }
+  RegisterInterrupt(&model);
 
   const CpSolverResponse response = SolveCpModel(model_proto, &model);
-
-  {
-    std::lock_guard<std::mutex> lock(g_active_model_mutex);
-    if (g_active_model == &model) {
-      g_active_model = nullptr;
-    }
-  }
-
   return SerializeResponse(response, out_len);
 }
 
 // Free a buffer returned by solve_model() / validate_model().
 EMSCRIPTEN_KEEPALIVE void free_buffer(uint8_t* ptr) {
   std::free(ptr);
-}
-
-// Interrupt the currently running solve, if any.
-EMSCRIPTEN_KEEPALIVE void interrupt_solve() {
-  std::lock_guard<std::mutex> lock(g_active_model_mutex);
-  if (g_active_model != nullptr) {
-    StopSearch(g_active_model);
-  }
 }
 
 // Validate a CpModelProto. Returns nullptr if valid, otherwise a malloc()'d
@@ -369,15 +342,3 @@ EMSCRIPTEN_KEEPALIVE uint8_t* validate_model(const uint8_t* model_data,
 }
 
 }  // extern "C"
-
-namespace {
-
-std::string GetCpModelSchemaString() { return kCpModelProtoSchema; }
-std::string GetSatParametersSchemaString() { return kSatParametersProtoSchema; }
-
-}  // namespace
-
-EMSCRIPTEN_BINDINGS(cp_sat_api_bindings) {
-  emscripten::function("getCpModelSchema", &GetCpModelSchemaString);
-  emscripten::function("getSatParametersSchema", &GetSatParametersSchemaString);
-}

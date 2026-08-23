@@ -18,7 +18,19 @@ import { SolverFailureKind, SolverJobFailureSchema } from './generated/bridge/jo
 
 type SolverWorkerScope = {
   onmessage: ((event: MessageEvent<Uint8Array>) => void) | null;
-  postMessage(message: Uint8Array, transfer: Transferable[]): void;
+  postMessage(message: SolverWorkerMessage, transfer: Transferable[]): void;
+};
+
+export type SolverWorkerCancellationMessage = {
+  type: 'shared-cancellation';
+  memory: SharedArrayBuffer;
+  byteOffset: number;
+};
+
+export type SolverWorkerMessage = Uint8Array | SolverWorkerCancellationMessage;
+
+export type SolverWorkerOptions = {
+  cancellation?: () => Promise<Omit<SolverWorkerCancellationMessage, 'type'>>;
 };
 
 function isJobEvent(event: unknown): event is SolverJobEvent {
@@ -31,6 +43,7 @@ export function installSolverWorker<Request, Response, Event>(
   scope: SolverWorkerScope,
   executor: SolverExecutor<Request, Response, Event>,
   codec: SolverBridgeCodec<Request, Response, Event>,
+  options: SolverWorkerOptions = {},
 ): void {
   const jobs = new Map<number, SolverJob<Response>>();
   const post = (bytes: Uint8Array) => scope.postMessage(bytes, [bytes.buffer]);
@@ -55,7 +68,6 @@ export function installSolverWorker<Request, Response, Event>(
       }
 
       const job = executor.execute(codec.decodeRequest(outer.operation.value), {
-        requestedThreads: outer.settings?.requestedThreads ?? codec.defaultRequestedThreads ?? 0,
         onEvent: async (event) => {
           if (isJobEvent(event)) {
             if (event.type === 'status') {
@@ -93,5 +105,13 @@ export function installSolverWorker<Request, Response, Event>(
     }
   };
 
-  post(encodeSolverBridgeReady(codec.solver));
+  void (async () => {
+    if (options.cancellation) {
+      scope.postMessage({
+        type: 'shared-cancellation',
+        ...await options.cancellation(),
+      }, []);
+    }
+    post(encodeSolverBridgeReady(codec.solver));
+  })();
 }

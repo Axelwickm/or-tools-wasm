@@ -1,8 +1,8 @@
-import { SolverWorkerExecutor, type WorkerLike } from '../worker_helpers.js';
+import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
 import type { KnapsackBridgeRequest, KnapsackBridgeResponse } from '../generated/bridge/knapsack_pb.js';
 import { knapsackBridgeCodec, type KnapsackExecutorLike } from './executor.js';
 
-async function createKnapsackWorker(): Promise<WorkerLike<Uint8Array, Uint8Array>> {
+async function createKnapsackWorker(): Promise<SolverWorkerLike> {
   return new Worker(
     new URL('./worker.js', import.meta.url),
     { type: 'module', name: 'ortools-executor-knapsack' },

@@ -1,4 +1,5 @@
 import { create } from '@bufbuild/protobuf';
+import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
@@ -6,6 +7,7 @@ import {
   MpSolverSolveRequestSchema,
 } from '../generated/bridge/mp_solver_pb.js';
 import type { SolverJobEvent } from '../solver_executor.js';
+import { decodeProtobufWithExactLongs } from '../protobufjs_helpers.js';
 import { MpSolverExecutor, type MpSolverExecutorLike } from './executor.js';
 import { MpSolverServerExecutor } from './server_executor.js';
 import { MpSolverWorkerExecutor } from './worker_executor.js';
@@ -20,6 +22,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): M
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
     case 'server': return new MpSolverServerExecutor(configuration);
+    case 'cloud': return new CloudExecutor('mp-solver', { test: configuration.test });
   }
 }
 
@@ -140,13 +143,7 @@ async function encodeMPModel(model: MPSolverModelRequest): Promise<Uint8Array> {
 
 async function decodeMPSolutionResponse(bytes: Uint8Array): Promise<MPSolverSolutionResponse> {
   const type = await resolveMPSolutionResponseType();
-  return type.toObject(type.decode(bytes), {
-    enums: String,
-    longs: Number,
-    defaults: true,
-    arrays: true,
-    objects: true,
-  }) as MPSolverSolutionResponse;
+  return decodeProtobufWithExactLongs<MPSolverSolutionResponse>(type, bytes);
 }
 
 async function encodeMPSolutionResponse(response: MPSolverSolutionResponse): Promise<Uint8Array> {
@@ -171,7 +168,7 @@ async function solveModelRequestBytes(
   const numThreads = normalizedNumThreads(options) ?? 1;
   const job = executor.execute(
     { case: 'solve', value: create(MpSolverSolveRequestSchema, { requestProto: requestBytes, numThreads }) },
-    { requestedThreads: numThreads, onEvent: options.onEvent ?? (() => {}) },
+    { resources: { threads: numThreads }, onEvent: options.onEvent ?? (() => {}) },
   );
   const abort = () => { void job.cancel().catch(() => {}); };
   options.signal?.addEventListener('abort', abort, { once: true });

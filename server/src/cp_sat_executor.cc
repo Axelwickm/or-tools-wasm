@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "cp_sat.pb.h"
-#include "generated_proto_schemas.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_checker.h"
 #include "ortools/sat/cp_model_solver.h"
@@ -150,14 +149,6 @@ SolverExecutorResult Validate(const bridge::CpSatValidateRequest& request) {
   return Response(response);
 }
 
-SolverExecutorResult Schema() {
-  bridge::CpSatBridgeResponse response;
-  auto* result = response.mutable_schema_result();
-  result->set_cp_model_proto_schema(sat::wasm::kCpModelProtoSchema);
-  result->set_sat_parameters_proto_schema(sat::wasm::kSatParametersProtoSchema);
-  return Response(response);
-}
-
 }  // namespace
 
 std::string CpSatExecutor::solver() const { return "cp-sat"; }
@@ -176,7 +167,9 @@ int CpSatExecutor::RequestedThreads(const SolverExecutorRequest& request,
       !parameters.ParseFromString(cp_sat_request.solve().sat_parameters_proto())) {
     throw std::invalid_argument("Failed to parse SatParameters.");
   }
-  const int solver_threads = parameters.num_workers();
+  const int solver_threads = parameters.num_workers() > 0
+                                 ? parameters.num_workers()
+                                 : parameters.num_search_workers();
   if (client_requested_threads > 0 && solver_threads <= 0) {
     throw std::invalid_argument(
         "A finite thread request cannot be paired with CP-SAT automatic workers.");
@@ -206,8 +199,6 @@ SolverExecutorResult CpSatExecutor::Execute(const SolverExecutorRequest& request
       return Solve(cp_sat_request.solve(), context, emit_event);
     case bridge::CpSatBridgeRequest::kValidate:
       return Validate(cp_sat_request.validate());
-    case bridge::CpSatBridgeRequest::kSchema:
-      return Schema();
     default:
       return Error("Unsupported CP-SAT server request payload.");
   }

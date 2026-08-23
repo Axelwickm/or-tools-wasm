@@ -3,7 +3,7 @@ import {
   SolverBridgeRequestSchema,
   SolverBridgeResponseSchema,
   SolverCancelRequestSchema,
-  SolverExecutionSettingsSchema,
+  SolverResourceRequestSchema,
   SolverJobCancelledSchema,
   SolverWorkerReadySchema,
   type SolverBridgeRequest,
@@ -11,6 +11,7 @@ import {
   type SolverJobFailure,
   type SolverJobStatus,
 } from './generated/bridge/job_pb.js';
+import type { SolverResourceRequest } from './solver_executor.js';
 
 export type SolverBridgeCodec<Request, Response, Event> = {
   solver: string;
@@ -21,22 +22,21 @@ export type SolverBridgeCodec<Request, Response, Event> = {
   decodeResult(payload: Uint8Array): Response;
   encodeEvent?(event: Event): Uint8Array;
   decodeEvent?(payload: Uint8Array): Event | null;
-  defaultRequestedThreads?: number;
 };
 
 export type SolverBridgeRequestInput = {
   requestId: number;
   solver: string;
   payload: Uint8Array;
-  requestedThreads?: number;
+  resources?: SolverResourceRequest;
 };
 
 export function encodeSolverBridgeRequest(input: SolverBridgeRequestInput): Uint8Array {
   return toBinary(SolverBridgeRequestSchema, create(SolverBridgeRequestSchema, {
     requestId: input.requestId,
     solver: input.solver,
-    settings: create(SolverExecutionSettingsSchema, {
-      requestedThreads: input.requestedThreads ?? 0,
+    resources: create(SolverResourceRequestSchema, {
+      threads: input.resources?.threads ?? 0,
     }),
     operation: { case: 'executePayload', value: input.payload },
   }));
@@ -152,10 +152,6 @@ export function encodeSolverBridgeReady(solver: string): Uint8Array {
       value: create(SolverWorkerReadySchema),
     },
   }));
-}
-
-export function encodeSolverBridgeResponse(response: SolverBridgeResponse): Uint8Array {
-  return toBinary(SolverBridgeResponseSchema, response);
 }
 
 export function decodeSolverBridgeResponse(bytes: Uint8Array): SolverBridgeResponse {

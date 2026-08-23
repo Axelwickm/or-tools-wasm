@@ -269,8 +269,8 @@ HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
   SolverExecutorRequest executor_request{
       bridge_request.request_id(), bridge_request.solver(),
       bridge_request.execute_payload()};
-  const int client_requested = bridge_request.has_settings()
-                                   ? static_cast<int>(bridge_request.settings().requested_threads())
+  const int client_requested = bridge_request.has_resources()
+                                   ? static_cast<int>(bridge_request.resources().threads())
                                    : 0;
   int requested_threads = 0;
   try {

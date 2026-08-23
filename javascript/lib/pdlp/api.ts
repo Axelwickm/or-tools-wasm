@@ -1,4 +1,5 @@
 import { create, toBinary } from '@bufbuild/protobuf';
+import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
@@ -121,6 +122,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): P
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
     case 'server': return new PdlpServerExecutor(configuration);
+    case 'cloud': return new CloudExecutor('pdlp', { test: configuration.test });
   }
 }
 

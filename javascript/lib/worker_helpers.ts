@@ -1,17 +1,24 @@
 import {
   decodeSolverBridgeRequest,
   decodeSolverBridgeResponse,
-  encodeSolverBridgeCancelRequest,
   encodeSolverBridgeRequest,
   type SolverBridgeCodec,
 } from './solver_bridge.js';
 import {
   createSolverFailureEvent,
+  createSolverJobStatusEvent,
   SolverFailureKind,
+  SolverJobCancelledError,
+  SolverExecutorBusyError,
+  SolverJobState,
   type SolverExecutionOptions,
   type SolverExecutor,
   type SolverJob,
 } from './solver_executor.js';
+import type {
+  SolverWorkerCancellationMessage,
+  SolverWorkerMessage,
+} from './solver_worker.js';
 
 export type WorkerLike<Request, Response> = {
   postMessage(message: Request, transfer?: Transferable[]): void;
@@ -24,11 +31,19 @@ export type WorkerLike<Request, Response> = {
   on?(event: 'error', listener: (error: Error) => void): void;
 };
 
+export type SolverWorkerLike = WorkerLike<Uint8Array, SolverWorkerMessage>;
+
 type PendingRequest<Response> = {
   resolve(value: Response): void;
   reject(reason: unknown): void;
   onEvent?(value: Response): void | Promise<void>;
   eventChain: Promise<void>;
+};
+
+type WorkerJobState = {
+  cancelled: boolean;
+  createdAtMs: bigint;
+  error?: Error;
 };
 
 export type ManagedWorkerOptions<Request, Response> = {
@@ -40,12 +55,17 @@ export type ManagedWorkerOptions<Request, Response> = {
   isError?(message: Response): boolean;
   errorMessage?(message: Response): string;
   loadErrorMessage?(error: Error | ErrorEvent): string;
+  handleMessage?(message: Response): boolean;
 };
 
 export class ManagedWorker<Request, Response> {
   private worker: WorkerLike<Request, Response> | null = null;
+  private workerPromise: Promise<WorkerLike<Request, Response>> | null = null;
   private readyPromise: Promise<void> | null = null;
+  private rejectReady: ((reason: unknown) => void) | null = null;
   private readonly pendingRequests = new Map<number, PendingRequest<Response>>();
+  private generation = 0;
+  private terminationError: Error = new Error('Worker terminated.');
 
   constructor(private readonly options: ManagedWorkerOptions<Request, Response>) {}
 
@@ -54,10 +74,17 @@ export class ManagedWorker<Request, Response> {
     worker.unref?.();
   }
 
-  async post(request: Request, onEvent?: (value: Response) => void | Promise<void>, transfer?: Transferable[]): Promise<Response> {
-    const worker = await this.ensureReady();
+  async post(
+    request: Request,
+    onEvent?: (value: Response) => void | Promise<void>,
+    transfer?: Transferable[],
+    beforePost?: () => void,
+  ): Promise<Response> {
+    const generation = this.generation;
+    const worker = await this.ensureReady(generation);
     worker.ref?.();
     return new Promise<Response>((resolve, reject) => {
+      beforePost?.();
       this.pendingRequests.set(this.options.getRequestId(request), {
         resolve,
         reject,
@@ -68,35 +95,52 @@ export class ManagedWorker<Request, Response> {
     });
   }
 
-  terminate(reason?: string): void {
-    if (!this.worker) return;
-    this.worker.terminate();
+  terminate(reason?: string | Error): void {
+    const error = reason instanceof Error
+      ? reason
+      : new Error(reason ?? 'Worker terminated.');
+    this.generation++;
+    this.terminationError = error;
+    this.worker?.terminate();
     this.worker = null;
+    this.workerPromise = null;
+    this.rejectReady?.(error);
+    this.rejectReady = null;
     this.readyPromise = null;
-    const error = new Error(reason ?? 'Worker terminated.');
     for (const pending of this.pendingRequests.values()) {
       pending.reject(error);
     }
     this.pendingRequests.clear();
   }
 
-  private async ensureReady(): Promise<WorkerLike<Request, Response>> {
-    const worker = await this.ensureWorker();
+  private async ensureReady(generation = this.generation): Promise<WorkerLike<Request, Response>> {
+    const worker = await this.ensureWorker(generation);
     if (!this.readyPromise) {
       throw new Error('Worker ready state unavailable.');
     }
     await this.readyPromise;
+    if (generation !== this.generation) throw this.terminationError;
     return worker;
   }
 
-  private async ensureWorker(): Promise<WorkerLike<Request, Response>> {
+  private async ensureWorker(generation: number): Promise<WorkerLike<Request, Response>> {
+    if (generation !== this.generation) throw this.terminationError;
     if (this.worker) return this.worker;
 
-    const worker = await this.options.createWorker();
+    this.workerPromise ??= this.options.createWorker();
+    const worker = await this.workerPromise;
+    if (generation !== this.generation) {
+      worker.terminate();
+      throw this.terminationError;
+    }
     this.worker = worker;
+    this.workerPromise = null;
     this.readyPromise = new Promise<void>((resolve, reject) => {
+      this.rejectReady = reject;
       const handleMessage = (message: Response) => {
+        if (this.options.handleMessage?.(message)) return;
         if (this.options.isReady?.(message)) {
+          this.rejectReady = null;
           resolve();
           return;
         }
@@ -150,6 +194,7 @@ export class ManagedWorker<Request, Response> {
         const message = this.options.loadErrorMessage?.(errorLike)
           ?? defaultLoadErrorMessage(errorLike);
         const error = new Error(message);
+        this.rejectReady = null;
         reject(error);
         this.terminate(error.message);
       };
@@ -161,7 +206,10 @@ export class ManagedWorker<Request, Response> {
         worker.onmessage = (event: MessageEvent<Response>) => handleMessage(event.data);
         worker.onerror = handleError;
       }
-      if (!this.options.isReady) resolve();
+      if (!this.options.isReady) {
+        this.rejectReady = null;
+        resolve();
+      }
     });
 
     return worker;
@@ -181,24 +229,36 @@ export class SolverWorkerExecutor<Request, Response, Event>
 implements SolverExecutor<Request, Response, Event> {
   readonly solver: string;
   private nextRequestId = 1;
-  private readonly worker: ManagedWorker<Uint8Array, Uint8Array>;
+  private readonly worker: ManagedWorker<Uint8Array, SolverWorkerMessage>;
+  private activeJob: WorkerJobState | null = null;
+  private cancellation: SolverWorkerCancellationMessage | null = null;
 
   constructor(
     private readonly codec: SolverBridgeCodec<Request, Response, Event>,
-    createWorker: () => Promise<WorkerLike<Uint8Array, Uint8Array>>,
+    createWorker: () => Promise<SolverWorkerLike>,
+    private readonly supportsSharedCancellation = false,
   ) {
     this.solver = codec.solver;
     this.worker = new ManagedWorker({
       createWorker,
       isReady: (bytes) => {
+        if (!(bytes instanceof Uint8Array)) return false;
         const response = decodeSolverBridgeResponse(bytes);
         return response.solver === this.solver && response.payload.case === 'ready';
       },
       getRequestId: (bytes) => decodeSolverBridgeRequest(bytes).requestId,
-      getResponseId: (bytes) => decodeSolverBridgeResponse(bytes).requestId,
+      getResponseId: (bytes) => bytes instanceof Uint8Array
+        ? decodeSolverBridgeResponse(bytes).requestId
+        : undefined,
       isEvent: (bytes) => {
+        if (!(bytes instanceof Uint8Array)) return false;
         const payload = decodeSolverBridgeResponse(bytes).payload.case;
         return payload === 'eventPayload' || payload === 'status';
+      },
+      handleMessage: (message) => {
+        if (message instanceof Uint8Array) return false;
+        this.cancellation = message;
+        return true;
       },
       loadErrorMessage: (error) =>
         defaultLoadErrorMessage(error).replace('Worker', `${codec.label} worker`),
@@ -206,11 +266,19 @@ implements SolverExecutor<Request, Response, Event> {
   }
 
   execute(request: Request, options: SolverExecutionOptions<Event>): SolverJob<Response> {
+    if (this.activeJob) throw new SolverExecutorBusyError(this.codec.label);
     const requestId = this.nextRequestId++;
+    const state: WorkerJobState = {
+      cancelled: false,
+      createdAtMs: BigInt(Date.now()),
+    };
+    this.activeJob = state;
     return {
       requestId,
-      result: this.run(requestId, request, options),
-      cancel: () => this.cancel(requestId, options),
+      result: this.run(requestId, request, options, state).finally(() => {
+        if (this.activeJob === state) this.activeJob = null;
+      }),
+      cancel: () => this.cancel(requestId, options, state),
     };
   }
 
@@ -226,16 +294,17 @@ implements SolverExecutor<Request, Response, Event> {
     requestId: number,
     request: Request,
     options: SolverExecutionOptions<Event>,
+    state: WorkerJobState,
   ): Promise<Response> {
     const bytes = encodeSolverBridgeRequest({
       requestId,
       solver: this.solver,
       payload: this.codec.encodeRequest(request),
-      requestedThreads: options.requestedThreads ?? this.codec.defaultRequestedThreads ?? 0,
     });
     let failureHandled = false;
     try {
       const resultBytes = await this.worker.post(bytes, async (eventBytes) => {
+        if (!(eventBytes instanceof Uint8Array)) return;
         const outer = decodeSolverBridgeResponse(eventBytes);
         if (outer.payload.case === 'status') {
           await options.onEvent({ type: 'status', status: outer.payload.value });
@@ -243,7 +312,20 @@ implements SolverExecutor<Request, Response, Event> {
           const event = this.codec.decodeEvent?.(outer.payload.value);
           if (event !== null && event !== undefined) await options.onEvent(event);
         }
-      }, [bytes.buffer]);
+      }, [bytes.buffer], () => {
+        if (this.cancellation) {
+          Atomics.store(
+            new Uint8Array(this.cancellation.memory),
+            this.cancellation.byteOffset,
+            0,
+          );
+        }
+        if (state.cancelled) throw state.error;
+      });
+      if (!(resultBytes instanceof Uint8Array)) {
+        throw new Error(`${this.codec.label} worker returned an invalid message.`);
+      }
+      if (state.cancelled) throw state.error;
       const outer = decodeSolverBridgeResponse(resultBytes);
       if (outer.payload.case === 'failure') {
         failureHandled = true;
@@ -259,6 +341,15 @@ implements SolverExecutor<Request, Response, Event> {
       }
       return this.codec.decodeResult(outer.payload.value);
     } catch (error) {
+      if (state.cancelled) {
+        await options.onEvent(createSolverJobStatusEvent(
+          this.solver,
+          requestId,
+          SolverJobState.CANCELLED,
+          state.createdAtMs,
+        ));
+        throw state.error ?? error;
+      }
       if (!failureHandled) {
         await options.onEvent(createSolverFailureEvent(
           this.solver,
@@ -276,29 +367,29 @@ implements SolverExecutor<Request, Response, Event> {
   private async cancel(
     targetRequestId: number,
     options: SolverExecutionOptions<Event>,
+    state: WorkerJobState,
   ): Promise<void> {
-    const requestId = this.nextRequestId++;
-    const bytes = encodeSolverBridgeCancelRequest(requestId, this.solver, targetRequestId);
-    try {
-      const responseBytes = await this.worker.post(bytes, undefined, [bytes.buffer]);
-      const response = decodeSolverBridgeResponse(responseBytes);
-      if (response.payload.case === 'failure') {
-        throw new Error(response.payload.value.message);
-      }
-      if (response.payload.case !== 'cancelled' ||
-          response.payload.value.targetRequestId !== targetRequestId) {
-        throw new Error(`${this.codec.label} worker returned an invalid cancellation acknowledgement.`);
-      }
-    } catch (error) {
-      await options.onEvent(createSolverFailureEvent(
-        this.solver,
-        requestId,
-        error instanceof Error ? error.message : String(error),
-        SolverFailureKind.WORKER_CRASH,
-        error instanceof Error ? error.stack ?? '' : '',
-        true,
-      ));
-      throw error;
+    if (this.activeJob !== state || state.cancelled) return;
+    state.cancelled = true;
+    state.error = new SolverJobCancelledError(this.codec.label, targetRequestId);
+    await options.onEvent(createSolverJobStatusEvent(
+      this.solver,
+      targetRequestId,
+      SolverJobState.CANCELLING,
+      state.createdAtMs,
+    ));
+    if (!this.supportsSharedCancellation) {
+      this.worker.terminate(state.error);
+      return;
     }
+    await this.worker.load();
+    if (!this.cancellation) {
+      throw new Error(`${this.codec.label} worker did not provide a cancellation signal.`);
+    }
+    Atomics.store(
+      new Uint8Array(this.cancellation.memory),
+      this.cancellation.byteOffset,
+      1,
+    );
   }
 }

@@ -1,54 +1,36 @@
-import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
+import {
+  CpSat,
+  type CpModelProto,
+  type CpSatModelInstance,
+} from 'or-tools-wasm/cp-sat';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
-
-type MagicSquareExpr = {
-  vars: number[];
-  coeffs: number[];
-  offset: number;
-};
-
-type MagicSquareModel = {
-  name: string;
-  variables: Array<{ name: string; domain: number[] }>;
-  constraints: Array<
-    | { name: string; all_diff: { exprs: MagicSquareExpr[] } }
-    | {
-      name: string;
-      linear: { vars: number[]; coeffs: number[]; domain: number[] };
-    }
-  >;
-};
 
 const statusEl = document.getElementById('status') as HTMLPreElement | null;
 const solutionGrid = document.getElementById('solution-grid') as HTMLElement | null;
 const sizeInput = document.getElementById('size') as HTMLInputElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const maxWorkerCount = getMaxWorkerCount();
 const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
+const maxWorkerCount = getMaxWorkerCount();
+const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
+
+let activeSolve: AbortController | null = null;
 
 if (workerInput) {
   workerInput.max = String(maxWorkerCount);
   workerInput.min = '1';
   workerInput.value = String(maxWorkerCount);
 }
-configureSolverExecutorSelector(CpSat, executorSelector);
 
 function append(text: string) {
-  if (statusEl) {
-    statusEl.textContent += `${text}\n`;
-  }
+  if (statusEl) statusEl.textContent += `${text}\n`;
 }
 
 function setRunning(running: boolean) {
-  if (runButton) {
-    runButton.disabled = running;
-  }
-  if (stopButton) {
-    stopButton.disabled = !running;
-  }
+  if (runButton) runButton.disabled = running;
+  if (stopButton) stopButton.disabled = !running;
 }
 
 function showSolutionMessage(message: string) {
@@ -59,60 +41,37 @@ function showSolutionMessage(message: string) {
 
 function renderSolution(size: number, values: Array<number | string>) {
   if (!solutionGrid) return;
-  if (!values.length) {
-    showSolutionMessage('Solver returned no solution.');
-    return;
-  }
-
-  const normalize = (value: number | string) => {
-    if (typeof value === 'number') return value;
-    const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
-
-  const parsedValues = values.map(normalize);
   solutionGrid.innerHTML = '';
   solutionGrid.style.gridTemplateColumns = `repeat(${size}, minmax(2.5rem, auto))`;
-  for (let r = 0; r < size; ++r) {
-    for (let c = 0; c < size; ++c) {
-      const idx = r * size + c;
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-      cell.textContent = String(parsedValues[idx] ?? '?');
-      solutionGrid.appendChild(cell);
-    }
+  for (const value of values) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.textContent = String(value);
+    solutionGrid.appendChild(cell);
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function buildMagicSquareModel(size: number): MagicSquareModel {
+function buildMagicSquareModel(size: number): CpModelProto {
   const numCells = size * size;
-  const variables: MagicSquareModel['variables'] = [];
-  const domain: [number, number] = [1, numCells];
-  for (let r = 0; r < size; ++r) {
-    for (let c = 0; c < size; ++c) {
-      variables.push({
-        name: `cell_${r}_${c}`,
-        domain: [...domain],
-      });
-    }
-  }
-
-  const constraints: MagicSquareModel['constraints'] = [];
-  const allDiffExprs: MagicSquareExpr[] = [];
-  for (let i = 0; i < numCells; ++i) {
-    allDiffExprs.push({ vars: [i], coeffs: [1], offset: 0 });
-  }
-  constraints.push({
+  const variables: NonNullable<CpModelProto['variables']> = Array.from(
+    { length: numCells },
+    (_, index) => ({
+      name: `cell_${Math.floor(index / size)}_${index % size}`,
+      domain: [1, numCells],
+    }),
+  );
+  const constraints: NonNullable<CpModelProto['constraints']> = [{
     name: 'all_diff',
-    all_diff: { exprs: allDiffExprs },
-  });
-
-  const target = (size * (size * size + 1)) / 2;
-  const addLinearConstraint = (name: string, vars: number[]) => {
+    allDiff: {
+      exprs: Array.from({ length: numCells }, (_, index) => ({
+        vars: [index],
+        coeffs: [1],
+        offset: 0,
+      })),
+    },
+  }];
+  const target = (size * (numCells + 1)) / 2;
+  const addSum = (name: string, vars: number[]) => {
     constraints.push({
       name,
       linear: {
@@ -123,115 +82,94 @@ function buildMagicSquareModel(size: number): MagicSquareModel {
     });
   };
 
-  for (let r = 0; r < size; ++r) {
-    const vars: number[] = [];
-    for (let c = 0; c < size; ++c) {
-      vars.push(r * size + c);
-    }
-    addLinearConstraint(`row_${r}`, vars);
+  for (let row = 0; row < size; row += 1) {
+    addSum(`row_${row}`, Array.from(
+      { length: size },
+      (_, column) => row * size + column,
+    ));
   }
-
-  for (let c = 0; c < size; ++c) {
-    const vars: number[] = [];
-    for (let r = 0; r < size; ++r) {
-      vars.push(r * size + c);
-    }
-    addLinearConstraint(`col_${c}`, vars);
+  for (let column = 0; column < size; column += 1) {
+    addSum(`col_${column}`, Array.from(
+      { length: size },
+      (_, row) => row * size + column,
+    ));
   }
-
-  const diagMain: number[] = [];
-  const diagAnti: number[] = [];
-  for (let i = 0; i < size; ++i) {
-    diagMain.push(i * size + i);
-    diagAnti.push(i * size + (size - 1 - i));
-  }
-  addLinearConstraint('diag_main', diagMain);
-  addLinearConstraint('diag_anti', diagAnti);
-
-  return {
-    name: `magic_square_${size}`,
-    variables,
-    constraints,
-  };
+  addSum('diag_main', Array.from(
+    { length: size },
+    (_, index) => index * size + index,
+  ));
+  addSum('diag_anti', Array.from(
+    { length: size },
+    (_, index) => index * size + size - index - 1,
+  ));
+  return { name: `magic_square_${size}`, variables, constraints };
 }
 
 async function runMagicSquare() {
-  if (!sizeInput || !workerInput) {
-    append('Missing configuration inputs.');
-    return;
-  }
+  if (!sizeInput || !workerInput || activeSolve) return;
 
+  const size = Math.max(1, Number.parseInt(sizeInput.value, 10) || 1);
+  const requestedWorkers = Number.parseInt(workerInput.value, 10) || 1;
+  const numWorkers = Math.min(Math.max(1, requestedWorkers), maxWorkerCount);
+  workerInput.value = String(numWorkers);
+  const controller = new AbortController();
+  activeSolve = controller;
   setRunning(true);
-  try {
-    const size = Math.max(1, Number.parseInt(sizeInput.value, 10) || 1);
-    const requestedWorkers = Number.parseInt(workerInput.value, 10) || 1;
-    const workers = Math.min(Math.max(1, requestedWorkers), maxWorkerCount);
-    workerInput.value = String(workers);
-    append(`Building model (size=${size})…`);
-    showSolutionMessage('Solving…');
+  if (statusEl) statusEl.textContent = '';
+  append(`Building raw model proto (size=${size})…`);
+  showSolutionMessage('Solving…');
 
-    let model: CpSatModelInstance;
-    try {
-      model = await CpSat.createModel(buildMagicSquareModel(size));
-    } catch (err) {
-      append(`Model build failed: ${(err as Error).message}`);
-      return;
-    }
+  try {
+    const model: CpSatModelInstance = await CpSat.createModel(buildMagicSquareModel(size));
 
     const validation = await CpSat.validate(model);
     if (!validation.ok) {
       append(`Model invalid: ${validation.message}`);
+      showSolutionMessage('Model invalid.');
       return;
     }
 
-    const params: SatParameters = {
+    append(`Solving with ${numWorkers} worker${numWorkers === 1 ? '' : 's'}…`);
+    const result = await CpSat.solve(model, {
+      executor: selectedExecutor(),
+      numWorkers,
       logSearchProgress: true,
-    };
-    if (workers > 0) {
-      params.numWorkers = workers;
+      signal: controller.signal,
+    });
+    const response = result.response;
+    if (!response) {
+      append('Solver returned no response.');
+      showSolutionMessage('Solver returned no response.');
+      return;
     }
-    console.debug(
-      '[MagicSquare] solve params',
-      JSON.stringify({ ...params, numWorkers: params.numWorkers ?? 'default' }),
-    );
-
-    append('Solving…');
-    try {
-      const result = await CpSat.solve(model, { solverParameters: params });
-      const response = result.response;
-      if (!response || !statusEl) {
-        append('Solver returned no response.');
-        showSolutionMessage('Solver returned no response.');
-        return;
-      }
-      statusEl.textContent = JSON.stringify(response, null, 2);
-
-      if (!isRecord(response) || !Array.isArray(response.solution)) {
-        showSolutionMessage('No solution entries returned.');
-        return;
-      }
-      renderSolution(size, response.solution as Array<number | string>);
-    } catch (err) {
-      append(`Solve failed: ${(err as Error).message}`);
+    if (statusEl) statusEl.textContent += `${JSON.stringify(response, null, 2)}\n`;
+    if (!Array.isArray(response.solution)) {
+      showSolutionMessage('No solution entries returned.');
+      return;
+    }
+    renderSolution(size, response.solution as Array<number | string>);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      append('Solve cancelled.');
+      showSolutionMessage('Solve cancelled.');
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      append(`Solve failed: ${message}`);
       showSolutionMessage('Solve failed.');
     }
   } finally {
+    if (activeSolve === controller) activeSolve = null;
     setRunning(false);
   }
 }
 
-if (runButton) {
-  runButton.addEventListener('click', () => {
-    void runMagicSquare();
-  });
-}
+runButton?.addEventListener('click', () => {
+  void runMagicSquare();
+});
 
 if (stopButton) {
   stopButton.disabled = true;
   stopButton.addEventListener('click', () => {
-    append('Cancellation requested.');
-    void CpSat.cancelSolve().catch((err) => {
-      append(`Cancellation failed: ${(err as Error).message}`);
-    });
+    activeSolve?.abort('Cancelled by the user.');
   });
 }

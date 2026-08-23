@@ -401,7 +401,7 @@ const validation = await CpSat.validate(modelBytes);
 if (!validation.ok) throw new Error(validation.message);
 
 const result = await CpSat.solve(modelBytes, {
-  numSearchWorkers: 4,
+  numWorkers: 4,
   logSearchProgress: true,
 });
 ```
@@ -418,30 +418,16 @@ uses the generated TypeScript `CpModelProto` shape from OR-Tools.
 Runs native CP-SAT model validation. `ok` is `false` when OR-Tools rejects the
 model; `message` contains the native validation message.
 
-`CpSat.solve(model: Uint8Array, params?: Uint8Array | SatParameters | null, callbacks?: CpSatSolveCallbacks): Promise<CpSatSolveResult>`
+`CpSat.solve(model: Uint8Array, options?: CpSatSolveOptions): Promise<CpSatSolveResult>`
 
-Solves a binary `CpModelProto`. `params` can be binary `SatParameters`, a
-JSON-like `SatParameters` object, or `null`. The returned `CpSatSolveResult`
-contains:
+Solves a binary `CpModelProto`. Solver parameters and execution options share
+one options object. The returned `CpSatSolveResult` contains:
 
 - `response`: decoded `CpSolverResponse | null`
 - `bytes`: raw binary `CpSolverResponse`
 
-`callbacks` may contain:
-
-- `onSolution(response, bytes)`: called for intermediate solutions when enabled
-  by compatible solver parameters.
-- `onBestBound(bound)`: called on best-bound updates.
-- `onLog(message)`: called for solver log output.
-
-`CpSat.solveRaw(model: Uint8Array, params?: Uint8Array | null): Promise<Uint8Array>`
-
-Low-level solve that returns raw `CpSolverResponse` bytes and accepts only raw
-parameter bytes.
-
-`CpSat.cancelSolve(): Promise<void>`
-
-Requests cancellation of the active CP-SAT solve.
+`options.onEvent` receives enabled solution, best-bound, log, status, and
+failure events. Pass an `AbortSignal` as `options.signal` to cancel a solve.
 
 `CpSat.getSchemas(): Promise<{ cp_model: string; sat_parameters: string; linear_solver?: string; optional_boolean?: string }>`
 

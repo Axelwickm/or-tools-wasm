@@ -1,2 +1,1 @@
-export const packageName = 'or-tools-wasm';
-export const version = '0.9.1';
+export { packageName, version } from './package_metadata.js';

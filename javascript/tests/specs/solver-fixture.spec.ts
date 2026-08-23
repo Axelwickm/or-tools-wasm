@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import browserFixtureGroups from '../../../tests/harness/browser_groups.ts';
 
 type WorkerStats = {
   total?: number;
@@ -10,6 +11,11 @@ type WorkerStats = {
 
 test('runs the shared solver fixture cases across executor modes', async ({ page }) => {
   const includeServer = process.env.ORTOOLS_TEST_SERVER === '1';
+  const requestedGroup = process.env.FIXTURE_CASE_GROUP;
+  const groups = requestedGroup
+    ? browserFixtureGroups.filter((group) => group === requestedGroup)
+    : browserFixtureGroups;
+  if (groups.length === 0) throw new Error(`Unknown fixture case group: ${requestedGroup}`);
   const browserErrors: string[] = [];
   let serverStreamRequests = 0;
   let failOnPageError: (error: Error) => void = () => {};
@@ -40,34 +46,44 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     }
   });
 
-  await page.goto(includeServer ? '/?server=1' : '/');
-
   const status = page.locator('#status');
-  try {
-    await Promise.race([
-      page.waitForFunction(() => {
-        const text = document.getElementById('status')?.textContent;
-        if (!text || text === 'pending') return false;
-        const status = JSON.parse(text) as { ok?: boolean };
-        return status.ok === true;
-      }),
-      pageErrorPromise,
-    ]);
-  } catch (error) {
-    const statusText = await page
-      .locator('#status')
-      .evaluate((element) => element.textContent)
-      .catch(() => '<missing #status>');
-    throw new Error(
-      [
-        error instanceof Error ? error.message : String(error),
-        `Current #status: ${statusText}`,
-        ...browserErrors,
-      ].join('\n\n'),
-    );
+  const groupStatuses: unknown[] = [];
+  for (const group of groups) {
+    const search = new URLSearchParams({ group });
+    if (includeServer) search.set('server', '1');
+    await page.goto(`/?${search}`);
+
+    try {
+      await Promise.race([
+        page.waitForFunction(() => {
+          const text = document.getElementById('status')?.textContent;
+          if (!text || text === 'pending') return false;
+          const status = JSON.parse(text) as { ok?: boolean };
+          return status.ok === true;
+        }),
+        pageErrorPromise,
+      ]);
+    } catch (error) {
+      const statusText = await status
+        .evaluate((element) => element.textContent)
+        .catch(() => '<missing #status>');
+      throw new Error(
+        [
+          error instanceof Error ? error.message : String(error),
+          `Fixture group: ${group}`,
+          `Current #status: ${statusText}`,
+          ...browserErrors,
+        ].join('\n\n'),
+      );
+    }
+    groupStatuses.push(JSON.parse(await status.textContent() ?? '{}'));
   }
 
-  const parsedStatus = JSON.parse(await status.textContent() ?? '{}') as {
+  const parsedStatus = Object.assign({}, ...groupStatuses) as {
+    cloudExecutorResult?: {
+      id?: string;
+      ok?: boolean;
+    };
     results?: Array<{
       mode?: string;
       workerProfile?: string;
@@ -91,6 +107,12 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       statusStates?: number[];
       responseBytesLength?: number;
     }>;
+    cpSatWorkerLifecycleResult?: {
+      id?: string;
+      ok?: boolean;
+    };
+    cpSatWorkerLifecycleStatsBefore?: WorkerStats;
+    cpSatWorkerLifecycleStatsAfter?: WorkerStats;
     cpSatSolverStructureWorkerStatsBefore?: WorkerStats;
     cpSatSolverStructureWorkerStatsAfter?: WorkerStats;
     cpSatSubsolverResults?: Array<{
@@ -187,6 +209,25 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     expect(results?.every((result) => typeof result.id === 'string' && result.id.length > 0), `${label} stable case IDs`).toBe(true);
     expect(results?.every((result) => result.ok === true), `${label} ok results`).toBe(true);
   };
+  if (requestedGroup) {
+    if (requestedGroup === 'cp-sat-worker-lifecycle') {
+      expect(parsedStatus.cpSatWorkerLifecycleResult).toEqual(expect.objectContaining({
+        id: 'cp_sat.worker.lifecycle',
+        ok: true,
+      }));
+      expect(parsedStatus.cpSatWorkerLifecycleStatsAfter?.executorWorkers?.['cp-sat']).toBeGreaterThan(
+        parsedStatus.cpSatWorkerLifecycleStatsBefore?.executorWorkers?.['cp-sat'] ?? 0,
+      );
+      expect(parsedStatus.cpSatWorkerLifecycleStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBe(
+        (parsedStatus.cpSatWorkerLifecycleStatsBefore?.activeExecutorWorkers?.['cp-sat'] ?? 0) + 1,
+      );
+    }
+    return;
+  }
+  expect(parsedStatus.cloudExecutorResult).toEqual(expect.objectContaining({
+    id: 'cloud/status',
+    ok: true,
+  }));
   if (includeServer) expect(serverStreamRequests, 'native server SSE requests').toBeGreaterThan(0);
   const expectedHighLevelCpSatProfiles = [
     'direct/1 worker/1',
@@ -201,6 +242,16 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     params?: Record<string, unknown>;
   }) => `${result.mode}/${result.workerProfile}/${String(result.params?.numWorkers)}`;
   expectStableCaseIds(parsedStatus.cpSatSolverStructureResults, 'CP-SAT solver structure');
+  expect(parsedStatus.cpSatWorkerLifecycleResult).toEqual(expect.objectContaining({
+    id: 'cp_sat.worker.lifecycle',
+    ok: true,
+  }));
+  expect(parsedStatus.cpSatWorkerLifecycleStatsAfter?.executorWorkers?.['cp-sat']).toBeGreaterThan(
+    parsedStatus.cpSatWorkerLifecycleStatsBefore?.executorWorkers?.['cp-sat'] ?? 0,
+  );
+  expect(parsedStatus.cpSatWorkerLifecycleStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBe(
+    (parsedStatus.cpSatWorkerLifecycleStatsBefore?.activeExecutorWorkers?.['cp-sat'] ?? 0) + 1,
+  );
   expectStableCaseIds(parsedStatus.cpSatSubsolverResults, 'CP-SAT subsolver selection');
   expect(parsedStatus.cpSatSubsolverResults).toHaveLength(includeServer ? 6 : 4);
   expect(parsedStatus.cpSatSubsolverResults).toEqual(expect.arrayContaining([
@@ -256,9 +307,7 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
         'getSchemas',
         'loadModule',
         'modelStats',
-        'setExecutor',
         'solve',
-        'solveRaw',
         'validate',
       ]),
       ok: true,

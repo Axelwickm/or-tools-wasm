@@ -45,7 +45,7 @@ if (!validation.ok) throw new Error(validation.message);
 
 const controller = new AbortController();
 const result = await CpSat.solve(model, {
-  solverParameters: params,
+  ...params,
   eventMask: { solution: true, bestBound: true, log: true },
   onEvent: (event) => console.log(event),
   signal: controller.signal,

@@ -195,8 +195,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   add_custom_command(
     OUTPUT "${PROTO_SCHEMA_HEADER}"
     COMMAND "${CMAKE_COMMAND}"
-            -DCP_MODEL_PROTO="${PROJECT_SOURCE_DIR}/ortools/sat/cp_model.proto"
-            -DSAT_PARAMETERS_PROTO="${PROJECT_SOURCE_DIR}/ortools/sat/sat_parameters.proto"
             -DLINEAR_SOLVER_PROTO="${PROJECT_SOURCE_DIR}/ortools/linear_solver/linear_solver.proto"
             -DOPTIONAL_BOOLEAN_PROTO="${PROJECT_SOURCE_DIR}/ortools/util/optional_boolean.proto"
             -DTEMPLATE_FILE="${PROJECT_SOURCE_DIR}/javascript/generated_proto_schemas.h.in"
@@ -205,8 +203,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     DEPENDS
       "${PROJECT_SOURCE_DIR}/scripts/embed_proto.cmake"
       "${PROJECT_SOURCE_DIR}/javascript/generated_proto_schemas.h.in"
-      "${PROJECT_SOURCE_DIR}/ortools/sat/cp_model.proto"
-      "${PROJECT_SOURCE_DIR}/ortools/sat/sat_parameters.proto"
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/linear_solver.proto"
       "${PROJECT_SOURCE_DIR}/ortools/util/optional_boolean.proto")
   add_custom_target(generate_proto_schemas
@@ -471,6 +467,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       CP_SAT_NODE_LINK_OPTIONS
       CP_SAT_ASYNCIFY_LINK_OPTIONS
       ${${RUNTIME_SOURCES}})
+
+    if(RUNTIME_NAME STREQUAL "cp_sat_runtime")
+      foreach(CP_SAT_TARGET
+          ${RUNTIME_NAME}
+          ${RUNTIME_NAME}_asyncify
+          ${RUNTIME_NAME}_node
+          ${RUNTIME_NAME}_node_asyncify)
+        target_link_options(${CP_SAT_TARGET} PRIVATE
+          "-sEXPORTED_FUNCTIONS=['_malloc','_free','_cp_sat_interrupt_address']")
+      endforeach()
+    endif()
 
     list(APPEND ORTOOLS_WASM_RUNTIME_TARGETS
       ${RUNTIME_NAME}

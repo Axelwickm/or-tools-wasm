@@ -4,7 +4,7 @@ import {
   setExecutor,
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/pdlp';
-import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
+import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {

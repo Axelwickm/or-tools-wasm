@@ -48,15 +48,13 @@ function externalSharedRuntimePlugin(name, sharedImportPrefix) {
         };
       });
       buildContext.onLoad(
-        { filter: /worker_executor\.ts$/ },
+        { filter: /\.ts$/ },
         async (args) => {
           const source = await readFile(args.path, 'utf8');
+          if (!source.includes('new Worker(')) return null;
           const nodeSource = source
             .replaceAll('new Worker(', 'new NodeWorker(')
             .replaceAll("{ type: 'module', name:", '{ execArgv: [], name:');
-          if (nodeSource === source) {
-            throw new Error(`Expected a browser Worker constructor in ${args.path}`);
-          }
           return {
             loader: 'ts',
             contents: `import { Worker as NodeWorker } from 'node:worker_threads';

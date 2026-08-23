@@ -142,6 +142,10 @@ for (const webRuntimePath of webRuntimePaths) {
     runtime = runtime.replaceAll(from, to);
   }
   runtime = runtime.replace(/(?:worker\.unref\?\.\(\);)+worker\.workerID/g, 'worker.unref?.();worker.workerID');
+  runtime = runtime.replace(
+    /(?:Module\["PThread"\]=PThread;)+PThread\.init\(\);FS\.createPreloadedFile=FS_createPreloadedFile;/g,
+    'Module["PThread"]=PThread;PThread.init();FS.createPreloadedFile=FS_createPreloadedFile;',
+  );
   runtime = patchJspiAsyncCtors(runtime);
   runtime = patchJspiInvokeTableEntries(runtime);
 
@@ -159,6 +163,8 @@ function patchJspiAsyncCtors(runtime) {
   const asyncInitRuntime =
     'async function initRuntime(){assert(!runtimeInitialized);runtimeInitialized=true;if(ENVIRONMENT_IS_PTHREAD)return startWorker();checkStackCookie();if(!Module["noFSInit"]&&!FS.initialized)FS.init();TTY.init();await wasmExports["__wasm_call_ctors"]();FS.ignorePermissions=false}';
 
+  if (runtime.includes(asyncInitRuntime)) return runtime;
+
   return runtime
     .replace(initRuntime, asyncInitRuntime)
     .replaceAll('initRuntime();readyPromiseResolve?.(Module);', 'await initRuntime();readyPromiseResolve?.(Module);');
@@ -166,6 +172,7 @@ function patchJspiAsyncCtors(runtime) {
 
 function patchJspiInvokeTableEntries(runtime) {
   if (!runtime.includes('WebAssembly.promising')) return runtime;
+  if (runtime.includes('var wasmTablePromisingMirror=[];')) return runtime;
 
   const tableEntryHelper =
     'var wasmTableMirror=[];var getWasmTableEntry=funcPtr=>{var func=wasmTableMirror[funcPtr];if(!func){wasmTableMirror[funcPtr]=func=wasmTable.get(funcPtr);if(Asyncify.isAsyncExport(func)){wasmTableMirror[funcPtr]=func=Asyncify.makeAsyncFunction(func)}}return func};';

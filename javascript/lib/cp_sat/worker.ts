@@ -1,10 +1,14 @@
 /// <reference lib="webworker" />
 
 import { installSolverWorker } from '../solver_worker.js';
-import { CpSatExecutor, cpSatBridgeCodec } from './executor.js';
+import { cpSatProtocol } from './protocol.js';
+import { DirectCpSatExecutor } from './direct_executor.js';
+
+const executor = new DirectCpSatExecutor();
 
 installSolverWorker(
   self as DedicatedWorkerGlobalScope,
-  new CpSatExecutor(),
-  cpSatBridgeCodec,
+  executor,
+  cpSatProtocol,
+  { cancellation: () => executor.workerCancellation() },
 );

@@ -10,6 +10,11 @@ export type WorkerExecutorConfiguration = {
   type: 'worker';
 };
 
+export type CloudExecutorConfiguration = {
+  type: 'cloud';
+  test?: boolean;
+};
+
 export type ServerExecutorConfiguration = {
   type: 'server';
   url: string | URL;
@@ -23,7 +28,12 @@ export type ExecutorConfiguration =
   | AutoExecutorConfiguration
   | DirectExecutorConfiguration
   | WorkerExecutorConfiguration
+  | CloudExecutorConfiguration
   | ServerExecutorConfiguration;
+
+export type ExecutorSelection =
+  | Exclude<ExecutorConfiguration['type'], 'server'>
+  | ExecutorConfiguration;
 
 export type ResolvedExecutorConfiguration = Exclude<ExecutorConfiguration, AutoExecutorConfiguration>;
 
@@ -31,8 +41,10 @@ const isBrowserMainThread = typeof window !== 'undefined' && typeof document !==
 const isWorkerAvailable = typeof Worker !== 'undefined';
 
 export function resolveExecutorConfiguration(
-  configuration: ExecutorConfiguration = { type: 'auto' },
+  selection: ExecutorSelection = 'auto',
 ): ResolvedExecutorConfiguration {
+  const configuration: ExecutorConfiguration =
+    typeof selection === 'string' ? { type: selection } : selection;
   if (configuration.type !== 'auto') {
     return configuration;
   }

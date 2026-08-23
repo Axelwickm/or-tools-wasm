@@ -48,8 +48,6 @@ endif()
 
 set(BRIDGE_PROTO_OUT_DIR "${CMAKE_BINARY_DIR}/server_bridge_protos")
 set(PROTO_SCHEMA_HEADER "${CMAKE_BINARY_DIR}/server_proto_schemas/generated_proto_schemas.h")
-set(SERVER_CP_MODEL_PROTO "${REPO_ROOT}/ortools/sat/cp_model.proto")
-set(SERVER_SAT_PARAMETERS_PROTO "${REPO_ROOT}/ortools/sat/sat_parameters.proto")
 set(SERVER_LINEAR_SOLVER_PROTO "${REPO_ROOT}/ortools/linear_solver/linear_solver.proto")
 set(SERVER_OPTIONAL_BOOLEAN_PROTO "${REPO_ROOT}/ortools/util/optional_boolean.proto")
 set(SERVER_PROTO_SCHEMA_TEMPLATE "${REPO_ROOT}/javascript/generated_proto_schemas.h.in")
@@ -111,8 +109,6 @@ add_custom_command(
   OUTPUT "${PROTO_SCHEMA_HEADER}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/server_proto_schemas"
   COMMAND "${CMAKE_COMMAND}"
-          "-DCP_MODEL_PROTO=${SERVER_CP_MODEL_PROTO}"
-          "-DSAT_PARAMETERS_PROTO=${SERVER_SAT_PARAMETERS_PROTO}"
           "-DLINEAR_SOLVER_PROTO=${SERVER_LINEAR_SOLVER_PROTO}"
           "-DOPTIONAL_BOOLEAN_PROTO=${SERVER_OPTIONAL_BOOLEAN_PROTO}"
           "-DTEMPLATE_FILE=${SERVER_PROTO_SCHEMA_TEMPLATE}"
@@ -121,8 +117,6 @@ add_custom_command(
   DEPENDS
     "${REPO_ROOT}/scripts/embed_proto.cmake"
     "${SERVER_PROTO_SCHEMA_TEMPLATE}"
-    "${SERVER_CP_MODEL_PROTO}"
-    "${SERVER_SAT_PARAMETERS_PROTO}"
     "${SERVER_LINEAR_SOLVER_PROTO}"
     "${SERVER_OPTIONAL_BOOLEAN_PROTO}"
   COMMENT "Generate server proto schema strings"
@@ -208,10 +202,8 @@ add_executable(server_cp_sat_executor_test
   src/cp_sat_executor.cc
   src/cp_sat_executor_test.cc
   src/job_scheduler.cc)
-add_dependencies(server_cp_sat_executor_test server_proto_schemas)
 target_include_directories(server_cp_sat_executor_test PRIVATE
-  "${REPO_ROOT}"
-  "${CMAKE_BINARY_DIR}/server_proto_schemas")
+  "${REPO_ROOT}")
 target_link_libraries(server_cp_sat_executor_test PRIVATE
   ortools::ortools
   server_bridge_proto

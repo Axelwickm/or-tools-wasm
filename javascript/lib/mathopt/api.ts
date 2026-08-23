@@ -1,4 +1,5 @@
 import { create } from '@bufbuild/protobuf';
+import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
@@ -25,6 +26,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): M
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
     case 'server': return new MathOptServerExecutor(configuration);
+    case 'cloud': return new CloudExecutor('mathopt', { test: configuration.test });
   }
 }
 
@@ -2788,7 +2790,7 @@ async function executeMathOptRequest(
 ): Promise<Uint8Array> {
   if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('MathOpt solve aborted.', 'AbortError');
   const job = executor.execute(request, {
-    requestedThreads: options.threads ?? 1,
+    resources: { threads: options.threads ?? 1 },
     onEvent: options.onEvent ?? (() => {}),
   });
   const abort = () => { void job.cancel().catch(() => {}); };

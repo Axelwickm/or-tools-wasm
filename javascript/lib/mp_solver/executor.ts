@@ -32,35 +32,37 @@ export const mpSolverBridgeCodec: SolverBridgeCodec<MpSolverExecutorRequest, MpS
   decodeRequest: (payload) => fromBinary(MpSolverBridgeRequestSchema, payload).payload,
   encodeResult: (response) => toBinary(MpSolverBridgeResponseSchema, response),
   decodeResult: (payload) => fromBinary(MpSolverBridgeResponseSchema, payload),
-  defaultRequestedThreads: 1,
 };
+
+type MpSolverJobState = { cancelled: boolean };
 
 export class MpSolverExecutor implements MpSolverExecutorLike {
   readonly solver = 'mp-solver';
   private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
-  private readonly cancelled = new Set<number>();
 
   async load() { await this.module(); }
   terminate(_reason?: string) {}
 
   execute(request: MpSolverExecutorRequest, options: SolverExecutionOptions<never>): SolverJob<MpSolverBridgeResponse> {
     const requestId = this.nextRequestId++;
+    const state: MpSolverJobState = { cancelled: false };
     return {
       requestId,
-      result: this.run(requestId, request, options),
-      cancel: () => this.cancel(requestId, options),
+      result: this.run(requestId, request, options, state),
+      cancel: () => this.cancel(requestId, options, state),
     };
   }
 
   private module() { return this.modulePromise ??= loadMPSolverRuntime(); }
 
-  private async run(requestId: number, request: MpSolverExecutorRequest, options: SolverExecutionOptions<never>) {
+  private async run(requestId: number, request: MpSolverExecutorRequest, options: SolverExecutionOptions<never>, state: MpSolverJobState) {
     const createdAt = BigInt(Date.now());
     try {
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.STARTING, createdAt));
-      const threads = request.case === 'solve' ? Math.max(1, request.value.numThreads) : 1;
-      await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.RUNNING, createdAt, BigInt(Date.now()), threads));
+      await options.onEvent(createSolverJobStatusEvent(
+        this.solver, requestId, SolverJobState.RUNNING, createdAt, BigInt(Date.now()),
+      ));
       const module = await this.module();
       let response: MpSolverBridgeResponse;
       if (request.case === 'solve') {
@@ -78,7 +80,7 @@ export class MpSolverExecutor implements MpSolverExecutorLike {
         throw new Error('MP Solver request has no operation.');
       }
       await options.onEvent(createSolverJobStatusEvent(
-        this.solver, requestId, this.cancelled.has(requestId) ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED, createdAt,
+        this.solver, requestId, state.cancelled ? SolverJobState.CANCELLED : SolverJobState.SUCCEEDED, createdAt,
       ));
       return response;
     } catch (error) {
@@ -87,11 +89,11 @@ export class MpSolverExecutor implements MpSolverExecutorLike {
         error instanceof Error ? error.stack ?? '' : ''));
       await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.FAILED, createdAt));
       throw error;
-    } finally { this.cancelled.delete(requestId); }
+    }
   }
 
-  private async cancel(requestId: number, options: SolverExecutionOptions<never>) {
-    this.cancelled.add(requestId);
+  private async cancel(requestId: number, options: SolverExecutionOptions<never>, state: MpSolverJobState) {
+    state.cancelled = true;
     await options.onEvent(createSolverJobStatusEvent(this.solver, requestId, SolverJobState.CANCELLING, BigInt(Date.now())));
   }
 

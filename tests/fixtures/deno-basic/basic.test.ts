@@ -1,6 +1,7 @@
 import {
   CpSat,
 } from 'or-tools-wasm/cp-sat';
+import { packageName, version } from 'or-tools-wasm';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import {
   initMPSolver,
@@ -46,19 +47,21 @@ import {
   RoutingModel,
   setExecutor as setRoutingExecutor,
 } from 'or-tools-wasm/routing';
-import { fixtureModes } from '../browser-basic-src/shared_case.ts';
-import { runCpSatHighLevelParityCasesForPackage } from '../browser-basic-src/cpsat_high_level_runner.ts';
-import { cpSatCases, runCpSatCases } from '../browser-basic-src/cpsat_runner.ts';
-import { runCpSatSolverStructureCases } from '../browser-basic-src/cpsat_solver_structure_runner.ts';
-import { runCpSatSubsolverCases } from '../browser-basic-src/cpsat_subsolver_runner.ts';
-import { runKnapsackCases } from '../browser-basic-src/knapsack_runner.ts';
-import { runMathOptCases } from '../browser-basic-src/mathopt_runner.ts';
-import { runMPSolverCases } from '../browser-basic-src/mp_solver_runner.ts';
-import { runNetworkFlowCases } from '../browser-basic-src/network_flow_runner.ts';
-import { runPdlpCases } from '../browser-basic-src/pdlp_runner.ts';
-import { runRcpspCases } from '../browser-basic-src/rcpsp_runner.ts';
-import { runRoutingCases } from '../browser-basic-src/routing_runner.ts';
-import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
+import { executorFixtureModes } from '../../harness/shared_case.ts';
+import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
+import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
+import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
+import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
+import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
+import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
+import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
+import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
+import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
+import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
+import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
+import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
+import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
+import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 
 type NamedCaseResult = {
   id?: string;
@@ -83,6 +86,14 @@ async function assertCaseSteps(t: Deno.TestContext, runtime: string, results: Na
 Deno.test('validates CP-SAT execution semantics in Deno', async (t) => {
   const results = await runCpSatSubsolverCases(CpSat as never);
   await assertCaseSteps(t, 'deno CP-SAT execution semantics', results);
+});
+
+Deno.test('enforces the CP-SAT worker job lifecycle in Deno', async () => {
+  await runCpSatWorkerLifecycleCase(CpSat as never);
+});
+
+Deno.test('cloud executor checks service status without sending the model', async () => {
+  await runCloudExecutorCase(CpSatApi as never, { packageName, version });
 });
 
 Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
@@ -113,7 +124,7 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
     setExecutor: setRoutingExecutor,
-  }, { modes: fixtureModes });
+  }, { modes: executorFixtureModes });
   await assertCaseSteps(t, 'deno routing', routingResults);
 
   const mpSolverResults = await runMPSolverCases({
@@ -121,7 +132,7 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     MPSolver,
     MPSolverParameters,
     setExecutor: setMPSolverExecutor,
-  }, { modes: fixtureModes });
+  }, { modes: executorFixtureModes });
   await assertCaseSteps(t, 'deno MPSolver', mpSolverResults);
 
   const knapsackResults = await runKnapsackCases({
@@ -150,7 +161,7 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   const mathOptResults = await runMathOptCases({
     initMathOpt,
     MathOpt,
-  }, { modes: fixtureModes });
+  }, { modes: executorFixtureModes });
   await assertCaseSteps(t, 'deno MathOpt', mathOptResults);
 
   const pdlpResults = await runPdlpCases({

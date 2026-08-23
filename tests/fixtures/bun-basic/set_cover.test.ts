@@ -1,6 +1,6 @@
 import * as SetCoverApi from 'or-tools-wasm/set-cover';
 import { terminateLoadedRuntimeThreads } from 'or-tools-wasm/set-cover';
-import { runSetCoverCases } from '../browser-basic-src/set_cover_runner.ts';
+import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {

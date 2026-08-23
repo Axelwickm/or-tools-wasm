@@ -1,4 +1,5 @@
 import { create } from '@bufbuild/protobuf';
+import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
@@ -59,6 +60,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): R
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
     case 'server': return new RoutingServerExecutor(configuration);
+    case 'cloud': return new CloudExecutor('routing', { test: configuration.test });
   }
 }
 

@@ -1,4 +1,5 @@
 import { create } from '@bufbuild/protobuf';
+import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import type { SolverJobEvent } from '../solver_executor.js';
@@ -42,6 +43,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): K
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
     case 'server': return new KnapsackServerExecutor(configuration);
+    case 'cloud': return new CloudExecutor('knapsack', { test: configuration.test });
   }
 }
 

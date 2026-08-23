@@ -34,8 +34,33 @@ export type SolverJob<Response> = {
   cancel(): Promise<void>;
 };
 
+export class SolverExecutorBusyError extends Error {
+  constructor(solver: string) {
+    super(`${solver} worker executor already has an active job.`);
+    this.name = 'SolverExecutorBusyError';
+  }
+}
+
+export class SolverJobCancelledError extends Error {
+  constructor(solver: string, requestId: number) {
+    super(`${solver} worker job ${requestId} was cancelled.`);
+    this.name = 'AbortError';
+  }
+}
+
+export class SolverCancellationUnsupportedError extends Error {
+  constructor(solver: string) {
+    super(`${solver} direct executor does not support cancellation.`);
+    this.name = 'SolverCancellationUnsupportedError';
+  }
+}
+
+export type SolverResourceRequest = {
+  threads?: number;
+};
+
 export type SolverExecutionOptions<Event> = {
-  requestedThreads?: number;
+  resources?: SolverResourceRequest;
   onEvent: SolverExecutorEventHandler<SolverJobEvent | Event>;
 };
 

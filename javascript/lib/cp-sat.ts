@@ -1,12 +1,14 @@
 export { CpSat } from './cp_sat/api.js';
 export { default } from './cp_sat/api.js';
+export {
+  CloudExecutorUnavailableError,
+} from './cloud_executor.js';
 export type {
   CpSatApi,
   CpSatEvent,
   CpSatEventHandler,
   CpSatEventMask,
   CpSatModelInstance,
-  CpSatRawSolveOptions,
   CpSatSchemas,
   CpSatSolveOptions,
   CpSatSolveResult,
@@ -16,8 +18,10 @@ export type { SolverJobEvent } from './solver_executor.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';
 export type {
   AutoExecutorConfiguration,
+  CloudExecutorConfiguration,
   DirectExecutorConfiguration,
   ExecutorConfiguration,
+  ExecutorSelection,
   ServerExecutorConfiguration,
   WorkerExecutorConfiguration,
 } from './executor_configuration.js';
@@ -50,6 +54,7 @@ export {
   term,
   weightedSum,
 } from './cp_sat/high_level_api.js';
+export type { CpSolverSolveOptions } from './cp_sat/high_level_api.js';
 export type { LinearExprLike, LiteralLike } from './cp_sat/high_level_api.js';
 export {
   CpSolverStatus,

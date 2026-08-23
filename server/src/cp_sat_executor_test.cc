@@ -36,7 +36,8 @@ void ExpectEq(const Lhs& lhs, const Rhs& rhs, const std::string& message) {
 }
 
 SolverExecutorRequest SolveRequest(int num_workers, bool enumerate_all,
-                                   bool solution_events) {
+                                   bool solution_events,
+                                   int num_search_workers = 0) {
   sat::CpModelProto model;
   for (const char* name : {"x", "y"}) {
     auto* variable = model.add_variables();
@@ -54,6 +55,7 @@ SolverExecutorRequest SolveRequest(int num_workers, bool enumerate_all,
 
   sat::SatParameters parameters;
   parameters.set_num_workers(num_workers);
+  parameters.set_num_search_workers(num_search_workers);
   parameters.set_enumerate_all_solutions(enumerate_all);
 
   bridge::CpSatBridgeRequest request;
@@ -86,6 +88,8 @@ void ResolvesThreadsWithoutChangingSolverParameters() {
   const auto request = SolveRequest(2, false, false);
   ExpectEq(executor.RequestedThreads(request, 2, 8), 2,
            "explicit CP-SAT worker count determines scheduler reservation");
+  ExpectEq(executor.RequestedThreads(SolveRequest(0, false, false, 2), 2, 8), 2,
+           "deprecated CP-SAT worker count determines scheduler reservation");
 
   bool mismatch_rejected = false;
   try {

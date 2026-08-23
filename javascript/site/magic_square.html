@@ -37,74 +37,61 @@
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm/cp-sat';
+				<pre class="code-block"><code data-highlight="ts">import {
+  CpSat,
+  type CpModelProto,
+} from 'or-tools-wasm/cp-sat';
 
-type MagicSquareExpr = {
-  vars: number[];
-  coeffs: number[];
-  offset: number;
-};
-
-type MagicSquareModel = {
-  name: string;
-  variables: Array&lt;{ name: string; domain: number[] }&gt;;
-  constraints: Array&lt;
-    | { name: string; all_diff: { exprs: MagicSquareExpr[] } }
-    | { name: string; linear: { vars: number[]; coeffs: number[]; domain: number[] } }
-  &gt;;
-};
-
-function buildMagicSquareModel(size: number): MagicSquareModel {
-  const numCells = size * size;
-  const variables: MagicSquareModel['variables'] = [];
-  const domain: [number, number] = [1, numCells];
-  for (let row = 0; row &lt; size; ++row) {
-    for (let col = 0; col &lt; size; ++col) {
-      variables.push({ name: `cell_${row}_${col}`, domain: [...domain] });
-    }
-  }
-
-  const constraints: MagicSquareModel['constraints'] = [];
+const size = 5;
+const numCells = size * size;
+const variables: NonNullable&lt;CpModelProto['variables']&gt; = Array.from(
+  { length: numCells },
+  (_, index) =&gt; ({
+    name: `cell_${Math.floor(index / size)}_${index % size}`,
+    domain: [1, numCells],
+  }),
+);
+const constraints: NonNullable&lt;CpModelProto['constraints']&gt; = [{
+  name: 'all_diff',
+  allDiff: {
+    exprs: variables.map((_, index) =&gt; ({
+      vars: [index],
+      coeffs: [1],
+      offset: 0,
+    })),
+  },
+}];
+const target = (size * (numCells + 1)) / 2;
+const addSum = (name: string, vars: number[]) =&gt; {
   constraints.push({
-    name: 'all_diff',
-    all_diff: {
-      exprs: Array.from({ length: numCells }, (_, index) =&gt; ({
-        vars: [index],
-        coeffs: [1],
-        offset: 0,
-      })),
+    name,
+    linear: {
+      vars,
+      coeffs: Array(vars.length).fill(1),
+      domain: [target, target],
     },
   });
+};
 
-  const target = (size * (size * size + 1)) / 2;
-  const addSum = (name: string, vars: number[]) =&gt; {
-    constraints.push({
-      name,
-      linear: { vars, coeffs: Array(vars.length).fill(1), domain: [target, target] },
-    });
-  };
-
-  for (let row = 0; row &lt; size; ++row) {
-    addSum(`row_${row}`, Array.from({ length: size }, (_, col) =&gt; row * size + col));
-  }
-  for (let col = 0; col &lt; size; ++col) {
-    addSum(`col_${col}`, Array.from({ length: size }, (_, row) =&gt; row * size + col));
-  }
-  addSum('diag_main', Array.from({ length: size }, (_, index) =&gt; index * size + index));
-  addSum('diag_anti', Array.from({ length: size }, (_, index) =&gt; index * size + (size - 1 - index)));
-
-  return { name: `magic_square_${size}`, variables, constraints };
+for (let row = 0; row &lt; size; row += 1) {
+  addSum(`row_${row}`, Array.from({ length: size }, (_, column) =&gt; row * size + column));
 }
+for (let column = 0; column &lt; size; column += 1) {
+  addSum(`col_${column}`, Array.from({ length: size }, (_, row) =&gt; row * size + column));
+}
+addSum('diag_main', Array.from({ length: size }, (_, index) =&gt; index * size + index));
+addSum('diag_anti', Array.from({ length: size }, (_, index) =&gt; index * size + size - index - 1));
 
-CpSat.setExecutor({ type: 'worker' });
-const size = 5;
-const model = await CpSat.createModel(buildMagicSquareModel(size));
-const validation = await CpSat.validate(model);
-if (!validation.ok) throw new Error(validation.message);
-
-const workers = 4;
-const params: SatParameters = { numWorkers: workers, logSearchProgress: true };
-const result = await CpSat.solve(model, { solverParameters: params });
+const model = await CpSat.createModel({
+  name: `magic_square_${size}`,
+  variables,
+  constraints,
+});
+const result = await CpSat.solve(model, {
+  executor: 'worker',
+  numWorkers: 4,
+  logSearchProgress: true,
+});
 console.log(result.response?.solution);</code></pre>
 			</details>
 		</div>
@@ -125,6 +112,7 @@ console.log(result.response?.solution);</code></pre>
 			<label>Executor <select id="cp-sat-executor">
 				<option value="direct">Direct</option>
 				<option value="worker" selected>Worker</option>
+				<option value="cloud">Cloud</option>
 				<option value="server">Server</option>
 			</select></label>
 			<button id="run">Run magic square</button>

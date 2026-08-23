@@ -1,0 +1,1407 @@
+import type { ExecutorFixtureMode } from '../../../harness/shared_case.ts';
+import {
+  assertServerExecutorIsRunning,
+  executorFixtureModes,
+  serverExecutorConfiguration,
+} from '../../../harness/shared_case.ts';
+
+export type MpSolverCaseResult = {
+  id?: string;
+  name: string;
+  solver?: string;
+  source?: string;
+  upstream?: string;
+  tags?: string[];
+  mode?: ExecutorFixtureMode;
+  ok: boolean;
+  skipped?: boolean;
+  reason?: string;
+  status: number;
+  objective: number;
+  values: Record<string, number>;
+};
+
+function mpSolverCaseId(name: string): string {
+  return `mp_solver.${name
+    .replace(/^MPSolver:\s*/, '')
+    .replaceAll(/[().:,/-]+/g, '_')
+    .replaceAll(/\s+/g, '_')
+    .replaceAll(/^_+|_+$/g, '')
+    .toLowerCase()}`;
+}
+
+function decorateMpSolverResult(result: MpSolverCaseResult): MpSolverCaseResult {
+  return {
+    id: result.id ?? mpSolverCaseId(result.name),
+    solver: result.solver ?? 'mp-solver',
+    source: result.source,
+    upstream: result.upstream ?? result.name.replace(/^MPSolver:\s*/, ''),
+    tags: result.tags ?? ['python-parity'],
+    ...result,
+  };
+}
+
+type MPVariableLike = {
+  Lb(): number;
+  Ub(): number;
+  Integer(): boolean;
+  SetBounds(lb: number, ub: number): void;
+  SetLb(lb: number): void;
+  SetUb(ub: number): void;
+  ReducedCost(): number;
+  reduced_cost(): number;
+  index(): number;
+  name(): string;
+  solution_value(): number;
+  unrounded_solution_value(): number;
+  basis_status(): number;
+  branching_priority(): number;
+  SetBranchingPriority(priority: number): void;
+};
+
+type MPConstraintLike = {
+  Clear(): void;
+  SetCoefficient(variable: MPVariableLike, coefficient: number): void;
+  GetCoefficient(variable: MPVariableLike): number;
+  Lb(): number;
+  Ub(): number;
+  SetBounds(lb: number, ub: number): void;
+  SetLb(lb: number): void;
+  SetUb(ub: number): void;
+  DualValue(): number;
+  dual_value(): number;
+  index(): number;
+  name(): string;
+  basis_status(): number;
+  is_lazy(): boolean;
+  set_is_lazy(laziness: boolean): void;
+};
+
+type MPObjectiveLike = {
+  Clear(): void;
+  SetCoefficient(variable: MPVariableLike, coefficient: number): void;
+  GetCoefficient(variable: MPVariableLike): number;
+  SetOffset(offset: number): void;
+  AddOffset(offset: number): void;
+  Offset(): number;
+  offset(): number;
+  SetMinimization(): void;
+  SetMaximization(): void;
+  SetOptimizationDirection(maximize: boolean): void;
+  Value(): number;
+  BestBound(): number;
+  maximization(): boolean;
+  minimization(): boolean;
+};
+
+type MPSolverParametersLike = {
+  SetDoubleParam(param: number, value: number): void;
+  GetDoubleParam(param: number): number;
+  ResetDoubleParam(param: number): void;
+  SetIntegerParam(param: number, value: number): void;
+  GetIntegerParam(param: number): number;
+  ResetIntegerParam(param: number): void;
+  Reset(): void;
+  delete(): void;
+};
+
+type MPSolverLike = {
+  Name(): string;
+  IsMip(): boolean;
+  IsMIP(): boolean;
+  Clear(): void;
+  infinity(): number;
+  variable(index: number): MPVariableLike;
+  variables(): MPVariableLike[];
+  LookupVariableOrNull(name: string): MPVariableLike | null;
+  LookupVariable(name: string): MPVariableLike | null;
+  Var(lb: number, ub: number, integer: boolean, name: string): MPVariableLike;
+  NumVar(lb: number, ub: number, name: string): MPVariableLike;
+  IntVar(lb: number, ub: number, name: string): MPVariableLike;
+  BoolVar(name: string): MPVariableLike;
+  constraint(index: number): MPConstraintLike;
+  constraints(): MPConstraintLike[];
+  LookupConstraintOrNull(name: string): MPConstraintLike | null;
+  LookupConstraint(name: string): MPConstraintLike | null;
+  Constraint(): MPConstraintLike;
+  Constraint(name: string): MPConstraintLike;
+  Constraint(lb: number, ub: number, name?: string): MPConstraintLike;
+  RowConstraint(): MPConstraintLike;
+  RowConstraint(name: string): MPConstraintLike;
+  RowConstraint(lb: number, ub: number, name?: string): MPConstraintLike;
+  Objective(): MPObjectiveLike;
+  Solve(parameters?: MPSolverParametersLike): Promise<number>;
+  SolveWithProto(options?: {
+    solverSpecificParameters?: string;
+    loadSolution?: boolean;
+  }): Promise<{
+    response: Record<string, unknown>;
+    loaded: boolean;
+  }>;
+  LoadSolutionFromProto?(response?: Uint8Array | Record<string, unknown>, tolerance?: number): Promise<boolean>;
+  VerifySolution(tolerance: number, logErrors: boolean): boolean;
+  EnableOutput(): void;
+  SuppressOutput(): void;
+  OutputIsEnabled(): boolean;
+  SetTimeLimit(milliseconds: number): void;
+  time_limit(): number;
+  SetNumThreads(numThreads: number): boolean;
+  GetNumThreads(): number;
+  SolverVersion(): string;
+  ComputeConstraintActivities(): number[];
+  ComputeExactConditionNumber(): number;
+  SetHint(variables: MPVariableLike[], values: number[]): void;
+  NextSolution(): boolean;
+  ExportModelAsLpFormat(obfuscate: boolean): string;
+  ExportModelAsMpsFormat(fixedFormat: boolean, obfuscate: boolean): string;
+  NumVariables(): number;
+  NumConstraints(): number;
+  WallTime(): number;
+  iterations(): number;
+  nodes(): number;
+  delete(): void;
+};
+
+export type MPSolverApi = {
+  initMPSolver(): Promise<void>;
+  MPSolver: {
+    new(name: string, problemType: number): MPSolverLike;
+    GLOP_LINEAR_PROGRAMMING: number;
+    CLP_LINEAR_PROGRAMMING: number;
+    GLPK_LINEAR_PROGRAMMING: number;
+    GLPK_MIXED_INTEGER_PROGRAMMING: number;
+    SCIP_MIXED_INTEGER_PROGRAMMING: number;
+    CBC_MIXED_INTEGER_PROGRAMMING: number;
+    BOP_INTEGER_PROGRAMMING: number;
+    KNAPSACK_MIXED_INTEGER_PROGRAMMING: number;
+    SAT_INTEGER_PROGRAMMING: number;
+    OPTIMAL: number;
+    INFEASIBLE: number;
+    BASIC: number;
+    AT_LOWER_BOUND: number;
+    SupportsProblemType(problemType: number): boolean;
+    ParseSolverType(solverId: string): number | null;
+    ParseAndCheckSupportForProblemType(solverId: string): number | null;
+    CreateSolver(solverId: string): MPSolverLike | null;
+    createModelRequest(request: Record<string, unknown>): Promise<Uint8Array>;
+    solveModelRequest(request: Uint8Array | Record<string, unknown>): Promise<{
+      bytes: Uint8Array;
+      response: Record<string, unknown>;
+    }>;
+  };
+  MPSolverParameters: {
+    new(): MPSolverParametersLike;
+    RELATIVE_MIP_GAP: number;
+    PRIMAL_TOLERANCE: number;
+    DUAL_TOLERANCE: number;
+    PRESOLVE: number;
+    LP_ALGORITHM: number;
+    INCREMENTALITY: number;
+    SCALING: number;
+    PRESOLVE_OFF: number;
+    PRESOLVE_ON: number;
+    DUAL: number;
+    PRIMAL: number;
+    BARRIER: number;
+    INCREMENTALITY_OFF: number;
+    INCREMENTALITY_ON: number;
+    SCALING_OFF: number;
+    SCALING_ON: number;
+  };
+  setExecutor(configuration: { type: 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
+};
+
+export type MPSolverRunOptions = {
+  modes?: readonly ExecutorFixtureMode[];
+  onProgress?: (caseName: string, context?: Record<string, unknown>) => void;
+};
+
+function setMPSolverMode(api: MPSolverApi, mode: ExecutorFixtureMode) {
+  api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
+}
+
+type LpBackend = {
+  solverId: 'GLOP' | 'CLP' | 'GLPK_LP';
+  problemType: number;
+  supportsExactConditionNumber: boolean;
+  x3ReducedCost: number;
+};
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function near(actual: number, expected: number, tolerance = 1e-7) {
+  return Math.abs(actual - expected) <= tolerance;
+}
+
+function lpBackends(api: MPSolverApi): LpBackend[] {
+  const results: LpBackend[] = [
+    {
+      solverId: 'GLOP',
+      problemType: api.MPSolver.GLOP_LINEAR_PROGRAMMING,
+      supportsExactConditionNumber: false,
+      x3ReducedCost: -2.666666666666667,
+    },
+    {
+      solverId: 'CLP',
+      problemType: api.MPSolver.CLP_LINEAR_PROGRAMMING,
+      supportsExactConditionNumber: false,
+      x3ReducedCost: -2.666666666666667,
+    },
+    {
+      solverId: 'GLPK_LP',
+      problemType: api.MPSolver.GLPK_LINEAR_PROGRAMMING,
+      supportsExactConditionNumber: true,
+      x3ReducedCost: -2.666666666666667,
+    },
+  ];
+  return results;
+}
+
+function createSolver(api: MPSolverApi, solverId: string, name: string): MPSolverLike {
+  const solver = api.MPSolver.CreateSolver(solverId);
+  assert(solver !== null, `${name}: CreateSolver(${solverId}) failed`);
+  return solver;
+}
+
+function skipped(name: string, reason: string): MpSolverCaseResult {
+  return { name, ok: true, skipped: true, reason, status: -1, objective: 0, values: {} };
+}
+
+async function runSimpleProgram(
+  api: MPSolverApi,
+  name: string,
+  solverId: string,
+  createX: (solver: MPSolverLike, infinity: number) => MPVariableLike,
+  createY: (solver: MPSolverLike, infinity: number) => MPVariableLike,
+  expected: { objective: number; x: number; y: number },
+  numThreads = 1,
+): Promise<MpSolverCaseResult> {
+  const solver = createSolver(api, solverId, name);
+  try {
+    if (numThreads > 1) {
+      assert(solver.SetNumThreads(numThreads), `${name}: SetNumThreads(${numThreads}) failed`);
+      assert(solver.GetNumThreads() === numThreads, `${name}: expected ${numThreads} configured threads`);
+    }
+    const infinity = solver.infinity();
+    const x = createX(solver, infinity);
+    const y = createY(solver, infinity);
+    assert(solver.NumVariables() === 2, `${name}: expected 2 variables`);
+
+    const c0 = solver.Constraint(-infinity, 17.5, 'c0');
+    c0.SetCoefficient(x, 1);
+    c0.SetCoefficient(y, 7);
+
+    const c1 = solver.Constraint(-infinity, 3.5, 'c1');
+    c1.SetCoefficient(x, 1);
+    c1.SetCoefficient(y, 0);
+    assert(solver.NumConstraints() === 2, `${name}: expected 2 constraints`);
+
+    const objective = solver.Objective();
+    objective.SetCoefficient(x, 1);
+    objective.SetCoefficient(y, 10);
+    objective.SetMaximization();
+
+    const status = await solver.Solve();
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+    const values = {
+      x: x.solution_value(),
+      y: y.solution_value(),
+    };
+    assert(near(objective.Value(), expected.objective), `${name}: objective mismatch ${objective.Value()}`);
+    assert(near(values.x, expected.x), `${name}: x mismatch ${values.x}`);
+    assert(near(values.y, expected.y), `${name}: y mismatch ${values.y}`);
+    return {
+      name,
+      ok: true,
+      status,
+      objective: objective.Value(),
+      values,
+    };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runSimpleProgramBridgeMatrix(
+  api: MPSolverApi,
+  mode: ExecutorFixtureMode,
+  name: string,
+  solverId: string,
+  createX: (solver: MPSolverLike, infinity: number) => MPVariableLike,
+  createY: (solver: MPSolverLike, infinity: number) => MPVariableLike,
+  expected: { objective: number; x: number; y: number },
+): Promise<MpSolverCaseResult[]> {
+  return [await runSimpleProgram(
+    api,
+    `${name} (${mode})`,
+    solverId,
+    createX,
+    createY,
+    expected,
+  )];
+}
+
+async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  return runMixedIntegerCppStyleBackendCase(api, 'SAT', 'MPSolver: lp_test.py RunMixedIntegerExampleCppStyleAPI');
+}
+
+async function runMixedIntegerCppStyleBackendCase(
+  api: MPSolverApi,
+  solverId: 'SAT' | 'GLPK' | 'SCIP' | 'CBC',
+  name: string,
+): Promise<MpSolverCaseResult> {
+  const solver = createSolver(api, solverId, name);
+  try {
+    const infinity = solver.infinity();
+    const x1 = solver.IntVar(0.0, infinity, 'x1');
+    const x2 = solver.IntVar(0.0, infinity, 'x2');
+
+    const objective = solver.Objective();
+    objective.SetCoefficient(x1, 1);
+    objective.SetCoefficient(x2, 10);
+    objective.SetMaximization();
+
+    const c0 = solver.Constraint(-infinity, 17.5, 'c0');
+    c0.SetCoefficient(x1, 1);
+    c0.SetCoefficient(x2, 7);
+
+    const c1 = solver.Constraint(-infinity, 3.5, 'c1');
+    c1.SetCoefficient(x1, 1);
+    c1.SetCoefficient(x2, 0);
+
+    assert(solver.NumVariables() === 2, `${name}: expected 2 variables`);
+    assert(solver.NumConstraints() === 2, `${name}: expected 2 constraints`);
+    const status = await solver.Solve();
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+    assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+    assert(near(objective.Value(), 23), `${name}: objective mismatch ${objective.Value()}`);
+    assert(near(x1.solution_value(), 3), `${name}: x1 mismatch`);
+    assert(near(x2.solution_value(), 2), `${name}: x2 mismatch`);
+
+    return { name, ok: true, status, objective: objective.Value(), values: { x1: x1.solution_value(), x2: x2.solution_value() } };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runGlpkMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.GLPK_MIXED_INTEGER_PROGRAMMING), 'MPSolver: GLPK MIP not supported');
+  return runMixedIntegerCppStyleBackendCase(api, 'GLPK', 'MPSolver: GLPK_MIXED_INTEGER_PROGRAMMING');
+}
+
+async function runScipMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  // TEMP: parity - matches ortools/linear_solver/python/lp_test.py testApi for
+  // SCIP_MIXED_INTEGER_PROGRAMMING, which reaches RunMixedIntegerExampleCppStyleAPI.
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING), 'MPSolver: SCIP MIP not supported');
+  assert(api.MPSolver.ParseSolverType('SCIP') === api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING, 'MPSolver: SCIP ParseSolverType mismatch');
+  assert(
+    api.MPSolver.ParseAndCheckSupportForProblemType('SCIP') === api.MPSolver.SCIP_MIXED_INTEGER_PROGRAMMING,
+    'MPSolver: SCIP ParseAndCheckSupportForProblemType mismatch',
+  );
+  return runMixedIntegerCppStyleBackendCase(api, 'SCIP', 'MPSolver: SCIP_MIXED_INTEGER_PROGRAMMING');
+}
+
+async function runCbcMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  // TEMP: parity - covers CBC_MIXED_INTEGER_PROGRAMMING backend availability
+  // and integer solve behavior through the public MPSolver API.
+  assert(api.MPSolver.SupportsProblemType(api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING), 'MPSolver: CBC MIP not supported');
+  assert(api.MPSolver.ParseSolverType('CBC') === api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING, 'MPSolver: CBC ParseSolverType mismatch');
+  assert(
+    api.MPSolver.ParseAndCheckSupportForProblemType('CBC') === api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING,
+    'MPSolver: CBC ParseAndCheckSupportForProblemType mismatch',
+  );
+  return runMixedIntegerCppStyleBackendCase(api, 'CBC', 'MPSolver: CBC_MIXED_INTEGER_PROGRAMMING');
+}
+
+async function runCbcExecutorCase(api: MPSolverApi, mode: ExecutorFixtureMode): Promise<MpSolverCaseResult[]> {
+  return [await runSimpleProgram(
+    api,
+    `MPSolver: CBC threaded execution (${mode})`,
+    'CBC',
+    (solver, infinity) => solver.IntVar(0, infinity, 'x'),
+    (solver, infinity) => solver.IntVar(0, infinity, 'y'),
+    { objective: 23, x: 3, y: 2 },
+    4,
+  )];
+}
+
+function bopBinaryRequest(api: MPSolverApi) {
+  return {
+    solverType: api.MPSolver.BOP_INTEGER_PROGRAMMING,
+    model: {
+      name: 'bop_binary_project_selection',
+      maximize: true,
+      variable: [
+        { lowerBound: 0, upperBound: 1, isInteger: true, objectiveCoefficient: 8, name: 'analytics' },
+        { lowerBound: 0, upperBound: 1, isInteger: true, objectiveCoefficient: 6, name: 'dashboard' },
+        { lowerBound: 0, upperBound: 1, isInteger: true, objectiveCoefficient: 5, name: 'alerts' },
+      ],
+      constraint: [
+        {
+          lowerBound: Number.NEGATIVE_INFINITY,
+          upperBound: 9,
+          varIndex: [0, 1, 2],
+          coefficient: [6, 4, 3],
+          name: 'budget',
+        },
+        {
+          lowerBound: Number.NEGATIVE_INFINITY,
+          upperBound: 1,
+          varIndex: [1, 2],
+          coefficient: [1, 1],
+          name: 'shared_design_team',
+        },
+      ],
+    },
+  };
+}
+
+function bopIntegerRequest(api: MPSolverApi) {
+  return {
+    solverType: api.MPSolver.BOP_INTEGER_PROGRAMMING,
+    model: {
+      name: 'bop_integer_production',
+      maximize: true,
+      variable: [
+        { lowerBound: 0, upperBound: 4, isInteger: true, objectiveCoefficient: 3, name: 'x' },
+        { lowerBound: 0, upperBound: 3, isInteger: true, objectiveCoefficient: 5, name: 'y' },
+      ],
+      constraint: [
+        {
+          lowerBound: Number.NEGATIVE_INFINITY,
+          upperBound: 7,
+          varIndex: [0, 1],
+          coefficient: [1, 2],
+          name: 'capacity',
+        },
+      ],
+    },
+  };
+}
+
+async function runBopBinaryCase(api: MPSolverApi, mode: ExecutorFixtureMode): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: BOP binary project selection (${mode})`;
+  setMPSolverMode(api, mode);
+  try {
+    assert(api.MPSolver.SupportsProblemType(api.MPSolver.BOP_INTEGER_PROGRAMMING), `${name}: backend not supported`);
+    assert(api.MPSolver.ParseSolverType('BOP') === api.MPSolver.BOP_INTEGER_PROGRAMMING, `${name}: ParseSolverType mismatch`);
+    assert(
+      api.MPSolver.ParseAndCheckSupportForProblemType('BOP') === api.MPSolver.BOP_INTEGER_PROGRAMMING,
+      `${name}: ParseAndCheckSupportForProblemType mismatch`,
+    );
+
+    if (mode !== 'direct') {
+      const result = await api.MPSolver.solveModelRequest(bopBinaryRequest(api));
+      const response = result.response;
+      assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+      assert(near(Number(response.objectiveValue), 13), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+      const variableValues = response.variableValue as number[];
+      assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+      assert(near(variableValues[0], 1), `${name}: analytics mismatch`);
+      assert(near(variableValues[1], 0), `${name}: dashboard mismatch`);
+      assert(near(variableValues[2], 1), `${name}: alerts mismatch`);
+      return {
+        name,
+        ok: true,
+        status: api.MPSolver.OPTIMAL,
+        objective: Number(response.objectiveValue),
+        values: { analytics: variableValues[0], dashboard: variableValues[1], alerts: variableValues[2] },
+      };
+    }
+
+    const solver = createSolver(api, 'BOP', name);
+    try {
+      assert(solver.IsMIP(), `${name}: BOP should be MIP`);
+      assert(solver.SolverVersion().length > 0, `${name}: missing solver version`);
+      const analytics = solver.BoolVar('analytics');
+      const dashboard = solver.BoolVar('dashboard');
+      const alerts = solver.BoolVar('alerts');
+      const budget = solver.Constraint(-solver.infinity(), 9, 'budget');
+      budget.SetCoefficient(analytics, 6);
+      budget.SetCoefficient(dashboard, 4);
+      budget.SetCoefficient(alerts, 3);
+      const team = solver.Constraint(-solver.infinity(), 1, 'shared_design_team');
+      team.SetCoefficient(dashboard, 1);
+      team.SetCoefficient(alerts, 1);
+      const objective = solver.Objective();
+      objective.SetCoefficient(analytics, 8);
+      objective.SetCoefficient(dashboard, 6);
+      objective.SetCoefficient(alerts, 5);
+      objective.SetMaximization();
+
+      const status = await solver.Solve();
+      assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+      assert(near(objective.Value(), 13), `${name}: objective mismatch ${objective.Value()}`);
+      assert(near(analytics.solution_value(), 1), `${name}: analytics mismatch`);
+      assert(near(dashboard.solution_value(), 0), `${name}: dashboard mismatch`);
+      assert(near(alerts.solution_value(), 1), `${name}: alerts mismatch`);
+      assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+      return {
+        name,
+        ok: true,
+        status,
+        objective: objective.Value(),
+        values: {
+          analytics: analytics.solution_value(),
+          dashboard: dashboard.solution_value(),
+          alerts: alerts.solution_value(),
+        },
+      };
+    } finally {
+      solver.delete();
+    }
+  } finally {
+    setMPSolverMode(api, mode);
+  }
+}
+
+async function runBopIntegerCase(api: MPSolverApi, mode: ExecutorFixtureMode): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: BOP integer production (${mode})`;
+  setMPSolverMode(api, mode);
+  try {
+    assert(api.MPSolver.SupportsProblemType(api.MPSolver.BOP_INTEGER_PROGRAMMING), `${name}: backend not supported`);
+
+    if (mode !== 'direct') {
+      const result = await api.MPSolver.solveModelRequest(bopIntegerRequest(api));
+      const response = result.response;
+      assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+      assert(near(Number(response.objectiveValue), 19), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+      const variableValues = response.variableValue as number[];
+      assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+      assert(near(variableValues[0], 3), `${name}: x mismatch`);
+      assert(near(variableValues[1], 2), `${name}: y mismatch`);
+      return {
+        name,
+        ok: true,
+        status: api.MPSolver.OPTIMAL,
+        objective: Number(response.objectiveValue),
+        values: { x: variableValues[0], y: variableValues[1] },
+      };
+    }
+
+    const solver = createSolver(api, 'BOP', name);
+    try {
+      const x = solver.IntVar(0, 4, 'x');
+      const y = solver.IntVar(0, 3, 'y');
+      const capacity = solver.Constraint(-solver.infinity(), 7, 'capacity');
+      capacity.SetCoefficient(x, 1);
+      capacity.SetCoefficient(y, 2);
+      const objective = solver.Objective();
+      objective.SetCoefficient(x, 3);
+      objective.SetCoefficient(y, 5);
+      objective.SetMaximization();
+
+      const status = await solver.Solve();
+      assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+      assert(near(objective.Value(), 19), `${name}: objective mismatch ${objective.Value()}`);
+      assert(near(x.solution_value(), 3), `${name}: x mismatch`);
+      assert(near(y.solution_value(), 2), `${name}: y mismatch`);
+      assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+      return {
+        name,
+        ok: true,
+        status,
+        objective: objective.Value(),
+        values: { x: x.solution_value(), y: y.solution_value() },
+      };
+    } finally {
+      solver.delete();
+    }
+  } finally {
+    setMPSolverMode(api, mode);
+  }
+}
+
+async function runBopInfeasibleCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  // TEMP: parity - mirrors ortools/linear_solver/python/lp_test.py
+  // testBopInfeasible construction through the public BOP MPSolver backend.
+  // Upstream prints status 0 instead of asserting it, so this case preserves
+  // that observed backend behavior while still exercising the same construction.
+  const name = 'MPSolver: lp_test.py testBopInfeasible';
+  const solver = new api.MPSolver('test', api.MPSolver.BOP_INTEGER_PROGRAMMING);
+  try {
+    solver.EnableOutput();
+    const x = solver.IntVar(0, 10, 'x');
+    const impossible = solver.Constraint(20, solver.infinity(), 'impossible');
+    impossible.SetCoefficient(x, 1);
+    const status = await solver.Solve();
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected upstream-observed status 0, got ${status}`);
+    return { name, ok: true, status, objective: 0, values: {} };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runKnapsackBackendCase(api: MPSolverApi, mode: ExecutorFixtureMode): Promise<MpSolverCaseResult> {
+  // TEMP: parity - covers the dedicated MPSolver KNAPSACK backend with the
+  // same one-dimensional data as knapsack_solver_test.py testSolveOneDimension.
+  const name = `MPSolver: KNAPSACK_MIXED_INTEGER_PROGRAMMING (${mode})`;
+  setMPSolverMode(api, mode);
+  try {
+    assert(api.MPSolver.SupportsProblemType(api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING), `${name}: backend not supported`);
+    assert(api.MPSolver.ParseSolverType('KNAPSACK') === api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING, `${name}: ParseSolverType mismatch`);
+    assert(
+      api.MPSolver.ParseAndCheckSupportForProblemType('KNAPSACK') === api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING,
+      `${name}: ParseAndCheckSupportForProblemType mismatch`,
+    );
+    if (mode !== 'direct') {
+      const result = await api.MPSolver.solveModelRequest({
+        solverType: api.MPSolver.KNAPSACK_MIXED_INTEGER_PROGRAMMING,
+        model: {
+          maximize: true,
+          variable: Array.from({ length: 9 }, (_, item) => ({
+            lowerBound: 0,
+            upperBound: 1,
+            isInteger: true,
+            objectiveCoefficient: item + 1,
+            name: `x_${item}`,
+          })),
+          constraint: [{
+            lowerBound: Number.NEGATIVE_INFINITY,
+            upperBound: 34,
+            varIndex: Array.from({ length: 9 }, (_, item) => item),
+            coefficient: Array.from({ length: 9 }, (_, item) => item + 1),
+            name: 'capacity',
+          }],
+        },
+      });
+      const response = result.response;
+      assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+      assert(near(Number(response.objectiveValue), 34), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+      const variableValues = response.variableValue as number[];
+      assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+      return {
+        name,
+        ok: true,
+        status: api.MPSolver.OPTIMAL,
+        objective: Number(response.objectiveValue),
+        values: Object.fromEntries(variableValues.map((value, item) => [`x_${item}`, value])),
+      };
+    }
+
+    const solver = createSolver(api, 'KNAPSACK', name);
+    try {
+      const profits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      const weights = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      const variables = profits.map((_, item) => solver.BoolVar(`x_${item}`));
+      const capacity = solver.Constraint(-solver.infinity(), 34, 'capacity');
+      for (const [item, variable] of variables.entries()) {
+        capacity.SetCoefficient(variable, weights[item]);
+        solver.Objective().SetCoefficient(variable, profits[item]);
+      }
+      solver.Objective().SetMaximization();
+      const status = await solver.Solve();
+      assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+      assert(near(solver.Objective().Value(), 34), `${name}: objective mismatch ${solver.Objective().Value()}`);
+      assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+      return {
+        name,
+        ok: true,
+        status,
+        objective: solver.Objective().Value(),
+        values: Object.fromEntries(variables.map((variable, item) => [`x_${item}`, variable.solution_value()])),
+      };
+    } finally {
+      solver.delete();
+    }
+  } finally {
+    setMPSolverMode(api, mode);
+  }
+}
+
+async function runSetHintCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  const name = 'MPSolver: lp_test.py testSetHint';
+  const solver = new api.MPSolver('RunBooleanExampleCppStyle', api.MPSolver.GLOP_LINEAR_PROGRAMMING);
+  try {
+    const x1 = solver.BoolVar('x1');
+    const x2 = solver.BoolVar('x2');
+    const objective = solver.Objective();
+    objective.SetCoefficient(x1, 2);
+    objective.SetCoefficient(x2, 1);
+    objective.SetMinimization();
+
+    const c0 = solver.Constraint(1, 3, 'c0');
+    c0.SetCoefficient(x1, 1);
+    c0.SetCoefficient(x2, 2);
+
+    solver.SetHint([x1, x2], [1.0, 0.0]);
+    assert(solver.variables().length === 2, `${name}: expected 2 variables`);
+    assert(solver.constraints().length === 1, `${name}: expected 1 constraint`);
+
+    return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: 0, values: {} };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runExternalApiCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: pywraplp_test.py test_external_api (${backend.solverId})`;
+  const solver = createSolver(api, backend.solverId, name);
+  try {
+    const infinity = solver.infinity();
+    assert(api.MPSolver.SupportsProblemType(backend.problemType), `${name}: ${backend.solverId} not supported`);
+    assert(!api.MPSolver.SupportsProblemType(10_000), `${name}: bogus solver type reported supported`);
+    assert(api.MPSolver.ParseSolverType(backend.solverId) === backend.problemType, `${name}: ParseSolverType mismatch`);
+    assert(api.MPSolver.ParseAndCheckSupportForProblemType(backend.solverId) === backend.problemType, `${name}: ParseAndCheckSupportForProblemType mismatch`);
+    assert(!solver.IsMIP(), `${name}: ${backend.solverId} should not be MIP`);
+
+    const x1 = solver.Var(0.0, infinity, false, 'x1');
+    const x2 = solver.NumVar(0.0, infinity, 'x2');
+    const x3 = solver.NumVar(0.0, infinity, 'x3');
+    assert(x1.Lb() === 0, `${name}: x1 lower bound mismatch`);
+    assert(x1.Ub() === infinity, `${name}: x1 upper bound mismatch`);
+    assert(!x1.Integer(), `${name}: x1 should be continuous`);
+    assert(x1.index() === 0 && x1.name() === 'x1', `${name}: x1 identity mismatch`);
+    assert(solver.variable(1).name() === 'x2', `${name}: variable(index) mismatch`);
+    assert(solver.LookupVariableOrNull('x3')?.index() === 2, `${name}: LookupVariableOrNull mismatch`);
+    assert(solver.LookupVariable('x2')?.index() === 1, `${name}: LookupVariable mismatch`);
+    assert(solver.LookupVariableOrNull('missing') === null, `${name}: missing variable lookup should be null`);
+    x3.SetBranchingPriority(17);
+    assert(x3.branching_priority() === 17, `${name}: branching priority mismatch`);
+
+    const objective = solver.Objective();
+    objective.SetCoefficient(x1, 10);
+    objective.SetCoefficient(x2, 6);
+    objective.SetCoefficient(x3, 4);
+    objective.SetOffset(5);
+    objective.AddOffset(2);
+    objective.SetMaximization();
+    assert(objective.GetCoefficient(x1) === 10, `${name}: objective coefficient mismatch`);
+    assert(objective.Offset() === 7, `${name}: objective offset mismatch`);
+    assert(objective.maximization(), `${name}: objective should maximize`);
+
+    const c0 = solver.Constraint(-infinity, 600, 'ConstraintName0');
+    c0.SetCoefficient(x1, 10);
+    c0.SetCoefficient(x2, 4);
+    c0.SetCoefficient(x3, 5);
+    const c1 = solver.Constraint(-infinity, 300, 'c1');
+    c1.SetCoefficient(x1, 2);
+    c1.SetCoefficient(x2, 2);
+    c1.SetCoefficient(x3, 6);
+    const c2 = solver.Constraint(-infinity, 100, 'OtherConstraintName');
+    c2.SetCoefficient(x1, 1);
+    c2.SetCoefficient(x2, 1);
+    c2.SetCoefficient(x3, 1);
+    const freeConstraint = solver.Constraint('free');
+    assert(freeConstraint.Lb() === -infinity && freeConstraint.Ub() === infinity, `${name}: unbounded named constraint mismatch`);
+    const anonymousConstraint = solver.RowConstraint();
+    assert(anonymousConstraint.Lb() === -infinity && anonymousConstraint.Ub() === infinity, `${name}: unbounded anonymous constraint mismatch`);
+
+    assert(c0.GetCoefficient(x3) === 5, `${name}: constraint coefficient mismatch`);
+    assert(c1.Lb() === -infinity && c1.Ub() === 300, `${name}: constraint bounds mismatch`);
+    c1.SetLb(-100000);
+    c1.SetUb(301);
+    assert(c1.Lb() === -100000 && c1.Ub() === 301, `${name}: SetLb/SetUb mismatch`);
+    c1.SetBounds(-infinity, 300);
+    assert(c0.index() === 0 && c0.name() === 'ConstraintName0', `${name}: constraint identity mismatch`);
+    assert(solver.constraint(2).name() === 'OtherConstraintName', `${name}: constraint(index) mismatch`);
+    assert(solver.LookupConstraintOrNull('ConstraintName0')?.index() === 0, `${name}: LookupConstraintOrNull mismatch`);
+    assert(solver.LookupConstraint('c1')?.index() === 1, `${name}: LookupConstraint mismatch`);
+    freeConstraint.Clear();
+
+    solver.SetTimeLimit(10000);
+    assert(solver.time_limit() === 10000, `${name}: time limit mismatch`);
+    solver.SuppressOutput();
+    assert(!solver.OutputIsEnabled(), `${name}: output should be suppressed`);
+    solver.EnableOutput();
+    assert(solver.OutputIsEnabled(), `${name}: output should be enabled`);
+    solver.SuppressOutput();
+    solver.SetNumThreads(1);
+    assert(solver.GetNumThreads() >= 1, `${name}: GetNumThreads mismatch`);
+
+    const params = new api.MPSolverParameters();
+    let status = -1;
+    try {
+      assert(near(params.GetDoubleParam(api.MPSolverParameters.RELATIVE_MIP_GAP), 1e-4), `${name}: default relative MIP gap mismatch`);
+      params.SetDoubleParam(api.MPSolverParameters.PRIMAL_TOLERANCE, 1e-8);
+      assert(near(params.GetDoubleParam(api.MPSolverParameters.PRIMAL_TOLERANCE), 1e-8), `${name}: primal tolerance mismatch`);
+      params.ResetDoubleParam(api.MPSolverParameters.PRIMAL_TOLERANCE);
+      params.SetIntegerParam(api.MPSolverParameters.PRESOLVE, api.MPSolverParameters.PRESOLVE_ON);
+      assert(params.GetIntegerParam(api.MPSolverParameters.PRESOLVE) === api.MPSolverParameters.PRESOLVE_ON, `${name}: presolve mismatch`);
+      params.SetIntegerParam(api.MPSolverParameters.SCALING, api.MPSolverParameters.SCALING_ON);
+      params.ResetIntegerParam(api.MPSolverParameters.SCALING);
+      params.SetIntegerParam(api.MPSolverParameters.INCREMENTALITY, api.MPSolverParameters.INCREMENTALITY_ON);
+      params.SetIntegerParam(api.MPSolverParameters.LP_ALGORITHM, api.MPSolverParameters.PRIMAL);
+      params.Reset();
+      status = await solver.Solve(params);
+    } finally {
+      params.delete();
+    }
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+    assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+    assert(near(x1.ReducedCost(), 0.0), `${name}: reduced cost mismatch`);
+    assert(near(c0.DualValue(), 2 / 3), `${name}: dual value mismatch ${c0.DualValue()}`);
+    assert(solver.ComputeConstraintActivities().length === solver.NumConstraints(), `${name}: activity count mismatch`);
+    if (backend.supportsExactConditionNumber) {
+      assert(Number.isFinite(solver.ComputeExactConditionNumber()), `${name}: condition number should be finite`);
+    }
+    assert(!solver.NextSolution(), `${name}: ${backend.solverId} should not produce a next solution`);
+    assert(solver.SolverVersion().length > 0, `${name}: missing solver version`);
+
+    return {
+      name,
+      ok: true,
+      status,
+      objective: objective.Value(),
+      values: {
+        x1: x1.solution_value(),
+        x2: x2.solution_value(),
+        x3: x3.solution_value(),
+      },
+    };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runLinearCppStyleCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: lp_test.py RunLinearExampleCppStyleAPI (${backend.solverId})`;
+  const solver = createSolver(api, backend.solverId, name);
+  try {
+    const infinity = solver.infinity();
+    const x1 = solver.NumVar(0.0, infinity, 'x1');
+    const x2 = solver.NumVar(0.0, infinity, 'x2');
+    const x3 = solver.NumVar(0.0, infinity, 'x3');
+
+    const objective = solver.Objective();
+    objective.SetCoefficient(x1, 10);
+    objective.SetCoefficient(x2, 6);
+    objective.SetCoefficient(x3, 4);
+    objective.SetMaximization();
+
+    const c0 = solver.Constraint(-infinity, 100, 'c0');
+    c0.SetCoefficient(x1, 1);
+    c0.SetCoefficient(x2, 1);
+    c0.SetCoefficient(x3, 1);
+    const c1 = solver.Constraint(-infinity, 600, 'c1');
+    c1.SetCoefficient(x1, 10);
+    c1.SetCoefficient(x2, 4);
+    c1.SetCoefficient(x3, 5);
+    const c2 = solver.Constraint(-infinity, 300, 'c2');
+    c2.SetCoefficient(x1, 2);
+    c2.SetCoefficient(x2, 2);
+    c2.SetCoefficient(x3, 6);
+
+    assert(solver.NumVariables() === 3, `${name}: expected 3 variables`);
+    assert(solver.NumConstraints() === 3, `${name}: expected 3 constraints`);
+    const status = await solver.Solve();
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+    assert(solver.VerifySolution(1e-7, true), `${name}: VerifySolution failed`);
+    assert(near(objective.Value(), 733.3333333333333, 1e-5), `${name}: objective mismatch ${objective.Value()}`);
+    assert(near(x1.solution_value(), 33.3333333333333, 1e-5), `${name}: x1 mismatch`);
+    assert(near(x2.solution_value(), 66.6666666666667, 1e-5), `${name}: x2 mismatch`);
+    assert(near(x3.solution_value(), 0, 1e-7), `${name}: x3 mismatch`);
+    assert(near(x1.ReducedCost(), 0, 1e-7), `${name}: x1 reduced cost mismatch`);
+    assert(near(x3.ReducedCost(), backend.x3ReducedCost, 1e-5), `${name}: x3 reduced cost mismatch ${x3.ReducedCost()}`);
+    const activities = solver.ComputeConstraintActivities();
+    assert(near(activities[c0.index()], 100, 1e-5), `${name}: c0 activity mismatch`);
+    assert(near(activities[c1.index()], 600, 1e-5), `${name}: c1 activity mismatch`);
+    assert(near(activities[c2.index()], 200, 1e-5), `${name}: c2 activity mismatch`);
+    assert(x1.basis_status() === api.MPSolver.BASIC, `${name}: x1 basis mismatch`);
+    assert(x3.basis_status() === api.MPSolver.AT_LOWER_BOUND, `${name}: x3 basis mismatch`);
+
+    return {
+      name,
+      ok: true,
+      status,
+      objective: objective.Value(),
+      values: { x1: x1.solution_value(), x2: x2.solution_value(), x3: x3.solution_value() },
+    };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runBooleanCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  const name = 'MPSolver: lp_test.py RunBooleanExampleCppStyleAPI';
+  const solver = createSolver(api, 'SAT', name);
+  try {
+    const x1 = solver.BoolVar('x1');
+    const x2 = solver.BoolVar('x2');
+    assert(solver.IsMIP(), `${name}: SAT should be MIP`);
+    assert(x1.Integer() && x2.Integer(), `${name}: BoolVar should be integer`);
+
+    const objective = solver.Objective();
+    objective.SetCoefficient(x1, 2);
+    objective.SetCoefficient(x2, 1);
+    objective.SetMinimization();
+    assert(objective.minimization(), `${name}: objective should minimize`);
+
+    const c0 = solver.Constraint(1, 3, 'c0');
+    c0.SetCoefficient(x1, 1);
+    c0.SetCoefficient(x2, 2);
+    c0.set_is_lazy(true);
+    assert(c0.is_lazy(), `${name}: laziness mismatch`);
+    solver.SetHint([x1, x2], [1, 0]);
+
+    const status = await solver.Solve();
+    assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
+    assert(near(objective.Value(), 1), `${name}: objective mismatch`);
+    assert(near(x1.solution_value(), 0), `${name}: x1 mismatch`);
+    assert(near(x2.solution_value(), 1), `${name}: x2 mismatch`);
+
+    return {
+      name,
+      ok: true,
+      status,
+      objective: objective.Value(),
+      values: { x1: x1.solution_value(), x2: x2.solution_value() },
+    };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runExportToMpsCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  const name = 'MPSolver: lp_test.py testExportToMps';
+  const solver = new api.MPSolver('ExportMps', api.MPSolver.GLOP_LINEAR_PROGRAMMING);
+  try {
+    const infinity = solver.infinity();
+    const x1 = solver.NumVar(0.0, infinity, 'x1');
+    const x2 = solver.NumVar(0.0, infinity, 'x2');
+    const x3 = solver.NumVar(0.0, infinity, 'x3');
+    const objective = solver.Objective();
+    objective.SetCoefficient(x1, 10);
+    objective.SetCoefficient(x2, 6);
+    objective.SetCoefficient(x3, 4);
+    objective.SetMaximization();
+
+    const c0 = solver.Constraint(-infinity, 600, 'ConstraintName0');
+    c0.SetCoefficient(x1, 10);
+    c0.SetCoefficient(x2, 4);
+    c0.SetCoefficient(x3, 5);
+    const c1 = solver.Constraint(-infinity, 300, 'c1');
+    c1.SetCoefficient(x1, 2);
+    c1.SetCoefficient(x2, 2);
+    c1.SetCoefficient(x3, 6);
+    const c2 = solver.Constraint(-infinity, 100, 'OtherConstraintName');
+    c2.SetCoefficient(x1, 1);
+    c2.SetCoefficient(x2, 1);
+    c2.SetCoefficient(x3, 1);
+
+    const mps = solver.ExportModelAsMpsFormat(false, false);
+    assert(mps.includes('ExportMps'), `${name}: MPS export missing model name`);
+
+    return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: 0, values: {} };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runClearSupportCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  const name = 'MPSolver support: Clear';
+  const solver = createSolver(api, 'GLOP', name);
+  try {
+    const infinity = solver.infinity();
+    const x = solver.NumVar(0, infinity, 'x');
+    const y = solver.NumVar(0, infinity, 'y');
+    const objective = solver.Objective();
+    objective.SetCoefficient(x, 1);
+    objective.SetCoefficient(y, 2);
+    objective.SetMaximization();
+    const c = solver.Constraint(-infinity, 4, 'limit');
+    c.SetCoefficient(x, 1);
+    c.SetCoefficient(y, 1);
+
+    const lp = solver.ExportModelAsLpFormat(false);
+    assert(lp.includes('Maximize'), `${name}: LP export missing Maximize`);
+    solver.Clear();
+    assert(solver.NumVariables() === 0, `${name}: Clear did not remove variables`);
+    assert(solver.NumConstraints() === 0, `${name}: Clear did not remove constraints`);
+
+    return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: 0, values: {} };
+  } finally {
+    solver.delete();
+  }
+}
+
+function mpProtoRequest(api: MPSolverApi, numWorkers: number) {
+  return {
+    solverType: api.MPSolver.SAT_INTEGER_PROGRAMMING,
+    solverSpecificParameters: `num_workers: ${numWorkers}`,
+    model: {
+      name: `MPSolver proto ${numWorkers} workers`,
+      maximize: true,
+      variable: [
+        { lowerBound: 0, upperBound: Number.POSITIVE_INFINITY, objectiveCoefficient: 1, isInteger: true, name: 'x' },
+        { lowerBound: 0, upperBound: Number.POSITIVE_INFINITY, objectiveCoefficient: 10, isInteger: true, name: 'y' },
+      ],
+      constraint: [
+        { lowerBound: Number.NEGATIVE_INFINITY, upperBound: 17.5, varIndex: [0, 1], coefficient: [1, 7], name: 'c0' },
+        { lowerBound: Number.NEGATIVE_INFINITY, upperBound: 3.5, varIndex: [0], coefficient: [1], name: 'c1' },
+      ],
+    },
+  };
+}
+
+function lpApiTestProtoRequest(solverType: number) {
+  return {
+    solverType,
+    model: {
+      maximize: true,
+      variable: [
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 2 },
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 1 },
+      ],
+      constraint: [
+        {
+          lowerBound: -10000,
+          upperBound: 4,
+          varIndex: [0, 1],
+          coefficient: [1, 2],
+        },
+      ],
+    },
+  };
+}
+
+function pywrapLpTestCbcProtoRequest(api: MPSolverApi) {
+  return {
+    solverType: api.MPSolver.CBC_MIXED_INTEGER_PROGRAMMING,
+    model: {
+      variable: [
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 2 },
+        { lowerBound: 1, upperBound: 10, objectiveCoefficient: 1 },
+      ],
+      constraint: [
+        {
+          lowerBound: -10000,
+          upperBound: 4,
+          varIndex: [0, 1],
+          coefficient: [1, 2],
+        },
+      ],
+    },
+  };
+}
+
+function lpTestSolveFromProtoRequest(solverType: number) {
+  return {
+    solverType,
+    solverTimeLimitSeconds: 1.0,
+    solverSpecificParameters: '',
+    model: {
+      maximize: false,
+      objectiveOffset: 0,
+      name: 'NAME_LONGER_THAN_8_CHARACTERS',
+      variable: [
+        { lowerBound: 0, upperBound: 4, objectiveCoefficient: 1, isInteger: false, name: 'XONE' },
+        { lowerBound: -1, upperBound: 1, objectiveCoefficient: 4, isInteger: false, name: 'YTWO' },
+        { lowerBound: 0, upperBound: Number.POSITIVE_INFINITY, objectiveCoefficient: 9, isInteger: false, name: 'ZTHREE' },
+      ],
+      constraint: [
+        {
+          lowerBound: Number.NEGATIVE_INFINITY,
+          upperBound: 5,
+          name: 'LIM1',
+          varIndex: [0, 1],
+          coefficient: [1, 1],
+        },
+        {
+          lowerBound: 10,
+          upperBound: Number.POSITIVE_INFINITY,
+          name: 'LIM2',
+          varIndex: [0, 2],
+          coefficient: [1, 1],
+        },
+        {
+          lowerBound: 7,
+          upperBound: 7,
+          name: 'MYEQN',
+          varIndex: [1, 2],
+          coefficient: [-1, 1],
+        },
+      ],
+    },
+  };
+}
+
+async function runProtoSolveCase(
+  api: MPSolverApi,
+  mode: ExecutorFixtureMode,
+  numWorkers: number,
+  displayName?: string,
+): Promise<MpSolverCaseResult> {
+  const name = displayName ?? `MPSolver: MPModelRequest solve (${mode}, ${numWorkers} worker${numWorkers === 1 ? '' : 's'})`;
+  const result = await api.MPSolver.solveModelRequest(mpProtoRequest(api, numWorkers));
+  const response = result.response;
+  assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+  assert(near(Number(response.objectiveValue), 23), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+  const variableValues = response.variableValue as number[];
+  assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+  assert(near(variableValues[0], 3), `${name}: x mismatch ${variableValues[0]}`);
+  assert(near(variableValues[1], 2), `${name}: y mismatch ${variableValues[1]}`);
+  return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
+}
+
+async function runLpApiTestProtoCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: lp_api_test.py test_proto (${backend.solverId})`;
+  const result = await api.MPSolver.solveModelRequest(lpApiTestProtoRequest(backend.problemType));
+  const response = result.response;
+  assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+  assert(near(Number(response.objectiveValue), 5), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+  const variableValues = response.variableValue as number[];
+  assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+  assert(near(variableValues[0], 2), `${name}: x mismatch ${variableValues[0]}`);
+  assert(near(variableValues[1], 1), `${name}: y mismatch ${variableValues[1]}`);
+  return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
+}
+
+async function runPywrapLpTestCbcProtoCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  // TEMP: parity - mirrors ortools/linear_solver/python/pywraplp_test.py
+  // PyWrapLp.test_proto with the same CBC MPModelProto, objective, variable
+  // values, and best-objective-bound assertions.
+  const name = 'MPSolver: pywraplp_test.py test_proto (CBC)';
+  const result = await api.MPSolver.solveModelRequest(pywrapLpTestCbcProtoRequest(api));
+  const response = result.response;
+  assert(response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(response.status)}`);
+  assert(near(Number(response.objectiveValue), 3), `${name}: objective mismatch ${String(response.objectiveValue)}`);
+  const variableValues = response.variableValue as number[];
+  assert(Array.isArray(variableValues), `${name}: expected variableValue array`);
+  assert(near(variableValues[0], 1), `${name}: x mismatch ${variableValues[0]}`);
+  assert(near(variableValues[1], 1), `${name}: y mismatch ${variableValues[1]}`);
+  assert(near(Number(response.bestObjectiveBound), 3), `${name}: best objective bound mismatch ${String(response.bestObjectiveBound)}`);
+  return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(response.objectiveValue), values: { x: variableValues[0], y: variableValues[1] } };
+}
+
+async function runLpTestLoadSolutionFromProtoCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
+  const name = 'MPSolver: lp_test.py testLoadSolutionFromProto';
+  const solver = new api.MPSolver('', api.MPSolver.GLOP_LINEAR_PROGRAMMING);
+  try {
+    assert(typeof solver.LoadSolutionFromProto === 'function', `${name}: LoadSolutionFromProto is not exposed`);
+    await solver.LoadSolutionFromProto({});
+    return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: 0, values: {} };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runLpTestSolveFromProtoCase(api: MPSolverApi, backend: LpBackend): Promise<MpSolverCaseResult> {
+  const name = `MPSolver: lp_test.py testSolveFromProto (${backend.solverId})`;
+  const request = lpTestSolveFromProtoRequest(backend.problemType);
+  assert((request.model.variable as unknown[]).length === 3, `${name}: expected 3 variables`);
+  const result = await api.MPSolver.solveModelRequest(request);
+  assert(result.response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL, got ${String(result.response.status)}`);
+  return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(result.response.objectiveValue), values: {} };
+}
+
+async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string): Promise<MpSolverCaseResult> {
+  const name = displayName ?? 'MPSolver: SolveWithProto loads solution';
+  const solver = createSolver(api, 'SAT', name);
+  try {
+    const infinity = solver.infinity();
+    const x = solver.IntVar(0, infinity, 'x');
+    const y = solver.IntVar(0, infinity, 'y');
+    const c0 = solver.Constraint(-infinity, 17.5, 'c0');
+    c0.SetCoefficient(x, 1);
+    c0.SetCoefficient(y, 7);
+    const c1 = solver.Constraint(-infinity, 3.5, 'c1');
+    c1.SetCoefficient(x, 1);
+    const objective = solver.Objective();
+    objective.SetCoefficient(x, 1);
+    objective.SetCoefficient(y, 10);
+    objective.SetMaximization();
+
+    const result = await solver.SolveWithProto({ solverSpecificParameters: 'num_workers: 4' });
+    assert(result.loaded, `${name}: solution was not loaded back into the solver`);
+    assert(result.response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL`);
+    assert(near(objective.Value(), 23), `${name}: loaded objective mismatch ${objective.Value()}`);
+    assert(near(x.solution_value(), 3), `${name}: loaded x mismatch ${x.solution_value()}`);
+    assert(near(y.solution_value(), 2), `${name}: loaded y mismatch ${y.solution_value()}`);
+    return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: objective.Value(), values: { x: x.solution_value(), y: y.solution_value() } };
+  } finally {
+    solver.delete();
+  }
+}
+
+async function runProtoSolveMatrix(
+  api: MPSolverApi,
+  options: MPSolverRunOptions,
+  mode: ExecutorFixtureMode,
+): Promise<MpSolverCaseResult[]> {
+  const results: MpSolverCaseResult[] = [];
+  for (const numWorkers of [1, 4]) {
+    options.onProgress?.('MPSolver: MPModelRequest solve', { mode, numWorkers });
+    results.push(await runProtoSolveCase(api, mode, numWorkers));
+  }
+  return results;
+}
+
+async function runMPSolverModeMatrix(
+  api: MPSolverApi,
+  options: MPSolverRunOptions,
+  label: string,
+  mode: ExecutorFixtureMode,
+  run: (mode: ExecutorFixtureMode) => Promise<MpSolverCaseResult>,
+): Promise<MpSolverCaseResult[]> {
+  options.onProgress?.(label, { mode });
+  return [await run(mode)];
+}
+
+async function runMPSolverContractCasesForMode(
+  api: MPSolverApi,
+  options: MPSolverRunOptions,
+  mode: ExecutorFixtureMode,
+): Promise<MpSolverCaseResult[]> {
+  setMPSolverMode(api, mode);
+  options.onProgress?.('MPSolver: initMPSolver');
+  await api.initMPSolver();
+  const protoResults = await runProtoSolveMatrix(api, options, mode);
+  const linearBackends = lpBackends(api);
+  const externalApiResults = [];
+  const lpApiProtoResults = [];
+  const linearCppStyleResults = [];
+  const solveFromProtoResults = [];
+  for (const backend of linearBackends) {
+    options.onProgress?.('MPSolver: pywraplp_test.py/test_external_api', { backend: backend.solverId });
+    externalApiResults.push(await runExternalApiCase(api, backend));
+    options.onProgress?.('MPSolver: lp_api_test.py/test_proto', { backend: backend.solverId });
+    lpApiProtoResults.push(await runLpApiTestProtoCase(api, backend));
+    options.onProgress?.('MPSolver: lp_test.py/RunLinearExampleCppStyleAPI', { backend: backend.solverId });
+    linearCppStyleResults.push(await runLinearCppStyleCase(api, backend));
+    options.onProgress?.('MPSolver: lp_test.py/testSolveFromProto', { backend: backend.solverId });
+    solveFromProtoResults.push(await runLpTestSolveFromProtoCase(api, backend));
+  }
+  options.onProgress?.('MPSolver: MPModelRequest stateful solve');
+  const statefulProtoSolve = await runStatefulProtoSolveCase(api);
+  options.onProgress?.('MPSolver: pywraplp_test.py/test_proto CBC');
+  const cbcProto = await runPywrapLpTestCbcProtoCase(api);
+  options.onProgress?.('MPSolver: lp_test.py/RunMixedIntegerExampleCppStyleAPI');
+  const mixedIntegerCppStyle = await runMixedIntegerCppStyleCase(api);
+  options.onProgress?.('MPSolver: GLPK simple_mip_program.py');
+  const glpkMixedInteger = await runGlpkMixedIntegerCase(api);
+  options.onProgress?.('MPSolver: SCIP simple_mip_program.py');
+  const scipMixedInteger = await runScipMixedIntegerCase(api);
+  options.onProgress?.('MPSolver: CBC simple_mip_program.py');
+  const cbcMixedInteger = await runCbcMixedIntegerCase(api);
+  const bopBinaryResults = await runMPSolverModeMatrix(
+    api,
+    options,
+    'MPSolver: BOP binary project selection',
+    mode,
+    (mode) => runBopBinaryCase(api, mode),
+  );
+  const bopIntegerResults = await runMPSolverModeMatrix(
+    api,
+    options,
+    'MPSolver: BOP integer production',
+    mode,
+    (mode) => runBopIntegerCase(api, mode),
+  );
+  const knapsackBackendResults = await runMPSolverModeMatrix(
+    api,
+    options,
+    'MPSolver: Knapsack backend',
+    mode,
+    (mode) => runKnapsackBackendCase(api, mode),
+  );
+  options.onProgress?.('MPSolver: lp_test.py/RunBooleanExampleCppStyleAPI');
+  const booleanCppStyle = await runBooleanCppStyleCase(api);
+  const results = [
+    statefulProtoSolve,
+    ...protoResults,
+    ...externalApiResults,
+    skipped(
+      'MPSolver: lp_api_test.py test_sum_no_brackets',
+      'Not applicable: this tests Python generator/list summation helper behavior, not OR-Tools solver API.',
+    ),
+    cbcProto,
+    ...lpApiProtoResults,
+    skipped(
+      'MPSolver: lp_test.py RunLinearExampleNaturalLanguageAPI',
+      'Blocked: Python operator-overloaded natural expression API is not exposed in TypeScript.',
+    ),
+    ...linearCppStyleResults,
+    mixedIntegerCppStyle,
+    glpkMixedInteger,
+    scipMixedInteger,
+    cbcMixedInteger,
+    ...bopBinaryResults,
+    ...bopIntegerResults,
+    ...knapsackBackendResults,
+    booleanCppStyle,
+    skipped(
+      'MPSolver: lp_test.py testApi',
+      'Partially mirrored by backend-specific C++ style cases; upstream also exercises Python-only natural expression helpers.',
+    ),
+    await runSetHintCase(api),
+    await runBopInfeasibleCase(api),
+    await runLpTestLoadSolutionFromProtoCase(api),
+    ...solveFromProtoResults,
+    await runExportToMpsCase(api),
+    await runClearSupportCase(api),
+    ...(await runSimpleProgramBridgeMatrix(
+      api,
+      mode,
+      'MPSolver: simple_lp_program.py',
+      'GLOP',
+      (solver, infinity) => solver.NumVar(0, infinity, 'x'),
+      (solver, infinity) => solver.NumVar(0, infinity, 'y'),
+      { objective: 25, x: 0, y: 2.5 },
+    )),
+    ...(await runSimpleProgramBridgeMatrix(
+      api,
+      mode,
+      'MPSolver: CLP simple_lp_program.py',
+      'CLP',
+      (solver, infinity) => solver.NumVar(0, infinity, 'x'),
+      (solver, infinity) => solver.NumVar(0, infinity, 'y'),
+      { objective: 25, x: 0, y: 2.5 },
+    )),
+    ...(await runSimpleProgramBridgeMatrix(
+      api,
+      mode,
+      'MPSolver: GLPK_LP simple_lp_program.py',
+      'GLPK_LP',
+      (solver, infinity) => solver.NumVar(0, infinity, 'x'),
+      (solver, infinity) => solver.NumVar(0, infinity, 'y'),
+      { objective: 25, x: 0, y: 2.5 },
+    )),
+    ...(await runSimpleProgramBridgeMatrix(
+      api,
+      mode,
+      'MPSolver: simple_mip_program.py',
+      'SAT',
+      (solver, infinity) => solver.IntVar(0, infinity, 'x'),
+      (solver, infinity) => solver.IntVar(0, infinity, 'y'),
+      { objective: 23, x: 3, y: 2 },
+    )),
+    ...(await runSimpleProgramBridgeMatrix(
+      api,
+      mode,
+      'MPSolver: GLPK simple_mip_program.py',
+      'GLPK',
+      (solver, infinity) => solver.IntVar(0, infinity, 'x'),
+      (solver, infinity) => solver.IntVar(0, infinity, 'y'),
+      { objective: 23, x: 3, y: 2 },
+    )),
+    ...(await runSimpleProgramBridgeMatrix(
+      api,
+      mode,
+      'MPSolver: SCIP simple_mip_program.py',
+      'SCIP',
+      (solver, infinity) => solver.IntVar(0, infinity, 'x'),
+      (solver, infinity) => solver.IntVar(0, infinity, 'y'),
+      { objective: 23, x: 3, y: 2 },
+    )),
+    ...(await runCbcExecutorCase(api, mode)),
+  ];
+  return results.map((result) => ({ ...decorateMpSolverResult(result), mode }));
+}
+
+export async function runMPSolverContractCases(
+  api: MPSolverApi,
+  options: MPSolverRunOptions = {},
+): Promise<MpSolverCaseResult[]> {
+  const modes = options.modes ?? executorFixtureModes;
+  if (modes.includes('server')) await assertServerExecutorIsRunning();
+  const results: MpSolverCaseResult[] = [];
+  for (const mode of modes) {
+    results.push(...await runMPSolverContractCasesForMode(api, options, mode));
+  }
+  return results;
+}
