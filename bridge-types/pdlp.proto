@@ -2,6 +2,12 @@ syntax = "proto3";
 
 package ortools_wasm.bridge.v1;
 
+// PDLP executor payload messages.
+//
+// The generic job.proto envelope supplies request identity, lifecycle,
+// failures, resources, and cancellation. This schema only describes PDLP
+// operations and results shared by worker and server execution.
+
 message PdlpSparseMatrixEntry {
   int32 row = 1;
   int32 column = 2;
@@ -33,6 +39,7 @@ message PdlpSolveParameters {
   optional double eps_optimal_absolute = 4;
   optional int32 l_inf_ruiz_iterations = 5;
   optional bool l2_norm_rescaling = 6;
+  optional int32 num_threads = 7;
 }
 
 message PdlpInitialSolution {
@@ -40,23 +47,38 @@ message PdlpInitialSolution {
   repeated double dual_solution = 2;
 }
 
-enum PdlpOperation {
-  PDLP_OPERATION_UNSPECIFIED = 0;
-  PDLP_OPERATION_VALIDATE = 1;
-  PDLP_OPERATION_IS_LINEAR = 2;
-  PDLP_OPERATION_FROM_MP_MODEL = 3;
-  PDLP_OPERATION_TO_MP_MODEL = 4;
-  PDLP_OPERATION_SOLVE = 5;
+message PdlpValidateRequest {
+  PdlpQuadraticProgram quadratic_program = 1;
+}
+
+message PdlpIsLinearRequest {
+  PdlpQuadraticProgram quadratic_program = 1;
+}
+
+message PdlpFromMpModelRequest {
+  bytes mp_model_proto = 1;
+  bool relax_integer_variables = 2;
+  bool include_names = 3;
+}
+
+message PdlpToMpModelRequest {
+  PdlpQuadraticProgram quadratic_program = 1;
+}
+
+message PdlpSolveRequest {
+  PdlpQuadraticProgram quadratic_program = 1;
+  PdlpSolveParameters parameters = 2;
+  PdlpInitialSolution initial_solution = 3;
 }
 
 message PdlpBridgeRequest {
-  PdlpOperation operation = 1;
-  PdlpQuadraticProgram quadratic_program = 2;
-  bytes mp_model_proto = 3;
-  bool relax_integer_variables = 4;
-  bool include_names = 5;
-  PdlpSolveParameters parameters = 6;
-  PdlpInitialSolution initial_solution = 7;
+  oneof payload {
+    PdlpValidateRequest validate = 1;
+    PdlpIsLinearRequest is_linear = 2;
+    PdlpFromMpModelRequest from_mp_model = 3;
+    PdlpToMpModelRequest to_mp_model = 4;
+    PdlpSolveRequest solve = 5;
+  }
 }
 
 message PdlpSolverResult {
@@ -67,10 +89,32 @@ message PdlpSolverResult {
   int32 iteration_count = 5;
 }
 
+message PdlpValidateResult {
+  string message = 1;
+}
+
+message PdlpIsLinearResult {
+  bool value = 1;
+}
+
+message PdlpFromMpModelResult {
+  PdlpQuadraticProgram quadratic_program = 1;
+}
+
+message PdlpToMpModelResult {
+  bytes mp_model_proto = 1;
+}
+
+message PdlpSolveResult {
+  PdlpSolverResult solver_result = 1;
+}
+
 message PdlpBridgeResponse {
-  string validation_error = 1;
-  bool is_linear = 2;
-  PdlpQuadraticProgram quadratic_program = 3;
-  bytes mp_model_proto = 4;
-  PdlpSolverResult solver_result = 5;
+  oneof payload {
+    PdlpValidateResult validate_result = 1;
+    PdlpIsLinearResult is_linear_result = 2;
+    PdlpFromMpModelResult from_mp_model_result = 3;
+    PdlpToMpModelResult to_mp_model_result = 4;
+    PdlpSolveResult solve_result = 5;
+  }
 }

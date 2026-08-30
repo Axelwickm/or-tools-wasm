@@ -51,7 +51,7 @@ model.add(x.plus(y.times(2)).eq(14));
 model.maximize(x.plus(y));
 
 const solver = new CpSolver();
-solver.parameters.numSearchWorkers = 4;
+solver.parameters.numWorkers = 4;
 const status = await solver.solve(model);
 
 console.log(solver.statusName(status));
@@ -434,11 +434,6 @@ failure events. Pass an `AbortSignal` as `options.signal` to cancel a solve.
 Returns embedded `.proto` schemas. CP-SAT always returns `cp_model` and
 `sat_parameters`; MPSolver-related schemas may be present when fetched through
 the worker path.
-
-`CpSat.loadModule(): Promise<unknown>`
-
-Loads the CP-SAT WebAssembly module directly. This is mostly an escape hatch;
-normal application code should use `solve()`.
 
 `CpSat.setWorkerBridgeEnabled(enabled: boolean): void`
 
@@ -1289,14 +1284,12 @@ thread, but there is no solver thread-count parameter.
 Import:
 
 ```ts
-import { GScipParameters, GlpkParameters, initMathOpt, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm/mathopt';
+import { GScipParameters, GlpkParameters, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm/mathopt';
 ```
 
 Initialize, build a model, and solve:
 
 ```ts
-await initMathOpt();
-
 const model = MathOpt.Model('basic');
 const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
 const y = model.addVariable({ lowerBound: 0, upperBound: 2, name: 'y' });
@@ -1306,16 +1299,14 @@ model.addLinearConstraint({
 });
 model.maximize([MathOpt.linearTerm(x, 2), MathOpt.linearTerm(y)]);
 
-const result = await MathOpt.solve(model, { solverType: MathOpt.SolverType.GLOP });
+const result = await MathOpt.solve(model, {
+  executor: 'worker',
+  solverType: MathOpt.SolverType.GLOP,
+});
 ```
 
-### Initialization
-
-`initMathOpt(): Promise<void>`
-
-Loads the MathOpt WebAssembly runtime.
-When the browser worker bridge is enabled, it initializes the MathOpt worker
-runtime instead.
+The runtime is loaded lazily. Select `auto`, `direct`, `worker`, `server`, or
+`cloud` per solve with the `executor` option.
 
 ### `MathOpt`
 
@@ -1344,36 +1335,19 @@ Static constructors and aliases:
 - `MathOpt.GlpkParameters`
 - `MathOpt.SolveInterrupter`
 - `MathOpt.IncrementalSolver`
-- `MathOpt.SolveParameters`
 - `MathOpt.ModelSolveParameters`
 - `MathOpt.SparseVectorFilter`
 - `MathOpt.SolutionHint`
-- `MathOpt.setWorkerBridgeEnabled(enabled): void`
-- `MathOpt.isWorkerBridgeEnabled(): boolean`
-- `MPSolver.setWorkerBridgeEnabled(enabled): void`
-- `MPSolver.isWorkerBridgeEnabled(): boolean`
-- `Pdlp.setWorkerBridgeEnabled(enabled): void`
-- `Pdlp.isWorkerBridgeEnabled(): boolean`
-- `NetworkFlow.setWorkerBridgeEnabled(enabled): void`
-- `NetworkFlow.isWorkerBridgeEnabled(): boolean`
-- `RoutingModel.setWorkerBridgeEnabled(enabled): void`
-- `RoutingModel.isWorkerBridgeEnabled(): boolean`
 
 Top-level value exports:
 
-- `initMathOpt`
 - `MathOpt`
-- `setWorkerBridgeEnabled`
-- `isWorkerBridgeEnabled`
-- `isWorkerBridgeAvailable`
-- `terminateWorkerBridge`
 - `terminateLoadedRuntimeThreads`
 - `MathOptModel`
 - `MathOptObjective`
 - `MathOptIndicatorConstraint`
 - `MathOptSolveInterrupter`
 - `MathOptIncrementalSolver`
-- `MathOptSolveParameters`
 - `MathOptModelSolveParameters`
 - `MathOptSparseVectorFilter`
 - `MathOptSolutionHint`
@@ -1397,6 +1371,8 @@ Top-level type exports:
 - `MathOptDualRayResult`
 - `MathOptBasisResult`
 - `MathOptIndicatorConstraintOptions`
+- `MathOptIncrementalSolveOptions`
+- `MathOptIncrementalSolverOptions`
 - `MathOptLinearConstraint`
 - `MathOptLinearConstraintMatrixEntry`
 - `MathOptLinearTerm`
@@ -1407,7 +1383,6 @@ Top-level type exports:
 - `MathOptSolutionHintOptions`
 - `MathOptSolveInterrupterLike`
 - `MathOptSolveOptions`
-- `MathOptSolveParametersOptions`
 - `MathOptSolveResult`
 - `MathOptSparseVectorFilterInput`
 - `MathOptSparseVectorFilterOptions`
@@ -1424,18 +1399,15 @@ Solving:
 - `MathOpt.encodeSolveRequest(model, options?): Uint8Array`
 - `new MathOpt.IncrementalSolver(model, solverType?, options?)`
 - `incrementalSolver.solve(options?): Promise<MathOptSolveResult>`
-- `incrementalSolver.Solve(options?): Promise<MathOptSolveResult>`
 - `incrementalSolver.close(): Promise<void>`
 
 `MathOptSolveOptions`:
 
+- `executor?: 'auto' | 'direct' | 'worker' | 'server' | 'cloud' | ExecutorConfiguration`
 - `solverType?: MathOptSolverType | keyof typeof MathOptSolverType`
 - `removeNames?: boolean`
 - `interrupter?: MathOptSolveInterrupter`
 - `messageCallback?: (messages: string[]) => void`
-- `msg_cb?: (messages: string[]) => void`
-- `parameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions`
-- `solveParameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions`
 - `modelParameters?: Uint8Array | MathOptModelSolveParameters | MathOptModelSolveParametersOptions`
 - `timeLimitSeconds?: number`
 - `threads?: number`
@@ -1457,20 +1429,15 @@ Solving:
 - `scaling?: MathOptEmphasis | keyof typeof MathOptEmphasis`
 - `gscip?: GScipParameters | GScipParametersOptions | Uint8Array`
 - `glop?: GlopParameters | GlopParametersOptions | Uint8Array`
-- `cpSat?: SatParameters | Uint8Array`
+- `cpSat?: Omit<SatParameters, 'numWorkers' | 'numSearchWorkers'> | Uint8Array`
 - `pdlp?: PdlpParameters | PdlpParametersOptions | Uint8Array`
 - `glpk?: GlpkParameters | GlpkParametersOptions | Uint8Array`
 
-Snake-case aliases are accepted for proto-shaped names where they are useful
-for Python/protobuf parity, for example `time_limit_seconds`,
-`relative_gap_tolerance`, `remove_names`, `cp_sat`, and
-`compute_unbound_rays_if_possible`.
-
-`removeNames` / `remove_names` omits model, variable, linear constraint, and
+`removeNames` omits model, variable, linear constraint, and
 indicator constraint names from the encoded `ModelProto`, matching upstream
 MathOpt `solve(remove_names=True)` behavior for models with duplicate names.
 
-`messageCallback` / `msg_cb` receives batched solver log lines after the WASM
+`messageCallback` receives batched solver log lines after the WASM
 solve returns. Passing a message callback enables solver output capture and
 also stores the captured lines on `MathOptSolveResult.messages`.
 
@@ -1510,18 +1477,18 @@ Tracked incremental updates include variable bounds/integrality, linear
 constraint bounds, objective changes, new/deleted variables and linear
 constraints, matrix coefficient changes, and new/deleted indicator constraints.
 Constructor options are used as defaults for every solve; per-call `solve()`
-options override those defaults except for the solver type, which is fixed by
-the incremental solver. `Solve()` is an alias for `solve()`. `close()` releases
-the native handle and is safe to call more than once.
+options override those defaults except for executor placement and solver type,
+which are fixed by the incremental solver. `close()` releases the native handle
+and is safe to call more than once.
 
-`solve()` accepts the same solve options as `MathOpt.solve()`, including
-message callbacks, `SolveParameters`, `ModelSolveParameters`, backend-specific
-parameters, and pre-interrupted solve interrupters. If a backend rejects an
+`solve()` accepts the same solver options as `MathOpt.solve()`, including
+message callbacks, `ModelSolveParameters`, backend-specific parameters, and
+pre-interrupted solve interrupters. If a backend rejects an
 incremental model update but can solve the current full model, the wrapper
 recreates the native solver and solves from that current full model. This keeps
 callers on one API for backends with limited update support, while still
 surfacing errors from invalid full models. Duplicate names are rejected for
-incremental solvers unless `removeNames` / `remove_names` is set.
+incremental solvers unless `removeNames` is set.
 
 `ModelSolveParameters` can request a filtered result. This is a result-size
 filter, not a separate partial optimization model: the solver still optimizes
@@ -1554,34 +1521,29 @@ solver-specific proto fields:
 
 - `GScipParameters`: emphasis, meta parameters, raw SCIP bool/int/long/real/char/string maps, output controls, `numSolutions`, and `objectiveLimit`
 - `GlopParameters`: `useScaling`, `maxTimeInSeconds`, `useDualSimplex`, and `usePreprocessing`
-- `PdlpParameters`: termination criteria, threading/sharding, scheduler, logging, restart, rescaling, linesearch, trust-region, and feasibility-polishing controls
+- `PdlpParameters`: termination criteria, sharding, scheduler, logging, restart, rescaling, linesearch, trust-region, and feasibility-polishing controls
 - `GlpkParameters`: `computeUnboundRaysIfPossible`
 
-`cpSat` accepts a `SatParameters`-shaped object for the commonly used MathOpt
-CP-SAT backend fields currently encoded by this package (`numWorkers`,
-`maxTimeInSeconds`, `randomSeed`, and logging flags), or raw `Uint8Array` proto
-bytes for advanced callers.
+`cpSat` accepts a `SatParameters`-shaped object for backend-specific settings
+such as `maxTimeInSeconds`, `randomSeed`, and logging flags, or raw `Uint8Array`
+proto bytes for advanced callers. Thread count is always configured with the
+top-level `threads` option, independent of the selected MathOpt backend.
 
-`parameters` / `solveParameters`, `modelParameters`, and each backend parameter
-option may be raw serialized proto bytes. This preserves a proto escape hatch
-for fields that do not yet have ergonomic TypeScript wrappers.
-
-`MathOpt.SolveParameters` wraps the same solver-independent fields accepted by
-`MathOptSolveOptions`, so callers can either pass flat solve options or an
-explicit parameter object.
+`modelParameters` and each backend parameter option may be raw serialized proto
+bytes. This preserves a proto escape hatch for backend fields that do not yet
+have ergonomic TypeScript wrappers.
 
 `MathOpt.ModelSolveParameters` encodes model-specific solve controls:
 
-- `variableValuesFilter` / `variable_values_filter`
-- `dualValuesFilter` / `dual_values_filter`
-- `reducedCostsFilter` / `reduced_costs_filter`
-- `quadraticDualValuesFilter` / `quadratic_dual_values_filter`
-- `initialBasis` / `initial_basis` as raw `BasisProto` bytes
-- `solutionHints` / `solution_hints`
-- `branchingPriorities` / `branching_priorities`
-- `lazyLinearConstraints`, `lazyLinearConstraintIds`, and snake-case aliases
-- `onlySomePrimalVariables(variables)` /
-  `only_some_primal_variables(variables)` as convenience constructors for
+- `variableValuesFilter`
+- `dualValuesFilter`
+- `reducedCostsFilter`
+- `quadraticDualValuesFilter`
+- `initialBasis` as raw `BasisProto` bytes
+- `solutionHints`
+- `branchingPriorities`
+- `lazyLinearConstraints`
+- `onlySomePrimalVariables(variables)` as a convenience constructor for
   filtering returned primal variable values
 
 `MathOpt.SparseVectorFilter` accepts `skipZeroValues`, `filterByIds`, and
@@ -1591,7 +1553,6 @@ accepts primal variable values and dual linear constraint values.
 `GlpkParameters` mirrors the upstream MathOpt GLPK-specific solve parameters:
 
 - `computeUnboundRaysIfPossible?: boolean`
-- `compute_unbound_rays_if_possible?: boolean`
 
 GLPK is single-threaded in this package. MathOpt GLPK solves reject
 `threads > 1`; omit `threads` or pass `threads: 1`.
@@ -1614,39 +1575,6 @@ GLPK is single-threaded in this package. MathOpt GLPK solves reject
 - `dualRays: MathOptDualRayResult[]`
 - `messages: string[]`
 - `rawResponse: Uint8Array`
-- `solve_time(): number | null`
-- `best_objective_bound(): number | null`
-- `has_primal_feasible_solution(): boolean`
-- `has_dual_feasible_solution(): boolean`
-- `has_ray(): boolean`
-- `has_dual_ray(): boolean`
-- `has_basis(): boolean`
-- `bounded(): boolean`
-- `objective_value(): number`
-- `variable_values(): Record<string, number>`
-- `variable_values(variable): number`
-- `variable_values(variables): number[]`
-- `reduced_costs(): Record<string, number>`
-- `reduced_costs(variable): number`
-- `reduced_costs(variables): number[]`
-- `dual_values(): Record<string, number>`
-- `dual_values(linearConstraint): number`
-- `dual_values(linearConstraints): number[]`
-- `ray_variable_values(): Record<string, number>`
-- `ray_variable_values(variable): number`
-- `ray_variable_values(variables): number[]`
-- `ray_reduced_costs(): Record<string, number>`
-- `ray_reduced_costs(variable): number`
-- `ray_reduced_costs(variables): number[]`
-- `ray_dual_values(): Record<string, number>`
-- `ray_dual_values(linearConstraint): number`
-- `ray_dual_values(linearConstraints): number[]`
-- `variable_status(): Record<string, string>`
-- `variable_status(variable): string`
-- `variable_status(variables): string[]`
-- `constraint_status(): Record<string, string>`
-- `constraint_status(linearConstraint): string`
-- `constraint_status(linearConstraints): string[]`
 
 `MathOptSolutionResult`:
 
@@ -1742,49 +1670,38 @@ rather than as top-level value exports.
 Variables:
 
 - `addVariable(options?): MathOptVariable`
-- `add_variable(options?): MathOptVariable`
 - `addIntegerVariable(options?): MathOptVariable`
-- `add_integer_variable(options?): MathOptVariable`
 - `addBinaryVariable(options?): MathOptVariable`
-- `add_binary_variable(options?): MathOptVariable`
 - `deleteVariable(variable): void`
-- `delete_variable(variable): void`
 - `variablesList(): MathOptVariable[]`
 - `variables(): MathOptVariable[]`
-- `getNumVariables()` / `get_num_variables(): number`
-- `getNextVariableId()` / `get_next_variable_id(): number`
+- `getNumVariables(): number`
+- `getNextVariableId(): number`
 - `ensureNextVariableIdAtLeast(id): void`
-- `ensure_next_variable_id_at_least(id): void`
-- `hasVariable(id)` / `has_variable(id): boolean`
+- `hasVariable(id): boolean`
 - `getVariable(id, validate?): MathOptVariable | undefined`
-- `get_variable(id, { validate }?): MathOptVariable`
 
 Linear constraints:
 
 - `addLinearConstraint(options?): MathOptLinearConstraint`
-- `add_linear_constraint(options?): MathOptLinearConstraint`
 - `deleteLinearConstraint(constraint): void`
-- `delete_linear_constraint(constraint): void`
-- `linearConstraints()` / `linear_constraints(): MathOptLinearConstraint[]`
-- `getNumLinearConstraints()` / `get_num_linear_constraints(): number`
-- `getNextLinearConstraintId()` / `get_next_linear_constraint_id(): number`
+- `linearConstraints(): MathOptLinearConstraint[]`
+- `getNumLinearConstraints(): number`
+- `getNextLinearConstraintId(): number`
 - `ensureNextLinearConstraintIdAtLeast(id): void`
-- `ensure_next_linear_constraint_id_at_least(id): void`
-- `hasLinearConstraint(id)` / `has_linear_constraint(id): boolean`
+- `hasLinearConstraint(id): boolean`
 - `getLinearConstraint(id, validate?): MathOptLinearConstraint | undefined`
-- `get_linear_constraint(id, { validate }?): MathOptLinearConstraint`
-- `columnNonzeros(variable)` / `column_nonzeros(variable): MathOptLinearConstraint[]`
-- `rowNonzeros(constraint)` / `row_nonzeros(constraint): MathOptVariable[]`
-- `linearConstraintMatrixEntries()` / `linear_constraint_matrix_entries(): MathOptLinearConstraintMatrixEntry[]`
+- `columnNonzeros(variable): MathOptLinearConstraint[]`
+- `rowNonzeros(constraint): MathOptVariable[]`
+- `linearConstraintMatrixEntries(): MathOptLinearConstraintMatrixEntry[]`
 
 Indicator constraints:
 
 - `addIndicatorConstraint(options?): MathOptIndicatorConstraint`
-- `add_indicator_constraint(options?): MathOptIndicatorConstraint`
 
 `MathOptLinearConstraintMatrixEntry` contains:
 
-- `linearConstraint` / `linear_constraint: MathOptLinearConstraint`
+- `linearConstraint: MathOptLinearConstraint`
 - `variable: MathOptVariable`
 - `coefficient: number`
 
@@ -1794,15 +1711,10 @@ Objective and encoding:
 - `maximize(terms, offset?): void`
 - `minimize(terms, offset?): void`
 - `maximizeLinearObjective(terms, offset?): void`
-- `maximize_linear_objective(terms, offset?): void`
 - `minimizeLinearObjective(terms, offset?): void`
-- `minimize_linear_objective(terms, offset?): void`
 - `setObjective(terms, isMaximize, offset?): void`
-- `set_objective(terms, is_maximize, offset?): void`
 - `setLinearObjective(terms, isMaximize, offset?): void`
-- `set_linear_objective(terms, is_maximize, offset?): void`
 - `setQuadraticObjective(terms, isMaximize, offset?): void`
-- `set_quadratic_objective(terms, is_maximize, offset?): void`
 - `variableName(id): string`
 - `linearConstraintName(id): string`
 - `encodeModelProto(): Uint8Array`
@@ -1812,7 +1724,6 @@ Objective and encoding:
 - `lb?: number`
 - `ub?: number`
 - `isInteger?: boolean`
-- `is_integer?: boolean`
 - `lowerBound?: number`
 - `upperBound?: number`
 - `integer?: boolean`
@@ -1836,9 +1747,7 @@ and `MathOpt.upperBoundedExpression()` results.
 
 - `indicator?: MathOptVariable`
 - `activateOnZero?: boolean`
-- `activate_on_zero?: boolean`
 - `impliedConstraint?: MathOpt.boundedExpression()` / `lowerBoundedExpression()` / `upperBoundedExpression()`
-- `implied_constraint?: ...`
 - `lb` / `lowerBound` and `ub` / `upperBound`
 - `expr` / `expression`
 - `terms?: MathOptLinearTerm[]`
@@ -1853,9 +1762,9 @@ Properties:
 
 - `id: number`
 - `name: string`
-- `lowerBound` / `lower_bound`
-- `upperBound` / `upper_bound`
-- `integer` / `is_integer`
+- `lowerBound`
+- `upperBound`
+- `integer`
 
 Methods:
 
@@ -1869,18 +1778,15 @@ Properties:
 
 - `id: number`
 - `name: string`
-- `lowerBound` / `lower_bound`
-- `upperBound` / `upper_bound`
+- `lowerBound`
+- `upperBound`
 
 Methods:
 
 - `setCoefficient(variable, coefficient): void`
-- `set_coefficient(variable, coefficient): void`
 - `getCoefficient(variable): number`
-- `get_coefficient(variable): number`
 - `terms(): MathOptLinearTerm[]`
 - `asBoundedLinearExpression(): MathOptBoundedExpression<MathOptLinearExpression>`
-- `as_bounded_linear_expression(): MathOptBoundedExpression<MathOptLinearExpression>`
 - `equals(other): boolean`
 - `toString(): string`
 - `assertLive(): void`
@@ -1889,26 +1795,22 @@ Methods:
 
 Properties:
 
-- `isMaximize` / `is_maximize`
+- `isMaximize`
 - `offset`
 - `name`
 
-`isMaximize` / `is_maximize` and `offset` are writable. `name` is read-only and
+`isMaximize` and `offset` are writable. `name` is read-only and
 is currently the empty string for the primary objective.
 
 Methods:
 
 - `clear(): void`
 - `setLinearCoefficient(variable, coefficient): void`
-- `set_linear_coefficient(variable, coefficient): void`
 - `getLinearCoefficient(variable): number`
-- `get_linear_coefficient(variable): number`
-- `linearTerms()` / `linear_terms(): MathOptLinearTerm[]`
+- `linearTerms(): MathOptLinearTerm[]`
 - `setQuadraticCoefficient(firstVariable, secondVariable, coefficient): void`
-- `set_quadratic_coefficient(firstVariable, secondVariable, coefficient): void`
 - `getQuadraticCoefficient(firstVariable, secondVariable): number`
-- `get_quadratic_coefficient(firstVariable, secondVariable): number`
-- `quadraticTerms()` / `quadratic_terms(): MathOptQuadraticTerm[]`
+- `quadraticTerms(): MathOptQuadraticTerm[]`
 
 ### MathOpt Expression Classes
 
@@ -1937,8 +1839,7 @@ Methods:
 
 - Returned by `MathOpt.variableEq(lhs, rhs)` when two different live variables
   belong to the same model.
-- Properties: `firstVariable` / `first_variable`, `secondVariable` /
-  `second_variable`.
+- Properties: `firstVariable`, `secondVariable`.
 - Method: `assertNotBoolean(): never`.
 
 Bounded expression classes represent constraints produced by `eq`, `le`, and
@@ -1948,7 +1849,7 @@ Bounded expression classes represent constraints produced by `eq`, `le`, and
 - `MathOptLowerBoundedExpression`
 - `MathOptUpperBoundedExpression`
 
-They expose `lowerBound`/`lower_bound`, `upperBound`/`upper_bound`, and
+They expose `lowerBound`, `upperBound`, and
 `toString()`. `MathOptBoundedExpression` also exposes `expression` and
 `assertNotBoolean()`. `MathOptLowerBoundedExpression` exposes `expression`,
 `toBoundedExpression(upperBound)`, and `assertNotBoolean()`.
@@ -1960,7 +1861,7 @@ They expose `lowerBound`/`lower_bound`, `upperBound`/`upper_bound`, and
 Import:
 
 ```ts
-import { initPdlp, Pdlp, QuadraticProgram } from 'or-tools-wasm/pdlp';
+import { Pdlp, QuadraticProgram } from 'or-tools-wasm/pdlp';
 ```
 
 PDLP exposes the primal-dual hybrid gradient solver for LP and convex diagonal
@@ -1973,20 +1874,15 @@ const qp = new QuadraticProgram({
   variableUpperBounds: [10, 10],
 });
 
-const result = await Pdlp.primalDualHybridGradient(qp, {
+const result = await Pdlp.solve(qp, {
+  executor: 'worker',
   terminationCriteria: { iterationLimit: 1000 },
 });
 ```
 
-### Initialization
-
-`initPdlp(): Promise<void>`
-
-Loads the PDLP WebAssembly runtime for direct solves. The `Pdlp` async helpers
-will initialize the runtime automatically if needed, but `initPdlp()` is
-available for explicit direct-runtime warmup. When the browser worker bridge is
-enabled, `initPdlp()` is a no-op and PDLP helper calls run through the worker
-bridge.
+The runtime is loaded lazily. Select `auto`, `direct`, `worker`, `server`, or
+`cloud` per operation with the `executor` option. `auto` selects the default for
+the current environment.
 
 ### `QuadraticProgram`
 
@@ -1996,29 +1892,26 @@ Constructor:
 new QuadraticProgram(input?: QuadraticProgramInput)
 ```
 
-Fields are available in both camelCase and snake_case:
+Fields:
 
-- `problemName` / `problem_name`
-- `objectiveOffset` / `objective_offset`
-- `objectiveScalingFactor` / `objective_scaling_factor`
-- `objectiveVector` / `objective_vector`
-- `objectiveMatrixDiagonal` / `objective_matrix_diagonal`
-- `constraintMatrix` / `constraint_matrix`
-- `constraintLowerBounds` / `constraint_lower_bounds`
-- `constraintUpperBounds` / `constraint_upper_bounds`
-- `variableLowerBounds` / `variable_lower_bounds`
-- `variableUpperBounds` / `variable_upper_bounds`
-- `variableNames` / `variable_names`
-- `constraintNames` / `constraint_names`
+- `problemName`
+- `objectiveOffset`
+- `objectiveScalingFactor`
+- `objectiveVector`
+- `objectiveMatrixDiagonal`
+- `constraintMatrix`
+- `constraintLowerBounds`
+- `constraintUpperBounds`
+- `variableLowerBounds`
+- `variableUpperBounds`
+- `variableNames`
+- `constraintNames`
 
 Methods:
 
 - `resizeAndInitialize(numVariables, numConstraints): void`
-- `resize_and_initialize(numVariables, numConstraints): void`
 - `setObjectiveMatrixDiagonal(values): void`
-- `set_objective_matrix_diagonal(values): void`
 - `clearObjectiveMatrix(): void`
-- `clear_objective_matrix(): void`
 - `toBytes(): Uint8Array`
 
 Sparse matrix input accepts either:
@@ -2037,24 +1930,17 @@ Constructor:
 new PrimalAndDualSolution({ primalSolution?: number[]; dualSolution?: number[] })
 ```
 
-Fields are also exposed as `primal_solution` and `dual_solution`.
-
 ### `Pdlp`
 
 - `Pdlp.QuadraticProgram`
 - `Pdlp.PrimalAndDualSolution`
-- `validateQuadraticProgramDimensions(qp): Promise<void>`
-- `validate_quadratic_program_dimensions(qp): Promise<void>`
-- `isLinearProgram(qp): Promise<boolean>`
-- `is_linear_program(qp): Promise<boolean>`
+- `validateQuadraticProgramDimensions(qp, options?): Promise<void>`
+- `isLinearProgram(qp, options?): Promise<boolean>`
 - `qpFromMpModelProto(proto, options?): Promise<QuadraticProgram>`
-- `qp_from_mpmodel_proto(proto, relaxIntegerVariables?, includeNames?): Promise<QuadraticProgram>`
-- `qpToMpModelProto(qp): Promise<Uint8Array>`
-- `qp_to_mpmodel_proto(qp): Promise<Uint8Array>`
-- `primalDualHybridGradient(qp, params?, initialSolution?): Promise<PdlpSolverResult>`
-- `primal_dual_hybrid_gradient(qp, params?, initialSolution?): Promise<PdlpSolverResult>`
+- `qpToMpModelProto(qp, options?): Promise<Uint8Array>`
+- `solve(qp, options?): Promise<PdlpSolverResult>`
 
-`PdlpSolveParams` supports camelCase and snake_case forms:
+`PdlpSolveOptions` combines solver parameters with execution options:
 
 - `terminationCriteria.iterationLimit`
 - `terminationCriteria.simpleOptimalityCriteria.epsOptimalRelative`
@@ -2062,16 +1948,20 @@ Fields are also exposed as `primal_solution` and `dual_solution`.
 - `terminationCheckFrequency`
 - `lInfRuizIterations`
 - `l2NormRescaling`
+- `numThreads`
+
+It also accepts `initialSolution`, `executor`, `signal`, and `onEvent`.
+Conversion options such as `relaxIntegerVariables` and `includeNames` belong in
+the same per-call options object.
 
 `PdlpSolverResult` contains:
 
-- `primalSolution` / `primal_solution`
-- `dualSolution` / `dual_solution`
-- `reducedCosts` / `reduced_costs`
-- `solveLog` / `solve_log`
+- `primalSolution`
+- `dualSolution`
+- `reducedCosts`
+- `solveLog`
 
-`solveLog` contains `terminationReason` / `termination_reason` and
-`iterationCount` / `iteration_count`.
+`solveLog` contains `terminationReason` and `iterationCount`.
 
 ## Worker Bridge
 

@@ -13,11 +13,7 @@ import {
   setExecutor as setNetworkFlowExecutor,
   SimpleMaxFlow,
 } from 'or-tools-wasm/network-flow';
-import {
-  initMathOpt,
-  MathOpt,
-  setExecutor as setMathOptExecutor,
-} from 'or-tools-wasm/mathopt';
+import { MathOpt } from 'or-tools-wasm/mathopt';
 import { runBunFixture } from './shared.ts';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -69,13 +65,15 @@ async function runNetworkFlowSmoke() {
 }
 
 async function runMathOptSmoke() {
-  setMathOptExecutor({ type: 'worker' });
-  await initMathOpt();
   const model = MathOpt.Model('bun_mixed_runtime_mathopt');
   const x = model.addVariable({ lowerBound: 1, upperBound: 1, name: 'x' });
   model.objective.setLinearCoefficient(x, 1);
   model.objective.isMaximize = true;
-  const result = await MathOpt.solve(model, { solverType: MathOpt.SolverType.GLOP, threads: 1 });
+  const result = await MathOpt.solve(model, {
+    executor: 'worker',
+    solverType: MathOpt.SolverType.GLOP,
+    threads: 1,
+  });
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `MathOpt expected OPTIMAL, got ${result.terminationReason}`);
   assert(result.objectiveValue === 1, `MathOpt expected objective 1, got ${result.objectiveValue}`);
 }
@@ -93,6 +91,5 @@ await runBunFixture(async () => {
 }, async () => {
   setMPSolverExecutor({ type: 'direct' });
   setNetworkFlowExecutor({ type: 'auto' });
-  setMathOptExecutor({ type: 'direct' });
   await terminateLoadedRuntimeThreads();
 });

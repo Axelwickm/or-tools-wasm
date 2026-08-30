@@ -1,4 +1,4 @@
-import { initMathOpt, MathOpt, setExecutor, type MathOptVariable } from 'or-tools-wasm/mathopt';
+import { MathOpt, type MathOptVariable } from 'or-tools-wasm/mathopt';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
@@ -24,6 +24,7 @@ let cancelled = false;
 let givens = new Set<number>();
 let activeInterrupter: InstanceType<typeof MathOpt.SolveInterrupter> | null = null;
 const maxWorkerCount = getMaxWorkerCount();
+const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
 
 type SudokuBackend = 'CP_SAT' | 'GSCIP' | 'GLPK';
 
@@ -253,7 +254,7 @@ function parseSolution(result: Awaited<ReturnType<typeof MathOpt.solve>>, variab
   for (let row = 0; row < size; ++row) {
     for (let col = 0; col < size; ++col) {
       for (let digit = 1; digit <= digits; ++digit) {
-        if (result.variable_values(variables[varIndex(row, col, digit)]) > 0.5) {
+        if (result.variableValues(variables[varIndex(row, col, digit)]) > 0.5) {
           grid[cellIndex(row, col)] = digit;
           break;
         }
@@ -285,11 +286,11 @@ async function solveSudoku(
   },
   blockedSolution?: Grid,
 ) {
-  await initMathOpt();
   const { model, variables } = buildSudokuModel(clues, blockedSolution);
   activeInterrupter = new MathOpt.SolveInterrupter();
   try {
     const result = await MathOpt.solve(model, {
+      executor: selectedExecutor(),
       solverType: MathOpt.SolverType[options.backend],
       threads: options.backend === 'GLPK' ? 1 : options.workers,
       timeLimitSeconds: options.timeLimitSeconds,
@@ -297,7 +298,6 @@ async function solveSudoku(
       interrupter: activeInterrupter,
       cpSat: options.backend === 'CP_SAT'
         ? {
-          numWorkers: options.workers,
           maxTimeInSeconds: options.timeLimitSeconds,
           randomSeed: options.seed,
           randomizeSearch: options.randomizeSearch,
@@ -445,8 +445,6 @@ clearBoard();
 if (workerInput) workerInput.value = String(Math.min(maxWorkerCount, 4));
 solverSelect?.addEventListener('change', updateBackendControls);
 updateBackendControls();
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
-
 generateButton?.addEventListener('click', () => {
   void generatePuzzle();
 });

@@ -61,7 +61,7 @@ export type CpSatEventMask = {
   log?: boolean;
 };
 
-export type CpSatSolverParameters = SatParameters;
+export type CpSatSolverParameters = Omit<SatParameters, 'numSearchWorkers'>;
 
 export type CpSatSolveOptions = CpSatSolverParameters & {
   executor?: ExecutorSelection;
@@ -84,7 +84,6 @@ export type CpSatApi = {
   modelStats(model: Uint8Array): Promise<string>;
   getSchemas(): Promise<CpSatSchemas>;
   createModel(model: CpModelProto): Promise<Uint8Array>;
-  loadModule(): Promise<unknown>;
 };
 
 export type CpSatModelInstance = Uint8Array;
@@ -123,12 +122,6 @@ function createResolvedCpSatExecutor(executor: ResolvedExecutorConfiguration): C
     case 'cloud':
       return new CloudExecutor('cp-sat', { test: executor.test });
   }
-}
-
-const defaultCpSatExecutor = createCpSatExecutor();
-
-function loadModule() {
-  return defaultCpSatExecutor.load();
 }
 
 type ProtobufType = import('protobufjs').Type;
@@ -338,11 +331,9 @@ async function executeSolve(
 }
 
 function schedulerResourcesFromParameters(
-  parameters: SatParameters,
+  parameters: CpSatSolverParameters,
 ): SolverResourceRequest | undefined {
-  const threads = parameters.numWorkers && parameters.numWorkers > 0
-    ? parameters.numWorkers
-    : parameters.numSearchWorkers;
+  const threads = parameters.numWorkers;
   return threads !== undefined && threads > 0 ? { threads } : undefined;
 }
 
@@ -357,6 +348,9 @@ async function solve(
     signal,
     ...solverParameters
   } = options;
+  if ((solverParameters as SatParameters).numSearchWorkers !== undefined) {
+    throw new Error('numSearchWorkers is not supported; use numWorkers.');
+  }
   const { parametersType, responseType } = getProtobufContext();
   const solverParametersBytes = encodeSatParameters(parametersType, solverParameters);
   const bytes = await executeSolve(modelBytes, {
@@ -412,7 +406,6 @@ export const CpSat: CpSatApi = {
   modelStats,
   getSchemas,
   createModel,
-  loadModule,
 };
 
 if (isBrowserMainThread) {

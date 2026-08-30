@@ -2,14 +2,12 @@ type MathOptVariableLike = {
   readonly id: number;
   readonly name: string;
   upperBound?: number;
-  upper_bound?: number;
 };
 
 type MathOptLinearConstraintLike = {
   readonly id: number;
   readonly name: string;
   upperBound?: number;
-  upper_bound?: number;
 };
 
 type MathOptModelLike = {
@@ -85,54 +83,13 @@ type MathOptSolveResult = {
   }>;
   messages: string[];
   rawResponse: Uint8Array;
-  solve_time(): number | null;
-  best_objective_bound(): number | null;
-  has_primal_feasible_solution(): boolean;
-  has_dual_feasible_solution(): boolean;
-  has_ray(): boolean;
-  has_dual_ray(): boolean;
-  has_basis(): boolean;
-  bounded(): boolean;
-  objective_value(): number;
-  variable_values(): Record<string, number>;
-  variable_values(variable: MathOptVariableLike): number;
-  variable_values(variables: MathOptVariableLike[]): number[];
-  reduced_costs(): Record<string, number>;
-  reduced_costs(variable: MathOptVariableLike): number;
-  reduced_costs(variables: MathOptVariableLike[]): number[];
-  dual_values(): Record<string, number>;
-  dual_values(linearConstraint: MathOptLinearConstraintLike): number;
-  dual_values(linearConstraints: MathOptLinearConstraintLike[]): number[];
-  ray_variable_values(): Record<string, number>;
-  ray_variable_values(variable: MathOptVariableLike): number;
-  ray_variable_values(variables: MathOptVariableLike[]): number[];
-  ray_reduced_costs(): Record<string, number>;
-  ray_reduced_costs(variable: MathOptVariableLike): number;
-  ray_reduced_costs(variables: MathOptVariableLike[]): number[];
-  ray_dual_values(): Record<string, number>;
-  ray_dual_values(linearConstraint: MathOptLinearConstraintLike): number;
-  ray_dual_values(linearConstraints: MathOptLinearConstraintLike[]): number[];
-  variable_status(): Record<string, string>;
-  variable_status(variable: MathOptVariableLike): string;
-  variable_status(variables: MathOptVariableLike[]): string[];
-  constraint_status(): Record<string, string>;
-  constraint_status(linearConstraint: MathOptLinearConstraintLike): string;
-  constraint_status(linearConstraints: MathOptLinearConstraintLike[]): string[];
 };
 
 type MathOptSolveOptions = {
   solverType?: number | keyof MathOptSolverTypeLike;
   removeNames?: boolean;
-  remove_names?: boolean;
   interrupter?: MathOptSolveInterrupterLike;
-  solveInterrupter?: MathOptSolveInterrupterLike;
-  solve_interrupter?: MathOptSolveInterrupterLike;
   messageCallback?: (messages: string[]) => void;
-  message_callback?: (messages: string[]) => void;
-  msgCb?: (messages: string[]) => void;
-  msg_cb?: (messages: string[]) => void;
-  parameters?: unknown;
-  solveParameters?: unknown;
   modelParameters?: unknown;
   threads?: number;
   timeLimitSeconds?: number;
@@ -170,11 +127,9 @@ type MathOptSolveInterrupterLike = {
   readonly interrupted: boolean;
   interrupt(): void;
   isInterrupted?(): boolean;
-  is_interrupted?(): boolean;
 };
 
 type MathOptApi = {
-  initMathOpt(): Promise<void>;
   MathOpt: {
     SolverType: MathOptSolverTypeLike;
     LPAlgorithm: Record<string, string | number>;
@@ -188,7 +143,6 @@ type MathOptApi = {
     PdlpParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
     GlpkParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
     SolveInterrupter: new () => MathOptSolveInterrupterLike;
-    SolveParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
     ModelSolveParameters: {
       new (options?: Record<string, unknown>): { toProtoBytes(): Uint8Array };
       onlySomePrimalVariables?(variables: MathOptVariableLike[]): { toProtoBytes(): Uint8Array };
@@ -566,7 +520,7 @@ async function testMessageCallback(api: MathOptApi): Promise<string> {
   const logs: string[] = [];
   const result = await api.MathOpt.solve(model, {
     solverType: 'GSCIP',
-    msg_cb(messages) {
+    messageCallback(messages) {
       logs.push(...messages);
     },
   });
@@ -681,13 +635,13 @@ async function testIncrementalLp(api: MathOptApi): Promise<string> {
   model.maximize([{ variable: x, coefficient: 2 }]);
   const solver = new api.MathOpt.IncrementalSolver(model, 'GLOP');
 
-  const result = await solver.solve({ parameters: new api.MathOpt.SolveParameters({ enableOutput: true }) });
+  const result = await solver.solve({ enableOutput: true });
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: first solve termination ${result.terminationReason}`);
   near(result.objectiveValue, 2);
   near(result.variableValues.x, 1);
 
   x.upperBound = 3;
-  const result2 = await solver.solve({ parameters: new api.MathOpt.SolveParameters({ enableOutput: true }) });
+  const result2 = await solver.solve({ enableOutput: true });
   assert(result2.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: second solve termination ${result2.terminationReason}`);
   near(result2.objectiveValue, 6);
   near(result2.variableValues.x, 3);
@@ -715,16 +669,16 @@ async function testIncrementalMip(api: MathOptApi): Promise<string> {
     { variable: y, coefficient: 3 },
   ]);
   const solver = new api.MathOpt.IncrementalSolver(model, 'GSCIP');
-  const params = new api.MathOpt.SolveParameters({ enableOutput: true });
+  const params = { enableOutput: true };
 
-  const result = await solver.solve({ parameters: params });
+  const result = await solver.solve(params);
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: first solve termination ${result.terminationReason}`);
   near(result.objectiveValue, 3);
   near(result.variableValues.x, 0);
   near(result.variableValues.y, 1);
 
   c.upperBound = 2;
-  const result2 = await solver.solve({ parameters: params });
+  const result2 = await solver.solve(params);
   assert(result2.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: second solve termination ${result2.terminationReason}`);
   near(result2.objectiveValue, 5);
   near(result2.variableValues.x, 1);
@@ -753,13 +707,13 @@ async function testIncrementalMipWithMessageCallback(api: MathOptApi): Promise<s
     { variable: y, coefficient: 3 },
   ]);
   const solver = new api.MathOpt.IncrementalSolver(model, 'GSCIP');
-  const params = new api.MathOpt.SolveParameters({ enableOutput: true });
+  const params = { enableOutput: true };
   const incrementalMarker = 'feasible solutions given by solution candidate storage';
 
   const firstLogs: string[] = [];
   const result = await solver.solve({
-    parameters: params,
-    msg_cb(messages) {
+    ...params,
+    messageCallback(messages) {
       firstLogs.push(...messages);
     },
   });
@@ -772,8 +726,8 @@ async function testIncrementalMipWithMessageCallback(api: MathOptApi): Promise<s
   c.upperBound = 2;
   const secondLogs: string[] = [];
   const result2 = await solver.solve({
-    parameters: params,
-    msg_cb(messages) {
+    ...params,
+    messageCallback(messages) {
       secondLogs.push(...messages);
     },
   });
@@ -825,7 +779,7 @@ async function testIncrementalSolveErrorOnReject(api: MathOptApi): Promise<strin
   const solver = new api.MathOpt.IncrementalSolver(model, 'CP_SAT');
 
   const result = await solver.solve({
-    msg_cb() {},
+    messageCallback() {},
   });
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: first solve termination ${result.terminationReason}`);
   near(result.objectiveValue, 2);
@@ -833,7 +787,7 @@ async function testIncrementalSolveErrorOnReject(api: MathOptApi): Promise<strin
 
   model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
   await assertRejects(
-    () => solver.solve({ msg_cb() {} }),
+    () => solver.solve({ messageCallback() {} }),
     /duplicate name/i,
     `${name}: duplicate name after rejected update should be rejected`,
   );
@@ -850,13 +804,13 @@ async function testIncrementalSolveRejected(api: MathOptApi): Promise<string> {
   model.maximize([{ variable: x, coefficient: 2 }]);
   const solver = new api.MathOpt.IncrementalSolver(model, 'CP_SAT');
 
-  const result = await solver.solve({ msg_cb() {} });
+  const result = await solver.solve({ messageCallback() {} });
   assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: first solve termination ${result.terminationReason}`);
   near(result.objectiveValue, 2);
   near(result.variableValues.x, 1);
 
   x.upperBound = 3;
-  const result2 = await solver.solve({ msg_cb() {} });
+  const result2 = await solver.solve({ messageCallback() {} });
   assert(result2.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: second solve termination ${result2.terminationReason}`);
   near(result2.objectiveValue, 6);
   near(result2.variableValues.x, 3);
@@ -872,14 +826,14 @@ async function testMultipleIncrementalLps(api: MathOptApi): Promise<string> {
   const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
   model.maximize([{ variable: x, coefficient: 2 }]);
   const solver = new api.MathOpt.IncrementalSolver(model, 'GLOP');
-  const params = new api.MathOpt.SolveParameters({
+  const params = {
     presolve: api.MathOpt.Emphasis.OFF,
     enableOutput: true,
-  });
+  };
 
   for (const ub of [2, 3, 4, 5]) {
     x.upperBound = ub;
-    const result = await solver.solve({ parameters: params });
+    const result = await solver.solve(params);
     assert(result.terminationReason === 'TERMINATION_REASON_OPTIMAL', `${name}: solve for ub=${ub} terminated ${result.terminationReason}`);
     near(result.objectiveValue, 2 * ub);
     near(result.variableValues.x, ub);
@@ -914,23 +868,16 @@ async function testPrimalRayHelpers(api: MathOptApi): Promise<string> {
     solverType: 'GLPK',
     glpk: new api.MathOpt.GlpkParameters({ computeUnboundRaysIfPossible: true }),
   });
-  const otherModel = api.MathOpt.Model('primal_ray_helpers_other');
-  const otherX = otherModel.addVariable({ name: 'other_x' });
-
   assert(result.terminationReason === 'TERMINATION_REASON_UNBOUNDED', `${name}: termination ${result.terminationReason}`);
-  assert(!result.has_primal_feasible_solution(), `${name}: unbounded LP should not expose a feasible primal solution`);
-  assert(result.has_ray(), `${name}: expected a primal ray`);
-  assert(!result.has_dual_ray(), `${name}: expected no dual ray`);
+  assert(!result.solutions.some((solution) => solution.primalSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE'), `${name}: unbounded LP should not expose a feasible primal solution`);
+  assert(result.primalRays?.length === 1, `${name}: expected a primal ray`);
+  assert(result.dualRays?.length === 0, `${name}: expected no dual ray`);
   assert(result.primalRays?.length === 1, `${name}: expected one primal ray`);
-  near(result.ray_variable_values(x), 1);
-  const rayValuesByName = result.ray_variable_values();
+  const rayValuesByName = result.primalRays[0].variableValues;
   near(rayValuesByName.x, 1);
-  const rayValues = result.ray_variable_values([x]);
-  near(rayValues[0], 1);
-  assert(result.ray_variable_values([]).length === 0, `${name}: ray_variable_values([]) should return []`);
-  assertThrows(() => result.ray_variable_values(otherX), /different MathOpt model/i, `${name}: wrong-model ray variable should throw`);
-  assertThrows(() => result.objective_value(), /no primal feasible solution/i, `${name}: objective_value() should require feasible solution`);
-  assertThrows(() => result.variable_values(), /no primal feasible solution/i, `${name}: variable_values() should require feasible solution`);
+  near(result.primalRays[0].variableValuesById[x.id], 1);
+  assert(result.objectiveValue === null, `${name}: objectiveValue should be null without a feasible solution`);
+  assert(Object.keys(result.variableValues).length === 0, `${name}: variableValues should be empty without a feasible solution`);
   return `${name} PASS`;
 }
 
@@ -960,34 +907,18 @@ async function testDualRayHelpers(api: MathOptApi): Promise<string> {
     lpAlgorithm: 'DUAL_SIMPLEX',
     enableOutput: true,
   });
-  const otherModel = api.MathOpt.Model('dual_ray_helpers_other');
-  const otherX = otherModel.addVariable({ name: 'other_x' });
-  const otherC = otherModel.addLinearConstraint({ upperBound: 1, terms: [], name: 'other_c' });
-  const missingC = model.addLinearConstraint({ upperBound: 1, terms: [], name: 'missing_c' });
-
   assert(result.terminationReason === 'TERMINATION_REASON_INFEASIBLE', `${name}: termination ${result.terminationReason}`);
-  assert(!result.has_ray(), `${name}: expected no primal ray`);
-  assert(result.has_dual_ray(), `${name}: expected a dual ray`);
+  assert(result.primalRays?.length === 0, `${name}: expected no primal ray`);
+  assert(result.dualRays?.length === 1, `${name}: expected a dual ray`);
   assert(result.dualRays?.length === 1, `${name}: expected one dual ray`);
-  const reducedCostsByName = result.ray_reduced_costs();
+  const reducedCostsByName = result.dualRays[0].reducedCosts;
   near(reducedCostsByName.x_1, 1);
   near(reducedCostsByName.x_2, 1);
-  near(result.ray_reduced_costs(x1), 1);
-  near(result.ray_reduced_costs(x2), 1);
-  const reducedCosts = result.ray_reduced_costs([x2, x1]);
-  near(reducedCosts[0], 1);
-  near(reducedCosts[1], 1);
-  assert(result.ray_reduced_costs([]).length === 0, `${name}: ray_reduced_costs([]) should return []`);
-  assertThrows(() => result.ray_reduced_costs(otherX), /different MathOpt model/i, `${name}: wrong-model ray reduced cost should throw`);
-
-  const dualValuesByName = result.ray_dual_values();
+  near(result.dualRays[0].reducedCostsById[x1.id], 1);
+  near(result.dualRays[0].reducedCostsById[x2.id], 1);
+  const dualValuesByName = result.dualRays[0].dualValues;
   near(dualValuesByName.y, -1);
-  near(result.ray_dual_values(y), -1);
-  const dualValues = result.ray_dual_values([y]);
-  near(dualValues[0], -1);
-  assert(result.ray_dual_values([]).length === 0, `${name}: ray_dual_values([]) should return []`);
-  assertThrows(() => result.ray_dual_values(otherC), /different MathOpt model/i, `${name}: wrong-model ray dual value should throw`);
-  assertThrows(() => result.ray_dual_values(missingC), /not present/i, `${name}: missing same-model ray dual value should throw`);
+  near(result.dualRays[0].dualValuesById[y.id], -1);
   return `${name} PASS`;
 }
 
@@ -1079,9 +1010,12 @@ async function testBackendParameterProtoEncoding(api: MathOptApi): Promise<strin
       objectiveLimit: 10,
     }),
     glop: { usePreprocessing: false, useScaling: false, useDualSimplex: true, maxTimeInSeconds: 2 },
-    cpSat: { numWorkers: 4, maxTimeInSeconds: 3, logSearchProgress: true },
+    cpSat: {
+      maxTimeInSeconds: 3,
+      maxDeterministicTime: 4,
+      logSearchProgress: true,
+    },
     pdlp: {
-      numThreads: 2,
       terminationCriteria: {
         iterationLimit: 20,
         simpleOptimalityCriteria: { epsOptimalAbsolute: 1e-6, epsOptimalRelative: 1e-5 },
@@ -1113,10 +1047,9 @@ async function testBackendParameterProtoEncoding(api: MathOptApi): Promise<strin
   assertVarint(glop, 34, 0);
   const cpSat = nestedFields(parameters, 15);
   assertDouble(cpSat, 36, 3);
+  assertDouble(cpSat, 67, 4);
   assertVarint(cpSat, 41, 1);
-  assertVarint(cpSat, 206, 4);
   const pdlp = nestedFields(parameters, 16);
-  assertVarint(pdlp, 2, 2);
   assertVarint(pdlp, 6, enumNumber(api.MathOpt.PdlpRestartStrategy.NO_RESTARTS));
   assertVarint(pdlp, 9, 10);
   assertVarint(pdlp, 10, 0);
@@ -1149,7 +1082,8 @@ async function testModelSolveParametersProtoEncoding(api: MathOptApi): Promise<s
 
   const request = api.MathOpt.encodeSolveRequest(model, {
     solverType: 'GLOP',
-    parameters: new api.MathOpt.SolveParameters({ timeLimitSeconds: 2, threads: 1 }),
+    threads: 1,
+    timeLimitSeconds: 2,
     modelParameters: new api.MathOpt.ModelSolveParameters({
       variableValuesFilter: new api.MathOpt.SparseVectorFilter({ elements: [x], filterByIds: true }),
       dualValuesFilter: { elements: [demand], filterByIds: true, skipZeroValues: true },
@@ -1389,10 +1323,6 @@ export const mathoptSolveResultContractCases: MathOptContractCase[] = [
       });
       model.maximize([{ variable: x, coefficient: 2 }, { variable: y, coefficient: 1 }]);
       const result = await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLOP });
-      const otherModel = api.MathOpt.Model('result_support_check_other');
-      const otherX = otherModel.addVariable({ name: 'other_x' });
-      const otherC = otherModel.addLinearConstraint({ upperBound: 1, terms: [], name: 'other_c' });
-
       assert(
         typeof result.objectiveValue === 'number',
         `${name}: objectiveValue should be available on result`,
@@ -1405,71 +1335,37 @@ export const mathoptSolveResultContractCases: MathOptContractCase[] = [
         typeof result.variableValuesById[x.id] === 'number',
         `${name}: variableValuesById should be available`,
       );
-      assert(result.has_primal_feasible_solution(), `${name}: expected primal feasible solution`);
-      assert(result.has_dual_feasible_solution(), `${name}: expected dual feasible solution`);
-      assert(!result.has_ray(), `${name}: bounded LP should not have a primal ray`);
-      assert(!result.has_dual_ray(), `${name}: bounded LP should not have a dual ray`);
-      assert(result.has_basis(), `${name}: GLOP LP result should expose a basis`);
-      assert(result.bounded(), `${name}: optimal LP should be bounded`);
-      const solveTime = result.solve_time();
-      assert(typeof solveTime === 'number' && solveTime >= 0, `${name}: solve_time() should return nonnegative seconds`);
-      assert(result.solveTimeSeconds === solveTime, `${name}: solveTimeSeconds should match solve_time()`);
+      const bestSolution = result.solutions[0];
+      assert(bestSolution?.primalSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE', `${name}: expected primal feasible solution`);
+      assert(bestSolution?.dualSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE', `${name}: expected dual feasible solution`);
+      assert(result.primalRays?.length === 0, `${name}: bounded LP should not have a primal ray`);
+      assert(result.dualRays?.length === 0, `${name}: bounded LP should not have a dual ray`);
+      assert(bestSolution?.basis != null, `${name}: GLOP LP result should expose a basis`);
+      assert(typeof result.solveTimeSeconds === 'number' && result.solveTimeSeconds >= 0, `${name}: solveTimeSeconds should be nonnegative`);
       assert(result.primalStatus === 'FEASIBILITY_STATUS_FEASIBLE', `${name}: primal status should be feasible`);
       assert(result.dualStatus === 'FEASIBILITY_STATUS_FEASIBLE', `${name}: dual status should be feasible`);
       assert(result.primalOrDualInfeasible === false, `${name}: primal_or_dual_infeasible should be false`);
-      near(result.objective_value(), 2);
-      near(result.best_objective_bound(), 2);
-      near(result.variable_values(x), 1);
-      near(result.variable_values(y), 0);
-      const values = result.variable_values([y, x]);
-      near(values[0], 0);
-      near(values[1], 1);
-      const valuesByName = result.variable_values();
+      near(result.objectiveValue, 2);
+      near(result.dualBound, 2);
+      near(result.variableValuesById[x.id], 1);
+      near(result.variableValuesById[y.id], 0);
+      const valuesByName = result.variableValues;
       near(valuesByName.x, 1);
       near(valuesByName.y, 0);
-      assertThrows(() => result.variable_values(otherX), /different MathOpt model/i, `${name}: wrong-model variable value should throw`);
+      const dualSolution = bestSolution.dualSolution;
+      assert(typeof dualSolution.reducedCosts.x === 'number', `${name}: reducedCosts should include x`);
+      assert(typeof dualSolution.reducedCosts.y === 'number', `${name}: reducedCosts should include y`);
+      near(dualSolution.reducedCostsById[x.id], dualSolution.reducedCosts.x);
+      near(dualSolution.reducedCostsById[y.id], dualSolution.reducedCosts.y);
+      assert(typeof dualSolution.dualValues.c === 'number', `${name}: dualValues should include c`);
+      near(dualSolution.dualValuesById[c.id], dualSolution.dualValues.c);
 
-      const reducedCostsByName = result.reduced_costs();
-      assert(typeof reducedCostsByName.x === 'number', `${name}: reduced_costs() should include x`);
-      assert(typeof reducedCostsByName.y === 'number', `${name}: reduced_costs() should include y`);
-      near(result.reduced_costs(x), reducedCostsByName.x);
-      near(result.reduced_costs(y), reducedCostsByName.y);
-      const reducedCosts = result.reduced_costs([y, x]);
-      near(reducedCosts[0], reducedCostsByName.y);
-      near(reducedCosts[1], reducedCostsByName.x);
-      assert(result.reduced_costs([]).length === 0, `${name}: reduced_costs([]) should return []`);
-      assertThrows(() => result.reduced_costs(otherX), /different MathOpt model/i, `${name}: wrong-model reduced cost should throw`);
-
-      const dualValuesByName = result.dual_values();
-      assert(typeof dualValuesByName.c === 'number', `${name}: dual_values() should include c`);
-      near(result.dual_values(c), dualValuesByName.c);
-      const dualValues = result.dual_values([c]);
-      near(dualValues[0], dualValuesByName.c);
-      assert(result.dual_values([]).length === 0, `${name}: dual_values([]) should return []`);
-      assertThrows(() => result.dual_values(otherC), /different MathOpt model/i, `${name}: wrong-model dual value should throw`);
-
-      assertThrows(() => result.ray_variable_values(), /no primal ray/i, `${name}: missing primal ray values should throw`);
-      assertThrows(() => result.ray_variable_values(x), /no primal ray/i, `${name}: missing primal ray variable should throw`);
-      assertThrows(() => result.ray_reduced_costs(), /no dual ray/i, `${name}: missing dual ray reduced costs should throw`);
-      assertThrows(() => result.ray_dual_values(), /no dual ray/i, `${name}: missing dual ray dual values should throw`);
-
-      const variableStatusByName = result.variable_status();
-      assert(variableStatusByName.x?.startsWith('BASIS_STATUS_'), `${name}: variable_status() should include x basis status`);
-      assert(variableStatusByName.y?.startsWith('BASIS_STATUS_'), `${name}: variable_status() should include y basis status`);
-      assert(result.variable_status(x) === variableStatusByName.x, `${name}: variable_status(x) should match record`);
-      assert(result.variable_status(y) === variableStatusByName.y, `${name}: variable_status(y) should match record`);
-      const variableStatuses = result.variable_status([y, x]);
-      assert(variableStatuses[0] === variableStatusByName.y, `${name}: variable_status([y, x])[0] should match y`);
-      assert(variableStatuses[1] === variableStatusByName.x, `${name}: variable_status([y, x])[1] should match x`);
-      assert(result.variable_status([]).length === 0, `${name}: variable_status([]) should return []`);
-      assertThrows(() => result.variable_status(otherX), /different MathOpt model/i, `${name}: wrong-model variable status should throw`);
-
-      const constraintStatusByName = result.constraint_status();
-      assert(constraintStatusByName.c?.startsWith('BASIS_STATUS_'), `${name}: constraint_status() should include c basis status`);
-      assert(result.constraint_status(c) === constraintStatusByName.c, `${name}: constraint_status(c) should match record`);
-      assert(result.constraint_status([c])[0] === constraintStatusByName.c, `${name}: constraint_status([c]) should match record`);
-      assert(result.constraint_status([]).length === 0, `${name}: constraint_status([]) should return []`);
-      assertThrows(() => result.constraint_status(otherC), /different MathOpt model/i, `${name}: wrong-model constraint status should throw`);
+      const basis = bestSolution.basis;
+      assert(basis.variableStatus.x?.startsWith('BASIS_STATUS_'), `${name}: variableStatus should include x basis status`);
+      assert(basis.variableStatus.y?.startsWith('BASIS_STATUS_'), `${name}: variableStatus should include y basis status`);
+      assert(basis.variableStatusById[x.id] === basis.variableStatus.x, `${name}: x status maps should agree`);
+      assert(basis.constraintStatus.c?.startsWith('BASIS_STATUS_'), `${name}: constraintStatus should include c`);
+      assert(basis.constraintStatusById[c.id] === basis.constraintStatus.c, `${name}: c status maps should agree`);
       return `${name} PASS`;
     },
   },
@@ -1490,7 +1386,6 @@ export const mathoptSolveResultContractCases: MathOptContractCase[] = [
 ];
 
 export async function runMathOptSolveResultContractCases(api: MathOptApi): Promise<string[]> {
-  await api.initMathOpt();
   const results: string[] = [];
   for (const testCase of mathoptSolveResultContractCases) {
     results.push(await testCase.run(api));

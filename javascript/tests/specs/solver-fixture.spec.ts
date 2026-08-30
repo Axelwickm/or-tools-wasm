@@ -84,6 +84,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       id?: string;
       ok?: boolean;
     };
+    cpSatConcurrencyResult?: {
+      id?: string;
+      ok?: boolean;
+    };
+    solverConcurrencyResult?: {
+      id?: string;
+      ok?: boolean;
+    };
     results?: Array<{
       mode?: string;
       workerProfile?: string;
@@ -228,6 +236,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     id: 'cloud/status',
     ok: true,
   }));
+  expect(parsedStatus.cpSatConcurrencyResult).toEqual(expect.objectContaining({
+    id: 'cp_sat.executor.concurrency',
+    ok: true,
+  }));
+  expect(parsedStatus.solverConcurrencyResult).toEqual(expect.objectContaining({
+    id: 'mathopt_pdlp.executor.concurrency',
+    ok: true,
+  }));
   if (includeServer) expect(serverStreamRequests, 'native server SSE requests').toBeGreaterThan(0);
   const expectedHighLevelCpSatProfiles = [
     'direct/1 worker/1',
@@ -305,7 +321,6 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       publicMethods: expect.arrayContaining([
         'createModel',
         'getSchemas',
-        'loadModule',
         'modelStats',
         'solve',
         'validate',
@@ -354,13 +369,13 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   );
   expect(parsedStatus.results).toHaveLength(includeServer ? 6 : 4);
   expect(parsedStatus.results).toEqual([
-    expect.objectContaining({ mode: 'direct', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
-    expect.objectContaining({ mode: 'direct', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
-    expect.objectContaining({ mode: 'worker', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
-    expect.objectContaining({ mode: 'worker', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
+    expect.objectContaining({ mode: 'direct', workerProfile: '1 worker', params: { numWorkers: 1 }, ok: true }),
+    expect.objectContaining({ mode: 'direct', workerProfile: '4 workers', params: { numWorkers: 4 }, ok: true }),
+    expect.objectContaining({ mode: 'worker', workerProfile: '1 worker', params: { numWorkers: 1 }, ok: true }),
+    expect.objectContaining({ mode: 'worker', workerProfile: '4 workers', params: { numWorkers: 4 }, ok: true }),
     ...(includeServer ? [
-      expect.objectContaining({ mode: 'server', workerProfile: '1 worker', params: { numSearchWorkers: 1 }, ok: true }),
-      expect.objectContaining({ mode: 'server', workerProfile: '4 workers', params: { numSearchWorkers: 4 }, ok: true }),
+      expect.objectContaining({ mode: 'server', workerProfile: '1 worker', params: { numWorkers: 1 }, ok: true }),
+      expect.objectContaining({ mode: 'server', workerProfile: '4 workers', params: { numWorkers: 4 }, ok: true }),
     ] : []),
   ]);
   const [directResult] = parsedStatus.results ?? [];

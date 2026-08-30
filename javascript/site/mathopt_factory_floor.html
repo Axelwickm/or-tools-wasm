@@ -490,9 +490,7 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
-
-await initMathOpt();
+        <pre class="code-block"><code data-highlight="ts">import { MathOpt } from 'or-tools-wasm/mathopt';
 
 // Build the rolling production model once.
 const model = MathOpt.Model('bakery_production');
@@ -505,7 +503,9 @@ model.maximize([{ variable: startBreadNow, coefficient: 100 }]);
 
 // Keep this solver object alive between replans.
 const solver = new MathOpt.IncrementalSolver(model, MathOpt.SolverType.CP_SAT, {
-  cpSat: { maxTimeInSeconds: 1, numWorkers: 4 },
+  executor: 'worker',
+  threads: 4,
+  cpSat: { maxTimeInSeconds: 1 },
 });
 
 async function replanAfterFactoryStateChanges(openBreadOrders: number, freeMixers: number) {

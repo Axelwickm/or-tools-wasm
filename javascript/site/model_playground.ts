@@ -143,7 +143,6 @@ function parseParams() {
   }
   const params = parseJsonObject(paramsInput, 'SAT parameters') as SatParameters;
   params.numWorkers = getSelectedWorkerCount();
-  delete params.numSearchWorkers;
   return params;
 }
 

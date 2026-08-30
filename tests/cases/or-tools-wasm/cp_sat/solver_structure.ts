@@ -18,7 +18,6 @@ import {
 
 type CpSatPublicApi = CpSatLike & {
   getSchemas(): Promise<unknown>;
-  loadModule(): Promise<unknown>;
 };
 
 type CpSatPackageApi = {
@@ -68,7 +67,6 @@ function cpSatFromPackage(api: CpSatPackageApi): CpSatPublicApi {
   const methods = [
     'createModel',
     'getSchemas',
-    'loadModule',
     'modelStats',
     'solve',
     'validate',
@@ -99,7 +97,7 @@ async function runSolveContract(CpSat: CpSatPublicApi, mode: SolverStructureMode
   let solutionEventWasLive = false;
   const solvePromise = CpSat.solve(modelBytes, {
       executor,
-      numSearchWorkers: 1,
+      numWorkers: 1,
       eventMask: { solution: true },
       onEvent: (event) => {
         events.push(event);
@@ -167,7 +165,6 @@ export async function runCpSatSolverStructureCases(api: CpSatPackageApi): Promis
       publicMethods: [
         'createModel',
         'getSchemas',
-        'loadModule',
         'modelStats',
         'solve',
         'validate',

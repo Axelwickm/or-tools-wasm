@@ -1,7 +1,7 @@
 import { mathOptExpressionContractCases } from './mathopt_expression_contract.ts';
 import { runMathOptModelContractCases } from './mathopt_model_contract.ts';
 import { mathoptSolveResultContractCases } from './mathopt_solve_result_contract.ts';
-import type { ExecutorFixtureMode } from '../../../harness/shared_case.ts';
+import type { ExecutorFixtureMode, FixtureMode } from '../../../harness/shared_case.ts';
 import { assertServerExecutorIsRunning, executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
 
 export type MathOptCaseResult = {
@@ -30,9 +30,7 @@ type MathOptVariableLike = {
   lowerBound?: number;
   upperBound?: number;
   integer?: boolean;
-  lower_bound?: number;
-  upper_bound?: number;
-  is_integer?: boolean;
+  isInteger?: boolean;
   equals?(other: MathOptVariableLike): boolean;
   toString(): string;
 };
@@ -42,14 +40,10 @@ type MathOptLinearConstraintLike = {
   readonly name: string;
   lowerBound?: number;
   upperBound?: number;
-  lower_bound?: number;
-  upper_bound?: number;
   setCoefficient?(variable: MathOptVariableLike, coefficient: number): void;
-  set_coefficient?(variable: MathOptVariableLike, coefficient: number): void;
   getCoefficient?(variable: MathOptVariableLike): number;
-  get_coefficient?(variable: MathOptVariableLike): number;
   terms?(): Array<{ variable: MathOptVariableLike; coefficient: number }>;
-  as_bounded_linear_expression?(): MathOptBoundedExpressionLike<MathOptLinearExpressionLike>;
+  asBoundedLinearExpression?(): MathOptBoundedExpressionLike<MathOptLinearExpressionLike>;
   equals?(other: MathOptLinearConstraintLike): boolean;
   toString(): string;
 };
@@ -92,9 +86,7 @@ type MathOptQuadraticExpressionLike = {
 
 type MathOptVarEqVarLike = {
   firstVariable: MathOptVariableLike;
-  first_variable: MathOptVariableLike;
   secondVariable: MathOptVariableLike;
-  second_variable: MathOptVariableLike;
   assertNotBoolean(): never;
 };
 
@@ -108,20 +100,16 @@ type MathOptExpressionInput =
 
 type MathOptBoundedExpressionLike<T> = {
   lowerBound: number;
-  lower_bound: number;
   expression: T;
   upperBound: number;
-  upper_bound: number;
   assertNotBoolean(): never;
   toString(): string;
 };
 
 type MathOptLowerBoundedExpressionLike<T> = {
   lowerBound: number;
-  lower_bound: number;
   expression: T;
   upperBound: number;
-  upper_bound: number;
   toBoundedExpression(upperBound: number): MathOptBoundedExpressionLike<T>;
   assertNotBoolean(): never;
   toString(): string;
@@ -129,10 +117,8 @@ type MathOptLowerBoundedExpressionLike<T> = {
 
 type MathOptUpperBoundedExpressionLike<T> = {
   lowerBound: number;
-  lower_bound: number;
   expression: T;
   upperBound: number;
-  upper_bound: number;
   toBoundedExpression(lowerBound: number): MathOptBoundedExpressionLike<T>;
   assertNotBoolean(): never;
   toString(): string;
@@ -145,7 +131,6 @@ type MathOptModelLike = {
     lb?: number;
     ub?: number;
     isInteger?: boolean;
-    is_integer?: boolean;
     lowerBound?: number;
     upperBound?: number;
     integer?: boolean;
@@ -157,20 +142,6 @@ type MathOptModelLike = {
     name?: string;
   }): MathOptVariableLike;
   addBinaryVariable?(options?: {
-    name?: string;
-  }): MathOptVariableLike;
-  add_variable?(options?: {
-    lowerBound?: number;
-    upperBound?: number;
-    integer?: boolean;
-    name?: string;
-  }): MathOptVariableLike;
-  add_integer_variable?(options?: {
-    lowerBound?: number;
-    upperBound?: number;
-    name?: string;
-  }): MathOptVariableLike;
-  add_binary_variable?(options?: {
     name?: string;
   }): MathOptVariableLike;
   addLinearConstraint(options?: {
@@ -186,95 +157,57 @@ type MathOptModelLike = {
   addIndicatorConstraint?(options?: {
     indicator?: MathOptVariableLike;
     activateOnZero?: boolean;
-    activate_on_zero?: boolean;
     impliedConstraint?: unknown;
-    implied_constraint?: unknown;
     lowerBound?: number;
     upperBound?: number;
     terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
     expression?: unknown;
     name?: string;
   }): unknown;
-  add_indicator_constraint?(options?: {
-    indicator?: MathOptVariableLike;
-    activate_on_zero?: boolean;
-    implied_constraint?: unknown;
-    lower_bound?: number;
-    upper_bound?: number;
-    terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
-    expression?: unknown;
-    name?: string;
-  }): unknown;
-  add_linear_constraint?(options?: {
-    lb?: number;
-    ub?: number;
-    expr?: unknown;
-    lowerBound?: number;
-    upperBound?: number;
-    terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
-    expression?: unknown;
-    name?: string;
-  } | MathOptBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptLowerBoundedExpressionLike<MathOptLinearExpressionLike> | MathOptUpperBoundedExpressionLike<MathOptLinearExpressionLike>): MathOptLinearConstraintLike;
   variables?(): MathOptVariableLike[];
-  getVariable?(id: number): MathOptVariableLike | undefined;
-  get_variable?(id: number, options?: { validate?: boolean }): MathOptVariableLike;
+  getVariable?(id: number, validate?: boolean): MathOptVariableLike | undefined;
   hasVariable?(id: number): boolean;
-  has_variable?(id: number): boolean;
   getNumVariables?(): number;
-  get_num_variables?(): number;
   getNextVariableId?(): number;
-  get_next_variable_id?(): number;
   ensureNextVariableIdAtLeast?(id: number): void;
-  ensure_next_variable_id_at_least?(id: number): void;
   linearConstraints?(): MathOptLinearConstraintLike[];
-  linear_constraints?(): MathOptLinearConstraintLike[];
-  getLinearConstraint?(id: number): MathOptLinearConstraintLike | undefined;
-  get_linear_constraint?(id: number, options?: { validate?: boolean }): MathOptLinearConstraintLike;
+  getLinearConstraint?(id: number, validate?: boolean): MathOptLinearConstraintLike | undefined;
   hasLinearConstraint?(id: number): boolean;
-  has_linear_constraint?(id: number): boolean;
   getNumLinearConstraints?(): number;
-  get_num_linear_constraints?(): number;
   getNextLinearConstraintId?(): number;
-  get_next_linear_constraint_id?(): number;
   ensureNextLinearConstraintIdAtLeast?(id: number): void;
-  ensure_next_linear_constraint_id_at_least?(id: number): void;
   deleteVariable?(variable: MathOptVariableLike): void;
-  delete_variable?(variable: MathOptVariableLike): void;
   deleteLinearConstraint?(constraint: MathOptLinearConstraintLike): void;
-  delete_linear_constraint?(constraint: MathOptLinearConstraintLike): void;
-  column_nonzeros?(variable: MathOptVariableLike): MathOptLinearConstraintLike[];
-  row_nonzeros?(constraint: MathOptLinearConstraintLike): MathOptVariableLike[];
-  linear_constraint_matrix_entries?(): Array<{
+  columnNonzeros?(variable: MathOptVariableLike): MathOptLinearConstraintLike[];
+  rowNonzeros?(constraint: MathOptLinearConstraintLike): MathOptVariableLike[];
+  linearConstraintMatrixEntries?(): Array<{
     linearConstraint?: MathOptLinearConstraintLike;
-    linear_constraint?: MathOptLinearConstraintLike;
     variable: MathOptVariableLike;
     coefficient: number;
   }>;
-  maximize_linear_objective?(terms: unknown, offset?: number): void;
-  minimize_linear_objective?(terms: unknown, offset?: number): void;
-  set_linear_objective?(terms: unknown, isMaximize: boolean, offset?: number): void;
-  set_objective?(terms: unknown, isMaximize: boolean, offset?: number): void;
-  set_quadratic_objective?(terms: unknown, isMaximize: boolean, offset?: number): void;
+  maximizeLinearObjective?(terms: unknown, offset?: number): void;
+  minimizeLinearObjective?(terms: unknown, offset?: number): void;
+  setLinearObjective?(terms: unknown, isMaximize: boolean, offset?: number): void;
+  setObjective?(terms: unknown, isMaximize: boolean, offset?: number): void;
+  setQuadraticObjective?(terms: unknown, isMaximize: boolean, offset?: number): void;
   maximize(terms: unknown, offset?: number): void;
   minimize(terms: unknown, offset?: number): void;
 };
 
 type MathOptObjectiveLike = {
   isMaximize?: boolean;
-  is_maximize?: boolean;
   offset: number;
   name: string;
   clear(): void;
-  set_linear_coefficient(variable: MathOptVariableLike, coefficient: number): void;
-  get_linear_coefficient(variable: MathOptVariableLike): number;
-  linear_terms(): MathOptLinearTermLike[];
-  set_quadratic_coefficient(firstVariable: MathOptVariableLike, secondVariable: MathOptVariableLike, coefficient: number): void;
-  get_quadratic_coefficient(firstVariable: MathOptVariableLike, secondVariable: MathOptVariableLike): number;
-  quadratic_terms(): MathOptQuadraticTermLike[];
+  setLinearCoefficient(variable: MathOptVariableLike, coefficient: number): void;
+  getLinearCoefficient(variable: MathOptVariableLike): number;
+  linearTerms(): MathOptLinearTermLike[];
+  setQuadraticCoefficient(firstVariable: MathOptVariableLike, secondVariable: MathOptVariableLike, coefficient: number): void;
+  getQuadraticCoefficient(firstVariable: MathOptVariableLike, secondVariable: MathOptVariableLike): number;
+  quadraticTerms(): MathOptQuadraticTermLike[];
 };
 
 export type MathOptApi = {
-  initMathOpt(): Promise<void>;
   MathOpt: {
     SolverType: {
       GLOP: number;
@@ -294,19 +227,15 @@ export type MathOptApi = {
     PdlpParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
     GlpkParameters: new (options?: {
       computeUnboundRaysIfPossible?: boolean;
-      compute_unbound_rays_if_possible?: boolean;
     }) => { toProtoBytes(): Uint8Array };
     SolveInterrupter: new () => {
       readonly interrupted: boolean;
       interrupt(): void;
       isInterrupted?(): boolean;
-      is_interrupted?(): boolean;
     };
-    SolveParameters: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
     ModelSolveParameters: {
       new (options?: Record<string, unknown>): { toProtoBytes(): Uint8Array };
       onlySomePrimalVariables?(variables: MathOptVariableLike[]): { toProtoBytes(): Uint8Array };
-      only_some_primal_variables?(variables: MathOptVariableLike[]): { toProtoBytes(): Uint8Array };
     };
     SparseVectorFilter: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
     SolutionHint: new (options?: Record<string, unknown>) => { toProtoBytes(): Uint8Array };
@@ -344,13 +273,8 @@ export type MathOptApi = {
       solverType?: number | string;
       threads?: number;
       iterationLimit?: number;
-      interrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean; is_interrupted?(): boolean };
-      solveInterrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean; is_interrupted?(): boolean };
-      solve_interrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean; is_interrupted?(): boolean };
+      interrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean };
       messageCallback?: (messages: string[]) => void;
-      message_callback?: (messages: string[]) => void;
-      msgCb?: (messages: string[]) => void;
-      msg_cb?: (messages: string[]) => void;
       [key: string]: unknown;
     }): Promise<{
       terminationReason: string;
@@ -398,39 +322,6 @@ export type MathOptApi = {
       }>;
       messages: string[];
       rawResponse: Uint8Array;
-      solve_time(): number | null;
-      best_objective_bound(): number | null;
-      has_primal_feasible_solution(): boolean;
-      has_dual_feasible_solution(): boolean;
-      has_ray(): boolean;
-      has_dual_ray(): boolean;
-      has_basis(): boolean;
-      bounded(): boolean;
-      objective_value(): number;
-      variable_values(): Record<string, number>;
-      variable_values(variable: MathOptVariableLike): number;
-      variable_values(variables: MathOptVariableLike[]): number[];
-      reduced_costs(): Record<string, number>;
-      reduced_costs(variable: MathOptVariableLike): number;
-      reduced_costs(variables: MathOptVariableLike[]): number[];
-      dual_values(): Record<string, number>;
-      dual_values(linearConstraint: MathOptLinearConstraintLike): number;
-      dual_values(linearConstraints: MathOptLinearConstraintLike[]): number[];
-      ray_variable_values(): Record<string, number>;
-      ray_variable_values(variable: MathOptVariableLike): number;
-      ray_variable_values(variables: MathOptVariableLike[]): number[];
-      ray_reduced_costs(): Record<string, number>;
-      ray_reduced_costs(variable: MathOptVariableLike): number;
-      ray_reduced_costs(variables: MathOptVariableLike[]): number[];
-      ray_dual_values(): Record<string, number>;
-      ray_dual_values(linearConstraint: MathOptLinearConstraintLike): number;
-      ray_dual_values(linearConstraints: MathOptLinearConstraintLike[]): number[];
-      variable_status(): Record<string, string>;
-      variable_status(variable: MathOptVariableLike): string;
-      variable_status(variables: MathOptVariableLike[]): string[];
-      constraint_status(): Record<string, string>;
-      constraint_status(linearConstraint: MathOptLinearConstraintLike): string;
-      constraint_status(linearConstraints: MathOptLinearConstraintLike[]): string[];
     }>;
     encodeSolveRequest(model: MathOptModelLike, options?: {
       solverType?: number | string;
@@ -438,9 +329,34 @@ export type MathOptApi = {
       iterationLimit?: number;
       [key: string]: unknown;
     }): Uint8Array;
-    setExecutor(configuration: { type: 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
   };
 };
+
+type MathOptExecutorSelection = FixtureMode | ReturnType<typeof serverExecutorConfiguration>;
+
+function withMathOptExecutor(
+  api: MathOptApi,
+  executor: MathOptExecutorSelection,
+): MathOptApi {
+  const IncrementalSolver = api.MathOpt.IncrementalSolver;
+  const ScopedIncrementalSolver = function (...args: any[]) {
+    const [model, solverType, options = {}] = args;
+    return new IncrementalSolver(model, solverType, { ...options, executor });
+  } as unknown as typeof IncrementalSolver;
+  const MathOpt = new Proxy(api.MathOpt, {
+    get(target, property, receiver) {
+      if (property === 'solve') {
+        return (model: MathOptModelLike, options: Record<string, unknown> = {}) =>
+          target.solve(model, { ...options, executor });
+      }
+      if (property === 'IncrementalSolver') return ScopedIncrementalSolver;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  return {
+    MathOpt,
+  };
+}
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -631,10 +547,6 @@ async function runGScipMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: 
   const result = await api.MathOpt.solve(model, {
     solverType: api.MathOpt.SolverType.GSCIP,
     threads,
-    gscip: threads > 1 ? {
-      boolParams: { 'concurrent/presolvebefore': false },
-      intParams: { 'parallel/minnthreads': threads },
-    } : undefined,
   });
   assertOptimal('MathOpt GSCIP MIP', result);
   assert(near(result.objectiveValue, 8), `MathOpt GSCIP MIP: expected objective 8, got ${result.objectiveValue}`);
@@ -765,47 +677,31 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
   const modes = options.modes ?? executorFixtureModes;
   if (modes.includes('server')) await assertServerExecutorIsRunning();
   for (const mode of modes) {
-    api.MathOpt.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
-      await api.initMathOpt();
-      for (const threads of [1, 4]) {
-        options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
-        results.push(await runGlopLp(api, mode, threads));
-        options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
-        results.push(await runCpSatMip(api, mode, threads));
-        options.onProgress?.('MathOpt.testGScipIntegerProgram', mode, threads);
-        results.push(await runGScipMip(api, mode, threads));
-        options.onProgress?.('MathOpt.testPdlpLinearProgram', mode, threads);
-        results.push(await runPdlpLp(api, mode, threads));
-        if (threads === 1) {
-          options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
-          results.push(await runGlpkLp(api, mode));
-        }
-        for (const testCase of mathoptSolveResultContractCases) {
-          if (!activeSolveResultContractNames.has(testCase.name)) continue;
-          options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
-          const output = await testCase.run(api);
-          results.push(withMathOptMetadata({
-            name: `MathOpt.${testCase.name}`,
-            mode,
-            threads,
-            ok: !output.startsWith('TODO:'),
-            terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
-            objectiveValue: null,
-            values: {},
-          }, {
-            source: 'ortools/math_opt/python',
-            upstream: testCase.name,
-            tags: ['python-parity', 'solve-result', mode, `${threads}-threads`],
-          }));
-        }
+    const scopedApi = withMathOptExecutor(
+      api,
+      mode === 'server' ? serverExecutorConfiguration() : mode,
+    );
+    for (const threads of [1, 4]) {
+      options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
+      results.push(await runGlopLp(scopedApi, mode, threads));
+      options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
+      results.push(await runCpSatMip(scopedApi, mode, threads));
+      options.onProgress?.('MathOpt.testGScipIntegerProgram', mode, threads);
+      results.push(await runGScipMip(scopedApi, mode, threads));
+      options.onProgress?.('MathOpt.testPdlpLinearProgram', mode, threads);
+      results.push(await runPdlpLp(scopedApi, mode, threads));
+      if (threads === 1) {
+        options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
+        results.push(await runGlpkLp(scopedApi, mode));
       }
-      for (const testCase of mathOptExpressionContractCases) {
-        options.onProgress?.(`MathOpt.${testCase.name}`, mode, 1);
-        const output = await testCase.run(api);
+      for (const testCase of mathoptSolveResultContractCases) {
+        if (!activeSolveResultContractNames.has(testCase.name)) continue;
+        options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
+        const output = await testCase.run(scopedApi);
         results.push(withMathOptMetadata({
           name: `MathOpt.${testCase.name}`,
           mode,
-          threads: 1,
+          threads,
           ok: !output.startsWith('TODO:'),
           terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
           objectiveValue: null,
@@ -813,17 +709,35 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
         }, {
           source: 'ortools/math_opt/python',
           upstream: testCase.name,
-          tags: ['python-parity', 'expression-api', mode],
+          tags: ['python-parity', 'solve-result', mode, `${threads}-threads`],
         }));
       }
-      options.onProgress?.('MathOpt.modelContract', mode, 1);
-      results.push(...(await runMathOptModelContractCases(api, mode, 1)).map((result) =>
-        withMathOptMetadata(result, {
-          source: 'ortools/math_opt/python',
-          upstream: result.name.replace(/^MathOpt\./, ''),
-          tags: ['python-parity', 'model-api', mode],
-        })
-      ));
+    }
+    for (const testCase of mathOptExpressionContractCases) {
+      options.onProgress?.(`MathOpt.${testCase.name}`, mode, 1);
+      const output = await testCase.run(scopedApi);
+      results.push(withMathOptMetadata({
+        name: `MathOpt.${testCase.name}`,
+        mode,
+        threads: 1,
+        ok: !output.startsWith('TODO:'),
+        terminationReason: output.startsWith('TODO:') ? output : 'API_ONLY',
+        objectiveValue: null,
+        values: {},
+      }, {
+        source: 'ortools/math_opt/python',
+        upstream: testCase.name,
+        tags: ['python-parity', 'expression-api', mode],
+      }));
+    }
+    options.onProgress?.('MathOpt.modelContract', mode, 1);
+    results.push(...(await runMathOptModelContractCases(scopedApi, mode, 1)).map((result) =>
+      withMathOptMetadata(result, {
+        source: 'ortools/math_opt/python',
+        upstream: result.name.replace(/^MathOpt\./, ''),
+        tags: ['python-parity', 'model-api', mode],
+      })
+    ));
   }
   return results;
 }

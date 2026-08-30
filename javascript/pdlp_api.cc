@@ -52,6 +52,14 @@ class Reader {
     return value;
   }
 
+  int32_t ReadI32() {
+    if (!Ensure(sizeof(int32_t))) return 0;
+    int32_t value;
+    std::memcpy(&value, data_ + offset_, sizeof(value));
+    offset_ += sizeof(value);
+    return value;
+  }
+
   double ReadDouble() {
     if (!Ensure(sizeof(double))) return 0.0;
     double value;
@@ -162,13 +170,14 @@ uint8_t* CopyStringToBuffer(const std::string& value, size_t* out_len) {
   return buffer;
 }
 
-uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
-                           size_t* out_len) {
+uint8_t* CopyProtoResultToBuffer(const google::protobuf::MessageLite& message,
+                                 size_t* out_len) {
   std::string data;
   if (!message.SerializeToString(&data)) {
     if (out_len != nullptr) *out_len = 0;
     return nullptr;
   }
+  data.insert(data.begin(), '\x01');
   return CopyStringToBuffer(data, out_len);
 }
 
@@ -220,6 +229,7 @@ bool DecodeQuadraticProgram(Reader* reader, QuadraticProgram* qp) {
     const uint32_t row = reader->ReadU32();
     const uint32_t col = reader->ReadU32();
     const double value = reader->ReadDouble();
+    if (row >= num_constraints || col >= num_variables) return false;
     entries.emplace_back(row, col, value);
   }
   qp->constraint_matrix.resize(num_constraints, num_variables);
@@ -264,10 +274,10 @@ uint8_t* EncodeQuadraticProgram(const QuadraticProgram& qp, size_t* out_len) {
 PrimalDualHybridGradientParams DecodeParams(Reader* reader) {
   PrimalDualHybridGradientParams params;
   if (reader->ReadU8()) {
-    params.mutable_termination_criteria()->set_iteration_limit(reader->ReadU32());
+    params.mutable_termination_criteria()->set_iteration_limit(reader->ReadI32());
   }
   if (reader->ReadU8()) {
-    params.set_termination_check_frequency(reader->ReadU32());
+    params.set_termination_check_frequency(reader->ReadI32());
   }
   if (reader->ReadU8()) {
     params.mutable_termination_criteria()
@@ -280,10 +290,13 @@ PrimalDualHybridGradientParams DecodeParams(Reader* reader) {
         ->set_eps_optimal_absolute(reader->ReadDouble());
   }
   if (reader->ReadU8()) {
-    params.set_l_inf_ruiz_iterations(reader->ReadU32());
+    params.set_l_inf_ruiz_iterations(reader->ReadI32());
   }
   if (reader->ReadU8()) {
     params.set_l2_norm_rescaling(reader->ReadU8() != 0);
+  }
+  if (reader->ReadU8()) {
+    params.set_num_threads(reader->ReadI32());
   }
   return params;
 }
@@ -339,7 +352,7 @@ EMSCRIPTEN_KEEPALIVE
 int pdlp_is_linear_program(const uint8_t* qp_data, size_t qp_len) {
   Reader reader(qp_data, qp_len);
   QuadraticProgram qp;
-  if (!DecodeQuadraticProgram(&reader, &qp)) return 0;
+  if (!DecodeQuadraticProgram(&reader, &qp)) return -1;
   return IsLinearProgram(qp) ? 1 : 0;
 }
 
@@ -367,7 +380,7 @@ uint8_t* pdlp_qp_to_mpmodel_proto(const uint8_t* qp_data, size_t qp_len,
   }
   absl::StatusOr<MPModelProto> proto = QpToMpModelProto(qp);
   if (!proto.ok()) return CopyStringToBuffer("", out_len);
-  return CopyProtoToBuffer(*proto, out_len);
+  return CopyProtoResultToBuffer(*proto, out_len);
 }
 
 EMSCRIPTEN_KEEPALIVE

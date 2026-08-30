@@ -19,10 +19,7 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt, setExecutor } from 'or-tools-wasm/mathopt';
-
-setExecutor({ type: 'worker' });
-await initMathOpt();
+        <pre class="code-block"><code data-highlight="ts">import { MathOpt } from 'or-tools-wasm/mathopt';
 
 const model = MathOpt.Model('gscip_simple_mip');
 const x = model.addIntegerVariable({ lowerBound: 0, upperBound: 10, name: 'x' });
@@ -42,6 +39,7 @@ model.maximize([
 ]);
 
 const result = await MathOpt.solve(model, {
+  executor: 'worker',
   solverType: MathOpt.SolverType.GSCIP,
   threads: 4,
 });

@@ -1,7 +1,5 @@
 import {
-  initMathOpt,
   MathOpt,
-  setExecutor,
   type MathOptIncrementalSolver,
   type MathOptLinearConstraint,
   type MathOptModel,
@@ -466,7 +464,6 @@ const executorSelector = document.getElementById('solver-executor') as HTMLSelec
 const workerThreadsInput = document.getElementById('worker-threads') as HTMLInputElement | null;
 
 let running = false;
-let initialized = false;
 let solving = false;
 let pendingPlanRequest = false;
 let activeSolveKind: PlanSolveKind | null = null;
@@ -494,14 +491,13 @@ let lastError = '';
 let movementPlanStatus = 'Idle';
 
 const maxWorkerCount = getMaxWorkerCount();
+const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
 if (workerThreadsInput) {
   const initialThreads = Math.min(4, maxWorkerCount);
   workerThreadsInput.max = String(maxWorkerCount);
   workerThreadsInput.value = String(initialThreads);
   workerThreadsInput.title = `Available worker threads: ${maxWorkerCount}`;
 }
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
-
 function zeroProductRecord(): Record<ProductType, number> {
   return Object.fromEntries(productTypes.map((product) => [product, 0])) as Record<ProductType, number>;
 }
@@ -758,10 +754,6 @@ async function solvePlan(): Promise<void> {
   lastError = '';
   renderMetrics();
   try {
-    if (!initialized) {
-      await initMathOpt();
-      initialized = true;
-    }
     const hadPlanner = planner !== null;
     const nextPlanner = await ensurePlanner();
     const solveKind: PlanSolveKind = hadPlanner ? 'partial' : 'full';
@@ -860,7 +852,11 @@ async function ensurePlanner(): Promise<PlannerModel> {
     coefficient: objectiveCoefficient(product, slot, zeroProductRecord()),
   }))));
 
-  const solver = new MathOpt.IncrementalSolver(model, MathOpt.SolverType.CP_SAT, cpSatPlannerOptions());
+  const solver = new MathOpt.IncrementalSolver(
+    model,
+    MathOpt.SolverType.CP_SAT,
+    { ...cpSatPlannerOptions(), executor: selectedExecutor() },
+  );
   planner = {
     model,
     solver,
@@ -1071,11 +1067,11 @@ async function planTrafficDispatches(): Promise<string> {
 
   model.maximize(decisionTerms);
   const result = await MathOpt.solve(model, {
+    executor: selectedExecutor(),
     solverType: MathOpt.SolverType.CP_SAT,
     threads: currentThreadCount(),
     timeLimitSeconds: 0.45,
     cpSat: {
-      numWorkers: currentThreadCount(),
       maxTimeInSeconds: 0.45,
       randomSeed: 11,
       stopAfterFirstSolution: false,
@@ -1274,7 +1270,6 @@ function cpSatPlannerOptions() {
     timeLimitSeconds: 1,
     relativeGapTolerance: 0,
     cpSat: {
-      numWorkers: currentThreadCount(),
       maxTimeInSeconds: 1,
       randomSeed: 7,
       stopAfterFirstSolution: false,

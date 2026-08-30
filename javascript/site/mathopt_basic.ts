@@ -1,5 +1,5 @@
-import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
-import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, setRunning, workerCountInput } from './mathopt_sample_helpers.js';
+import { MathOpt } from 'or-tools-wasm/mathopt';
+import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, selectedMathOptExecutor, setRunning, workerCountInput } from './mathopt_sample_helpers.js';
 
 const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;
 
@@ -37,9 +37,6 @@ async function runMathOptExample() {
   try {
     const solverType = selectedSolverType();
     const threads = solverType === 'GLPK' ? 1 : configureMathOptRun();
-    appendStatus('Initializing MathOpt runtime...');
-    await initMathOpt();
-
     const model = MathOpt.Model('basics');
     const x = addBackendCompatibleBinaryVariable(model, solverType, 'x');
     const y = addBackendCompatibleBinaryVariable(model, solverType, 'y');
@@ -57,6 +54,7 @@ async function runMathOptExample() {
 
     appendStatus(`Solving with ${solverType}, threads=${threads}...`);
     const result = await MathOpt.solve(model, {
+      executor: selectedMathOptExecutor(),
       solverType: MathOpt.SolverType[solverType],
       threads,
       timeLimitSeconds: 5,
@@ -74,7 +72,7 @@ async function runMathOptExample() {
         })
         : undefined,
       cpSat: solverType === 'CP_SAT'
-        ? { numWorkers: threads, maxTimeInSeconds: 5 }
+        ? { maxTimeInSeconds: 5 }
         : undefined,
     });
     renderRows([

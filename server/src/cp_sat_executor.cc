@@ -167,9 +167,11 @@ int CpSatExecutor::RequestedThreads(const SolverExecutorRequest& request,
       !parameters.ParseFromString(cp_sat_request.solve().sat_parameters_proto())) {
     throw std::invalid_argument("Failed to parse SatParameters.");
   }
-  const int solver_threads = parameters.num_workers() > 0
-                                 ? parameters.num_workers()
-                                 : parameters.num_search_workers();
+  if (parameters.num_search_workers() != 0) {
+    throw std::invalid_argument(
+        "CP-SAT num_search_workers is not supported; use num_workers.");
+  }
+  const int solver_threads = parameters.num_workers();
   if (client_requested_threads > 0 && solver_threads <= 0) {
     throw std::invalid_argument(
         "A finite thread request cannot be paired with CP-SAT automatic workers.");

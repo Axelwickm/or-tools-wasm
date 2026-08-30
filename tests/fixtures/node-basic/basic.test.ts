@@ -34,15 +34,8 @@ import {
   SteepestSearch,
   TrivialSolutionGenerator,
 } from 'or-tools-wasm/set-cover';
-import {
-  initMathOpt,
-  MathOpt,
-} from 'or-tools-wasm/mathopt';
-import {
-  initPdlp,
-  Pdlp,
-  setExecutor as setPdlpExecutor,
-} from 'or-tools-wasm/pdlp';
+import { MathOpt } from 'or-tools-wasm/mathopt';
+import * as PdlpApi from 'or-tools-wasm/pdlp';
 import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import {
   BOOL_FALSE,
@@ -65,6 +58,7 @@ import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runn
 import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
+import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
 import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
@@ -111,6 +105,10 @@ test('runs the shared proto CP-SAT cases in Node', async (t) => {
 
 test('enforces the CP-SAT worker job lifecycle in Node', async () => {
   await runCpSatWorkerLifecycleCase(CpSat as never);
+});
+
+test('enforces CP-SAT local solve concurrency in Node', async () => {
+  await runCpSatConcurrencyCase(CpSatApi as never);
 });
 
 test('runs the shared Routing cases in Node', async (t) => {
@@ -186,17 +184,12 @@ test('runs the shared RCPSP cases in Node', async (t) => {
 
 test('runs the shared MathOpt cases in Node', async (t) => {
   const mathOptResults = await runMathOptCases({
-    initMathOpt,
     MathOpt,
   }, { modes: executorFixtureModes });
   await assertCaseResults(t, 'node MathOpt', mathOptResults);
 });
 
 test('runs the shared PDLP cases in Node', async (t) => {
-  const pdlpResults = await runPdlpCases({
-    initPdlp,
-    Pdlp,
-    setExecutor: setPdlpExecutor,
-  });
+  const pdlpResults = await runPdlpCases(PdlpApi);
   await assertCaseResults(t, 'node PDLP', pdlpResults);
 });

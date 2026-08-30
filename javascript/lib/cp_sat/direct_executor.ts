@@ -5,6 +5,7 @@ import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,
   SolverCancellationUnsupportedError,
+  SolverExecutorBusyError,
   SolverFailureKind,
   SolverJobState,
   type SolverFailureKind as SolverFailureKindType,
@@ -45,11 +46,6 @@ function callbackFlags(mask?: CpSatCallbackMask) {
 type CpSatWasmCallbackRegistry = {
   nextId: number;
   sinks: Map<number, (eventType: number, payload: Uint8Array) => void>;
-};
-
-export type CpSatWorkerCancellation = {
-  memory: SharedArrayBuffer;
-  byteOffset: number;
 };
 
 function cpSatWasmCallbacks(module: OrToolsWasmModule): CpSatWasmCallbackRegistry {
@@ -105,48 +101,32 @@ export class DirectCpSatExecutor implements CpSatExecutor {
 
   private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
+  private activeJob: object | null = null;
 
   constructor(private readonly loadModuleImpl: () => Promise<OrToolsWasmModule> = loadRuntime) {}
 
   async load(): Promise<void> {
-    await this.loadModule();
+    await this.module();
   }
 
-  loadModule() {
+  private module() {
     this.modulePromise ??= this.loadModuleImpl();
     return this.modulePromise;
-  }
-
-  async workerCancellation(): Promise<CpSatWorkerCancellation> {
-    const module = await this.loadModule();
-    const memory = module.HEAPU8.buffer;
-    if (!(memory instanceof SharedArrayBuffer)) {
-      throw new Error('CP-SAT worker cancellation requires shared WASM memory.');
-    }
-    const interruptAddress = module._cp_sat_interrupt_address
-      ?? module.cp_sat_interrupt_address;
-    if (typeof interruptAddress !== 'function') {
-      const matchingExports = Object.keys(module)
-        .filter((name) => name.includes('interrupt'))
-        .join(', ');
-      throw new Error(
-        `CP-SAT interrupt address export unavailable${matchingExports ? `: ${matchingExports}` : '.'}`,
-      );
-    }
-    return {
-      memory,
-      byteOffset: interruptAddress() as number,
-    };
   }
 
   execute(
     payload: CpSatOperation,
     options: SolverExecutionOptions<CpSatSolverEvent>,
   ): CpSatJob {
+    if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextCpSatRequestId();
+    const state = {};
+    this.activeJob = state;
     return {
       requestId,
-      result: this.run(requestId, payload, options.onEvent),
+      result: this.run(requestId, payload, options.onEvent).finally(() => {
+        if (this.activeJob === state) this.activeJob = null;
+      }),
       cancel: () => Promise.reject(new SolverCancellationUnsupportedError(this.solver)),
     };
   }
@@ -212,7 +192,7 @@ export class DirectCpSatExecutor implements CpSatExecutor {
     createdAtMs: bigint,
     onEvent: SolverExecutorEventHandler<SolverJobEvent | CpSatSolverEvent>,
   ): Promise<CpSatResult> {
-    const module = await this.loadModule();
+    const module = await this.module();
     const startedAtMs = nowMs();
     await onEvent(createCpSatJobStatusEvent(
       requestId,
@@ -280,7 +260,7 @@ export class DirectCpSatExecutor implements CpSatExecutor {
     createdAtMs: bigint,
     onEvent: SolverExecutorEventHandler<SolverJobEvent | CpSatSolverEvent>,
   ): Promise<CpSatResult> {
-    const module = await this.loadModule();
+    const module = await this.module();
     const startedAtMs = nowMs();
     await onEvent(createCpSatJobStatusEvent(
       requestId,

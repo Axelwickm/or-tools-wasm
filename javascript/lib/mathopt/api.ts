@@ -1,38 +1,66 @@
-import { create } from '@bufbuild/protobuf';
 import { CloudExecutor } from '../cloud_executor.js';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
-import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
-  MathOptIncrementalCreateRequestSchema,
-  MathOptIncrementalDeleteRequestSchema,
-  MathOptIncrementalSolveRequestSchema,
-  MathOptSolveRequestSchema,
-} from '../generated/bridge/mathopt_pb.js';
-import type { SolverJobEvent } from '../solver_executor.js';
-import { MathOptExecutor, type MathOptExecutorLike, type MathOptExecutorRequest } from './executor.js';
-import { MathOptServerExecutor } from './server_executor.js';
-import { MathOptWorkerExecutor } from './worker_executor.js';
+  resolveExecutorConfiguration,
+  type ExecutorSelection,
+  type ResolvedExecutorConfiguration,
+} from '../executor_configuration.js';
+import type {
+  SolverJobEvent,
+  SolverResourceRequest,
+} from '../solver_executor.js';
+import { SolverServerExecutor } from '../solver_server_executor.js';
+import {
+  SolverWorkerExecutor,
+  type SolverWorkerLike,
+} from '../worker_helpers.js';
+import { satParametersProtoSchema } from '../generated/cp_sat_schemas.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
+import { DirectMathOptExecutor } from './direct_executor.js';
+import {
+  mathOptProtocol,
+  type MathOptExecutor,
+  type MathOptOperation,
+} from './protocol.js';
+import * as protobufModule from 'protobufjs';
 
 type WireValue = Uint8Array;
+type ProtobufType = import('protobufjs').Type;
 
-const directExecutor = new MathOptExecutor();
-const workerExecutor = new MathOptWorkerExecutor();
-let resolvedExecutorConfiguration = resolveExecutorConfiguration();
-let mathOptExecutor: MathOptExecutorLike = createResolvedExecutor(resolvedExecutorConfiguration);
+let satParametersType: ProtobufType | undefined;
 
-function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): MathOptExecutorLike {
-  switch (configuration.type) {
-    case 'direct': return directExecutor;
-    case 'worker': return workerExecutor;
-    case 'server': return new MathOptServerExecutor(configuration);
-    case 'cloud': return new CloudExecutor('mathopt', { test: configuration.test });
-  }
+function getSatParametersType(): ProtobufType {
+  return satParametersType ??= protobufModule
+    .parse(satParametersProtoSchema)
+    .root
+    .lookupType('operations_research.sat.SatParameters');
 }
 
-export function setMathOptExecutor(configuration: ExecutorConfiguration): void {
-  resolvedExecutorConfiguration = resolveExecutorConfiguration(configuration);
-  mathOptExecutor = createResolvedExecutor(resolvedExecutorConfiguration);
+async function createMathOptWorker(): Promise<SolverWorkerLike> {
+  return new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module', name: 'ortools-executor-mathopt' },
+  );
+}
+
+const directMathOptExecutor = new DirectMathOptExecutor();
+const workerMathOptExecutor = new SolverWorkerExecutor(
+  mathOptProtocol,
+  createMathOptWorker,
+);
+
+function createMathOptExecutor(selection: ExecutorSelection = 'auto'): MathOptExecutor {
+  return createResolvedMathOptExecutor(resolveExecutorConfiguration(selection));
+}
+
+function createResolvedMathOptExecutor(
+  configuration: ResolvedExecutorConfiguration,
+): MathOptExecutor {
+  switch (configuration.type) {
+    case 'direct': return directMathOptExecutor;
+    case 'worker': return workerMathOptExecutor;
+    case 'server': return new SolverServerExecutor(mathOptProtocol, configuration);
+    case 'cloud': return new CloudExecutor('mathopt', { test: configuration.test });
+  }
 }
 
 export type MathOptEvent = SolverJobEvent;
@@ -44,7 +72,6 @@ export type MathOptLinearTerm = {
 
 export type MathOptLinearConstraintMatrixEntry = {
   linearConstraint: MathOptLinearConstraint;
-  linear_constraint: MathOptLinearConstraint;
   variable: MathOptVariable;
   coefficient: number;
 };
@@ -80,16 +107,12 @@ export type MathOptLinearConstraintOptions = {
 export type MathOptIndicatorConstraintOptions = {
   indicator?: MathOptVariable;
   activateOnZero?: boolean;
-  activate_on_zero?: boolean;
   impliedConstraint?: MathOptBoundedExpression<MathOptLinearExpression>
     | MathOptLowerBoundedExpression<MathOptLinearExpression>
     | MathOptUpperBoundedExpression<MathOptLinearExpression>;
-  implied_constraint?: MathOptIndicatorConstraintOptions['impliedConstraint'];
   lowerBound?: number;
-  lower_bound?: number;
   lb?: number;
   upperBound?: number;
-  upper_bound?: number;
   ub?: number;
   expression?: MathOptLinearExpressionInput;
   expr?: MathOptLinearExpressionInput;
@@ -101,7 +124,6 @@ export type MathOptVariableOptions = {
   lb?: number;
   ub?: number;
   isInteger?: boolean;
-  is_integer?: boolean;
   lowerBound?: number;
   upperBound?: number;
   integer?: boolean;
@@ -109,56 +131,33 @@ export type MathOptVariableOptions = {
 };
 
 export type MathOptSolveOptions = {
+  executor?: ExecutorSelection;
   solverType?: MathOptSolverType | keyof typeof MathOptSolverType;
   removeNames?: boolean;
-  remove_names?: boolean;
   interrupter?: MathOptSolveInterrupter | MathOptSolveInterrupterLike;
-  solveInterrupter?: MathOptSolveInterrupter | MathOptSolveInterrupterLike;
-  solve_interrupter?: MathOptSolveInterrupter | MathOptSolveInterrupterLike;
   messageCallback?: (messages: string[]) => void;
-  message_callback?: (messages: string[]) => void;
-  msgCb?: (messages: string[]) => void;
-  msg_cb?: (messages: string[]) => void;
-  parameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions;
-  solveParameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions;
-  solve_parameters?: Uint8Array | MathOptSolveParameters | MathOptSolveParametersOptions;
   modelParameters?: Uint8Array | MathOptModelSolveParameters | MathOptModelSolveParametersOptions;
-  model_parameters?: Uint8Array | MathOptModelSolveParameters | MathOptModelSolveParametersOptions;
   timeLimitSeconds?: number;
-  time_limit_seconds?: number;
   threads?: number;
   iterationLimit?: number;
-  iteration_limit?: number;
   nodeLimit?: number;
-  node_limit?: number;
   cutoffLimit?: number;
-  cutoff_limit?: number;
   objectiveLimit?: number;
-  objective_limit?: number;
   bestBoundLimit?: number;
-  best_bound_limit?: number;
   solutionLimit?: number;
-  solution_limit?: number;
   enableOutput?: boolean;
-  enable_output?: boolean;
   randomSeed?: number;
-  random_seed?: number;
   absoluteGapTolerance?: number;
-  absolute_gap_tolerance?: number;
   relativeGapTolerance?: number;
-  relative_gap_tolerance?: number;
   solutionPoolSize?: number;
-  solution_pool_size?: number;
   lpAlgorithm?: MathOptLPAlgorithm | keyof typeof MathOptLPAlgorithm;
-  lp_algorithm?: MathOptLPAlgorithm | keyof typeof MathOptLPAlgorithm;
   presolve?: MathOptEmphasis | keyof typeof MathOptEmphasis;
   cuts?: MathOptEmphasis | keyof typeof MathOptEmphasis;
   heuristics?: MathOptEmphasis | keyof typeof MathOptEmphasis;
   scaling?: MathOptEmphasis | keyof typeof MathOptEmphasis;
   gscip?: GScipParameters | GScipParametersOptions | Uint8Array;
   glop?: GlopParameters | GlopParametersOptions | Uint8Array;
-  cpSat?: SatParameters | Uint8Array;
-  cp_sat?: SatParameters | Uint8Array;
+  cpSat?: Omit<SatParameters, 'numWorkers' | 'numSearchWorkers'> | Uint8Array;
   pdlp?: PdlpParameters | PdlpParametersOptions | Uint8Array;
   glpk?: GlpkParameters | GlpkParametersOptions | Uint8Array;
   onEvent?: (event: MathOptEvent) => void | Promise<void>;
@@ -167,12 +166,8 @@ export type MathOptSolveOptions = {
 
 export type MathOptSparseVectorFilterOptions<TElement = unknown> = {
   skipZeroValues?: boolean;
-  skip_zero_values?: boolean;
   filterByIds?: boolean;
-  filter_by_ids?: boolean;
   ids?: Array<number | bigint>;
-  filteredIds?: Array<number | bigint>;
-  filtered_ids?: Array<number | bigint>;
   elements?: TElement[];
 };
 
@@ -184,39 +179,24 @@ export type MathOptSparseVectorFilterInput<TElement = unknown> =
 
 export type MathOptSolutionHintOptions = {
   variableValues?: MathOptLinearTerm[];
-  variable_values?: MathOptLinearTerm[];
   dualValues?: Array<{ linearConstraint: MathOptLinearConstraint; value: number }>;
-  dual_values?: Array<{ linear_constraint?: MathOptLinearConstraint; linearConstraint?: MathOptLinearConstraint; value: number }>;
 };
 
 export type MathOptModelSolveParametersOptions = {
   variableValuesFilter?: MathOptSparseVectorFilterInput<MathOptVariable>;
-  variable_values_filter?: MathOptSparseVectorFilterInput<MathOptVariable>;
   dualValuesFilter?: MathOptSparseVectorFilterInput<MathOptLinearConstraint>;
-  dual_values_filter?: MathOptSparseVectorFilterInput<MathOptLinearConstraint>;
   quadraticDualValuesFilter?: MathOptSparseVectorFilterInput<number | bigint>;
-  quadratic_dual_values_filter?: MathOptSparseVectorFilterInput<number | bigint>;
   reducedCostsFilter?: MathOptSparseVectorFilterInput<MathOptVariable>;
-  reduced_costs_filter?: MathOptSparseVectorFilterInput<MathOptVariable>;
   initialBasis?: Uint8Array;
-  initial_basis?: Uint8Array;
   solutionHints?: Array<MathOptSolutionHint | MathOptSolutionHintOptions | Uint8Array>;
-  solution_hints?: Array<MathOptSolutionHint | MathOptSolutionHintOptions | Uint8Array>;
   branchingPriorities?: Array<{ variable: MathOptVariable; priority: number }>;
-  branching_priorities?: Array<{ variable: MathOptVariable; priority: number }>;
   lazyLinearConstraints?: Array<MathOptLinearConstraint | number | bigint>;
-  lazy_linear_constraints?: Array<MathOptLinearConstraint | number | bigint>;
-  lazyLinearConstraintIds?: Array<number | bigint>;
-  lazy_linear_constraint_ids?: Array<number | bigint>;
 };
 
 export type MathOptSolveInterrupterLike = {
   readonly interrupted?: boolean;
   isInterrupted?(): boolean;
-  is_interrupted?(): boolean;
 };
-
-export type MathOptSolveParametersOptions = Omit<MathOptSolveOptions, 'solverType' | 'removeNames' | 'remove_names' | 'interrupter' | 'solveInterrupter' | 'solve_interrupter' | 'messageCallback' | 'message_callback' | 'msgCb' | 'msg_cb' | 'parameters' | 'solveParameters' | 'solve_parameters' | 'modelParameters' | 'model_parameters'>;
 
 export type MathOptSolveResult = {
   terminationReason: string;
@@ -235,39 +215,6 @@ export type MathOptSolveResult = {
   dualRays: MathOptDualRayResult[];
   messages: string[];
   rawResponse: Uint8Array;
-  solve_time(): number | null;
-  best_objective_bound(): number | null;
-  has_primal_feasible_solution(): boolean;
-  has_dual_feasible_solution(): boolean;
-  has_ray(): boolean;
-  has_dual_ray(): boolean;
-  has_basis(): boolean;
-  bounded(): boolean;
-  objective_value(): number;
-  variable_values(): Record<string, number>;
-  variable_values(variable: MathOptVariable): number;
-  variable_values(variables: MathOptVariable[]): number[];
-  reduced_costs(): Record<string, number>;
-  reduced_costs(variable: MathOptVariable): number;
-  reduced_costs(variables: MathOptVariable[]): number[];
-  dual_values(): Record<string, number>;
-  dual_values(linearConstraint: MathOptLinearConstraint): number;
-  dual_values(linearConstraints: MathOptLinearConstraint[]): number[];
-  ray_variable_values(): Record<string, number>;
-  ray_variable_values(variable: MathOptVariable): number;
-  ray_variable_values(variables: MathOptVariable[]): number[];
-  ray_reduced_costs(): Record<string, number>;
-  ray_reduced_costs(variable: MathOptVariable): number;
-  ray_reduced_costs(variables: MathOptVariable[]): number[];
-  ray_dual_values(): Record<string, number>;
-  ray_dual_values(linearConstraint: MathOptLinearConstraint): number;
-  ray_dual_values(linearConstraints: MathOptLinearConstraint[]): number[];
-  variable_status(): Record<string, string>;
-  variable_status(variable: MathOptVariable): string;
-  variable_status(variables: MathOptVariable[]): string[];
-  constraint_status(): Record<string, string>;
-  constraint_status(linearConstraint: MathOptLinearConstraint): string;
-  constraint_status(linearConstraints: MathOptLinearConstraint[]): string[];
 };
 
 export type MathOptPrimalSolutionResult = {
@@ -372,14 +319,6 @@ export class MathOptVarEqVar {
     }
     this.firstVariable = firstVariable;
     this.secondVariable = secondVariable;
-  }
-
-  get first_variable(): MathOptVariable {
-    return this.firstVariable;
-  }
-
-  get second_variable(): MathOptVariable {
-    return this.secondVariable;
   }
 
   assertNotBoolean(): never {
@@ -507,33 +446,19 @@ export type GScipParametersOptions = {
   presolve?: GScipMetaParamValue | keyof typeof GScipMetaParamValue;
   separating?: GScipMetaParamValue | keyof typeof GScipMetaParamValue;
   boolParams?: Record<string, boolean>;
-  bool_params?: Record<string, boolean>;
   intParams?: Record<string, number>;
-  int_params?: Record<string, number>;
   longParams?: Record<string, number | bigint>;
-  long_params?: Record<string, number | bigint>;
   realParams?: Record<string, number>;
-  real_params?: Record<string, number>;
   charParams?: Record<string, string>;
-  char_params?: Record<string, string>;
   stringParams?: Record<string, string>;
-  string_params?: Record<string, string>;
   silenceOutput?: boolean;
-  silence_output?: boolean;
   printDetailedSolvingStats?: boolean;
-  print_detailed_solving_stats?: boolean;
   printScipModel?: boolean;
-  print_scip_model?: boolean;
   searchLogsFilename?: string;
-  search_logs_filename?: string;
   detailedSolvingStatsFilename?: string;
-  detailed_solving_stats_filename?: string;
   scipModelFilename?: string;
-  scip_model_filename?: string;
   numSolutions?: number;
-  num_solutions?: number;
   objectiveLimit?: number;
-  objective_limit?: number;
 };
 
 export class GScipParameters {
@@ -546,33 +471,29 @@ export class GScipParameters {
       enumField(2, options.heuristics, GScipMetaParamValue),
       enumField(3, options.presolve, GScipMetaParamValue),
       enumField(4, options.separating, GScipMetaParamValue),
-      ...mapFields(5, options.boolParams ?? options.bool_params, fieldBool),
-      ...mapFields(6, options.intParams ?? options.int_params, fieldVarint),
-      ...mapFields(7, options.longParams ?? options.long_params, fieldVarint),
-      ...mapFields(8, options.realParams ?? options.real_params, fieldDouble),
-      ...mapFields(9, options.charParams ?? options.char_params, fieldString),
-      ...mapFields(10, options.stringParams ?? options.string_params, fieldString),
-      optionalBoolField(11, options.silenceOutput ?? options.silence_output),
-      optionalBoolField(12, options.printDetailedSolvingStats ?? options.print_detailed_solving_stats),
-      optionalBoolField(13, options.printScipModel ?? options.print_scip_model),
-      optionalStringField(14, options.searchLogsFilename ?? options.search_logs_filename),
-      optionalStringField(15, options.detailedSolvingStatsFilename ?? options.detailed_solving_stats_filename),
-      optionalStringField(16, options.scipModelFilename ?? options.scip_model_filename),
-      optionalVarintField(17, options.numSolutions ?? options.num_solutions),
-      optionalDoubleField(18, options.objectiveLimit ?? options.objective_limit),
+      ...mapFields(5, options.boolParams, fieldBool),
+      ...mapFields(6, options.intParams, fieldVarint),
+      ...mapFields(7, options.longParams, fieldVarint),
+      ...mapFields(8, options.realParams, fieldDouble),
+      ...mapFields(9, options.charParams, fieldString),
+      ...mapFields(10, options.stringParams, fieldString),
+      optionalBoolField(11, options.silenceOutput),
+      optionalBoolField(12, options.printDetailedSolvingStats),
+      optionalBoolField(13, options.printScipModel),
+      optionalStringField(14, options.searchLogsFilename),
+      optionalStringField(15, options.detailedSolvingStatsFilename),
+      optionalStringField(16, options.scipModelFilename),
+      optionalVarintField(17, options.numSolutions),
+      optionalDoubleField(18, options.objectiveLimit),
     ]);
   }
 }
 
 export type GlopParametersOptions = {
   useScaling?: boolean;
-  use_scaling?: boolean;
   maxTimeInSeconds?: number;
-  max_time_in_seconds?: number;
   useDualSimplex?: boolean;
-  use_dual_simplex?: boolean;
   usePreprocessing?: boolean;
-  use_preprocessing?: boolean;
 };
 
 export class GlopParameters {
@@ -581,10 +502,10 @@ export class GlopParameters {
   toProtoBytes(): Uint8Array {
     const options = this.options;
     return message([
-      optionalBoolField(16, options.useScaling ?? options.use_scaling),
-      optionalDoubleField(26, options.maxTimeInSeconds ?? options.max_time_in_seconds),
-      optionalBoolField(31, options.useDualSimplex ?? options.use_dual_simplex),
-      optionalBoolField(34, options.usePreprocessing ?? options.use_preprocessing),
+      optionalBoolField(16, options.useScaling),
+      optionalDoubleField(26, options.maxTimeInSeconds),
+      optionalBoolField(31, options.useDualSimplex),
+      optionalBoolField(34, options.usePreprocessing),
     ]);
   }
 }
@@ -592,77 +513,39 @@ export class GlopParameters {
 export type PdlpParametersOptions = {
   terminationCriteria?: {
     optimalityNorm?: PdlpOptimalityNorm | keyof typeof PdlpOptimalityNorm;
-    optimality_norm?: PdlpOptimalityNorm | keyof typeof PdlpOptimalityNorm;
     iterationLimit?: number;
-    iteration_limit?: number;
     timeSecLimit?: number;
-    time_sec_limit?: number;
     kktMatrixPassLimit?: number;
-    kkt_matrix_pass_limit?: number;
     epsPrimalInfeasible?: number;
-    eps_primal_infeasible?: number;
     epsDualInfeasible?: number;
-    eps_dual_infeasible?: number;
     simpleOptimalityCriteria?: {
       epsOptimalAbsolute?: number;
-      eps_optimal_absolute?: number;
       epsOptimalRelative?: number;
-      eps_optimal_relative?: number;
-    };
-    simple_optimality_criteria?: {
-      eps_optimal_absolute?: number;
-      eps_optimal_relative?: number;
     };
   };
-  termination_criteria?: PdlpParametersOptions['terminationCriteria'];
-  numThreads?: number;
-  num_threads?: number;
   numShards?: number;
-  num_shards?: number;
   schedulerType?: PdlpSchedulerType | keyof typeof PdlpSchedulerType;
-  scheduler_type?: PdlpSchedulerType | keyof typeof PdlpSchedulerType;
   recordIterationStats?: boolean;
-  record_iteration_stats?: boolean;
   verbosityLevel?: number;
-  verbosity_level?: number;
   logIntervalSeconds?: number;
-  log_interval_seconds?: number;
   majorIterationFrequency?: number;
-  major_iteration_frequency?: number;
   terminationCheckFrequency?: number;
-  termination_check_frequency?: number;
   restartStrategy?: PdlpRestartStrategy | keyof typeof PdlpRestartStrategy;
-  restart_strategy?: PdlpRestartStrategy | keyof typeof PdlpRestartStrategy;
   primalWeightUpdateSmoothing?: number;
-  primal_weight_update_smoothing?: number;
   initialPrimalWeight?: number;
-  initial_primal_weight?: number;
   lInfRuizIterations?: number;
-  l_inf_ruiz_iterations?: number;
   l2NormRescaling?: boolean;
-  l2_norm_rescaling?: boolean;
   sufficientReductionForRestart?: number;
-  sufficient_reduction_for_restart?: number;
   necessaryReductionForRestart?: number;
-  necessary_reduction_for_restart?: number;
   linesearchRule?: PdlpLinesearchRule | keyof typeof PdlpLinesearchRule;
-  linesearch_rule?: PdlpLinesearchRule | keyof typeof PdlpLinesearchRule;
   initialStepSizeScaling?: number;
-  initial_step_size_scaling?: number;
   randomProjectionSeeds?: number[];
-  random_projection_seeds?: number[];
   infiniteConstraintBoundThreshold?: number;
-  infinite_constraint_bound_threshold?: number;
   useDiagonalQpTrustRegionSolver?: boolean;
-  use_diagonal_qp_trust_region_solver?: boolean;
   diagonalQpTrustRegionSolverTolerance?: number;
-  diagonal_qp_trust_region_solver_tolerance?: number;
   useFeasibilityPolishing?: boolean;
-  use_feasibility_polishing?: boolean;
   applyFeasibilityPolishingAfterLimitsReached?: boolean;
-  apply_feasibility_polishing_after_limits_reached?: boolean;
   applyFeasibilityPolishingIfSolverIsInterrupted?: boolean;
-  apply_feasibility_polishing_if_solver_is_interrupted?: boolean;
 };
 
 export class PdlpParameters {
@@ -670,49 +553,47 @@ export class PdlpParameters {
 
   toProtoBytes(): Uint8Array {
     const options = this.options;
+    if ('numThreads' in options) {
+      throw new Error('MathOpt PDLP thread count belongs in the top-level threads option.');
+    }
     return message([
-      fieldMessageIfPresent(1, encodePdlpTerminationCriteria(options.terminationCriteria ?? options.termination_criteria)),
-      optionalVarintField(2, options.numThreads ?? options.num_threads),
-      optionalBoolField(3, options.recordIterationStats ?? options.record_iteration_stats),
-      optionalVarintField(4, options.majorIterationFrequency ?? options.major_iteration_frequency),
-      optionalVarintField(5, options.terminationCheckFrequency ?? options.termination_check_frequency),
-      enumField(6, options.restartStrategy ?? options.restart_strategy, PdlpRestartStrategy),
-      optionalDoubleField(7, options.primalWeightUpdateSmoothing ?? options.primal_weight_update_smoothing),
-      optionalDoubleField(8, options.initialPrimalWeight ?? options.initial_primal_weight),
-      optionalVarintField(9, options.lInfRuizIterations ?? options.l_inf_ruiz_iterations),
-      optionalBoolField(10, options.l2NormRescaling ?? options.l2_norm_rescaling),
-      optionalDoubleField(11, options.sufficientReductionForRestart ?? options.sufficient_reduction_for_restart),
-      enumField(12, options.linesearchRule ?? options.linesearch_rule, PdlpLinesearchRule),
-      optionalDoubleField(17, options.necessaryReductionForRestart ?? options.necessary_reduction_for_restart),
-      optionalDoubleField(25, options.initialStepSizeScaling ?? options.initial_step_size_scaling),
-      optionalVarintField(26, options.verbosityLevel ?? options.verbosity_level),
-      optionalVarintField(27, options.numShards ?? options.num_shards),
-      fieldPackedVarintsIfPresent(28, options.randomProjectionSeeds ?? options.random_projection_seeds),
-      optionalDoubleField(22, options.infiniteConstraintBoundThreshold ?? options.infinite_constraint_bound_threshold),
-      optionalBoolField(23, options.useDiagonalQpTrustRegionSolver ?? options.use_diagonal_qp_trust_region_solver),
-      optionalDoubleField(24, options.diagonalQpTrustRegionSolverTolerance ?? options.diagonal_qp_trust_region_solver_tolerance),
-      optionalDoubleField(31, options.logIntervalSeconds ?? options.log_interval_seconds),
-      enumField(32, options.schedulerType ?? options.scheduler_type, PdlpSchedulerType),
-      optionalBoolField(30, options.useFeasibilityPolishing ?? options.use_feasibility_polishing),
-      optionalBoolField(33, options.applyFeasibilityPolishingAfterLimitsReached ?? options.apply_feasibility_polishing_after_limits_reached),
-      optionalBoolField(34, options.applyFeasibilityPolishingIfSolverIsInterrupted ?? options.apply_feasibility_polishing_if_solver_is_interrupted),
+      fieldMessageIfPresent(1, encodePdlpTerminationCriteria(options.terminationCriteria)),
+      optionalBoolField(3, options.recordIterationStats),
+      optionalVarintField(4, options.majorIterationFrequency),
+      optionalVarintField(5, options.terminationCheckFrequency),
+      enumField(6, options.restartStrategy, PdlpRestartStrategy),
+      optionalDoubleField(7, options.primalWeightUpdateSmoothing),
+      optionalDoubleField(8, options.initialPrimalWeight),
+      optionalVarintField(9, options.lInfRuizIterations),
+      optionalBoolField(10, options.l2NormRescaling),
+      optionalDoubleField(11, options.sufficientReductionForRestart),
+      enumField(12, options.linesearchRule, PdlpLinesearchRule),
+      optionalDoubleField(17, options.necessaryReductionForRestart),
+      optionalDoubleField(25, options.initialStepSizeScaling),
+      optionalVarintField(26, options.verbosityLevel),
+      optionalVarintField(27, options.numShards),
+      fieldPackedVarintsIfPresent(28, options.randomProjectionSeeds),
+      optionalDoubleField(22, options.infiniteConstraintBoundThreshold),
+      optionalBoolField(23, options.useDiagonalQpTrustRegionSolver),
+      optionalDoubleField(24, options.diagonalQpTrustRegionSolverTolerance),
+      optionalDoubleField(31, options.logIntervalSeconds),
+      enumField(32, options.schedulerType, PdlpSchedulerType),
+      optionalBoolField(30, options.useFeasibilityPolishing),
+      optionalBoolField(33, options.applyFeasibilityPolishingAfterLimitsReached),
+      optionalBoolField(34, options.applyFeasibilityPolishingIfSolverIsInterrupted),
     ]);
   }
 }
 
 export type GlpkParametersOptions = {
   computeUnboundRaysIfPossible?: boolean;
-  compute_unbound_rays_if_possible?: boolean;
 };
 
 export class GlpkParameters {
   readonly computeUnboundRaysIfPossible?: boolean;
-  readonly compute_unbound_rays_if_possible?: boolean;
 
   constructor(options: GlpkParametersOptions = {}) {
-    this.computeUnboundRaysIfPossible = options.computeUnboundRaysIfPossible
-      ?? options.compute_unbound_rays_if_possible;
-    this.compute_unbound_rays_if_possible = this.computeUnboundRaysIfPossible;
+    this.computeUnboundRaysIfPossible = options.computeUnboundRaysIfPossible;
   }
 
   toProtoBytes(): Uint8Array {
@@ -739,17 +620,6 @@ export class MathOptSolveInterrupter {
     return this.interruptedValue;
   }
 
-  is_interrupted(): boolean {
-    return this.isInterrupted();
-  }
-}
-
-export class MathOptSolveParameters {
-  constructor(readonly options: MathOptSolveParametersOptions = {}) {}
-
-  toProtoBytes(): Uint8Array {
-    return encodeMathOptSolveParameters(this.options) ?? empty();
-  }
 }
 
 export class MathOptSparseVectorFilter<TElement = unknown> {
@@ -764,16 +634,12 @@ export class MathOptSolutionHint {
   constructor(readonly options: MathOptSolutionHintOptions = {}) {}
 
   toProtoBytes(): Uint8Array {
-    const variableValues = this.options.variableValues ?? this.options.variable_values;
-    const dualValues = this.options.dualValues ?? this.options.dual_values;
+    const { variableValues, dualValues } = this.options;
     return message([
       fieldMessageIfPresent(1, variableValues === undefined ? null : encodeSparseDoubleVector(variableValues)),
-      fieldMessageIfPresent(2, dualValues === undefined ? null : encodeLinearConstraintDoubleVector(dualValues.map((entry) => {
-        const normalized = entry as { linearConstraint?: MathOptLinearConstraint; linear_constraint?: MathOptLinearConstraint; value: number };
-        const linearConstraint = normalized.linearConstraint ?? normalized.linear_constraint;
-        if (!linearConstraint) throw new Error('MathOpt solution hint dual values must include a linear constraint.');
-        return { linearConstraint, value: entry.value };
-      }))),
+      fieldMessageIfPresent(2, dualValues === undefined
+        ? null
+        : encodeLinearConstraintDoubleVector(dualValues)),
     ]);
   }
 }
@@ -783,21 +649,19 @@ export class MathOptModelSolveParameters {
 
   toProtoBytes(): Uint8Array {
     const options = this.options;
-    const solutionHints = options.solutionHints ?? options.solution_hints;
-    const branchingPriorities = options.branchingPriorities ?? options.branching_priorities;
-    const lazyLinearConstraintIds = options.lazyLinearConstraintIds
-      ?? options.lazy_linear_constraint_ids
-      ?? (options.lazyLinearConstraints ?? options.lazy_linear_constraints)?.map((constraint) =>
-        typeof constraint === 'object' ? constraint.id : constraint
-      );
+    const lazyLinearConstraintIds = options.lazyLinearConstraints?.map((constraint) =>
+      typeof constraint === 'object' ? constraint.id : constraint
+    );
     return message([
-      fieldMessageIfPresent(1, modelFilterBytes(options.variableValuesFilter ?? options.variable_values_filter)),
-      fieldMessageIfPresent(2, modelFilterBytes(options.dualValuesFilter ?? options.dual_values_filter)),
-      fieldMessageIfPresent(10, modelFilterBytes(options.quadraticDualValuesFilter ?? options.quadratic_dual_values_filter)),
-      fieldMessageIfPresent(3, modelFilterBytes(options.reducedCostsFilter ?? options.reduced_costs_filter)),
-      fieldMessageIfPresent(4, options.initialBasis ?? options.initial_basis),
-      ...(solutionHints ?? []).map((hint) => fieldMessage(5, solutionHintBytes(hint))),
-      fieldMessageIfPresent(6, branchingPriorities === undefined ? null : encodeVariableInt32Vector(branchingPriorities)),
+      fieldMessageIfPresent(1, modelFilterBytes(options.variableValuesFilter)),
+      fieldMessageIfPresent(2, modelFilterBytes(options.dualValuesFilter)),
+      fieldMessageIfPresent(10, modelFilterBytes(options.quadraticDualValuesFilter)),
+      fieldMessageIfPresent(3, modelFilterBytes(options.reducedCostsFilter)),
+      fieldMessageIfPresent(4, options.initialBasis),
+      ...(options.solutionHints ?? []).map((hint) => fieldMessage(5, solutionHintBytes(hint))),
+      fieldMessageIfPresent(6, options.branchingPriorities === undefined
+        ? null
+        : encodeVariableInt32Vector(options.branchingPriorities)),
       fieldPackedVarintsIfPresent(9, lazyLinearConstraintIds),
     ]);
   }
@@ -808,9 +672,6 @@ export class MathOptModelSolveParameters {
     });
   }
 
-  static only_some_primal_variables(variables: MathOptVariable[]): MathOptModelSolveParameters {
-    return MathOptModelSolveParameters.onlySomePrimalVariables(variables);
-  }
 }
 
 export class MathOptQuadraticTermKey {
@@ -985,14 +846,6 @@ export class MathOptBoundedExpression<TExpression = unknown> {
     readonly upperBound: number,
   ) {}
 
-  get lower_bound(): number {
-    return this.lowerBound;
-  }
-
-  get upper_bound(): number {
-    return this.upperBound;
-  }
-
   assertNotBoolean(): never {
     throw new TypeError('__bool__ is unsupported for two-sided or ranged linear inequality.');
   }
@@ -1009,14 +862,6 @@ export class MathOptLowerBoundedExpression<TExpression = unknown> {
     readonly lowerBound: number,
     readonly expression: TExpression,
   ) {}
-
-  get lower_bound(): number {
-    return this.lowerBound;
-  }
-
-  get upper_bound(): number {
-    return this.upperBound;
-  }
 
   toBoundedExpression(upperBound: number): MathOptBoundedExpression<TExpression> {
     return new MathOptBoundedExpression(this.lowerBound, this.expression, upperBound);
@@ -1038,14 +883,6 @@ export class MathOptUpperBoundedExpression<TExpression = unknown> {
     readonly expression: TExpression,
     readonly upperBound: number,
   ) {}
-
-  get lower_bound(): number {
-    return this.lowerBound;
-  }
-
-  get upper_bound(): number {
-    return this.upperBound;
-  }
 
   toBoundedExpression(lowerBound: number): MathOptBoundedExpression<TExpression> {
     return new MathOptBoundedExpression(lowerBound, this.expression, this.upperBound);
@@ -1136,7 +973,7 @@ export class MathOptModel {
       id,
       lowerBound: options.lowerBound ?? options.lb ?? Number.NEGATIVE_INFINITY,
       upperBound: options.upperBound ?? options.ub ?? Number.POSITIVE_INFINITY,
-      integer: options.integer ?? options.isInteger ?? options.is_integer ?? false,
+      integer: options.integer ?? options.isInteger ?? false,
       name: options.name ?? '',
       deleted: false,
     };
@@ -1144,24 +981,12 @@ export class MathOptModel {
     return new MathOptVariable(this, variable);
   }
 
-  add_variable(options: MathOptVariableOptions = {}): MathOptVariable {
-    return this.addVariable(options);
-  }
-
   addIntegerVariable(options: Omit<MathOptVariableOptions, 'integer'> = {}): MathOptVariable {
     return this.addVariable({ ...options, integer: true });
   }
 
-  add_integer_variable(options: Omit<MathOptVariableOptions, 'integer'> = {}): MathOptVariable {
-    return this.addIntegerVariable(options);
-  }
-
   addBinaryVariable(options: Omit<MathOptVariableOptions, 'lowerBound' | 'upperBound' | 'integer'> = {}): MathOptVariable {
     return this.addVariable({ ...options, lowerBound: 0, upperBound: 1, integer: true });
-  }
-
-  add_binary_variable(options: Omit<MathOptVariableOptions, 'lowerBound' | 'upperBound' | 'integer'> = {}): MathOptVariable {
-    return this.addBinaryVariable(options);
   }
 
   addLinearConstraint(
@@ -1185,10 +1010,6 @@ export class MathOptModel {
     };
     this.constraints.push(constraint);
     return new MathOptLinearConstraint(this, constraint);
-  }
-
-  add_linear_constraint(options: Partial<MathOptLinearConstraintOptions> = {}): MathOptLinearConstraint {
-    return this.addLinearConstraint(options);
   }
 
   addIndicatorConstraint(options: MathOptIndicatorConstraintOptions = {}): MathOptIndicatorConstraint {
@@ -1215,10 +1036,6 @@ export class MathOptModel {
     };
     this.indicatorConstraints.push(constraint);
     return new MathOptIndicatorConstraint(this, constraint);
-  }
-
-  add_indicator_constraint(options: MathOptIndicatorConstraintOptions = {}): MathOptIndicatorConstraint {
-    return this.addIndicatorConstraint(options);
   }
 
   private normalizeLinearConstraintOptions(
@@ -1256,11 +1073,11 @@ export class MathOptModel {
     if (options === null || typeof options !== 'object' || Array.isArray(options)) {
       throw new TypeError(`Unsupported type for indicator constraint options: ${mathOptOperandType(options)}`);
     }
-    const implied = options.impliedConstraint ?? options.implied_constraint;
+    const implied = options.impliedConstraint;
     if (implied instanceof MathOptBoundedExpression) {
       return {
         indicator: options.indicator,
-        activateOnZero: options.activateOnZero ?? options.activate_on_zero,
+        activateOnZero: options.activateOnZero,
         lowerBound: implied.lowerBound,
         upperBound: implied.upperBound,
         expression: implied.expression,
@@ -1270,7 +1087,7 @@ export class MathOptModel {
     if (implied instanceof MathOptLowerBoundedExpression) {
       return {
         indicator: options.indicator,
-        activateOnZero: options.activateOnZero ?? options.activate_on_zero,
+        activateOnZero: options.activateOnZero,
         lowerBound: implied.lowerBound,
         upperBound: Number.POSITIVE_INFINITY,
         expression: implied.expression,
@@ -1280,7 +1097,7 @@ export class MathOptModel {
     if (implied instanceof MathOptUpperBoundedExpression) {
       return {
         indicator: options.indicator,
-        activateOnZero: options.activateOnZero ?? options.activate_on_zero,
+        activateOnZero: options.activateOnZero,
         lowerBound: Number.NEGATIVE_INFINITY,
         upperBound: implied.upperBound,
         expression: implied.expression,
@@ -1289,9 +1106,9 @@ export class MathOptModel {
     }
     return {
       indicator: options.indicator,
-      activateOnZero: options.activateOnZero ?? options.activate_on_zero,
-      lowerBound: options.lowerBound ?? options.lower_bound ?? options.lb,
-      upperBound: options.upperBound ?? options.upper_bound ?? options.ub,
+      activateOnZero: options.activateOnZero,
+      lowerBound: options.lowerBound ?? options.lb,
+      upperBound: options.upperBound ?? options.ub,
       expression: options.expression ?? options.expr,
       terms: options.terms,
       name: options.name,
@@ -1319,20 +1136,12 @@ export class MathOptModel {
     });
   }
 
-  delete_variable(variable: MathOptVariable): void {
-    this.deleteVariable(variable);
-  }
-
   deleteLinearConstraint(constraint: MathOptLinearConstraint): void {
     this.assertOwnsConstraint(constraint);
     if (constraint.data.deleted) {
       throw new Error(`Linear constraint ${constraint.id} has already been deleted.`);
     }
     constraint.data.deleted = true;
-  }
-
-  delete_linear_constraint(constraint: MathOptLinearConstraint): void {
-    this.deleteLinearConstraint(constraint);
   }
 
   variablesList(): MathOptVariable[] {
@@ -1349,16 +1158,8 @@ export class MathOptModel {
     return this.variablesList().length;
   }
 
-  get_num_variables(): number {
-    return this.getNumVariables();
-  }
-
   getNextVariableId(): number {
     return this.variableData.length;
-  }
-
-  get_next_variable_id(): number {
-    return this.getNextVariableId();
   }
 
   ensureNextVariableIdAtLeast(id: number): void {
@@ -1375,16 +1176,8 @@ export class MathOptModel {
     }
   }
 
-  ensure_next_variable_id_at_least(id: number): void {
-    this.ensureNextVariableIdAtLeast(id);
-  }
-
   hasVariable(id: number): boolean {
     return !!this.getVariable(id);
-  }
-
-  has_variable(id: number): boolean {
-    return this.hasVariable(id);
   }
 
   getVariable(id: number, validate = true): MathOptVariable | undefined {
@@ -1403,36 +1196,18 @@ export class MathOptModel {
     return undefined;
   }
 
-  get_variable(id: number, options?: { validate?: boolean }): MathOptVariable {
-    const variable = this.getVariable(id, options?.validate ?? true);
-    if (!variable) throw new Error(`Variable ${id} does not exist.`);
-    return variable;
-  }
-
   linearConstraints(): MathOptLinearConstraint[] {
     return this.constraints
       .filter((constraint) => !constraint.deleted)
       .map((constraint) => new MathOptLinearConstraint(this, constraint));
   }
 
-  linear_constraints(): MathOptLinearConstraint[] {
-    return this.linearConstraints();
-  }
-
   getNumLinearConstraints(): number {
     return this.linearConstraints().length;
   }
 
-  get_num_linear_constraints(): number {
-    return this.getNumLinearConstraints();
-  }
-
   getNextLinearConstraintId(): number {
     return this.constraints.length;
-  }
-
-  get_next_linear_constraint_id(): number {
-    return this.getNextLinearConstraintId();
   }
 
   ensureNextLinearConstraintIdAtLeast(id: number): void {
@@ -1449,16 +1224,8 @@ export class MathOptModel {
     }
   }
 
-  ensure_next_linear_constraint_id_at_least(id: number): void {
-    this.ensureNextLinearConstraintIdAtLeast(id);
-  }
-
   hasLinearConstraint(id: number): boolean {
     return !!this.getLinearConstraint(id);
-  }
-
-  has_linear_constraint(id: number): boolean {
-    return this.hasLinearConstraint(id);
   }
 
   getLinearConstraint(id: number, validate = true): MathOptLinearConstraint | undefined {
@@ -1477,12 +1244,6 @@ export class MathOptModel {
     return undefined;
   }
 
-  get_linear_constraint(id: number, options?: { validate?: boolean }): MathOptLinearConstraint {
-    const constraint = this.getLinearConstraint(id, options?.validate ?? true);
-    if (!constraint) throw new Error(`Linear constraint ${id} does not exist.`);
-    return constraint;
-  }
-
   maximize(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], offset = 0): void {
     this.objectiveDataValue = objectiveData(true, terms, offset);
   }
@@ -1495,40 +1256,20 @@ export class MathOptModel {
     this.setLinearObjective(terms, true, offset);
   }
 
-  maximize_linear_objective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
-    this.maximizeLinearObjective(terms, offset);
-  }
-
   minimizeLinearObjective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
     this.setLinearObjective(terms, false, offset);
-  }
-
-  minimize_linear_objective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], offset = 0): void {
-    this.minimizeLinearObjective(terms, offset);
   }
 
   setObjective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], isMaximize: boolean, offset = 0): void {
     this.objectiveDataValue = objectiveData(isMaximize, terms, offset);
   }
 
-  set_objective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], is_maximize: boolean, offset = 0): void {
-    this.setObjective(terms, is_maximize, offset);
-  }
-
   setLinearObjective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], isMaximize: boolean, offset = 0): void {
     this.objectiveDataValue = linearObjectiveData(isMaximize, terms, offset);
   }
 
-  set_linear_objective(terms: MathOptLinearExpressionInput | MathOptLinearTerm[], is_maximize: boolean, offset = 0): void {
-    this.setLinearObjective(terms, is_maximize, offset);
-  }
-
   setQuadraticObjective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], isMaximize: boolean, offset = 0): void {
     this.setObjective(terms, isMaximize, offset);
-  }
-
-  set_quadratic_objective(terms: MathOptQuadraticExpressionInput | MathOptLinearTerm[], is_maximize: boolean, offset = 0): void {
-    this.setQuadraticObjective(terms, is_maximize, offset);
   }
 
   columnNonzeros(variable: MathOptVariable): MathOptLinearConstraint[] {
@@ -1539,18 +1280,10 @@ export class MathOptModel {
       .map((constraint) => new MathOptLinearConstraint(this, constraint));
   }
 
-  column_nonzeros(variable: MathOptVariable): MathOptLinearConstraint[] {
-    return this.columnNonzeros(variable);
-  }
-
   rowNonzeros(constraint: MathOptLinearConstraint): MathOptVariable[] {
     this.assertOwnsConstraint(constraint);
     constraint.assertLive();
     return constraint.terms().map((term) => term.variable);
-  }
-
-  row_nonzeros(constraint: MathOptLinearConstraint): MathOptVariable[] {
-    return this.rowNonzeros(constraint);
   }
 
   linearConstraintMatrixEntries(): MathOptLinearConstraintMatrixEntry[] {
@@ -1562,15 +1295,10 @@ export class MathOptModel {
           .filter((term) => term.coefficient !== 0)
           .map((term) => ({
             linearConstraint,
-            linear_constraint: linearConstraint,
             variable: term.variable,
             coefficient: term.coefficient,
           }));
       });
-  }
-
-  linear_constraint_matrix_entries(): MathOptLinearConstraintMatrixEntry[] {
-    return this.linearConstraintMatrixEntries();
   }
 
   get objectiveData(): MathOptObjectiveData {
@@ -1752,14 +1480,6 @@ export class MathOptVariable {
     this.data.lowerBound = value;
   }
 
-  get lower_bound(): number {
-    return this.lowerBound;
-  }
-
-  set lower_bound(value: number) {
-    this.lowerBound = value;
-  }
-
   get upperBound(): number {
     this.assertLive();
     return this.data.upperBound;
@@ -1770,14 +1490,6 @@ export class MathOptVariable {
     this.data.upperBound = value;
   }
 
-  get upper_bound(): number {
-    return this.upperBound;
-  }
-
-  set upper_bound(value: number) {
-    this.upperBound = value;
-  }
-
   get integer(): boolean {
     this.assertLive();
     return this.data.integer;
@@ -1786,14 +1498,6 @@ export class MathOptVariable {
   set integer(value: boolean) {
     this.assertLive();
     this.data.integer = value;
-  }
-
-  get is_integer(): boolean {
-    return this.integer;
-  }
-
-  set is_integer(value: boolean) {
-    this.integer = value;
   }
 
   equals(other: MathOptVariable): boolean {
@@ -1834,14 +1538,6 @@ export class MathOptLinearConstraint {
     this.data.lowerBound = value;
   }
 
-  get lower_bound(): number {
-    return this.lowerBound;
-  }
-
-  set lower_bound(value: number) {
-    this.lowerBound = value;
-  }
-
   get upperBound(): number {
     this.assertLive();
     return this.data.upperBound;
@@ -1850,14 +1546,6 @@ export class MathOptLinearConstraint {
   set upperBound(value: number) {
     this.assertLive();
     this.data.upperBound = value;
-  }
-
-  get upper_bound(): number {
-    return this.upperBound;
-  }
-
-  set upper_bound(value: number) {
-    this.upperBound = value;
   }
 
   setCoefficient(variable: MathOptVariable, coefficient: number): void {
@@ -1876,18 +1564,10 @@ export class MathOptLinearConstraint {
     }
   }
 
-  set_coefficient(variable: MathOptVariable, coefficient: number): void {
-    this.setCoefficient(variable, coefficient);
-  }
-
   getCoefficient(variable: MathOptVariable): number {
     this.assertLive();
     this.model.assertOwnsVariable(variable);
     return this.data.terms.find((term) => term.variable.id === variable.id)?.coefficient ?? 0;
-  }
-
-  get_coefficient(variable: MathOptVariable): number {
-    return this.getCoefficient(variable);
   }
 
   terms(): MathOptLinearTerm[] {
@@ -1902,10 +1582,6 @@ export class MathOptLinearConstraint {
       new MathOptLinearExpression(this.terms()),
       this.upperBound,
     );
-  }
-
-  as_bounded_linear_expression(): MathOptBoundedExpression<MathOptLinearExpression> {
-    return this.asBoundedLinearExpression();
   }
 
   equals(other: MathOptLinearConstraint): boolean {
@@ -1946,26 +1622,14 @@ export class MathOptIndicatorConstraint {
     return this.data.activateOnZero;
   }
 
-  get activate_on_zero(): boolean {
-    return this.activateOnZero;
-  }
-
   get lowerBound(): number {
     this.assertLive();
     return this.data.lowerBound;
   }
 
-  get lower_bound(): number {
-    return this.lowerBound;
-  }
-
   get upperBound(): number {
     this.assertLive();
     return this.data.upperBound;
-  }
-
-  get upper_bound(): number {
-    return this.upperBound;
   }
 
   terms(): MathOptLinearTerm[] {
@@ -1991,14 +1655,6 @@ export class MathOptObjective {
     this.model.objectiveData = { ...this.model.objectiveData, maximize: value };
   }
 
-  get is_maximize(): boolean {
-    return this.isMaximize;
-  }
-
-  set is_maximize(value: boolean) {
-    this.isMaximize = value;
-  }
-
   get offset(): number {
     return this.model.objectiveData.offset;
   }
@@ -2022,25 +1678,13 @@ export class MathOptObjective {
     this.model.objectiveData = { ...this.model.objectiveData, linearTerms: terms };
   }
 
-  set_linear_coefficient(variable: MathOptVariable, coefficient: number): void {
-    this.setLinearCoefficient(variable, coefficient);
-  }
-
   getLinearCoefficient(variable: MathOptVariable): number {
     this.model.assertOwnsVariable(variable);
     return this.model.objectiveData.linearTerms.find((term) => term.variable.id === variable.id)?.coefficient ?? 0;
   }
 
-  get_linear_coefficient(variable: MathOptVariable): number {
-    return this.getLinearCoefficient(variable);
-  }
-
   linearTerms(): MathOptLinearTerm[] {
     return [...this.model.objectiveData.linearTerms].filter((term) => term.coefficient !== 0);
-  }
-
-  linear_terms(): MathOptLinearTerm[] {
-    return this.linearTerms();
   }
 
   setQuadraticCoefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable, coefficient: number): void {
@@ -2054,10 +1698,6 @@ export class MathOptObjective {
     this.model.objectiveData = { ...this.model.objectiveData, quadraticTerms: terms };
   }
 
-  set_quadratic_coefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable, coefficient: number): void {
-    this.setQuadraticCoefficient(firstVariable, secondVariable, coefficient);
-  }
-
   getQuadraticCoefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable): number {
     this.model.assertOwnsVariable(firstVariable);
     this.model.assertOwnsVariable(secondVariable);
@@ -2067,17 +1707,10 @@ export class MathOptObjective {
     })?.coefficient ?? 0;
   }
 
-  get_quadratic_coefficient(firstVariable: MathOptVariable, secondVariable: MathOptVariable): number {
-    return this.getQuadraticCoefficient(firstVariable, secondVariable);
-  }
-
   quadraticTerms(): MathOptQuadraticTerm[] {
     return [...this.model.objectiveData.quadraticTerms].filter((term) => term.coefficient !== 0);
   }
 
-  quadratic_terms(): MathOptQuadraticTerm[] {
-    return this.quadraticTerms();
-  }
 }
 
 function findVariableKey(map: ReadonlyMap<MathOptVariable, number>, variable: MathOptVariable): MathOptVariable | undefined {
@@ -2503,24 +2136,34 @@ export function completeLowerBound<TExpression>(
   return upperBounded.toBoundedExpression(lowerBound);
 }
 
-export async function initMathOpt(): Promise<void> {
-  await mathOptExecutor.load();
-}
+export type MathOptIncrementalSolverOptions = Omit<
+  MathOptSolveOptions,
+  'solverType'
+>;
+
+export type MathOptIncrementalSolveOptions = Omit<
+  MathOptSolveOptions,
+  'solverType' | 'executor'
+>;
 
 export class MathOptIncrementalSolver {
   private readonly initPromise: Promise<number>;
   private checkpoint: MathOptModelSnapshot;
   private handle: number | null = null;
   private closed = false;
-  private readonly executor = mathOptExecutor;
+  private readonly executor: MathOptExecutor;
+  readonly options: MathOptIncrementalSolveOptions;
 
   constructor(
     readonly model: MathOptModel,
     readonly solverType: MathOptSolverType | keyof typeof MathOptSolverType = MathOptSolverType.GLOP,
-    readonly options: Omit<MathOptSolveOptions, 'solverType'> = {},
+    options: MathOptIncrementalSolverOptions = {},
   ) {
+    const { executor, ...solveOptions } = options;
+    this.executor = createMathOptExecutor(executor);
+    this.options = solveOptions;
     this.checkpoint = model.snapshot();
-    if (!(options.removeNames ?? options.remove_names ?? false)) {
+    if (!(options.removeNames ?? false)) {
       assertNoDuplicateNamesForIncrementalSolver(this.checkpoint);
     }
     this.initPromise = this.create();
@@ -2532,8 +2175,8 @@ export class MathOptIncrementalSolver {
       solverType: this.solverType,
     });
     const responseBytes = await executeMathOptRequest(this.executor, {
-      case: 'incrementalCreate',
-      value: create(MathOptIncrementalCreateRequestSchema, { solveRequestProto: requestBytes }),
+      type: 'incrementalCreate',
+      request: requestBytes,
     }, this.options);
     const response = readMessage(responseBytes);
     const statusBytes = response.messages.get(3)?.[0];
@@ -2550,7 +2193,7 @@ export class MathOptIncrementalSolver {
     return handle;
   }
 
-  async solve(options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
+  async solve(options: MathOptIncrementalSolveOptions = {}): Promise<MathOptSolveResult> {
     if (this.closed) {
       throw new Error('MathOpt IncrementalSolver is closed.');
     }
@@ -2560,19 +2203,17 @@ export class MathOptIncrementalSolver {
       ...options,
       solverType: this.solverType,
     };
-    const removeNames = mergedOptions.removeNames ?? mergedOptions.remove_names ?? false;
+    const removeNames = mergedOptions.removeNames ?? false;
     const updateBytes = this.model.encodeModelUpdateSince(this.checkpoint, { removeNames });
     const requestBytes = MathOpt.encodeSolveRequest(this.model, mergedOptions);
     const interrupterState = solveInterrupterState(mergedOptions);
     const responseBytes = await executeMathOptRequest(this.executor, {
-      case: 'incrementalSolve',
-      value: create(MathOptIncrementalSolveRequestSchema, {
-        handle: BigInt(handle),
-        solveRequestProto: requestBytes,
-        modelUpdateProto: updateBytes ?? undefined,
-        useInterrupter: interrupterState.useInterrupter,
-        interruptAtStart: interrupterState.interrupted,
-      }),
+      type: 'incrementalSolve',
+      handle: BigInt(handle),
+      request: requestBytes,
+      modelUpdate: updateBytes ?? undefined,
+      useInterrupter: interrupterState.useInterrupter,
+      interruptAtStart: interrupterState.interrupted,
     }, mergedOptions);
     const result = decodeSolveResponse(responseBytes, this.model);
     this.checkpoint = this.model.snapshot();
@@ -2583,10 +2224,6 @@ export class MathOptIncrementalSolver {
     return result;
   }
 
-  async Solve(options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
-    return this.solve(options);
-  }
-
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
@@ -2594,8 +2231,8 @@ export class MathOptIncrementalSolver {
       const handle = this.handle ?? await this.initPromise.catch(() => 0);
       if (handle > 0) {
         await executeMathOptRequest(this.executor, {
-          case: 'incrementalDelete',
-          value: create(MathOptIncrementalDeleteRequestSchema, { handle: BigInt(handle) }),
+          type: 'incrementalDelete',
+          handle: BigInt(handle),
         }, this.options);
       }
     } finally {
@@ -2619,7 +2256,6 @@ export class MathOpt {
   static readonly PdlpLinesearchRule = PdlpLinesearchRule;
   static readonly GlpkParameters = GlpkParameters;
   static readonly SolveInterrupter = MathOptSolveInterrupter;
-  static readonly SolveParameters = MathOptSolveParameters;
   static readonly ModelSolveParameters = MathOptModelSolveParameters;
   static readonly SparseVectorFilter = MathOptSparseVectorFilter;
   static readonly SolutionHint = MathOptSolutionHint;
@@ -2632,10 +2268,6 @@ export class MathOpt {
   static readonly LowerBoundedExpression = MathOptLowerBoundedExpression;
   static readonly UpperBoundedExpression = MathOptUpperBoundedExpression;
 
-  static setExecutor(configuration: ExecutorConfiguration): void {
-    setMathOptExecutor(configuration);
-  }
-
   static Model(name = ''): MathOptModel {
     return new MathOptModel(name);
   }
@@ -2643,14 +2275,16 @@ export class MathOpt {
   static async solve(model: MathOptModel, options: MathOptSolveOptions = {}): Promise<MathOptSolveResult> {
     const requestBytes = MathOpt.encodeSolveRequest(model, options);
     const interrupterState = solveInterrupterState(options);
-    const responseBytes = await executeMathOptRequest(mathOptExecutor, {
-      case: 'solve',
-      value: create(MathOptSolveRequestSchema, {
-        solveRequestProto: requestBytes,
+    const responseBytes = await executeMathOptRequest(
+      createMathOptExecutor(options.executor),
+      {
+        type: 'solve',
+        request: requestBytes,
         useInterrupter: interrupterState.useInterrupter,
         interruptAtStart: interrupterState.interrupted,
-      }),
-    }, options);
+      },
+      options,
+    );
     const result = decodeSolveResponse(responseBytes, model);
     const messageCallback = solveMessageCallback(options);
     if (messageCallback && result.messages.length > 0) {
@@ -2784,24 +2418,49 @@ export class MathOpt {
 }
 
 async function executeMathOptRequest(
-  executor: MathOptExecutorLike,
-  request: MathOptExecutorRequest,
+  executor: MathOptExecutor,
+  operation: MathOptOperation,
   options: Pick<MathOptSolveOptions, 'threads' | 'onEvent' | 'signal'>,
 ): Promise<Uint8Array> {
-  if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('MathOpt solve aborted.', 'AbortError');
-  const job = executor.execute(request, {
-    resources: { threads: options.threads ?? 1 },
+  throwIfAborted(options.signal);
+  const resources: SolverResourceRequest = {
+    threads: operation.type === 'solve' || operation.type === 'incrementalSolve'
+      ? options.threads ?? 1
+      : 1,
+  };
+  const job = executor.execute(operation, {
+    resources,
     onEvent: options.onEvent ?? (() => {}),
   });
-  const abort = () => { void job.cancel().catch(() => {}); };
+  let cancellationError: Error | undefined;
+  const abort = () => {
+    if (!options.signal) return;
+    cancellationError = createAbortError(options.signal);
+    void job.cancel().catch(() => {});
+  };
   options.signal?.addEventListener('abort', abort, { once: true });
   try {
     const response = await job.result;
-    if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('MathOpt solve aborted.', 'AbortError');
-    return response.solveResponseProto;
+    if (cancellationError) throw cancellationError;
+    return response.response;
   } finally {
     options.signal?.removeEventListener('abort', abort);
   }
+}
+
+function createAbortError(signal: AbortSignal): Error {
+  if (signal.reason instanceof Error) return signal.reason;
+  const error = new Error(
+    signal.reason === undefined
+      ? 'The MathOpt operation was aborted.'
+      : String(signal.reason),
+  );
+  error.name = 'AbortError';
+  return error;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw createAbortError(signal);
 }
 
 function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): Uint8Array {
@@ -2812,8 +2471,8 @@ function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): 
     throw new Error('GLPK does not support multi-threaded MathOpt solves; use threads: 1 or omit threads.');
   }
   const parameters = encodeMathOptSolveParameters(options);
-  const modelParameters = modelParametersBytes(options.modelParameters ?? options.model_parameters);
-  const removeNames = options.removeNames ?? options.remove_names ?? false;
+  const modelParameters = modelParametersBytes(options.modelParameters);
+  const removeNames = options.removeNames ?? false;
   return message([
     fieldVarint(1, solverType),
     fieldMessage(2, model.encodeModelProto({ removeNames })),
@@ -2823,32 +2482,30 @@ function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): 
 }
 
 function encodeMathOptSolveParameters(options: MathOptSolveOptions): Uint8Array | null {
-  const raw = options.parameters ?? options.solveParameters ?? options.solve_parameters;
-  if (raw) return solveParametersBytes(raw);
-  const enableOutput = options.enableOutput ?? options.enable_output ?? (solveMessageCallback(options) ? true : undefined);
+  const enableOutput = options.enableOutput ?? (solveMessageCallback(options) ? true : undefined);
   const fields = [
-    fieldDurationSeconds(1, options.timeLimitSeconds ?? options.time_limit_seconds),
-    optionalVarintField(2, options.iterationLimit ?? options.iteration_limit),
+    fieldDurationSeconds(1, options.timeLimitSeconds),
+    optionalVarintField(2, options.iterationLimit),
     optionalBoolField(3, enableOutput),
     optionalVarintField(4, options.threads),
-    optionalVarintField(5, options.randomSeed ?? options.random_seed),
-    enumField(6, options.lpAlgorithm ?? options.lp_algorithm, MathOptLPAlgorithm),
+    optionalVarintField(5, options.randomSeed),
+    enumField(6, options.lpAlgorithm, MathOptLPAlgorithm),
     enumField(7, options.presolve, MathOptEmphasis),
     enumField(8, options.cuts, MathOptEmphasis),
     enumField(9, options.heuristics, MathOptEmphasis),
     enumField(10, options.scaling, MathOptEmphasis),
     fieldMessageIfPresent(12, backendParametersBytes(options.gscip, GScipParameters)),
     fieldMessageIfPresent(14, backendParametersBytes(options.glop, GlopParameters)),
-    fieldMessageIfPresent(15, encodeSatParameters(options.cpSat ?? options.cp_sat)),
+    fieldMessageIfPresent(15, encodeSatParameters(options.cpSat)),
     fieldMessageIfPresent(16, backendParametersBytes(options.pdlp, PdlpParameters)),
-    optionalDoubleField(17, options.relativeGapTolerance ?? options.relative_gap_tolerance),
-    optionalDoubleField(18, options.absoluteGapTolerance ?? options.absolute_gap_tolerance),
-    optionalDoubleField(20, options.cutoffLimit ?? options.cutoff_limit),
-    optionalDoubleField(21, options.objectiveLimit ?? options.objective_limit),
-    optionalDoubleField(22, options.bestBoundLimit ?? options.best_bound_limit),
-    optionalVarintField(23, options.solutionLimit ?? options.solution_limit),
-    optionalVarintField(24, options.nodeLimit ?? options.node_limit),
-    optionalVarintField(25, options.solutionPoolSize ?? options.solution_pool_size),
+    optionalDoubleField(17, options.relativeGapTolerance),
+    optionalDoubleField(18, options.absoluteGapTolerance),
+    optionalDoubleField(20, options.cutoffLimit),
+    optionalDoubleField(21, options.objectiveLimit),
+    optionalDoubleField(22, options.bestBoundLimit),
+    optionalVarintField(23, options.solutionLimit),
+    optionalVarintField(24, options.nodeLimit),
+    optionalVarintField(25, options.solutionPoolSize),
     fieldMessageIfPresent(26, backendParametersBytes(options.glpk, GlpkParameters)),
   ];
   const encoded = message(fields);
@@ -3225,9 +2882,6 @@ function decodeSolveResponse(bytes: Uint8Array, model: MathOptModel): MathOptSol
   const primalRays = (result.messages.get(4) ?? []).map((rayBytes) => decodePrimalRay(rayBytes, model));
   const dualRays = (result.messages.get(5) ?? []).map((rayBytes) => decodeDualRay(rayBytes, model));
   const firstPrimalSolution = solutions.find((solution) => solution.primalSolution !== null)?.primalSolution ?? null;
-  const bestSolution = solutions[0] ?? null;
-  const firstDualRay = dualRays[0] ?? null;
-  const firstPrimalRay = primalRays[0] ?? null;
   const objectiveValue = firstPrimalSolution?.objectiveValue ?? null;
   const variableValues = firstPrimalSolution?.variableValues ?? {};
   const variableValuesById = firstPrimalSolution?.variableValuesById ?? {};
@@ -3251,176 +2905,8 @@ function decodeSolveResponse(bytes: Uint8Array, model: MathOptModel): MathOptSol
     dualRays,
     messages,
     rawResponse: bytes,
-    solve_time() {
-      return solveTimeSeconds;
-    },
-    best_objective_bound() {
-      return dualBound;
-    },
-    has_primal_feasible_solution() {
-      return firstPrimalSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE';
-    },
-    has_dual_feasible_solution() {
-      return bestSolution?.dualSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE';
-    },
-    has_ray() {
-      return firstPrimalRay !== null;
-    },
-    has_dual_ray() {
-      return firstDualRay !== null;
-    },
-    has_basis() {
-      return bestSolution?.basis !== null && bestSolution?.basis !== undefined;
-    },
-    bounded() {
-      return primalStatus === 2 && dualStatus === 2 && !primalOrDualInfeasible;
-    },
-    objective_value() {
-      if (objectiveValue === null || firstPrimalSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
-        throw new Error('MathOpt solve result has no primal feasible solution.');
-      }
-      return objectiveValue;
-    },
-    variable_values: ((input?: MathOptVariable | MathOptVariable[]) => {
-      if (firstPrimalSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
-        throw new Error('MathOpt solve result has no primal feasible solution.');
-      }
-      if (input === undefined) {
-        return variableValues;
-      }
-      if (Array.isArray(input)) {
-        return input.map((variable) => variableValueForResult(model, firstPrimalSolution, variable));
-      }
-      return variableValueForResult(model, firstPrimalSolution, input);
-    }) as MathOptSolveResult['variable_values'],
-    reduced_costs: ((input?: MathOptVariable | MathOptVariable[]) => {
-      const dualSolution = bestSolution?.dualSolution ?? null;
-      if (dualSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
-        throw new Error('Best solution does not have a dual feasible solution.');
-      }
-      return variableMapAccessor(model, dualSolution.reducedCosts, dualSolution.reducedCostsById, input, 'reduced_costs');
-    }) as MathOptSolveResult['reduced_costs'],
-    dual_values: ((input?: MathOptLinearConstraint | MathOptLinearConstraint[]) => {
-      const dualSolution = bestSolution?.dualSolution ?? null;
-      if (dualSolution?.feasibilityStatus !== 'SOLUTION_STATUS_FEASIBLE') {
-        throw new Error('Best solution does not have a dual feasible solution.');
-      }
-      return constraintMapAccessor(model, dualSolution.dualValues, dualSolution.dualValuesById, input, 'dual_values');
-    }) as MathOptSolveResult['dual_values'],
-    ray_variable_values: ((input?: MathOptVariable | MathOptVariable[]) => {
-      if (firstPrimalRay === null) {
-        throw new Error('MathOpt solve result has no primal ray.');
-      }
-      return variableMapAccessor(model, firstPrimalRay.variableValues, firstPrimalRay.variableValuesById, input, 'ray_variable_values');
-    }) as MathOptSolveResult['ray_variable_values'],
-    ray_reduced_costs: ((input?: MathOptVariable | MathOptVariable[]) => {
-      if (firstDualRay === null) {
-        throw new Error('MathOpt solve result has no dual ray.');
-      }
-      return variableMapAccessor(model, firstDualRay.reducedCosts, firstDualRay.reducedCostsById, input, 'ray_reduced_costs');
-    }) as MathOptSolveResult['ray_reduced_costs'],
-    ray_dual_values: ((input?: MathOptLinearConstraint | MathOptLinearConstraint[]) => {
-      if (firstDualRay === null) {
-        throw new Error('MathOpt solve result has no dual ray.');
-      }
-      return constraintMapAccessor(model, firstDualRay.dualValues, firstDualRay.dualValuesById, input, 'ray_dual_values');
-    }) as MathOptSolveResult['ray_dual_values'],
-    variable_status: ((input?: MathOptVariable | MathOptVariable[]) => {
-      const basis = bestSolution?.basis ?? null;
-      if (basis === null) {
-        throw new Error('Best solution does not have a basis.');
-      }
-      return variableMapAccessor(model, basis.variableStatus, basis.variableStatusById, input, 'variable_status');
-    }) as MathOptSolveResult['variable_status'],
-    constraint_status: ((input?: MathOptLinearConstraint | MathOptLinearConstraint[]) => {
-      const basis = bestSolution?.basis ?? null;
-      if (basis === null) {
-        throw new Error('Best solution does not have a basis.');
-      }
-      return constraintMapAccessor(model, basis.constraintStatus, basis.constraintStatusById, input, 'constraint_status');
-    }) as MathOptSolveResult['constraint_status'],
   };
   return solveResult;
-}
-
-function variableValueForResult(
-  model: MathOptModel,
-  solution: MathOptPrimalSolutionResult,
-  variable: MathOptVariable,
-): number {
-  if (!(variable instanceof MathOptVariable)) {
-    throw new Error('MathOpt variable_values() expects a MathOptVariable or an array of MathOptVariable.');
-  }
-  if (variable.model !== model) {
-    throw new Error('Variable belongs to a different MathOpt model.');
-  }
-  variable.assertLive();
-  if (!(variable.id in solution.variableValuesById)) {
-    throw new Error(`Variable ${variable.toString()} is not present in MathOpt variable_values().`);
-  }
-  return solution.variableValuesById[variable.id];
-}
-
-function variableMapAccessor<TValue>(
-  model: MathOptModel,
-  byName: Record<string, TValue>,
-  byId: Record<number, TValue>,
-  input: MathOptVariable | MathOptVariable[] | undefined,
-  methodName: string,
-): Record<string, TValue> | TValue | TValue[] {
-  if (input === undefined) return byName;
-  if (Array.isArray(input)) return input.map((variable) => variableValueFromMap(model, byId, variable, methodName));
-  return variableValueFromMap(model, byId, input, methodName);
-}
-
-function variableValueFromMap<TValue>(
-  model: MathOptModel,
-  byId: Record<number, TValue>,
-  variable: MathOptVariable,
-  methodName: string,
-): TValue {
-  if (!(variable instanceof MathOptVariable)) {
-    throw new Error(`MathOpt ${methodName}() expects a MathOptVariable or an array of MathOptVariable.`);
-  }
-  if (variable.model !== model) {
-    throw new Error(`Variable ${variable.toString()} belongs to a different MathOpt model.`);
-  }
-  variable.assertLive();
-  if (!(variable.id in byId)) {
-    throw new Error(`Variable ${variable.toString()} is not present in MathOpt ${methodName}().`);
-  }
-  return byId[variable.id];
-}
-
-function constraintMapAccessor<TValue>(
-  model: MathOptModel,
-  byName: Record<string, TValue>,
-  byId: Record<number, TValue>,
-  input: MathOptLinearConstraint | MathOptLinearConstraint[] | undefined,
-  methodName: string,
-): Record<string, TValue> | TValue | TValue[] {
-  if (input === undefined) return byName;
-  if (Array.isArray(input)) return input.map((constraint) => constraintValueFromMap(model, byId, constraint, methodName));
-  return constraintValueFromMap(model, byId, input, methodName);
-}
-
-function constraintValueFromMap<TValue>(
-  model: MathOptModel,
-  byId: Record<number, TValue>,
-  constraint: MathOptLinearConstraint,
-  methodName: string,
-): TValue {
-  if (!(constraint instanceof MathOptLinearConstraint)) {
-    throw new Error(`MathOpt ${methodName}() expects a MathOptLinearConstraint or an array of MathOptLinearConstraint.`);
-  }
-  if (constraint.model !== model) {
-    throw new Error(`Linear constraint ${constraint.toString()} belongs to a different MathOpt model.`);
-  }
-  constraint.assertLive();
-  if (!(constraint.id in byId)) {
-    throw new Error(`Linear constraint ${constraint.toString()} is not present in MathOpt ${methodName}().`);
-  }
-  return byId[constraint.id];
 }
 
 function decodeSolution(bytes: Uint8Array, model: MathOptModel): MathOptSolutionResult {
@@ -3800,14 +3286,6 @@ function mapFields<T>(
   ])));
 }
 
-function solveParametersBytes(value: MathOptSolveParameters | MathOptSolveParametersOptions | Uint8Array): Uint8Array {
-  if (value instanceof Uint8Array) return value;
-  if (typeof (value as { toProtoBytes?: unknown }).toProtoBytes === 'function') {
-    return (value as MathOptSolveParameters).toProtoBytes();
-  }
-  return new MathOptSolveParameters(value as MathOptSolveParametersOptions).toProtoBytes();
-}
-
 function modelParametersBytes(
   value: MathOptModelSolveParameters | MathOptModelSolveParametersOptions | Uint8Array | undefined,
 ): Uint8Array | null {
@@ -3820,19 +3298,17 @@ function modelParametersBytes(
 }
 
 function solveMessageCallback(options: MathOptSolveOptions): ((messages: string[]) => void) | undefined {
-  return options.messageCallback ?? options.message_callback ?? options.msgCb ?? options.msg_cb;
+  return options.messageCallback;
 }
 
 function solveInterrupterState(options: MathOptSolveOptions): MathOptSolveInterrupterState {
-  const interrupter = options.interrupter ?? options.solveInterrupter ?? options.solve_interrupter;
+  const interrupter = options.interrupter;
   if (!interrupter) {
     return { useInterrupter: false, interrupted: false };
   }
   const interrupted = typeof interrupter.isInterrupted === 'function'
     ? interrupter.isInterrupted()
-    : typeof interrupter.is_interrupted === 'function'
-      ? interrupter.is_interrupted()
-      : interrupter.interrupted === true;
+    : interrupter.interrupted === true;
   return { useInterrupter: true, interrupted };
 }
 
@@ -3862,17 +3338,16 @@ function normalizeSparseVectorFilter<TElement>(
 }
 
 function encodeSparseVectorFilter<TElement>(options: MathOptSparseVectorFilterOptions<TElement>): Uint8Array {
-  const explicitIds = options.ids ?? options.filteredIds ?? options.filtered_ids;
   const elementIds = options.elements?.map((element) => {
     if (typeof element === 'number' || typeof element === 'bigint') return element;
     const id = (element as { id?: number | bigint }).id;
     if (id === undefined) throw new Error('MathOpt sparse filter elements must expose an id.');
     return id;
   });
-  const ids = explicitIds ?? elementIds ?? [];
+  const ids = options.ids ?? elementIds ?? [];
   return message([
-    optionalBoolField(1, options.skipZeroValues ?? options.skip_zero_values),
-    optionalBoolField(2, options.filterByIds ?? options.filter_by_ids ?? (ids.length > 0 ? true : undefined)),
+    optionalBoolField(1, options.skipZeroValues),
+    optionalBoolField(2, options.filterByIds ?? (ids.length > 0 ? true : undefined)),
     ids.length === 0 ? empty() : fieldPackedVarints(3, ids),
   ]);
 }
@@ -3891,48 +3366,48 @@ function backendParametersBytes<TOptions, TParameters extends { toProtoBytes(): 
 
 function encodePdlpTerminationCriteria(criteria: PdlpParametersOptions['terminationCriteria'] | undefined): Uint8Array | null {
   if (!criteria) return null;
-  const simple = (criteria.simpleOptimalityCriteria ?? criteria.simple_optimality_criteria) as {
-    epsOptimalAbsolute?: number;
-    eps_optimal_absolute?: number;
-    epsOptimalRelative?: number;
-    eps_optimal_relative?: number;
-  } | undefined;
+  const simple = criteria.simpleOptimalityCriteria;
   const encoded = message([
-    enumField(1, criteria.optimalityNorm ?? criteria.optimality_norm, PdlpOptimalityNorm),
-    optionalDoubleField(4, criteria.epsPrimalInfeasible ?? criteria.eps_primal_infeasible),
-    optionalDoubleField(5, criteria.epsDualInfeasible ?? criteria.eps_dual_infeasible),
-    optionalDoubleField(6, criteria.timeSecLimit ?? criteria.time_sec_limit),
-    optionalVarintField(7, criteria.iterationLimit ?? criteria.iteration_limit),
-    optionalDoubleField(8, criteria.kktMatrixPassLimit ?? criteria.kkt_matrix_pass_limit),
+    enumField(1, criteria.optimalityNorm, PdlpOptimalityNorm),
+    optionalDoubleField(4, criteria.epsPrimalInfeasible),
+    optionalDoubleField(5, criteria.epsDualInfeasible),
+    optionalDoubleField(6, criteria.timeSecLimit),
+    optionalVarintField(7, criteria.iterationLimit),
+    optionalDoubleField(8, criteria.kktMatrixPassLimit),
     simple
       ? fieldMessage(9, message([
-        optionalDoubleField(1, simple.epsOptimalAbsolute ?? simple.eps_optimal_absolute),
-        optionalDoubleField(2, simple.epsOptimalRelative ?? simple.eps_optimal_relative),
+        optionalDoubleField(1, simple.epsOptimalAbsolute),
+        optionalDoubleField(2, simple.epsOptimalRelative),
       ]))
       : empty(),
   ]);
   return encoded.length > 0 ? encoded : null;
 }
 
-function encodeSatParameters(parameters: SatParameters | Uint8Array | undefined): Uint8Array | null {
+function encodeSatParameters(
+  parameters: Omit<SatParameters, 'numWorkers' | 'numSearchWorkers'> | Uint8Array | undefined,
+): Uint8Array | null {
   if (parameters === undefined) return null;
   if (parameters instanceof Uint8Array) return parameters;
-  const params = parameters as SatParameters & {
-    max_time_in_seconds?: number;
-    random_seed?: number;
-    log_search_progress?: boolean;
-    log_to_stdout?: boolean;
-    log_to_response?: boolean;
-    num_workers?: number;
-  };
-  return message([
-    optionalVarintField(31, params.randomSeed ?? params.random_seed),
-    optionalDoubleField(36, params.maxTimeInSeconds ?? params.max_time_in_seconds),
-    optionalBoolField(41, params.logSearchProgress ?? params.log_search_progress),
-    optionalBoolField(186, params.logToStdout ?? params.log_to_stdout),
-    optionalBoolField(187, params.logToResponse ?? params.log_to_response),
-    optionalVarintField(206, params.numWorkers ?? params.num_workers),
-  ]);
+  const params = parameters as SatParameters;
+  if (
+    params.numWorkers !== undefined ||
+    params.numSearchWorkers !== undefined
+  ) {
+    throw new Error('MathOpt CP-SAT thread count belongs in the top-level threads option.');
+  }
+  const type = getSatParametersType();
+  const unknownParameter = Object.keys(params).find(
+    (name) => type.fields[name] === undefined,
+  );
+  if (unknownParameter) {
+    throw new Error(`MathOpt.solve: unknown CP-SAT parameter "${unknownParameter}".`);
+  }
+  const validationError = type.verify(params);
+  if (validationError) {
+    throw new Error(`MathOpt.solve: ${validationError}`);
+  }
+  return type.encode(type.create(params)).finish();
 }
 
 function writeVarint(value: bigint): Uint8Array {

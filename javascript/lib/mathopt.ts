@@ -4,7 +4,6 @@ export {
   GScipEmphasis,
   GScipMetaParamValue,
   GScipParameters,
-  initMathOpt,
   MathOpt,
   MathOptEmphasis,
   MathOptIndicatorConstraint,
@@ -15,10 +14,8 @@ export {
   MathOptObjective,
   MathOptSolutionHint,
   MathOptSolveInterrupter,
-  MathOptSolveParameters,
   MathOptSolverType,
   MathOptSparseVectorFilter,
-  setMathOptExecutor as setExecutor,
   PdlpLinesearchRule,
   PdlpOptimalityNorm,
   PdlpParameters,
@@ -33,6 +30,8 @@ export type {
   MathOptDualSolutionResult,
   MathOptDualRayResult,
   MathOptIndicatorConstraintOptions,
+  MathOptIncrementalSolveOptions,
+  MathOptIncrementalSolverOptions,
   MathOptLinearConstraint,
   MathOptLinearConstraintMatrixEntry,
   MathOptLinearTerm,
@@ -44,7 +43,6 @@ export type {
   MathOptSolveOptions,
   MathOptEvent,
   MathOptSolveInterrupterLike,
-  MathOptSolveParametersOptions,
   MathOptSolveResult,
   MathOptSparseVectorFilterInput,
   MathOptSparseVectorFilterOptions,
@@ -52,5 +50,14 @@ export type {
   MathOptVariableOptions,
   PdlpParametersOptions,
 } from './mathopt/api.js';
-export type { ExecutorConfiguration } from './executor_configuration.js';
+export type {
+  AutoExecutorConfiguration,
+  CloudExecutorConfiguration,
+  DirectExecutorConfiguration,
+  ExecutorConfiguration,
+  ExecutorSelection,
+  ServerExecutorConfiguration,
+  WorkerExecutorConfiguration,
+} from './executor_configuration.js';
+export { CloudExecutorUnavailableError } from './cloud_executor.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

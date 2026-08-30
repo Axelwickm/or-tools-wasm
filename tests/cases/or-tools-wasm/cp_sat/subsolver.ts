@@ -68,7 +68,7 @@ async function solve(CpSat: CpSatLike, solverParameters: Record<string, unknown>
 async function runNoLpCase(CpSat: CpSatLike, mode: ExecutorFixtureMode) {
   const response = await solve(CpSat, {
     filterSubsolvers: ['no_lp'],
-    numSearchWorkers: 1,
+    numWorkers: 1,
   });
   assert(
     response.solveLog?.includes('1 full problem subsolver: [no_lp]'),
@@ -94,7 +94,7 @@ async function runNoLpCase(CpSat: CpSatLike, mode: ExecutorFixtureMode) {
 
 async function runParallelPortfolioCase(CpSat: CpSatLike, mode: ExecutorFixtureMode) {
   const response = await solve(CpSat, {
-    numSearchWorkers: 4,
+    numWorkers: 4,
     randomSeed: 1,
   });
   const solveLog = response.solveLog ?? '';

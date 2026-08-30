@@ -46,8 +46,8 @@ type CpSatRunResult = {
 };
 
 const DEFAULT_WORKER_PROFILES: WorkerProfile[] = [
-  { label: '1 worker', params: { numSearchWorkers: 1 } },
-  { label: '4 workers', params: { numSearchWorkers: 4 } },
+  { label: '1 worker', params: { numWorkers: 1 } },
+  { label: '4 workers', params: { numWorkers: 4 } },
 ];
 
 async function executorForMode(mode: RunMode) {

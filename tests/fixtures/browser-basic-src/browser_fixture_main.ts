@@ -4,6 +4,8 @@ import { runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
+import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
+import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
 import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
 import { withCpSatExecutor } from '../../harness/cpsat_types.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
@@ -135,7 +137,7 @@ async function runManualCpSatSolve(
 
     const solverStatus = await cpSatCases[0].run(
       withCpSatExecutor(CpSat as never, executorSelection),
-      { numSearchWorkers: 1 },
+      { numWorkers: 1 },
     );
     output.textContent = JSON.stringify({
       ok: true,
@@ -351,7 +353,6 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   );
   const mathOpt = await runSelectedGroup(selectedGroup, 'mathopt', 'mathopt', () =>
     runWithWorkerStats(workerSpy, () => runMathOptCases({
-      initMathOpt: MathOptApi.initMathOpt,
       MathOpt: MathOptApi.MathOpt,
     }, {
       modes: executorFixtureModes,
@@ -360,11 +361,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     }))
   );
   const pdlp = await runSelectedGroup(selectedGroup, 'pdlp', 'pdlp', () =>
-    runWithWorkerStats(workerSpy, () => runPdlpCases({
-      initPdlp: PdlpApi.initPdlp,
-      Pdlp: PdlpApi.Pdlp,
-      setExecutor: PdlpApi.setExecutor,
-    }, { modes: executorFixtureModes }))
+    runWithWorkerStats(workerSpy, () => runPdlpCases(PdlpApi as never, { modes: executorFixtureModes }))
   );
   const cpSatSolverStructure = await runSelectedGroup(
     selectedGroup,
@@ -378,6 +375,18 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     'cp-sat-worker-lifecycle',
     () => runWithWorkerStats(workerSpy, () => runCpSatWorkerLifecycleCase(typedCpSat as never)),
   );
+  const cpSatConcurrencyResult = await runSelectedGroup(
+    selectedGroup,
+    'cp-sat',
+    'cp-sat-concurrency',
+    () => runCpSatConcurrencyCase(CpSatApi as never),
+  );
+  const solverConcurrencyResult = await runSelectedGroup(
+    selectedGroup,
+    'mathopt',
+    'mathopt-pdlp-concurrency',
+    () => runSolverConcurrencyCase(MathOptApi as never, PdlpApi as never),
+  );
   const cloudExecutorResult = await runSelectedGroup(selectedGroup, 'cp-sat', 'cloud', () =>
     runCloudExecutorCase(CpSatApi as never, {
       packageName: PackageApi.packageName,
@@ -387,6 +396,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   setStatus({
     ok: true,
     cloudExecutorResult,
+    cpSatConcurrencyResult,
+    solverConcurrencyResult,
     cpSatSolverStructureResults: cpSatSolverStructure?.result,
     cpSatWorkerLifecycleResult: cpSatWorkerLifecycle?.result,
     cpSatWorkerLifecycleStatsBefore: cpSatWorkerLifecycle?.before,

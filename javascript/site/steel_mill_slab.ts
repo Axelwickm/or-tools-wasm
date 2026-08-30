@@ -1072,7 +1072,7 @@ const runExperiment = async () => {
   const params: Record<string, unknown> = {
     logSearchProgress: true,
     maxTimeInSeconds: 10,
-    numSearchWorkers: workerCount,
+    numWorkers: workerCount,
   };
 
   resetStatus();

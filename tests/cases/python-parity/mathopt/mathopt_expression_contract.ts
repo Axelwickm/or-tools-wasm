@@ -1,5 +1,4 @@
 type MathOptApi = {
-  initMathOpt(): Promise<void>;
   MathOpt: {
     SolverType: {
       GLOP: number;
@@ -62,9 +61,7 @@ type MathOptVariableLike = {
 
 type MathOptVarEqVarLike = {
   firstVariable: MathOptVariableLike;
-  first_variable: MathOptVariableLike;
   secondVariable: MathOptVariableLike;
-  second_variable: MathOptVariableLike;
   assertNotBoolean(): never;
 };
 
@@ -114,20 +111,16 @@ type MathOptExpressionInput =
 
 type MathOptBoundedExpressionLike<T> = {
   lowerBound: number;
-  lower_bound: number;
   expression: T;
   upperBound: number;
-  upper_bound: number;
   assertNotBoolean(): never;
   toString(): string;
 };
 
 type MathOptLowerBoundedExpressionLike<T> = {
   lowerBound: number;
-  lower_bound: number;
   expression: T;
   upperBound: number;
-  upper_bound: number;
   toBoundedExpression(upperBound: number): MathOptBoundedExpressionLike<T>;
   assertNotBoolean(): never;
   toString(): string;
@@ -135,10 +128,8 @@ type MathOptLowerBoundedExpressionLike<T> = {
 
 type MathOptUpperBoundedExpressionLike<T> = {
   lowerBound: number;
-  lower_bound: number;
   expression: T;
   upperBound: number;
-  upper_bound: number;
   toBoundedExpression(lowerBound: number): MathOptBoundedExpressionLike<T>;
   assertNotBoolean(): never;
   toString(): string;
@@ -379,7 +370,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_eq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_eq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -390,8 +380,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_eq_float');
-      assert(boundedExpression.lower_bound === 2.0, `test_eq_float expected lower bound 2, got ${boundedExpression.lower_bound}`);
-      assert(boundedExpression.upper_bound === 2.0, `test_eq_float expected upper bound 2, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.lowerBound === 2.0, `test_eq_float expected lower bound 2, got ${boundedExpression.lowerBound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_eq_float expected upper bound 2, got ${boundedExpression.upperBound}`);
       return 'BoundedLinearExprTest.test_eq_float PASS';
     },
   },
@@ -399,7 +389,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_eq_float_explicit',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_eq_float_explicit');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -410,8 +399,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_eq_float_explicit');
-      assert(boundedExpression.lower_bound === 2.0, `test_eq_float_explicit expected lower bound 2, got ${boundedExpression.lower_bound}`);
-      assert(boundedExpression.upper_bound === 2.0, `test_eq_float_explicit expected upper bound 2, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.lowerBound === 2.0, `test_eq_float_explicit expected lower bound 2, got ${boundedExpression.lowerBound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_eq_float_explicit expected upper bound 2, got ${boundedExpression.upperBound}`);
       return 'BoundedLinearExprTest.test_eq_float_explicit PASS';
     },
   },
@@ -419,7 +408,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_eq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_eq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -431,8 +419,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: -1.0 },
       ], 'test_eq_expr');
-      assert(boundedExpression.lower_bound === 0.0, `test_eq_expr expected lower bound 0, got ${boundedExpression.lower_bound}`);
-      assert(boundedExpression.upper_bound === 0.0, `test_eq_expr expected upper bound 0, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.lowerBound === 0.0, `test_eq_expr expected lower bound 0, got ${boundedExpression.lowerBound}`);
+      assert(boundedExpression.upperBound === 0.0, `test_eq_expr expected upper bound 0, got ${boundedExpression.upperBound}`);
 
       const varOnLhs = api.MathOpt.eq(x, rhs);
       assertFlatLinearExpression(varOnLhs.expression, 2.0, [
@@ -452,7 +440,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_eq_expr_explicit',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_eq_expr_explicit');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -464,8 +451,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: -1.0 },
       ], 'test_eq_expr_explicit');
-      assert(boundedExpression.lower_bound === 0.0, `test_eq_expr_explicit expected lower bound 0, got ${boundedExpression.lower_bound}`);
-      assert(boundedExpression.upper_bound === 0.0, `test_eq_expr_explicit expected upper bound 0, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.lowerBound === 0.0, `test_eq_expr_explicit expected lower bound 0, got ${boundedExpression.lowerBound}`);
+      assert(boundedExpression.upperBound === 0.0, `test_eq_expr_explicit expected upper bound 0, got ${boundedExpression.upperBound}`);
 
       const varOnLhs = api.MathOpt.eq(x, rhs);
       assertFlatLinearExpression(varOnLhs.expression, 2.0, [
@@ -485,7 +472,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_leq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_leq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -495,7 +481,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_leq_float');
-      assert(boundedExpression.upper_bound === 2.0, `test_leq_float expected upper bound 2, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_leq_float expected upper bound 2, got ${boundedExpression.upperBound}`);
       return 'BoundedLinearExprTest.test_leq_float PASS';
     },
   },
@@ -503,7 +489,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_leq_float_rev',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_leq_float_rev');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -513,7 +498,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_leq_float_rev');
-      assert(boundedExpression.upper_bound === 2.0, `test_leq_float_rev expected upper bound 2, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_leq_float_rev expected upper bound 2, got ${boundedExpression.upperBound}`);
       return 'BoundedLinearExprTest.test_leq_float_rev PASS';
     },
   },
@@ -521,7 +506,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_geq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_geq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -531,7 +515,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_geq_float');
-      assert(boundedExpression.lower_bound === 2.0, `test_geq_float expected lower bound 2, got ${boundedExpression.lower_bound}`);
+      assert(boundedExpression.lowerBound === 2.0, `test_geq_float expected lower bound 2, got ${boundedExpression.lowerBound}`);
       return 'BoundedLinearExprTest.test_geq_float PASS';
     },
   },
@@ -539,7 +523,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_geq_float_rev',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_geq_float_rev');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -549,7 +532,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_geq_float_rev');
-      assert(boundedExpression.lower_bound === 2.0, `test_geq_float_rev expected lower bound 2, got ${boundedExpression.lower_bound}`);
+      assert(boundedExpression.lowerBound === 2.0, `test_geq_float_rev expected lower bound 2, got ${boundedExpression.lowerBound}`);
       return 'BoundedLinearExprTest.test_geq_float_rev PASS';
     },
   },
@@ -557,7 +540,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_geq_leq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_ranged_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -569,8 +551,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_geq_leq_float');
-      assert(boundedExpression.upper_bound === 2.0, `test_geq_leq_float expected upper bound 2, got ${boundedExpression.upper_bound}`);
-      assert(boundedExpression.lower_bound === 0.0, `test_geq_leq_float expected lower bound 0, got ${boundedExpression.lower_bound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_geq_leq_float expected upper bound 2, got ${boundedExpression.upperBound}`);
+      assert(boundedExpression.lowerBound === 0.0, `test_geq_leq_float expected lower bound 0, got ${boundedExpression.lowerBound}`);
       return 'BoundedLinearExprTest.test_geq_leq_float PASS';
     },
   },
@@ -578,7 +560,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_geq_leq_float_rev',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_geq_leq_float_rev');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -590,8 +571,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_geq_leq_float_rev');
-      assert(boundedExpression.upper_bound === 2.0, `test_geq_leq_float_rev expected upper bound 2, got ${boundedExpression.upper_bound}`);
-      assert(boundedExpression.lower_bound === 0.0, `test_geq_leq_float_rev expected lower bound 0, got ${boundedExpression.lower_bound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_geq_leq_float_rev expected upper bound 2, got ${boundedExpression.upperBound}`);
+      assert(boundedExpression.lowerBound === 0.0, `test_geq_leq_float_rev expected lower bound 0, got ${boundedExpression.lowerBound}`);
       return 'BoundedLinearExprTest.test_geq_leq_float_rev PASS';
     },
   },
@@ -599,7 +580,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_leq_geq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_leq_geq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -611,8 +591,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_leq_geq_float');
-      assert(boundedExpression.upper_bound === 2.0, `test_leq_geq_float expected upper bound 2, got ${boundedExpression.upper_bound}`);
-      assert(boundedExpression.lower_bound === 0.0, `test_leq_geq_float expected lower bound 0, got ${boundedExpression.lower_bound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_leq_geq_float expected upper bound 2, got ${boundedExpression.upperBound}`);
+      assert(boundedExpression.lowerBound === 0.0, `test_leq_geq_float expected lower bound 0, got ${boundedExpression.lowerBound}`);
       return 'BoundedLinearExprTest.test_leq_geq_float PASS';
     },
   },
@@ -620,7 +600,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_leq_geq_float_rev',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_leq_geq_float_rev');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -632,8 +611,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: x, coefficient: 1.0 },
         { variable: y, coefficient: 2.0 },
       ], 'test_leq_geq_float_rev');
-      assert(boundedExpression.upper_bound === 2.0, `test_leq_geq_float_rev expected upper bound 2, got ${boundedExpression.upper_bound}`);
-      assert(boundedExpression.lower_bound === 0.0, `test_leq_geq_float_rev expected lower bound 0, got ${boundedExpression.lower_bound}`);
+      assert(boundedExpression.upperBound === 2.0, `test_leq_geq_float_rev expected upper bound 2, got ${boundedExpression.upperBound}`);
+      assert(boundedExpression.lowerBound === 0.0, `test_leq_geq_float_rev expected lower bound 0, got ${boundedExpression.lowerBound}`);
       return 'BoundedLinearExprTest.test_leq_geq_float_rev PASS';
     },
   },
@@ -641,7 +620,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_leq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_leq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -655,8 +633,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: y, coefficient: 2.0 },
         { variable: z, coefficient: 4.0 },
       ], 'test_leq_expr');
-      assert(boundedExpression.lower_bound === Number.NEGATIVE_INFINITY, `test_leq_expr expected lower -inf, got ${boundedExpression.lower_bound}`);
-      assert(boundedExpression.upper_bound === 0.0, `test_leq_expr expected upper 0, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.lowerBound === Number.NEGATIVE_INFINITY, `test_leq_expr expected lower -inf, got ${boundedExpression.lowerBound}`);
+      assert(boundedExpression.upperBound === 0.0, `test_leq_expr expected upper 0, got ${boundedExpression.upperBound}`);
       return 'BoundedLinearExprTest.test_leq_expr PASS';
     },
   },
@@ -664,7 +642,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_geq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_geq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -678,8 +655,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         { variable: y, coefficient: 2.0 },
         { variable: z, coefficient: 4.0 },
       ], 'test_geq_expr');
-      assert(boundedExpression.lower_bound === 0.0, `test_geq_expr expected lower 0, got ${boundedExpression.lower_bound}`);
-      assert(boundedExpression.upper_bound === Number.POSITIVE_INFINITY, `test_geq_expr expected upper inf, got ${boundedExpression.upper_bound}`);
+      assert(boundedExpression.lowerBound === 0.0, `test_geq_expr expected lower 0, got ${boundedExpression.lowerBound}`);
+      assert(boundedExpression.upperBound === Number.POSITIVE_INFINITY, `test_geq_expr expected upper inf, got ${boundedExpression.upperBound}`);
       return 'BoundedLinearExprTest.test_geq_expr PASS';
     },
   },
@@ -687,15 +664,14 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_var_eq_var',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_var_eq_var');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
       const alsoX = x;
       const boundedExpression = api.MathOpt.variableEq(x, y);
       assert(boundedExpression instanceof api.MathOpt.VarEqVar, 'test_var_eq_var expected VarEqVar');
-      assert(boundedExpression.first_variable === x, 'test_var_eq_var expected first variable x');
-      assert(boundedExpression.second_variable === y, 'test_var_eq_var expected second variable y');
+      assert(boundedExpression.firstVariable === x, 'test_var_eq_var expected first variable x');
+      assert(boundedExpression.secondVariable === y, 'test_var_eq_var expected second variable y');
 
       const secondModel = api.MathOpt.Model('mathopt_expression_var_eq_var_second');
       const secondX = secondModel.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
@@ -710,15 +686,14 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_var_eq_var_explicit',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_var_eq_var_explicit');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
       const alsoX = x;
       const boundedExpression = api.MathOpt.variableEq(x, y);
       assert(boundedExpression instanceof api.MathOpt.VarEqVar, 'test_var_eq_var_explicit expected VarEqVar');
-      assert(boundedExpression.first_variable === x, 'test_var_eq_var_explicit expected first variable x');
-      assert(boundedExpression.second_variable === y, 'test_var_eq_var_explicit expected second variable y');
+      assert(boundedExpression.firstVariable === x, 'test_var_eq_var_explicit expected first variable x');
+      assert(boundedExpression.secondVariable === y, 'test_var_eq_var_explicit expected second variable y');
 
       const secondModel = api.MathOpt.Model('mathopt_expression_var_eq_var_explicit_second');
       const secondX = secondModel.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
@@ -733,7 +708,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_var_neq_var',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_var_neq_var');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -751,7 +725,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_var_neq_var_explicit',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_var_neq_var_explicit');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -769,7 +742,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprTest.test_var_dict',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_var_dict');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -784,7 +756,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_ne',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_error_ne');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -804,7 +775,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_eq',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expression_error_eq');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const invalid = 'x' as unknown as MathOptExpressionInput;
@@ -818,7 +788,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_float_le_expr_le_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_float_le_expr_le_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -837,7 +806,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_float_ge_expr_ge_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_float_ge_expr_ge_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -856,7 +824,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_expr_le_expr_le_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expr_le_expr_le_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -875,7 +842,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_expr_ge_expr_ge_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_expr_ge_expr_ge_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -891,11 +857,10 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     },
   },
   {
-    name: 'BoundedLinearExprErrorTest.test_lower_bounded_expr_leq_expr',
+    name: 'BoundedLinearExprErrorTest.test_lowerBounded_expr_leq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
-      const model = api.MathOpt.Model('mathopt_lower_bounded_expr_leq_expr');
+      const model = api.MathOpt.Model('mathopt_lowerBounded_expr_leq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const lower = api.MathOpt.le(0.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
@@ -904,17 +869,16 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         () => api.MathOpt.le(lower as unknown as MathOptExpressionInput, rhs),
         TypeError,
         "unsupported operand type(s) for <=: 'LowerBoundedExpression' and 'LinearExpression'",
-        'test_lower_bounded_expr_leq_expr',
+        'test_lowerBounded_expr_leq_expr',
       );
-      return 'BoundedLinearExprErrorTest.test_lower_bounded_expr_leq_expr PASS';
+      return 'BoundedLinearExprErrorTest.test_lowerBounded_expr_leq_expr PASS';
     },
   },
   {
-    name: 'BoundedLinearExprErrorTest.test_lower_bounded_expr_geq_expr',
+    name: 'BoundedLinearExprErrorTest.test_lowerBounded_expr_geq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
-      const model = api.MathOpt.Model('mathopt_lower_bounded_expr_geq_expr');
+      const model = api.MathOpt.Model('mathopt_lowerBounded_expr_geq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const lower = api.MathOpt.le(0.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
@@ -923,17 +887,16 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         () => api.MathOpt.ge(lower as unknown as MathOptExpressionInput, rhs),
         TypeError,
         "unsupported operand type(s) for >=: 'LowerBoundedExpression' and 'LinearExpression'",
-        'test_lower_bounded_expr_geq_expr',
+        'test_lowerBounded_expr_geq_expr',
       );
-      return 'BoundedLinearExprErrorTest.test_lower_bounded_expr_geq_expr PASS';
+      return 'BoundedLinearExprErrorTest.test_lowerBounded_expr_geq_expr PASS';
     },
   },
   {
-    name: 'BoundedLinearExprErrorTest.test_lower_bounded_expr_geq_float',
+    name: 'BoundedLinearExprErrorTest.test_lowerBounded_expr_geq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
-      const model = api.MathOpt.Model('mathopt_lower_bounded_expr_geq_float');
+      const model = api.MathOpt.Model('mathopt_lowerBounded_expr_geq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const lower = api.MathOpt.le(0.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
@@ -941,17 +904,16 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         () => api.MathOpt.ge(lower as unknown as MathOptExpressionInput, 2.0),
         TypeError,
         "unsupported operand type(s) for >=: 'LowerBoundedExpression' and 'number'",
-        'test_lower_bounded_expr_geq_float',
+        'test_lowerBounded_expr_geq_float',
       );
-      return 'BoundedLinearExprErrorTest.test_lower_bounded_expr_geq_float PASS';
+      return 'BoundedLinearExprErrorTest.test_lowerBounded_expr_geq_float PASS';
     },
   },
   {
-    name: 'BoundedLinearExprErrorTest.test_upper_bounded_expr_geq_expr',
+    name: 'BoundedLinearExprErrorTest.test_upperBounded_expr_geq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
-      const model = api.MathOpt.Model('mathopt_upper_bounded_expr_geq_expr');
+      const model = api.MathOpt.Model('mathopt_upperBounded_expr_geq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const upper = api.MathOpt.ge(2.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
@@ -960,17 +922,16 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         () => api.MathOpt.ge(upper as unknown as MathOptExpressionInput, rhs),
         TypeError,
         "unsupported operand type(s) for >=: 'UpperBoundedExpression' and 'LinearExpression'",
-        'test_upper_bounded_expr_geq_expr',
+        'test_upperBounded_expr_geq_expr',
       );
-      return 'BoundedLinearExprErrorTest.test_upper_bounded_expr_geq_expr PASS';
+      return 'BoundedLinearExprErrorTest.test_upperBounded_expr_geq_expr PASS';
     },
   },
   {
-    name: 'BoundedLinearExprErrorTest.test_upper_bounded_expr_leq_expr',
+    name: 'BoundedLinearExprErrorTest.test_upperBounded_expr_leq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
-      const model = api.MathOpt.Model('mathopt_upper_bounded_expr_leq_expr');
+      const model = api.MathOpt.Model('mathopt_upperBounded_expr_leq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const upper = api.MathOpt.ge(2.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
@@ -979,17 +940,16 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         () => api.MathOpt.le(upper as unknown as MathOptExpressionInput, rhs),
         TypeError,
         "unsupported operand type(s) for <=: 'UpperBoundedExpression' and 'LinearExpression'",
-        'test_upper_bounded_expr_leq_expr',
+        'test_upperBounded_expr_leq_expr',
       );
-      return 'BoundedLinearExprErrorTest.test_upper_bounded_expr_leq_expr PASS';
+      return 'BoundedLinearExprErrorTest.test_upperBounded_expr_leq_expr PASS';
     },
   },
   {
-    name: 'BoundedLinearExprErrorTest.test_upper_bounded_expr_leq_float',
+    name: 'BoundedLinearExprErrorTest.test_upperBounded_expr_leq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
-      const model = api.MathOpt.Model('mathopt_upper_bounded_expr_leq_float');
+      const model = api.MathOpt.Model('mathopt_upperBounded_expr_leq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const upper = api.MathOpt.ge(2.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
@@ -997,16 +957,15 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         () => api.MathOpt.le(upper as unknown as MathOptExpressionInput, 2.0),
         TypeError,
         "unsupported operand type(s) for <=: 'UpperBoundedExpression' and 'number'",
-        'test_upper_bounded_expr_leq_float',
+        'test_upperBounded_expr_leq_float',
       );
-      return 'BoundedLinearExprErrorTest.test_upper_bounded_expr_leq_float PASS';
+      return 'BoundedLinearExprErrorTest.test_upperBounded_expr_leq_float PASS';
     },
   },
   {
     name: 'BoundedLinearExprErrorTest.test_bounded_expr_leq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_bounded_expr_leq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1027,7 +986,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_bounded_expr_leq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_bounded_expr_leq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1047,7 +1005,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_bounded_expr_geq_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_bounded_expr_geq_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1068,7 +1025,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedLinearExprErrorTest.test_bounded_expr_geq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_bounded_expr_geq_float');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1088,7 +1044,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_eq_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_eq_float');
       const x = model.addVariable();
       const bounded = api.MathOpt.eq(api.MathOpt.quadraticTerm(x, x, 5.0), 3.0);
@@ -1096,7 +1051,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_quad_eq_float');
-      assert(bounded.lower_bound === 3.0 && bounded.upper_bound === 3.0, 'test_quad_eq_float expected bounds [3, 3]');
+      assert(bounded.lowerBound === 3.0 && bounded.upperBound === 3.0, 'test_quad_eq_float expected bounds [3, 3]');
       return 'BoundedQuadraticExpressionTest.test_quad_eq_float PASS';
     },
   },
@@ -1104,7 +1059,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_float_eq_quad',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_float_eq_quad');
       const x = model.addVariable();
       const bounded = api.MathOpt.eq(3.0, api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1112,7 +1066,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_float_eq_quad');
-      assert(bounded.lower_bound === 3.0 && bounded.upper_bound === 3.0, 'test_float_eq_quad expected bounds [3, 3]');
+      assert(bounded.lowerBound === 3.0 && bounded.upperBound === 3.0, 'test_float_eq_quad expected bounds [3, 3]');
       return 'BoundedQuadraticExpressionTest.test_float_eq_quad PASS';
     },
   },
@@ -1120,7 +1074,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_eq_lin',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_eq_lin');
       const x = model.addVariable();
       const bounded = api.MathOpt.eq(api.MathOpt.quadraticTerm(x, x, 5.0), x);
@@ -1128,7 +1081,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [{ variable: x, coefficient: -1.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_quad_eq_lin');
-      assert(bounded.lower_bound === 0.0 && bounded.upper_bound === 0.0, 'test_quad_eq_lin expected bounds [0, 0]');
+      assert(bounded.lowerBound === 0.0 && bounded.upperBound === 0.0, 'test_quad_eq_lin expected bounds [0, 0]');
       return 'BoundedQuadraticExpressionTest.test_quad_eq_lin PASS';
     },
   },
@@ -1136,7 +1089,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_lin_eq_quad',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_lin_eq_quad');
       const x = model.addVariable();
       const bounded = api.MathOpt.eq(x, api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1144,7 +1096,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [{ variable: x, coefficient: -1.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_lin_eq_quad');
-      assert(bounded.lower_bound === 0.0 && bounded.upper_bound === 0.0, 'test_lin_eq_quad expected bounds [0, 0]');
+      assert(bounded.lowerBound === 0.0 && bounded.upperBound === 0.0, 'test_lin_eq_quad expected bounds [0, 0]');
       return 'BoundedQuadraticExpressionTest.test_lin_eq_quad PASS';
     },
   },
@@ -1152,7 +1104,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_eq_str_raises_error',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_eq_str');
       const x = model.addVariable();
       assertThrowsWithMessage(
@@ -1168,7 +1119,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_ne_raises_error',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_ne');
       const x = model.addVariable();
       assertThrowsWithMessage(
@@ -1184,7 +1134,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_le_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_le_float');
       const x = model.addVariable();
       const bounded = api.MathOpt.le(api.MathOpt.quadraticTerm(x, x, 5.0), 3.0);
@@ -1192,7 +1141,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_quad_le_float');
-      assert(bounded.upper_bound === 3.0, 'test_quad_le_float expected upper bound 3');
+      assert(bounded.upperBound === 3.0, 'test_quad_le_float expected upper bound 3');
       return 'BoundedQuadraticExpressionTest.test_quad_le_float PASS';
     },
   },
@@ -1200,7 +1149,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_float_ge_quad',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_float_ge_quad');
       const x = model.addVariable();
       const bounded = api.MathOpt.ge(3.0, api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1208,7 +1156,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_float_ge_quad');
-      assert(bounded.upper_bound === 3.0, 'test_float_ge_quad expected upper bound 3');
+      assert(bounded.upperBound === 3.0, 'test_float_ge_quad expected upper bound 3');
       return 'BoundedQuadraticExpressionTest.test_float_ge_quad PASS';
     },
   },
@@ -1216,7 +1164,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_le_lin',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_le_lin');
       const x = model.addVariable();
       const bounded = api.MathOpt.le(api.MathOpt.quadraticTerm(x, x, 5.0), api.MathOpt.fastSum([x, 2.0]));
@@ -1224,7 +1171,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, -2.0, [{ variable: x, coefficient: -1.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_quad_le_lin');
-      assert(bounded.upper_bound === 0.0, 'test_quad_le_lin expected upper bound 0');
+      assert(bounded.upperBound === 0.0, 'test_quad_le_lin expected upper bound 0');
       return 'BoundedQuadraticExpressionTest.test_quad_le_lin PASS';
     },
   },
@@ -1232,7 +1179,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_lin_ge_quad',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_lin_ge_quad');
       const x = model.addVariable();
       const bounded = api.MathOpt.ge(api.MathOpt.fastSum([x, 2.0]), api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1240,7 +1186,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, -2.0, [{ variable: x, coefficient: -1.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_lin_ge_quad');
-      assert(bounded.upper_bound === 0.0, 'test_lin_ge_quad expected upper bound 0');
+      assert(bounded.upperBound === 0.0, 'test_lin_ge_quad expected upper bound 0');
       return 'BoundedQuadraticExpressionTest.test_lin_ge_quad PASS';
     },
   },
@@ -1248,7 +1194,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_ge_float',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_ge_float');
       const x = model.addVariable();
       const bounded = api.MathOpt.ge(api.MathOpt.quadraticTerm(x, x, 5.0), 3.0);
@@ -1256,7 +1201,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_quad_ge_float');
-      assert(bounded.lower_bound === 3.0, 'test_quad_ge_float expected lower bound 3');
+      assert(bounded.lowerBound === 3.0, 'test_quad_ge_float expected lower bound 3');
       return 'BoundedQuadraticExpressionTest.test_quad_ge_float PASS';
     },
   },
@@ -1264,7 +1209,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_float_le_quad',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_float_le_quad');
       const x = model.addVariable();
       const bounded = api.MathOpt.le(3.0, api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1272,7 +1216,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_float_le_quad');
-      assert(bounded.lower_bound === 3.0, 'test_float_le_quad expected lower bound 3');
+      assert(bounded.lowerBound === 3.0, 'test_float_le_quad expected lower bound 3');
       return 'BoundedQuadraticExpressionTest.test_float_le_quad PASS';
     },
   },
@@ -1280,7 +1224,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_ge_lin',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_ge_lin');
       const x = model.addVariable();
       const bounded = api.MathOpt.ge(api.MathOpt.quadraticTerm(x, x, 5.0), api.MathOpt.fastSum([x, 2.0]));
@@ -1288,7 +1231,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, -2.0, [{ variable: x, coefficient: -1.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_quad_ge_lin');
-      assert(bounded.lower_bound === 0.0, 'test_quad_ge_lin expected lower bound 0');
+      assert(bounded.lowerBound === 0.0, 'test_quad_ge_lin expected lower bound 0');
       return 'BoundedQuadraticExpressionTest.test_quad_ge_lin PASS';
     },
   },
@@ -1296,7 +1239,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_lin_le_quad',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_lin_le_quad');
       const x = model.addVariable();
       const bounded = api.MathOpt.le(api.MathOpt.fastSum([x, 2.0]), api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1304,7 +1246,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, -2.0, [{ variable: x, coefficient: -1.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_lin_le_quad');
-      assert(bounded.lower_bound === 0.0, 'test_lin_le_quad expected lower bound 0');
+      assert(bounded.lowerBound === 0.0, 'test_lin_le_quad expected lower bound 0');
       return 'BoundedQuadraticExpressionTest.test_lin_le_quad PASS';
     },
   },
@@ -1312,7 +1254,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_le_str_raises_error',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_le_str');
       const x = model.addVariable();
       assertThrowsWithMessage(
@@ -1328,7 +1269,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_quad_ge_str_raises_error',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_ge_str');
       const x = model.addVariable();
       assertThrowsWithMessage(
@@ -1344,7 +1284,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_ge_twice',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_ge_twice');
       const x = model.addVariable();
       const lower = api.MathOpt.le(1.0, api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1354,7 +1293,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_ge_twice');
-      assert(bounded.lower_bound === 1.0 && bounded.upper_bound === 2.0, 'test_ge_twice expected bounds [1, 2]');
+      assert(bounded.lowerBound === 1.0 && bounded.upperBound === 2.0, 'test_ge_twice expected bounds [1, 2]');
       return 'BoundedQuadraticExpressionTest.test_ge_twice PASS';
     },
   },
@@ -1362,7 +1301,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_ge_twice_fails_when_ambiguous',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_ge_twice_fails_when_ambiguous');
       const x = model.addVariable();
       const ambiguous = api.MathOpt.le(x, api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1380,7 +1318,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_no_quad_ge_bounded_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_no_quad_ge_bounded_expr');
       const x = model.addVariable();
       const bounded = api.MathOpt.eq(x, 5.0);
@@ -1397,7 +1334,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_le_twice',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_le_twice');
       const x = model.addVariable();
       const upper = api.MathOpt.le(api.MathOpt.quadraticTerm(x, x, 5.0), 2.0);
@@ -1407,7 +1343,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertFlatQuadraticExpression(bounded.expression, 0.0, [], [
         { firstVariable: x, secondVariable: x, coefficient: 5.0 },
       ], 'test_le_twice');
-      assert(bounded.lower_bound === 1.0 && bounded.upper_bound === 2.0, 'test_le_twice expected bounds [1, 2]');
+      assert(bounded.lowerBound === 1.0 && bounded.upperBound === 2.0, 'test_le_twice expected bounds [1, 2]');
       return 'BoundedQuadraticExpressionTest.test_le_twice PASS';
     },
   },
@@ -1415,7 +1351,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_le_twice_fails_when_ambiguous',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quad_le_twice_fails_when_ambiguous');
       const x = model.addVariable();
       const ambiguous = api.MathOpt.ge(x, api.MathOpt.quadraticTerm(x, x, 5.0));
@@ -1433,7 +1368,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedQuadraticExpressionTest.test_no_quad_le_bounded_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_no_quad_le_bounded_expr');
       const x = model.addVariable();
       const bounded = api.MathOpt.eq(x, 5.0);
@@ -1450,7 +1384,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'FastSumTest.test_variables',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model();
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
@@ -1467,7 +1400,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'FastSumTest.test_numbers',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const result = api.MathOpt.fastSum([2.0, 4.0]);
       assert(result instanceof api.MathOpt.LinearExpression, 'FastSumTest.test_numbers expected LinearExpression');
       const flat = api.MathOpt.asFlatLinearExpression(result);
@@ -1480,7 +1412,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'FastSumTest.test_heterogeneous_linear',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model();
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
       const result = api.MathOpt.fastSum([2.0, api.MathOpt.linearTerm(x, 3.0)]);
@@ -1495,7 +1426,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'FastSumTest.test_heterogeneous_quad',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model();
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
       const result = api.MathOpt.fastSum([2.0, api.MathOpt.quadraticTerm(x, x, 3.0), x]);
@@ -1511,7 +1441,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'FastSumTest.test_all_quad',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model();
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
       const result = api.MathOpt.fastSum([
@@ -1530,7 +1459,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'EvaluateExpressionTest.test_scalar_expression',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model();
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
       const value = api.MathOpt.evaluateExpression(4.0, new Map([[x, 1.0]]));
@@ -1542,7 +1470,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'EvaluateExpressionTest.test_linear',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model();
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
       const y = model.addVariable();
@@ -1556,7 +1483,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'EvaluateExpressionTest.test_quadratic',
     source: EXPRESSIONS_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model();
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true });
       const y = model.addVariable();
@@ -1575,13 +1501,12 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'BoundedExpressionTest.test_bounded_expression_read',
     source: BOUNDED_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const bounded = api.MathOpt.boundedExpression(-3.0, 'e123', 4.5);
       assert(bounded instanceof api.MathOpt.BoundedExpression, 'expected BoundedExpression');
       assert(bounded.lowerBound === -3.0, `expected lower bound -3, got ${bounded.lowerBound}`);
-      assert(bounded.lower_bound === -3.0, `expected lower_bound -3, got ${bounded.lower_bound}`);
+      assert(bounded.lowerBound === -3.0, `expected lowerBound -3, got ${bounded.lowerBound}`);
       assert(bounded.upperBound === 4.5, `expected upper bound 4.5, got ${bounded.upperBound}`);
-      assert(bounded.upper_bound === 4.5, `expected upper_bound 4.5, got ${bounded.upper_bound}`);
+      assert(bounded.upperBound === 4.5, `expected upperBound 4.5, got ${bounded.upperBound}`);
       assert(bounded.expression === 'e123', `expected expression e123, got ${bounded.expression}`);
       assert(String(bounded) === '-3.0 <= e123 <= 4.5', `unexpected bounded string ${String(bounded)}`);
       try {
@@ -1594,10 +1519,9 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     },
   },
   {
-    name: 'BoundedExpressionTest.test_lower_bounded_expression_read',
+    name: 'BoundedExpressionTest.test_lowerBounded_expression_read',
     source: BOUNDED_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const bounded = api.MathOpt.lowerBoundedExpression(-3.0, 'e123');
       assert(bounded instanceof api.MathOpt.LowerBoundedExpression, 'expected LowerBoundedExpression');
       assert(bounded.lowerBound === -3.0, `expected lower bound -3, got ${bounded.lowerBound}`);
@@ -1610,14 +1534,13 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       } catch (error) {
         assert(error instanceof TypeError && /two-sided or ranged/.test(error.message), `unexpected bool error ${String(error)}`);
       }
-      return 'BoundedExpressionTest.test_lower_bounded_expression_read PASS';
+      return 'BoundedExpressionTest.test_lowerBounded_expression_read PASS';
     },
   },
   {
-    name: 'BoundedExpressionTest.test_upper_bounded_expression_read',
+    name: 'BoundedExpressionTest.test_upperBounded_expression_read',
     source: BOUNDED_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const bounded = api.MathOpt.upperBoundedExpression('e123', 4.5);
       assert(bounded instanceof api.MathOpt.UpperBoundedExpression, 'expected UpperBoundedExpression');
       assert(bounded.lowerBound === Number.NEGATIVE_INFINITY, `expected lower bound -inf, got ${bounded.lowerBound}`);
@@ -1630,42 +1553,39 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       } catch (error) {
         assert(error instanceof TypeError && /two-sided or ranged/.test(error.message), `unexpected bool error ${String(error)}`);
       }
-      return 'BoundedExpressionTest.test_upper_bounded_expression_read PASS';
+      return 'BoundedExpressionTest.test_upperBounded_expression_read PASS';
     },
   },
   {
-    name: 'BoundedExpressionTest.test_lower_bounded_to_bounded',
+    name: 'BoundedExpressionTest.test_lowerBounded_to_bounded',
     source: BOUNDED_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const lowerBounded = api.MathOpt.lowerBoundedExpression(-3.0, 'e123');
       const bounded = lowerBounded.toBoundedExpression(4.5);
       assert(bounded instanceof api.MathOpt.BoundedExpression, 'expected BoundedExpression');
       assert(bounded.lowerBound === -3.0, `expected lower bound -3, got ${bounded.lowerBound}`);
       assert(bounded.upperBound === 4.5, `expected upper bound 4.5, got ${bounded.upperBound}`);
       assert(bounded.expression === 'e123', `expected expression e123, got ${bounded.expression}`);
-      return 'BoundedExpressionTest.test_lower_bounded_to_bounded PASS';
+      return 'BoundedExpressionTest.test_lowerBounded_to_bounded PASS';
     },
   },
   {
-    name: 'BoundedExpressionTest.test_upper_bounded_to_bounded',
+    name: 'BoundedExpressionTest.test_upperBounded_to_bounded',
     source: BOUNDED_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const upperBounded = api.MathOpt.upperBoundedExpression('e123', 4.5);
       const bounded = upperBounded.toBoundedExpression(-3.0);
       assert(bounded instanceof api.MathOpt.BoundedExpression, 'expected BoundedExpression');
       assert(bounded.lowerBound === -3.0, `expected lower bound -3, got ${bounded.lowerBound}`);
       assert(bounded.upperBound === 4.5, `expected upper bound 4.5, got ${bounded.upperBound}`);
       assert(bounded.expression === 'e123', `expected expression e123, got ${bounded.expression}`);
-      return 'BoundedExpressionTest.test_upper_bounded_to_bounded PASS';
+      return 'BoundedExpressionTest.test_upperBounded_to_bounded PASS';
     },
   },
   {
     name: 'SumTest.test_sum_vars',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_sum_vars');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1683,7 +1603,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_sum_linear_terms',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_sum_linear_terms');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1692,14 +1611,13 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         api.MathOpt.linearTerm(x, 1.25),
         z,
         x,
-        x,
         y,
         api.MathOpt.linearTerm(y, -0.5),
         1.0,
         8.0,
       ]);
       assertFlatLinearExpression(expression, 9.0, [
-        { variable: x, coefficient: 3.25 },
+        { variable: x, coefficient: 2.25 },
         { variable: y, coefficient: 0.5 },
         { variable: z, coefficient: 1.0 },
       ], 'SumTest.test_sum_linear_terms');
@@ -1710,7 +1628,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_sum_quadratic_terms',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_sum_quadratic_terms');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1718,7 +1635,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const expression = api.MathOpt.fastSum([
         api.MathOpt.linearTerm(x, 1.25),
         z,
-        x,
         x,
         y,
         api.MathOpt.linearTerm(y, -0.5),
@@ -1728,7 +1644,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         8.0,
       ]);
       assertFlatQuadraticExpression(expression, 9.0, [
-        { variable: x, coefficient: 3.25 },
+        { variable: x, coefficient: 2.25 },
         { variable: y, coefficient: 0.5 },
         { variable: z, coefficient: 1.0 },
       ], [
@@ -1742,7 +1658,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_sum_linear_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_sum_linear_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1766,7 +1681,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_sum_quadratic_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_sum_quadratic_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1803,7 +1717,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_generator_sum_vars',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_generator_sum_vars');
       const x = Array.from({ length: 3 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x[${i}]` }));
       const expression = api.MathOpt.fastSum([...x, 8.0]);
@@ -1819,7 +1732,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_generator_sum_terms',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_generator_sum_terms');
       const x = Array.from({ length: 3 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x[${i}]` }));
       const expression = api.MathOpt.fastSum([
@@ -1840,7 +1752,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_generator_sum_quadratic_terms',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_generator_sum_quadratic_terms');
       const x = Array.from({ length: 4 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x[${i}]` }));
       const expression = api.MathOpt.fastSum([
@@ -1861,7 +1772,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_generator_sum_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_generator_sum_expression');
       const x = Array.from({ length: 3 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x[${i}]` }));
       const pieces = Array.from({ length: 2 }, (_, i) => api.MathOpt.fastSum([
@@ -1882,7 +1792,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'SumTest.test_generator_quadratic_sum_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_generator_quadratic_sum_expression');
       const x = Array.from({ length: 3 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x[${i}]` }));
       const pieces = Array.from({ length: 2 }, (_, i) => api.MathOpt.fastSum([
@@ -1907,7 +1816,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'AstTest.test_simple_linear_ast',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_simple_linear_ast');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1930,7 +1838,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'AstTest.test_simple_quadratic_ast',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_simple_quadratic_ast');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1958,7 +1865,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'AstTest.test_linear_sum_ast',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_sum_ast');
       const x = Array.from({ length: 5 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x[${i}]` }));
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -1989,7 +1895,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'AstTest.test_quadratic_sum_ast',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_sum_ast');
       const x = Array.from({ length: 3 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x[${i}]` }));
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2033,7 +1938,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticTermKey.test_var_dict',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_term_key_var_dict');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2059,7 +1963,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearNumberOpTests.test_mult',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_linear_number_mult_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2098,7 +2001,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearNumberOpTests.test_div',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_linear_number_div_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2137,7 +2039,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearNumberOpTests.test_add',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_linear_number_add_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2176,7 +2077,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearNumberOpTests.test_sub',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_linear_number_sub_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2217,7 +2117,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticNumberOpTests.test_mult',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_quadratic_number_mult_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2288,7 +2187,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticNumberOpTests.test_div',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_quadratic_number_div_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2359,7 +2257,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticNumberOpTests.test_add',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_quadratic_number_add_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2430,7 +2327,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticNumberOpTests.test_sub',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       for (const constant of [2.0, 0.25]) {
         const model = api.MathOpt.Model(`mathopt_quadratic_number_sub_${constant}`);
         const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
@@ -2509,7 +2405,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearAddSubTest.test_add_and_sub',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const linearVariant = (
         api: MathOptApi,
         kind: string,
@@ -2571,7 +2466,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearQuadraticAddSubTest.test_add_and_sub',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const kinds = [
         'Variable',
         'LinearTerm',
@@ -2759,7 +2653,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_var_var',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_var_var');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2772,7 +2665,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_term_term',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_term_term');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2785,7 +2677,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_expr_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_expr_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2808,7 +2699,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_sum_sum',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_sum_sum');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2831,7 +2721,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_prod_prod',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_prod_prod');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2850,7 +2739,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_var_term',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_var_term');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2864,7 +2752,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_var_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_var_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2884,7 +2771,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_var_sum',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_var_sum');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2904,7 +2790,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_var_prod',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_var_prod');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2918,7 +2803,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_term_expr',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_term_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2939,7 +2823,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_term_sum',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_term_sum');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2960,7 +2843,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_term_prod',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_term_prod');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2975,7 +2857,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_expr_sum',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_expr_sum');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -2998,7 +2879,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_expr_prod',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_expr_prod');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3019,7 +2899,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearLinearMulTest.test_sum_prod',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_mul_sum_prod');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3040,7 +2919,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_var',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_var');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertFlatLinearExpression(api.MathOpt.asFlatLinearExpression(x).multiply(-1.0), 0.0, [{ variable: x, coefficient: -1.0 }], 'negate_var');
@@ -3051,7 +2929,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_linear_term',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_linear_term');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertFlatLinearExpression(api.MathOpt.asFlatLinearExpression(api.MathOpt.linearTerm(x, 0.5)).multiply(-1.0), 0.0, [{ variable: x, coefficient: -0.5 }], 'negate_linear_term');
@@ -3062,7 +2939,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_linear_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_linear_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3075,7 +2951,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_linear_sum',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_linear_sum');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3088,7 +2963,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_ast_product',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_ast_product');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const product = api.MathOpt.asFlatLinearExpression(x).multiply(0.5);
@@ -3100,7 +2974,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_quadratic_term',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_quadratic_term');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertFlatQuadraticExpression(api.MathOpt.asFlatQuadraticExpression(api.MathOpt.quadraticTerm(x, x, 0.5)).multiply(-1.0), 0.0, [], [
@@ -3113,7 +2986,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_quadratic_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_quadratic_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3136,7 +3008,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_quadratic_sum',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_quadratic_sum');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3154,7 +3025,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_linear_linear_product',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_linear_linear_product');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const product = api.MathOpt.multiplyLinearExpressions(x, api.MathOpt.fastSum([x, 1.0]));
@@ -3168,7 +3038,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'NegateTest.test_negate_quadratic_product',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_negate_quadratic_product');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const product = api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([x, api.MathOpt.quadraticTerm(x, x)])).multiply(0.5);
@@ -3182,7 +3051,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearStrAndReprTest.test_sorting_ok',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_str_sorting');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3195,7 +3063,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearStrAndReprTest.test_simple_expressions',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_str_simple');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3211,7 +3078,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearStrAndReprTest.test_sum_expressions',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_str_sum');
       const x = Array.from({ length: 3 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x${i}` }));
       const expression = api.MathOpt.fastSum(x.map((variable, i) => api.MathOpt.linearTerm(variable, i)));
@@ -3223,7 +3089,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticStrAndReprTest.test_sorting_ok',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_str_sorting');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3236,7 +3101,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticStrAndReprTest.test_simple_expressions',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_str_simple');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3253,7 +3117,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticStrAndReprTest.test_sum_expressions',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_str_sum');
       const x = Array.from({ length: 3 }, (_, i) => model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: `x${i}` }));
       const expression = api.MathOpt.fastSum(x.map((variable, i) => api.MathOpt.quadraticTerm(variable, variable, i)));
@@ -3315,7 +3178,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedProductOperandTest.test_mult',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_unsupported_mult');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3338,7 +3200,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedProductOperandTest.test_div',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_unsupported_div');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
@@ -3371,7 +3232,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedAdditionOperandTest.test_add',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_unsupported_add');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertThrowsContaining(
@@ -3393,7 +3253,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedAdditionOperandTest.test_sub',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_unsupported_sub');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertThrowsContaining(
@@ -3415,7 +3274,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_linear_sum_not_tuple',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       assertThrowsContaining(() => newLinearExpression(api, true as unknown as Iterable<MathOptLinearTermLike>), TypeError, 'not iterable', 'linear expression non-iterable');
       return 'UnsupportedInitializationTest.test_linear_sum_not_tuple PASS';
     },
@@ -3424,7 +3282,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_linear_sum_not_linear_in_tuple',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_sum_not_linear');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertThrowsContaining(
@@ -3440,7 +3297,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_quadratic_sum_not_tuple',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       assertThrowsContaining(() => newQuadraticExpression(api, true as unknown as Iterable<MathOptLinearTermLike>), TypeError, 'not iterable', 'quadratic expression non-iterable');
       return 'UnsupportedInitializationTest.test_quadratic_sum_not_tuple PASS';
     },
@@ -3449,7 +3305,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_quadratic_sum_not_linear_in_tuple',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       assertThrowsContaining(
         () => newQuadraticExpression(api, ['string' as unknown as MathOptLinearTermLike]),
         TypeError,
@@ -3463,7 +3318,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_linear_product_not_scalar',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_product_not_scalar');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assert(Number.isNaN(api.MathOpt.asFlatLinearExpression(x).multiply(x as unknown as number).offset), 'linear product invalid scalar should propagate NaN');
@@ -3474,7 +3328,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_linear_product_not_linear',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       assertThrowsContaining(() => api.MathOpt.asFlatLinearExpression('string' as unknown as MathOptExpressionInput), TypeError, 'Unsupported MathOpt linear expression input', 'linear product invalid linear input');
       return 'UnsupportedInitializationTest.test_linear_product_not_linear PASS';
     },
@@ -3483,7 +3336,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_quadratic_product_not_scalar',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_product_not_scalar');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assert(Number.isNaN(api.MathOpt.asFlatQuadraticExpression(api.MathOpt.quadraticTerm(x, x)).multiply(x as unknown as number).offset), 'quadratic product invalid scalar should propagate NaN');
@@ -3494,7 +3346,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_quadratic_product_not_quadratic',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       assertThrowsContaining(() => api.MathOpt.asFlatQuadraticExpression('string' as unknown as MathOptExpressionInput), TypeError, 'Unsupported MathOpt linear expression input', 'quadratic product invalid quadratic input');
       return 'UnsupportedInitializationTest.test_quadratic_product_not_quadratic PASS';
     },
@@ -3503,7 +3354,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_linear_linear_product_first_not_linear',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_linear_product_first_not_linear');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertThrowsContaining(() => api.MathOpt.multiplyLinearExpressions('string' as unknown as MathOptExpressionInput, x), TypeError, 'Unsupported MathOpt linear expression input', 'linear linear product invalid first input');
@@ -3514,7 +3364,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'UnsupportedInitializationTest.test_linear_linear_product_second_not_linear',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_linear_product_second_not_linear');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       assertThrowsContaining(() => api.MathOpt.multiplyLinearExpressions(x, 'string' as unknown as MathOptExpressionInput), TypeError, 'Unsupported MathOpt linear expression input', 'linear linear product invalid second input');
@@ -3525,7 +3374,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearExpressionTest.test_init_to_zero',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const expression = newLinearExpression(api);
       assert(expression.offset === 0.0, `LinearExpressionTest.test_init_to_zero expected offset 0, got ${expression.offset}`);
       assert(expression.terms.size === 0, `LinearExpressionTest.test_init_to_zero expected no terms, got ${expression.terms.size}`);
@@ -3536,7 +3384,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearExpressionTest.test_terms_read_only',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_terms_read_only');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -3554,7 +3401,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearExpressionTest.test_no_copy_of_linear_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_no_copy_linear_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -3567,7 +3413,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearExpressionTest.test_number_as_flat_linear_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const expression = newLinearExpression(api, 2.0);
       assert(expression.terms.size === 0, `LinearExpressionTest.test_number_as_flat_linear_expression expected no terms, got ${expression.terms.size}`);
       assert(expression.offset === 2.0, `LinearExpressionTest.test_number_as_flat_linear_expression expected offset 2, got ${expression.offset}`);
@@ -3578,7 +3423,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearExpressionTest.test_evaluate',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_linear_expression_evaluate');
       const x = model.addVariable();
       const y = model.addVariable();
@@ -3592,7 +3436,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticExpressionTest.test_terms_read_only',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_terms_read_only');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -3617,7 +3460,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticExpressionTest.test_no_copy_of_quadratic_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_no_copy_quadratic_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
@@ -3630,7 +3472,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticExpressionTest.test_number_as_flat_quadratic_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const expression = newQuadraticExpression(api, 2.0);
       assert(expression.linearTerms.size === 0, `QuadraticExpressionTest.test_number_as_flat_quadratic_expression expected no linear terms, got ${expression.linearTerms.size}`);
       assert(expression.quadraticTerms.size === 0, `QuadraticExpressionTest.test_number_as_flat_quadratic_expression expected no quadratic terms, got ${expression.quadraticTerms.size}`);
@@ -3642,7 +3483,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticExpressionTest.test_evaluate',
     source: LINEAR_SOURCE,
     async run(api) {
-      await api.initMathOpt();
       const model = api.MathOpt.Model('mathopt_quadratic_expression_evaluate');
       const x = model.addVariable();
       const y = model.addVariable();

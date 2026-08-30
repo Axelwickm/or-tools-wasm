@@ -1,12 +1,10 @@
-import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
-import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, setRunning } from './mathopt_sample_helpers.js';
+import { MathOpt } from 'or-tools-wasm/mathopt';
+import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, selectedMathOptExecutor, setRunning } from './mathopt_sample_helpers.js';
 
 async function runGScipExample() {
   setRunning(true);
   clearStatus();
   try {
-    appendStatus('Initializing MathOpt runtime...');
-    await initMathOpt();
     const threads = configureMathOptRun();
 
     const model = MathOpt.Model('gscip_simple_mip');
@@ -32,6 +30,7 @@ async function runGScipExample() {
 
     appendStatus(`Solving with GSCIP, threads=${threads}...`);
     const result = await MathOpt.solve(model, {
+      executor: selectedMathOptExecutor(),
       solverType: MathOpt.SolverType.GSCIP,
       threads,
     });

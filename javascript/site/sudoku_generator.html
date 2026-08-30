@@ -70,9 +70,7 @@
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
-
-await initMathOpt();
+				<pre class="code-block"><code data-highlight="ts">import { MathOpt } from 'or-tools-wasm/mathopt';
 
 function varIndex(row: number, col: number, digit: number) {
   return (row * 9 + col) * 9 + (digit - 1);
@@ -118,10 +116,11 @@ for (let boxRow = 0; boxRow &lt; 3; boxRow++) {
 model.minimize([]);
 const solverType = MathOpt.SolverType.CP_SAT;
 const result = await MathOpt.solve(model, {
+  executor: 'worker',
   solverType,
   threads: 4,
   solutionLimit: 1,
-  cpSat: { numWorkers: 4, stopAfterFirstSolution: true },
+  cpSat: { stopAfterFirstSolution: true },
 });
 console.log(result.terminationReason, result.variableValues);</code></pre>
 			</details>

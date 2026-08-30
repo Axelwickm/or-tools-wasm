@@ -6,7 +6,7 @@
     "test": "tsc --noEmit && node --experimental-strip-types --test cloud_executor.test.ts && node --experimental-strip-types --test basic.test.ts && node --experimental-strip-types cp_sat_execution_semantics.test.ts"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-local.tgz"
+    "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-0.9.1.tgz"
   },
   "devDependencies": {
     "@types/node": "^20.14.15",

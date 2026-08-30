@@ -1,19 +1,34 @@
 import { create, toBinary } from '@bufbuild/protobuf';
 import { CloudExecutor } from '../cloud_executor.js';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
-import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
-  PdlpBridgeRequestSchema,
-  PdlpOperation,
+  resolveExecutorConfiguration,
+  type ExecutorSelection,
+  type ResolvedExecutorConfiguration,
+} from '../executor_configuration.js';
+import {
+  PdlpInitialSolutionSchema,
   PdlpQuadraticProgramSchema,
   PdlpSolveParametersSchema,
-  type PdlpBridgeResponse,
   type PdlpQuadraticProgram,
+  type PdlpSolveParameters as BridgePdlpSolveParameters,
+  type PdlpSolverResult as BridgePdlpSolverResult,
 } from '../generated/bridge/pdlp_pb.js';
-import type { SolverJobEvent } from '../solver_executor.js';
-import { PdlpExecutor, type PdlpExecutorLike } from './executor.js';
-import { PdlpServerExecutor } from './server_executor.js';
-import { PdlpWorkerExecutor } from './worker_executor.js';
+import type {
+  SolverJobEvent,
+  SolverResourceRequest,
+} from '../solver_executor.js';
+import { SolverServerExecutor } from '../solver_server_executor.js';
+import {
+  SolverWorkerExecutor,
+  type SolverWorkerLike,
+} from '../worker_helpers.js';
+import { DirectPdlpExecutor } from './direct_executor.js';
+import {
+  pdlpProtocol,
+  type PdlpExecutor,
+  type PdlpOperation,
+  type PdlpResult,
+} from './protocol.js';
 
 export type SparseMatrixEntry = {
   row: number;
@@ -30,36 +45,22 @@ export type SparseMatrixInput = {
 
 export type QuadraticProgramInput = {
   problemName?: string;
-  problem_name?: string;
   objectiveOffset?: number;
-  objective_offset?: number;
   objectiveScalingFactor?: number;
-  objective_scaling_factor?: number;
   objectiveVector?: number[];
-  objective_vector?: number[];
   objectiveMatrixDiagonal?: number[] | null;
-  objective_matrix_diagonal?: number[] | null;
   constraintMatrix?: SparseMatrixInput | number[][];
-  constraint_matrix?: SparseMatrixInput | number[][];
   constraintLowerBounds?: number[];
-  constraint_lower_bounds?: number[];
   constraintUpperBounds?: number[];
-  constraint_upper_bounds?: number[];
   variableLowerBounds?: number[];
-  variable_lower_bounds?: number[];
   variableUpperBounds?: number[];
-  variable_upper_bounds?: number[];
   variableNames?: string[];
-  variable_names?: string[];
   constraintNames?: string[];
-  constraint_names?: string[];
 };
 
 export type PrimalAndDualSolutionInput = {
   primalSolution?: number[];
-  primal_solution?: number[];
   dualSolution?: number[];
-  dual_solution?: number[];
 };
 
 export type PdlpSolveParams = {
@@ -70,64 +71,66 @@ export type PdlpSolveParams = {
       epsOptimalAbsolute?: number;
     };
   };
-  termination_criteria?: {
-    iteration_limit?: number;
-    simple_optimality_criteria?: {
-      eps_optimal_relative?: number;
-      eps_optimal_absolute?: number;
-    };
-  };
   terminationCheckFrequency?: number;
-  termination_check_frequency?: number;
   lInfRuizIterations?: number;
-  l_inf_ruiz_iterations?: number;
   l2NormRescaling?: boolean;
-  l2_norm_rescaling?: boolean;
+  numThreads?: number;
 };
 
 export type PdlpSolveLog = {
   terminationReason: string;
-  termination_reason: string;
   iterationCount: number;
-  iteration_count: number;
 };
 
 export type PdlpSolverResult = {
   primalSolution: number[];
-  primal_solution: number[];
   dualSolution: number[];
-  dual_solution: number[];
   reducedCosts: number[];
-  reduced_costs: number[];
   solveLog: PdlpSolveLog;
-  solve_log: PdlpSolveLog;
 };
 
 export type PdlpEvent = SolverJobEvent;
+export type PdlpEventHandler = (event: PdlpEvent) => void | Promise<void>;
 export type PdlpExecutionOptions = {
-  onEvent?: (event: PdlpEvent) => void | Promise<void>;
+  executor?: ExecutorSelection;
+  onEvent?: PdlpEventHandler;
   signal?: AbortSignal;
 };
 
-const directExecutor = new PdlpExecutor();
-const workerExecutor = new PdlpWorkerExecutor();
-let executor: PdlpExecutorLike = createExecutor({ type: 'auto' });
+export type PdlpFromMpModelOptions = PdlpExecutionOptions & {
+  relaxIntegerVariables?: boolean;
+  includeNames?: boolean;
+};
 
-function createExecutor(configuration: ExecutorConfiguration): PdlpExecutorLike {
-  return createResolvedExecutor(resolveExecutorConfiguration(configuration));
+export type PdlpSolveOptions = PdlpSolveParams & PdlpExecutionOptions & {
+  initialSolution?: PrimalAndDualSolutionInput | PrimalAndDualSolution;
+};
+
+async function createPdlpWorker(): Promise<SolverWorkerLike> {
+  return new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module', name: 'ortools-executor-pdlp' },
+  );
 }
 
-function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): PdlpExecutorLike {
+const directPdlpExecutor = new DirectPdlpExecutor();
+const workerPdlpExecutor = new SolverWorkerExecutor(pdlpProtocol, createPdlpWorker);
+
+function createPdlpExecutor(selection: ExecutorSelection = 'auto'): PdlpExecutor {
+  return createResolvedPdlpExecutor(resolveExecutorConfiguration(selection));
+}
+
+function createResolvedPdlpExecutor(configuration: ResolvedExecutorConfiguration): PdlpExecutor {
   switch (configuration.type) {
-    case 'direct': return directExecutor;
-    case 'worker': return workerExecutor;
-    case 'server': return new PdlpServerExecutor(configuration);
-    case 'cloud': return new CloudExecutor('pdlp', { test: configuration.test });
+    case 'direct':
+      return directPdlpExecutor;
+    case 'worker':
+      return workerPdlpExecutor;
+    case 'server':
+      return new SolverServerExecutor(pdlpProtocol, configuration);
+    case 'cloud':
+      return new CloudExecutor('pdlp', { test: configuration.test });
   }
-}
-
-export function setPdlpExecutor(configuration: ExecutorConfiguration): void {
-  executor = createExecutor(configuration);
 }
 
 const terminationReasonNames: Record<number, string> = {
@@ -147,10 +150,6 @@ const terminationReasonNames: Record<number, string> = {
   13: 'TERMINATION_REASON_INVALID_INITIAL_SOLUTION',
 };
 
-export async function initPdlp(): Promise<void> {
-  await executor.load();
-}
-
 function denseToEntries(dense: number[][]): SparseMatrixEntry[] {
   const entries: SparseMatrixEntry[] = [];
   dense.forEach((row, rowIndex) => {
@@ -161,50 +160,104 @@ function denseToEntries(dense: number[][]): SparseMatrixEntry[] {
   return entries;
 }
 
-function normalizeSparseMatrix(input: SparseMatrixInput | number[][] | undefined, numRows: number, numColumns: number): SparseMatrixEntry[] {
+function normalizeSparseMatrix(
+  input: SparseMatrixInput | number[][] | undefined,
+): SparseMatrixEntry[] {
   if (!input) return [];
   if (Array.isArray(input)) return denseToEntries(input);
   if (input.dense) return denseToEntries(input.dense);
-  return [...(input.entries ?? [])].filter((entry) => entry.value !== 0 && entry.row < numRows && entry.column < numColumns);
+  return [...(input.entries ?? [])]
+    .filter((entry) => entry.value !== 0)
+    .map((entry) => ({
+      row: int32('constraint matrix row', entry.row),
+      column: int32('constraint matrix column', entry.column),
+      value: entry.value,
+    }));
 }
 
-function normalizeQuadraticProgram(input: QuadraticProgramInput = {}): Required<Omit<QuadraticProgramInput, 'constraintMatrix' | 'constraint_matrix' | 'objectiveMatrixDiagonal' | 'objective_matrix_diagonal'>> & {
+function sparseMatrixDimensions(
+  input: SparseMatrixInput | number[][] | undefined,
+) {
+  if (Array.isArray(input)) {
+    return {
+      numRows: input.length,
+      numColumns: input.reduce((maximum, row) => Math.max(maximum, row.length), 0),
+    };
+  }
+  if (!input) return { numRows: 0, numColumns: 0 };
+  if (input.dense) {
+    return {
+      numRows: input.dense.length,
+      numColumns: input.dense.reduce(
+        (maximum, row) => Math.max(maximum, row.length),
+        0,
+      ),
+    };
+  }
+  return {
+    numRows: matrixDimension('constraint matrix numRows', input.numRows),
+    numColumns: matrixDimension('constraint matrix numColumns', input.numColumns),
+  };
+}
+
+function matrixDimension(name: string, value: number | undefined) {
+  if (value === undefined) return 0;
+  const result = int32(name, value);
+  if (result < 0) throw new Error(`Pdlp: ${name} must be non-negative.`);
+  return result;
+}
+
+type NormalizedQuadraticProgram = {
+  problemName: string;
+  objectiveOffset: number;
+  objectiveScalingFactor: number;
+  objectiveVector: number[];
   objectiveMatrixDiagonal: number[] | null;
+  constraintLowerBounds: number[];
+  constraintUpperBounds: number[];
+  variableLowerBounds: number[];
+  variableUpperBounds: number[];
+  variableNames: string[];
+  constraintNames: string[];
   constraintMatrixEntries: SparseMatrixEntry[];
   numVariables: number;
   numConstraints: number;
-} {
-  const objectiveVector = input.objective_vector ?? input.objectiveVector ?? [];
-  const constraintLowerBounds = input.constraint_lower_bounds ?? input.constraintLowerBounds ?? [];
-  const constraintUpperBounds = input.constraint_upper_bounds ?? input.constraintUpperBounds ?? [];
-  const variableLowerBounds = input.variable_lower_bounds ?? input.variableLowerBounds ?? Array(objectiveVector.length).fill(-Infinity);
-  const variableUpperBounds = input.variable_upper_bounds ?? input.variableUpperBounds ?? Array(objectiveVector.length).fill(Infinity);
-  const numVariables = Math.max(objectiveVector.length, variableLowerBounds.length, variableUpperBounds.length);
-  const numConstraints = Math.max(constraintLowerBounds.length, constraintUpperBounds.length);
-  const constraintMatrix = input.constraint_matrix ?? input.constraintMatrix;
+};
+
+function normalizeQuadraticProgram(
+  input: QuadraticProgramInput = {},
+): NormalizedQuadraticProgram {
+  const objectiveVector = input.objectiveVector ?? [];
+  const constraintLowerBounds = input.constraintLowerBounds ?? [];
+  const constraintUpperBounds = input.constraintUpperBounds ?? [];
+  const variableLowerBounds = input.variableLowerBounds ?? Array(objectiveVector.length).fill(-Infinity);
+  const variableUpperBounds = input.variableUpperBounds ?? Array(objectiveVector.length).fill(Infinity);
+  const constraintMatrix = input.constraintMatrix;
+  const matrixDimensions = sparseMatrixDimensions(constraintMatrix);
+  const numVariables = Math.max(
+    objectiveVector.length,
+    variableLowerBounds.length,
+    variableUpperBounds.length,
+    matrixDimensions.numColumns,
+  );
+  const numConstraints = Math.max(
+    constraintLowerBounds.length,
+    constraintUpperBounds.length,
+    matrixDimensions.numRows,
+  );
   return {
-    problemName: input.problem_name ?? input.problemName ?? '',
-    problem_name: input.problem_name ?? input.problemName ?? '',
-    objectiveOffset: input.objective_offset ?? input.objectiveOffset ?? 0,
-    objective_offset: input.objective_offset ?? input.objectiveOffset ?? 0,
-    objectiveScalingFactor: input.objective_scaling_factor ?? input.objectiveScalingFactor ?? 1,
-    objective_scaling_factor: input.objective_scaling_factor ?? input.objectiveScalingFactor ?? 1,
+    problemName: input.problemName ?? '',
+    objectiveOffset: input.objectiveOffset ?? 0,
+    objectiveScalingFactor: input.objectiveScalingFactor ?? 1,
     objectiveVector: pad(objectiveVector, numVariables, 0),
-    objective_vector: pad(objectiveVector, numVariables, 0),
     constraintLowerBounds: pad(constraintLowerBounds, numConstraints, -Infinity),
-    constraint_lower_bounds: pad(constraintLowerBounds, numConstraints, -Infinity),
     constraintUpperBounds: pad(constraintUpperBounds, numConstraints, Infinity),
-    constraint_upper_bounds: pad(constraintUpperBounds, numConstraints, Infinity),
     variableLowerBounds: pad(variableLowerBounds, numVariables, -Infinity),
-    variable_lower_bounds: pad(variableLowerBounds, numVariables, -Infinity),
     variableUpperBounds: pad(variableUpperBounds, numVariables, Infinity),
-    variable_upper_bounds: pad(variableUpperBounds, numVariables, Infinity),
-    variableNames: input.variable_names ?? input.variableNames ?? [],
-    variable_names: input.variable_names ?? input.variableNames ?? [],
-    constraintNames: input.constraint_names ?? input.constraintNames ?? [],
-    constraint_names: input.constraint_names ?? input.constraintNames ?? [],
-    objectiveMatrixDiagonal: input.objective_matrix_diagonal ?? input.objectiveMatrixDiagonal ?? null,
-    constraintMatrixEntries: normalizeSparseMatrix(constraintMatrix, numConstraints, numVariables),
+    variableNames: input.variableNames ?? [],
+    constraintNames: input.constraintNames ?? [],
+    objectiveMatrixDiagonal: input.objectiveMatrixDiagonal ?? null,
+    constraintMatrixEntries: normalizeSparseMatrix(constraintMatrix),
     numVariables,
     numConstraints,
   };
@@ -253,101 +306,137 @@ function fromBridgeQuadraticProgram(qp: PdlpQuadraticProgram): QuadraticProgram 
 }
 
 function toBridgeParameters(params: PdlpSolveParams = {}) {
-  const terminationCriteria = (params.terminationCriteria ?? params.termination_criteria) as {
-    iterationLimit?: number;
-    iteration_limit?: number;
-    simpleOptimalityCriteria?: {
-      epsOptimalRelative?: number;
-      epsOptimalAbsolute?: number;
-    };
-    simple_optimality_criteria?: {
-      eps_optimal_relative?: number;
-      eps_optimal_absolute?: number;
-    };
-  } | undefined;
-  const simple = (terminationCriteria?.simpleOptimalityCriteria ?? terminationCriteria?.simple_optimality_criteria) as {
-    epsOptimalRelative?: number;
-    eps_optimal_relative?: number;
-    epsOptimalAbsolute?: number;
-    eps_optimal_absolute?: number;
-  } | undefined;
+  const terminationCriteria = params.terminationCriteria;
+  const simple = terminationCriteria?.simpleOptimalityCriteria;
   return create(PdlpSolveParametersSchema, {
-    iterationLimit: terminationCriteria?.iterationLimit ?? terminationCriteria?.iteration_limit,
-    terminationCheckFrequency: params.terminationCheckFrequency ?? params.termination_check_frequency,
-    epsOptimalRelative: simple?.epsOptimalRelative ?? simple?.eps_optimal_relative,
-    epsOptimalAbsolute: simple?.epsOptimalAbsolute ?? simple?.eps_optimal_absolute,
-    lInfRuizIterations: params.lInfRuizIterations ?? params.l_inf_ruiz_iterations,
-    l2NormRescaling: params.l2NormRescaling ?? params.l2_norm_rescaling,
+    iterationLimit: int32Parameter(
+      'terminationCriteria.iterationLimit',
+      terminationCriteria?.iterationLimit,
+    ),
+    terminationCheckFrequency: int32Parameter(
+      'terminationCheckFrequency',
+      params.terminationCheckFrequency,
+    ),
+    epsOptimalRelative: simple?.epsOptimalRelative,
+    epsOptimalAbsolute: simple?.epsOptimalAbsolute,
+    lInfRuizIterations: int32Parameter(
+      'lInfRuizIterations',
+      params.lInfRuizIterations,
+    ),
+    l2NormRescaling: params.l2NormRescaling,
+    numThreads: positiveInt32Parameter(
+      'numThreads',
+      params.numThreads,
+    ),
   });
 }
 
-function solverResult(response: PdlpBridgeResponse): PdlpSolverResult {
-  if (!response.solverResult) throw new Error('PDLP solve returned no result.');
-  const { primalSolution, dualSolution, reducedCosts, terminationReason: terminationReasonNumber, iterationCount } = response.solverResult;
-  const solveLog = {
-    terminationReason: terminationReasonNames[terminationReasonNumber] ?? `TERMINATION_REASON_${terminationReasonNumber}`,
-    termination_reason: terminationReasonNames[terminationReasonNumber] ?? `TERMINATION_REASON_${terminationReasonNumber}`,
+function int32Parameter(name: string, value: number | undefined) {
+  if (value === undefined) return undefined;
+  return int32(`solve parameter ${name}`, value);
+}
+
+function positiveInt32Parameter(name: string, value: number | undefined) {
+  const result = int32Parameter(name, value);
+  if (result !== undefined && result <= 0) {
+    throw new Error(`Pdlp: solve parameter ${name} must be positive.`);
+  }
+  return result;
+}
+
+function int32(name: string, value: number) {
+  if (!Number.isInteger(value) || value < -0x80000000 || value > 0x7fffffff) {
+    throw new Error(`Pdlp: ${name} must be a 32-bit integer.`);
+  }
+  return value;
+}
+
+function solverResult(response: BridgePdlpSolverResult): PdlpSolverResult {
+  const {
+    primalSolution,
+    dualSolution,
+    reducedCosts,
+    terminationReason: terminationReasonNumber,
     iterationCount,
-    iteration_count: iterationCount,
+  } = response;
+  const terminationReason = terminationReasonNames[terminationReasonNumber]
+    ?? `TERMINATION_REASON_${terminationReasonNumber}`;
+  const solveLog = {
+    terminationReason,
+    iterationCount,
   };
   return {
     primalSolution,
-    primal_solution: primalSolution,
     dualSolution,
-    dual_solution: dualSolution,
     reducedCosts,
-    reduced_costs: reducedCosts,
     solveLog,
-    solve_log: solveLog,
   };
 }
 
-async function execute(request: Parameters<PdlpExecutorLike['execute']>[0], options: PdlpExecutionOptions = {}) {
-  if (options.signal?.aborted) throw abortError(options.signal);
-  const job = executor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
-  const onAbort = () => { void job.cancel().catch(() => {}); };
+async function execute(
+  request: PdlpOperation,
+  options: PdlpExecutionOptions = {},
+  resources?: SolverResourceRequest,
+): Promise<PdlpResult> {
+  throwIfAborted(options.signal);
+  const executor = createPdlpExecutor(options.executor);
+  const job = executor.execute(request, {
+    onEvent: options.onEvent ?? (() => {}),
+    resources,
+  });
+  let cancellationError: Error | undefined;
+  const onAbort = () => {
+    if (!options.signal) return;
+    cancellationError = createAbortError(options.signal);
+    void job.cancel().catch(() => {});
+  };
   options.signal?.addEventListener('abort', onAbort, { once: true });
+  if (options.signal?.aborted) onAbort();
   try {
     const response = await job.result;
-    if (options.signal?.aborted) throw abortError(options.signal);
+    if (cancellationError) throw cancellationError;
     return response;
   } finally {
     options.signal?.removeEventListener('abort', onAbort);
   }
 }
 
-function abortError(signal: AbortSignal) {
+function schedulerResourcesFromParameters(
+  parameters: BridgePdlpSolveParameters,
+): SolverResourceRequest | undefined {
+  return parameters.numThreads !== undefined && parameters.numThreads > 0
+    ? { threads: parameters.numThreads }
+    : undefined;
+}
+
+function createAbortError(signal: AbortSignal) {
   if (signal.reason instanceof Error) return signal.reason;
-  const error = new Error(signal.reason === undefined ? 'The PDLP operation was aborted.' : String(signal.reason));
+  const error = new Error(
+    signal.reason === undefined
+      ? 'The PDLP operation was aborted.'
+      : String(signal.reason),
+  );
   error.name = 'AbortError';
   return error;
 }
 
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw createAbortError(signal);
+}
+
 export class QuadraticProgram {
   problemName = '';
-  problem_name = '';
   objectiveOffset = 0;
-  objective_offset = 0;
   objectiveScalingFactor = 1;
-  objective_scaling_factor = 1;
   objectiveVector: number[] = [];
-  objective_vector: number[] = [];
   objectiveMatrixDiagonal: number[] | null = null;
-  objective_matrix_diagonal: number[] | null = null;
-  constraintMatrix: SparseMatrixInput = { entries: [] };
-  constraint_matrix: SparseMatrixInput = this.constraintMatrix;
+  constraintMatrix: SparseMatrixInput | number[][] = { entries: [] };
   constraintLowerBounds: number[] = [];
-  constraint_lower_bounds: number[] = [];
   constraintUpperBounds: number[] = [];
-  constraint_upper_bounds: number[] = [];
   variableLowerBounds: number[] = [];
-  variable_lower_bounds: number[] = [];
   variableUpperBounds: number[] = [];
-  variable_upper_bounds: number[] = [];
   variableNames: string[] = [];
-  variable_names: string[] = [];
   constraintNames: string[] = [];
-  constraint_names: string[] = [];
 
   constructor(input: QuadraticProgramInput = {}) {
     this.assign(input);
@@ -355,39 +444,19 @@ export class QuadraticProgram {
 
   resizeAndInitialize(numVariables: number, numConstraints: number): void {
     this.objectiveVector = Array(numVariables).fill(0);
-    this.objective_vector = this.objectiveVector;
     this.constraintLowerBounds = Array(numConstraints).fill(-Infinity);
-    this.constraint_lower_bounds = this.constraintLowerBounds;
     this.constraintUpperBounds = Array(numConstraints).fill(Infinity);
-    this.constraint_upper_bounds = this.constraintUpperBounds;
     this.variableLowerBounds = Array(numVariables).fill(-Infinity);
-    this.variable_lower_bounds = this.variableLowerBounds;
     this.variableUpperBounds = Array(numVariables).fill(Infinity);
-    this.variable_upper_bounds = this.variableUpperBounds;
     this.constraintMatrix = { numRows: numConstraints, numColumns: numVariables, entries: [] };
-    this.constraint_matrix = this.constraintMatrix;
-  }
-
-  resize_and_initialize(numVariables: number, numConstraints: number): void {
-    this.resizeAndInitialize(numVariables, numConstraints);
   }
 
   setObjectiveMatrixDiagonal(values: number[]): void {
     this.objectiveMatrixDiagonal = [...values];
-    this.objective_matrix_diagonal = this.objectiveMatrixDiagonal;
-  }
-
-  set_objective_matrix_diagonal(values: number[]): void {
-    this.setObjectiveMatrixDiagonal(values);
   }
 
   clearObjectiveMatrix(): void {
     this.objectiveMatrixDiagonal = null;
-    this.objective_matrix_diagonal = null;
-  }
-
-  clear_objective_matrix(): void {
-    this.clearObjectiveMatrix();
   }
 
   toBytes(): Uint8Array {
@@ -397,132 +466,133 @@ export class QuadraticProgram {
   private assign(input: QuadraticProgramInput): void {
     const qp = normalizeQuadraticProgram(input);
     this.problemName = qp.problemName;
-    this.problem_name = qp.problemName;
     this.objectiveOffset = qp.objectiveOffset;
-    this.objective_offset = qp.objectiveOffset;
     this.objectiveScalingFactor = qp.objectiveScalingFactor;
-    this.objective_scaling_factor = qp.objectiveScalingFactor;
     this.objectiveVector = [...qp.objectiveVector];
-    this.objective_vector = this.objectiveVector;
     this.objectiveMatrixDiagonal = qp.objectiveMatrixDiagonal ? [...qp.objectiveMatrixDiagonal] : null;
-    this.objective_matrix_diagonal = this.objectiveMatrixDiagonal;
     this.constraintLowerBounds = [...qp.constraintLowerBounds];
-    this.constraint_lower_bounds = this.constraintLowerBounds;
     this.constraintUpperBounds = [...qp.constraintUpperBounds];
-    this.constraint_upper_bounds = this.constraintUpperBounds;
     this.variableLowerBounds = [...qp.variableLowerBounds];
-    this.variable_lower_bounds = this.variableLowerBounds;
     this.variableUpperBounds = [...qp.variableUpperBounds];
-    this.variable_upper_bounds = this.variableUpperBounds;
     this.variableNames = [...qp.variableNames];
-    this.variable_names = this.variableNames;
     this.constraintNames = [...qp.constraintNames];
-    this.constraint_names = this.constraintNames;
     this.constraintMatrix = {
       numRows: qp.numConstraints,
       numColumns: qp.numVariables,
       entries: [...qp.constraintMatrixEntries],
     };
-    this.constraint_matrix = this.constraintMatrix;
   }
 }
 
 export class PrimalAndDualSolution {
   primalSolution: number[] = [];
-  primal_solution: number[] = [];
   dualSolution: number[] = [];
-  dual_solution: number[] = [];
 
   constructor(input: PrimalAndDualSolutionInput = {}) {
-    this.primalSolution = [...(input.primalSolution ?? input.primal_solution ?? [])];
-    this.primal_solution = this.primalSolution;
-    this.dualSolution = [...(input.dualSolution ?? input.dual_solution ?? [])];
-    this.dual_solution = this.dualSolution;
+    this.primalSolution = [...(input.primalSolution ?? [])];
+    this.dualSolution = [...(input.dualSolution ?? [])];
   }
+}
+
+async function validateQuadraticProgramDimensions(
+  qp: QuadraticProgramInput | QuadraticProgram,
+  options: PdlpExecutionOptions = {},
+): Promise<void> {
+  const response = await execute({
+    type: 'validate',
+    quadraticProgram: toBridgeQuadraticProgram(qp),
+  }, options);
+  if (response.type !== 'validate') {
+    throw new Error('PDLP executor returned the wrong validation result.');
+  }
+  if (response.message) throw new Error(response.message);
+}
+
+async function isLinearProgram(
+  qp: QuadraticProgramInput | QuadraticProgram,
+  options: PdlpExecutionOptions = {},
+): Promise<boolean> {
+  const response = await execute({
+    type: 'isLinear',
+    quadraticProgram: toBridgeQuadraticProgram(qp),
+  }, options);
+  if (response.type !== 'isLinear') {
+    throw new Error('PDLP executor returned the wrong linearity result.');
+  }
+  return response.value;
+}
+
+async function qpFromMpModelProto(
+  proto: Uint8Array,
+  options: PdlpFromMpModelOptions = {},
+): Promise<QuadraticProgram> {
+  const response = await execute({
+    type: 'fromMpModel',
+    model: proto,
+    relaxIntegerVariables: options.relaxIntegerVariables ?? false,
+    includeNames: options.includeNames ?? false,
+  }, options);
+  if (response.type !== 'fromMpModel') {
+    throw new Error('PDLP executor returned the wrong conversion result.');
+  }
+  return fromBridgeQuadraticProgram(response.quadraticProgram);
+}
+
+async function qpToMpModelProto(
+  qp: QuadraticProgramInput | QuadraticProgram,
+  options: PdlpExecutionOptions = {},
+): Promise<Uint8Array> {
+  const response = await execute({
+    type: 'toMpModel',
+    quadraticProgram: toBridgeQuadraticProgram(qp),
+  }, options);
+  if (response.type !== 'toMpModel') {
+    throw new Error('PDLP executor returned the wrong conversion result.');
+  }
+  return response.model;
+}
+
+async function solve(
+  qp: QuadraticProgramInput | QuadraticProgram,
+  options: PdlpSolveOptions = {},
+): Promise<PdlpSolverResult> {
+  const {
+    executor,
+    initialSolution,
+    onEvent,
+    signal,
+    ...parameters
+  } = options;
+  const solverParameters = toBridgeParameters(parameters);
+  const response = await execute({
+    type: 'solve',
+    quadraticProgram: toBridgeQuadraticProgram(qp),
+    parameters: solverParameters,
+    initialSolution: initialSolution ? create(PdlpInitialSolutionSchema, {
+      primalSolution: initialSolution.primalSolution ?? [],
+      dualSolution: initialSolution.dualSolution ?? [],
+    }) : undefined,
+  }, {
+    executor,
+    onEvent,
+    signal,
+  }, schedulerResourcesFromParameters(solverParameters));
+  if (response.type !== 'solve') {
+    throw new Error('PDLP executor returned the wrong solve result.');
+  }
+  return solverResult(response.result);
 }
 
 export const Pdlp = {
   QuadraticProgram,
   PrimalAndDualSolution,
-
-  setExecutor(configuration: ExecutorConfiguration): void {
-    setPdlpExecutor(configuration);
-  },
-
-  async validateQuadraticProgramDimensions(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<void> {
-    const response = await execute(create(PdlpBridgeRequestSchema, {
-      operation: PdlpOperation.VALIDATE,
-      quadraticProgram: toBridgeQuadraticProgram(qp),
-    }), options);
-    if (response.validationError) throw new Error(response.validationError);
-  },
-
-  async validate_quadratic_program_dimensions(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<void> {
-    return this.validateQuadraticProgramDimensions(qp, options);
-  },
-
-  async isLinearProgram(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<boolean> {
-    return (await execute(create(PdlpBridgeRequestSchema, {
-      operation: PdlpOperation.IS_LINEAR,
-      quadraticProgram: toBridgeQuadraticProgram(qp),
-    }), options)).isLinear;
-  },
-
-  async is_linear_program(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<boolean> {
-    return this.isLinearProgram(qp, options);
-  },
-
-  async qpFromMpModelProto(proto: Uint8Array, conversion: { relaxIntegerVariables?: boolean; includeNames?: boolean } = {}, options: PdlpExecutionOptions = {}): Promise<QuadraticProgram> {
-    const response = await execute(create(PdlpBridgeRequestSchema, {
-      operation: PdlpOperation.FROM_MP_MODEL,
-      mpModelProto: proto,
-      relaxIntegerVariables: conversion.relaxIntegerVariables ?? false,
-      includeNames: conversion.includeNames ?? false,
-    }), options);
-    if (!response.quadraticProgram) throw new Error('PDLP could not convert MPModelProto to QuadraticProgram.');
-    return fromBridgeQuadraticProgram(response.quadraticProgram);
-  },
-
-  async qp_from_mpmodel_proto(proto: Uint8Array, relaxIntegerVariables = false, includeNames = false): Promise<QuadraticProgram> {
-    return this.qpFromMpModelProto(proto, { relaxIntegerVariables, includeNames });
-  },
-
-  async qpToMpModelProto(qp: QuadraticProgramInput | QuadraticProgram, options: PdlpExecutionOptions = {}): Promise<Uint8Array> {
-    const response = await execute(create(PdlpBridgeRequestSchema, {
-      operation: PdlpOperation.TO_MP_MODEL,
-      quadraticProgram: toBridgeQuadraticProgram(qp),
-    }), options);
-    if (!response.mpModelProto.length) throw new Error('PDLP could not convert QuadraticProgram to MPModelProto.');
-    return response.mpModelProto;
-  },
-
-  async qp_to_mpmodel_proto(qp: QuadraticProgramInput | QuadraticProgram): Promise<Uint8Array> {
-    return this.qpToMpModelProto(qp);
-  },
-
-  async primalDualHybridGradient(
-    qp: QuadraticProgramInput | QuadraticProgram,
-    params: PdlpSolveParams = {},
-    initialSolution?: PrimalAndDualSolutionInput | PrimalAndDualSolution,
-    options: PdlpExecutionOptions = {},
-  ): Promise<PdlpSolverResult> {
-    return solverResult(await execute(create(PdlpBridgeRequestSchema, {
-      operation: PdlpOperation.SOLVE,
-      quadraticProgram: toBridgeQuadraticProgram(qp),
-      parameters: toBridgeParameters(params),
-      initialSolution: initialSolution ? {
-        primalSolution: initialSolution.primal_solution ?? initialSolution.primalSolution ?? [],
-        dualSolution: initialSolution.dual_solution ?? initialSolution.dualSolution ?? [],
-      } : undefined,
-    }), options));
-  },
-
-  async primal_dual_hybrid_gradient(
-    qp: QuadraticProgramInput | QuadraticProgram,
-    params: PdlpSolveParams = {},
-    initialSolution?: PrimalAndDualSolutionInput | PrimalAndDualSolution,
-    options: PdlpExecutionOptions = {},
-  ): Promise<PdlpSolverResult> {
-    return this.primalDualHybridGradient(qp, params, initialSolution, options);
-  },
+  validateQuadraticProgramDimensions,
+  isLinearProgram,
+  qpFromMpModelProto,
+  qpToMpModelProto,
+  solve,
 };
+
+export type PdlpApi = typeof Pdlp;
+
+export default Pdlp;

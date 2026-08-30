@@ -17,10 +17,7 @@ void Expect(bool condition, const std::string& message) {
   if (!condition) throw std::runtime_error(message);
 }
 
-bridge::PdlpBridgeRequest TinyLp(bridge::PdlpOperation operation) {
-  bridge::PdlpBridgeRequest request;
-  request.set_operation(operation);
-  auto* qp = request.mutable_quadratic_program();
+void PopulateTinyLp(bridge::PdlpQuadraticProgram* qp) {
   qp->set_num_variables(1);
   qp->set_num_constraints(1);
   qp->set_objective_scaling_factor(1);
@@ -33,6 +30,17 @@ bridge::PdlpBridgeRequest TinyLp(bridge::PdlpOperation operation) {
   entry->set_row(0);
   entry->set_column(0);
   entry->set_value(1);
+}
+
+bridge::PdlpBridgeRequest TinyLpIsLinearRequest() {
+  bridge::PdlpBridgeRequest request;
+  PopulateTinyLp(request.mutable_is_linear()->mutable_quadratic_program());
+  return request;
+}
+
+bridge::PdlpBridgeRequest TinyLpSolveRequest() {
+  bridge::PdlpBridgeRequest request;
+  PopulateTinyLp(request.mutable_solve()->mutable_quadratic_program());
   return request;
 }
 
@@ -59,39 +67,46 @@ bridge::PdlpBridgeResponse Response(const SolverExecutorResult& execution) {
 }
 
 void DetectsLinearProgram() {
-  Expect(Response(Execute(TinyLp(bridge::PDLP_OPERATION_IS_LINEAR))).is_linear(),
+  Expect(Response(Execute(TinyLpIsLinearRequest())).is_linear_result().value(),
          "Tiny LP is linear");
 }
 
 void SolvesLinearProgram() {
-  auto request = TinyLp(bridge::PDLP_OPERATION_SOLVE);
-  request.mutable_parameters()->set_iteration_limit(1000);
+  auto request = TinyLpSolveRequest();
+  request.mutable_solve()->mutable_parameters()->set_iteration_limit(1000);
   const auto response = Response(Execute(request));
-  Expect(response.has_solver_result(), "PDLP solve returns a result");
-  Expect(response.solver_result().primal_solution_size() == 1,
+  Expect(response.has_solve_result(), "PDLP solve returns a result");
+  Expect(response.solve_result().solver_result().primal_solution_size() == 1,
          "PDLP solve returns one primal value");
 }
 
-void ReservesOneThread() {
+void ReservesSolverThreads() {
   PdlpExecutor executor;
-  const auto request = TinyLp(bridge::PDLP_OPERATION_SOLVE);
+  auto request = TinyLpSolveRequest();
   const SolverExecutorRequest encoded{1, "pdlp", request.SerializeAsString()};
   Expect(executor.RequestedThreads(encoded, 1, 8) == 1,
          "PDLP reserves one thread");
-  bool rejected = false;
+
+  request.mutable_solve()->mutable_parameters()->set_num_threads(2);
+  const SolverExecutorRequest parallel{1, "pdlp", request.SerializeAsString()};
+  Expect(executor.RequestedThreads(parallel, 2, 8) == 2,
+         "PDLP reserves its requested solver threads");
+
+  bool mismatch_rejected = false;
   try {
-    executor.RequestedThreads(encoded, 2, 8);
+    executor.RequestedThreads(parallel, 3, 8);
   } catch (const std::invalid_argument&) {
-    rejected = true;
+    mismatch_rejected = true;
   }
-  Expect(rejected, "PDLP rejects unsupported multi-thread reservations");
+  Expect(mismatch_rejected,
+         "PDLP rejects scheduler reservations that disagree with num_threads");
 }
 
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
       {"DetectsLinearProgram", DetectsLinearProgram},
       {"SolvesLinearProgram", SolvesLinearProgram},
-      {"ReservesOneThread", ReservesOneThread},
+      {"ReservesSolverThreads", ReservesSolverThreads},
   };
   for (const auto& [name, test] : tests) {
     try {

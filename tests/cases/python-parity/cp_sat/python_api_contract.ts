@@ -14,7 +14,7 @@ const LARGE_NEGATIVE_OBJECTIVE_BOUND = { low: -1717986918, high: -107374183, uns
 const LARGE_POSITIVE_OBJECTIVE_BOUND = { low: 1717986918, high: 107374182, unsigned: false };
 
 const DEFAULT_SOLVE_PARAMS: CpSatSolveParams = {
-  numSearchWorkers: 1,
+  numWorkers: 1,
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -93,11 +93,9 @@ function solveParams(params: CpSatSolveParams, overrides: CpSatSolveParams = {})
 
 function exactEnumerationParams(params: CpSatSolveParams, overrides: CpSatSolveParams = {}) {
   const rest = solveParams(params, overrides);
-  delete rest.numWorkers;
-  delete rest.numSearchWorkers;
   return {
     ...rest,
-    numSearchWorkers: 1,
+    numWorkers: 1,
   };
 }
 

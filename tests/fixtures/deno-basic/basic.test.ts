@@ -24,15 +24,8 @@ import {
 } from 'or-tools-wasm/network-flow';
 import * as SetCoverApi from 'or-tools-wasm/set-cover';
 import * as RcpspApi from 'or-tools-wasm/rcpsp';
-import {
-  initMathOpt,
-  MathOpt,
-} from 'or-tools-wasm/mathopt';
-import {
-  initPdlp,
-  Pdlp,
-  setExecutor as setPdlpExecutor,
-} from 'or-tools-wasm/pdlp';
+import { MathOpt } from 'or-tools-wasm/mathopt';
+import * as PdlpApi from 'or-tools-wasm/pdlp';
 import {
   BOOL_FALSE,
   BOOL_UNSPECIFIED,
@@ -53,6 +46,7 @@ import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runn
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
+import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
@@ -90,6 +84,10 @@ Deno.test('validates CP-SAT execution semantics in Deno', async (t) => {
 
 Deno.test('enforces the CP-SAT worker job lifecycle in Deno', async () => {
   await runCpSatWorkerLifecycleCase(CpSat as never);
+});
+
+Deno.test('enforces CP-SAT local solve concurrency in Deno', async () => {
+  await runCpSatConcurrencyCase(CpSatApi as never);
 });
 
 Deno.test('cloud executor checks service status without sending the model', async () => {
@@ -159,15 +157,10 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   await assertCaseSteps(t, 'deno RCPSP', rcpspResults);
 
   const mathOptResults = await runMathOptCases({
-    initMathOpt,
     MathOpt,
   }, { modes: executorFixtureModes });
   await assertCaseSteps(t, 'deno MathOpt', mathOptResults);
 
-  const pdlpResults = await runPdlpCases({
-    initPdlp,
-    Pdlp,
-    setExecutor: setPdlpExecutor,
-  });
+  const pdlpResults = await runPdlpCases(PdlpApi);
   await assertCaseSteps(t, 'deno PDLP', pdlpResults);
 });

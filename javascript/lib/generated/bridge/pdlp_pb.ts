@@ -2,15 +2,15 @@
 // @generated from file pdlp.proto (package ortools_wasm.bridge.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file pdlp.proto.
  */
 export const file_pdlp: GenFile = /*@__PURE__*/
-  fileDesc("CgpwZGxwLnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIkMKFVBkbHBTcGFyc2VNYXRyaXhFbnRyeRILCgNyb3cYASABKAUSDgoGY29sdW1uGAIgASgFEg0KBXZhbHVlGAMgASgBIoAEChRQZGxwUXVhZHJhdGljUHJvZ3JhbRIVCg1udW1fdmFyaWFibGVzGAEgASgFEhcKD251bV9jb25zdHJhaW50cxgCIAEoBRIUCgxwcm9ibGVtX25hbWUYAyABKAkSGAoQb2JqZWN0aXZlX29mZnNldBgEIAEoARIgChhvYmplY3RpdmVfc2NhbGluZ19mYWN0b3IYBSABKAESGAoQb2JqZWN0aXZlX3ZlY3RvchgGIAMoARIhChlvYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAcgAygBEiUKHWhhc19vYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAggASgIEh8KF2NvbnN0cmFpbnRfbG93ZXJfYm91bmRzGAkgAygBEh8KF2NvbnN0cmFpbnRfdXBwZXJfYm91bmRzGAogAygBEh0KFXZhcmlhYmxlX2xvd2VyX2JvdW5kcxgLIAMoARIdChV2YXJpYWJsZV91cHBlcl9ib3VuZHMYDCADKAESFgoOdmFyaWFibGVfbmFtZXMYDSADKAkSGAoQY29uc3RyYWludF9uYW1lcxgOIAMoCRJQChljb25zdHJhaW50X21hdHJpeF9lbnRyaWVzGA8gAygLMi0ub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU3BhcnNlTWF0cml4RW50cnki/QIKE1BkbHBTb2x2ZVBhcmFtZXRlcnMSHAoPaXRlcmF0aW9uX2xpbWl0GAEgASgFSACIAQESKAobdGVybWluYXRpb25fY2hlY2tfZnJlcXVlbmN5GAIgASgFSAGIAQESIQoUZXBzX29wdGltYWxfcmVsYXRpdmUYAyABKAFIAogBARIhChRlcHNfb3B0aW1hbF9hYnNvbHV0ZRgEIAEoAUgDiAEBEiIKFWxfaW5mX3J1aXpfaXRlcmF0aW9ucxgFIAEoBUgEiAEBEh4KEWwyX25vcm1fcmVzY2FsaW5nGAYgASgISAWIAQFCEgoQX2l0ZXJhdGlvbl9saW1pdEIeChxfdGVybWluYXRpb25fY2hlY2tfZnJlcXVlbmN5QhcKFV9lcHNfb3B0aW1hbF9yZWxhdGl2ZUIXChVfZXBzX29wdGltYWxfYWJzb2x1dGVCGAoWX2xfaW5mX3J1aXpfaXRlcmF0aW9uc0IUChJfbDJfbm9ybV9yZXNjYWxpbmciRQoTUGRscEluaXRpYWxTb2x1dGlvbhIXCg9wcmltYWxfc29sdXRpb24YASADKAESFQoNZHVhbF9zb2x1dGlvbhgCIAMoASLuAgoRUGRscEJyaWRnZVJlcXVlc3QSOAoJb3BlcmF0aW9uGAEgASgOMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwT3BlcmF0aW9uEkcKEXF1YWRyYXRpY19wcm9ncmFtGAIgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbRIWCg5tcF9tb2RlbF9wcm90bxgDIAEoDBIfChdyZWxheF9pbnRlZ2VyX3ZhcmlhYmxlcxgEIAEoCBIVCg1pbmNsdWRlX25hbWVzGAUgASgIEj8KCnBhcmFtZXRlcnMYBiABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBTb2x2ZVBhcmFtZXRlcnMSRQoQaW5pdGlhbF9zb2x1dGlvbhgHIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscEluaXRpYWxTb2x1dGlvbiKOAQoQUGRscFNvbHZlclJlc3VsdBIXCg9wcmltYWxfc29sdXRpb24YASADKAESFQoNZHVhbF9zb2x1dGlvbhgCIAMoARIVCg1yZWR1Y2VkX2Nvc3RzGAMgAygBEhoKEnRlcm1pbmF0aW9uX3JlYXNvbhgEIAEoBRIXCg9pdGVyYXRpb25fY291bnQYBSABKAUi4wEKElBkbHBCcmlkZ2VSZXNwb25zZRIYChB2YWxpZGF0aW9uX2Vycm9yGAEgASgJEhEKCWlzX2xpbmVhchgCIAEoCBJHChFxdWFkcmF0aWNfcHJvZ3JhbRgDIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFF1YWRyYXRpY1Byb2dyYW0SFgoObXBfbW9kZWxfcHJvdG8YBCABKAwSPwoNc29sdmVyX3Jlc3VsdBgFIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlclJlc3VsdCrGAQoNUGRscE9wZXJhdGlvbhIeChpQRExQX09QRVJBVElPTl9VTlNQRUNJRklFRBAAEhsKF1BETFBfT1BFUkFUSU9OX1ZBTElEQVRFEAESHAoYUERMUF9PUEVSQVRJT05fSVNfTElORUFSEAISIAocUERMUF9PUEVSQVRJT05fRlJPTV9NUF9NT0RFTBADEh4KGlBETFBfT1BFUkFUSU9OX1RPX01QX01PREVMEAQSGAoUUERMUF9PUEVSQVRJT05fU09MVkUQBWIGcHJvdG8z");
+  fileDesc("CgpwZGxwLnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIkMKFVBkbHBTcGFyc2VNYXRyaXhFbnRyeRILCgNyb3cYASABKAUSDgoGY29sdW1uGAIgASgFEg0KBXZhbHVlGAMgASgBIoAEChRQZGxwUXVhZHJhdGljUHJvZ3JhbRIVCg1udW1fdmFyaWFibGVzGAEgASgFEhcKD251bV9jb25zdHJhaW50cxgCIAEoBRIUCgxwcm9ibGVtX25hbWUYAyABKAkSGAoQb2JqZWN0aXZlX29mZnNldBgEIAEoARIgChhvYmplY3RpdmVfc2NhbGluZ19mYWN0b3IYBSABKAESGAoQb2JqZWN0aXZlX3ZlY3RvchgGIAMoARIhChlvYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAcgAygBEiUKHWhhc19vYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAggASgIEh8KF2NvbnN0cmFpbnRfbG93ZXJfYm91bmRzGAkgAygBEh8KF2NvbnN0cmFpbnRfdXBwZXJfYm91bmRzGAogAygBEh0KFXZhcmlhYmxlX2xvd2VyX2JvdW5kcxgLIAMoARIdChV2YXJpYWJsZV91cHBlcl9ib3VuZHMYDCADKAESFgoOdmFyaWFibGVfbmFtZXMYDSADKAkSGAoQY29uc3RyYWludF9uYW1lcxgOIAMoCRJQChljb25zdHJhaW50X21hdHJpeF9lbnRyaWVzGA8gAygLMi0ub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU3BhcnNlTWF0cml4RW50cnkipwMKE1BkbHBTb2x2ZVBhcmFtZXRlcnMSHAoPaXRlcmF0aW9uX2xpbWl0GAEgASgFSACIAQESKAobdGVybWluYXRpb25fY2hlY2tfZnJlcXVlbmN5GAIgASgFSAGIAQESIQoUZXBzX29wdGltYWxfcmVsYXRpdmUYAyABKAFIAogBARIhChRlcHNfb3B0aW1hbF9hYnNvbHV0ZRgEIAEoAUgDiAEBEiIKFWxfaW5mX3J1aXpfaXRlcmF0aW9ucxgFIAEoBUgEiAEBEh4KEWwyX25vcm1fcmVzY2FsaW5nGAYgASgISAWIAQESGAoLbnVtX3RocmVhZHMYByABKAVIBogBAUISChBfaXRlcmF0aW9uX2xpbWl0Qh4KHF90ZXJtaW5hdGlvbl9jaGVja19mcmVxdWVuY3lCFwoVX2Vwc19vcHRpbWFsX3JlbGF0aXZlQhcKFV9lcHNfb3B0aW1hbF9hYnNvbHV0ZUIYChZfbF9pbmZfcnVpel9pdGVyYXRpb25zQhQKEl9sMl9ub3JtX3Jlc2NhbGluZ0IOCgxfbnVtX3RocmVhZHMiRQoTUGRscEluaXRpYWxTb2x1dGlvbhIXCg9wcmltYWxfc29sdXRpb24YASADKAESFQoNZHVhbF9zb2x1dGlvbhgCIAMoASJeChNQZGxwVmFsaWRhdGVSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbSJeChNQZGxwSXNMaW5lYXJSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbSJoChZQZGxwRnJvbU1wTW9kZWxSZXF1ZXN0EhYKDm1wX21vZGVsX3Byb3RvGAEgASgMEh8KF3JlbGF4X2ludGVnZXJfdmFyaWFibGVzGAIgASgIEhUKDWluY2x1ZGVfbmFtZXMYAyABKAgiXwoUUGRscFRvTXBNb2RlbFJlcXVlc3QSRwoRcXVhZHJhdGljX3Byb2dyYW0YASABKAsyLC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBRdWFkcmF0aWNQcm9ncmFtIuMBChBQZGxwU29sdmVSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbRI/CgpwYXJhbWV0ZXJzGAIgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU29sdmVQYXJhbWV0ZXJzEkUKEGluaXRpYWxfc29sdXRpb24YAyABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBJbml0aWFsU29sdXRpb24i6gIKEVBkbHBCcmlkZ2VSZXF1ZXN0Ej8KCHZhbGlkYXRlGAEgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwVmFsaWRhdGVSZXF1ZXN0SAASQAoJaXNfbGluZWFyGAIgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwSXNMaW5lYXJSZXF1ZXN0SAASRwoNZnJvbV9tcF9tb2RlbBgDIAEoCzIuLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscEZyb21NcE1vZGVsUmVxdWVzdEgAEkMKC3RvX21wX21vZGVsGAQgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwVG9NcE1vZGVsUmVxdWVzdEgAEjkKBXNvbHZlGAUgASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU29sdmVSZXF1ZXN0SABCCQoHcGF5bG9hZCKOAQoQUGRscFNvbHZlclJlc3VsdBIXCg9wcmltYWxfc29sdXRpb24YASADKAESFQoNZHVhbF9zb2x1dGlvbhgCIAMoARIVCg1yZWR1Y2VkX2Nvc3RzGAMgAygBEhoKEnRlcm1pbmF0aW9uX3JlYXNvbhgEIAEoBRIXCg9pdGVyYXRpb25fY291bnQYBSABKAUiJQoSUGRscFZhbGlkYXRlUmVzdWx0Eg8KB21lc3NhZ2UYASABKAkiIwoSUGRscElzTGluZWFyUmVzdWx0Eg0KBXZhbHVlGAEgASgIImAKFVBkbHBGcm9tTXBNb2RlbFJlc3VsdBJHChFxdWFkcmF0aWNfcHJvZ3JhbRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFF1YWRyYXRpY1Byb2dyYW0iLQoTUGRscFRvTXBNb2RlbFJlc3VsdBIWCg5tcF9tb2RlbF9wcm90bxgBIAEoDCJSCg9QZGxwU29sdmVSZXN1bHQSPwoNc29sdmVyX3Jlc3VsdBgBIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlclJlc3VsdCKJAwoSUGRscEJyaWRnZVJlc3BvbnNlEkUKD3ZhbGlkYXRlX3Jlc3VsdBgBIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFZhbGlkYXRlUmVzdWx0SAASRgoQaXNfbGluZWFyX3Jlc3VsdBgCIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscElzTGluZWFyUmVzdWx0SAASTQoUZnJvbV9tcF9tb2RlbF9yZXN1bHQYAyABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBGcm9tTXBNb2RlbFJlc3VsdEgAEkkKEnRvX21wX21vZGVsX3Jlc3VsdBgEIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFRvTXBNb2RlbFJlc3VsdEgAEj8KDHNvbHZlX3Jlc3VsdBgFIAEoCzInLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlUmVzdWx0SABCCQoHcGF5bG9hZGIGcHJvdG8z");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.PdlpSparseMatrixEntry
@@ -263,6 +263,11 @@ export type PdlpSolveParameters = Message<"ortools_wasm.bridge.v1.PdlpSolveParam
    * @generated from field: optional bool l2_norm_rescaling = 6;
    */
   l2NormRescaling?: boolean | undefined;
+
+  /**
+   * @generated from field: optional int32 num_threads = 7;
+   */
+  numThreads?: number | undefined;
 };
 
 /**
@@ -298,6 +303,11 @@ export type PdlpSolveParametersJson = {
    * @generated from field: optional bool l2_norm_rescaling = 6;
    */
   l2NormRescaling?: boolean;
+
+  /**
+   * @generated from field: optional int32 num_threads = 7;
+   */
+  numThreads?: number;
 };
 
 export type PdlpSolveParametersValid = PdlpSolveParameters;
@@ -349,43 +359,228 @@ export const PdlpInitialSolutionSchema: GenMessage<PdlpInitialSolution, {jsonTyp
   messageDesc(file_pdlp, 3);
 
 /**
- * @generated from message ortools_wasm.bridge.v1.PdlpBridgeRequest
+ * @generated from message ortools_wasm.bridge.v1.PdlpValidateRequest
  */
-export type PdlpBridgeRequest = Message<"ortools_wasm.bridge.v1.PdlpBridgeRequest"> & {
+export type PdlpValidateRequest = Message<"ortools_wasm.bridge.v1.PdlpValidateRequest"> & {
   /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpOperation operation = 1;
-   */
-  operation: PdlpOperation;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 2;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
    */
   quadraticProgram?: PdlpQuadraticProgram | undefined;
+};
 
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpValidateRequest
+ */
+export type PdlpValidateRequestJson = {
   /**
-   * @generated from field: bytes mp_model_proto = 3;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgramJson;
+};
+
+export type PdlpValidateRequestValid = PdlpValidateRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpValidateRequest.
+ * Use `create(PdlpValidateRequestSchema)` to create a new message.
+ */
+export const PdlpValidateRequestSchema: GenMessage<PdlpValidateRequest, {jsonType: PdlpValidateRequestJson, validType: PdlpValidateRequestValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 4);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpIsLinearRequest
+ */
+export type PdlpIsLinearRequest = Message<"ortools_wasm.bridge.v1.PdlpIsLinearRequest"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgram | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpIsLinearRequest
+ */
+export type PdlpIsLinearRequestJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgramJson;
+};
+
+export type PdlpIsLinearRequestValid = PdlpIsLinearRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpIsLinearRequest.
+ * Use `create(PdlpIsLinearRequestSchema)` to create a new message.
+ */
+export const PdlpIsLinearRequestSchema: GenMessage<PdlpIsLinearRequest, {jsonType: PdlpIsLinearRequestJson, validType: PdlpIsLinearRequestValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 5);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpFromMpModelRequest
+ */
+export type PdlpFromMpModelRequest = Message<"ortools_wasm.bridge.v1.PdlpFromMpModelRequest"> & {
+  /**
+   * @generated from field: bytes mp_model_proto = 1;
    */
   mpModelProto: Uint8Array;
 
   /**
-   * @generated from field: bool relax_integer_variables = 4;
+   * @generated from field: bool relax_integer_variables = 2;
    */
   relaxIntegerVariables: boolean;
 
   /**
-   * @generated from field: bool include_names = 5;
+   * @generated from field: bool include_names = 3;
    */
   includeNames: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpFromMpModelRequest
+ */
+export type PdlpFromMpModelRequestJson = {
+  /**
+   * @generated from field: bytes mp_model_proto = 1;
+   */
+  mpModelProto?: string;
 
   /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpSolveParameters parameters = 6;
+   * @generated from field: bool relax_integer_variables = 2;
+   */
+  relaxIntegerVariables?: boolean;
+
+  /**
+   * @generated from field: bool include_names = 3;
+   */
+  includeNames?: boolean;
+};
+
+export type PdlpFromMpModelRequestValid = PdlpFromMpModelRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpFromMpModelRequest.
+ * Use `create(PdlpFromMpModelRequestSchema)` to create a new message.
+ */
+export const PdlpFromMpModelRequestSchema: GenMessage<PdlpFromMpModelRequest, {jsonType: PdlpFromMpModelRequestJson, validType: PdlpFromMpModelRequestValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 6);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpToMpModelRequest
+ */
+export type PdlpToMpModelRequest = Message<"ortools_wasm.bridge.v1.PdlpToMpModelRequest"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgram | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpToMpModelRequest
+ */
+export type PdlpToMpModelRequestJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgramJson;
+};
+
+export type PdlpToMpModelRequestValid = PdlpToMpModelRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpToMpModelRequest.
+ * Use `create(PdlpToMpModelRequestSchema)` to create a new message.
+ */
+export const PdlpToMpModelRequestSchema: GenMessage<PdlpToMpModelRequest, {jsonType: PdlpToMpModelRequestJson, validType: PdlpToMpModelRequestValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 7);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpSolveRequest
+ */
+export type PdlpSolveRequest = Message<"ortools_wasm.bridge.v1.PdlpSolveRequest"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgram | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpSolveParameters parameters = 2;
    */
   parameters?: PdlpSolveParameters | undefined;
 
   /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpInitialSolution initial_solution = 7;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpInitialSolution initial_solution = 3;
    */
   initialSolution?: PdlpInitialSolution | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpSolveRequest
+ */
+export type PdlpSolveRequestJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgramJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpSolveParameters parameters = 2;
+   */
+  parameters?: PdlpSolveParametersJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpInitialSolution initial_solution = 3;
+   */
+  initialSolution?: PdlpInitialSolutionJson;
+};
+
+export type PdlpSolveRequestValid = PdlpSolveRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpSolveRequest.
+ * Use `create(PdlpSolveRequestSchema)` to create a new message.
+ */
+export const PdlpSolveRequestSchema: GenMessage<PdlpSolveRequest, {jsonType: PdlpSolveRequestJson, validType: PdlpSolveRequestValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 8);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpBridgeRequest
+ */
+export type PdlpBridgeRequest = Message<"ortools_wasm.bridge.v1.PdlpBridgeRequest"> & {
+  /**
+   * @generated from oneof ortools_wasm.bridge.v1.PdlpBridgeRequest.payload
+   */
+  payload: {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpValidateRequest validate = 1;
+     */
+    value: PdlpValidateRequest;
+    case: "validate";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpIsLinearRequest is_linear = 2;
+     */
+    value: PdlpIsLinearRequest;
+    case: "isLinear";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpFromMpModelRequest from_mp_model = 3;
+     */
+    value: PdlpFromMpModelRequest;
+    case: "fromMpModel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpToMpModelRequest to_mp_model = 4;
+     */
+    value: PdlpToMpModelRequest;
+    case: "toMpModel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpSolveRequest solve = 5;
+     */
+    value: PdlpSolveRequest;
+    case: "solve";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -393,39 +588,29 @@ export type PdlpBridgeRequest = Message<"ortools_wasm.bridge.v1.PdlpBridgeReques
  */
 export type PdlpBridgeRequestJson = {
   /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpOperation operation = 1;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpValidateRequest validate = 1;
    */
-  operation?: PdlpOperationJson;
+  validate?: PdlpValidateRequestJson;
 
   /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 2;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpIsLinearRequest is_linear = 2;
    */
-  quadraticProgram?: PdlpQuadraticProgramJson;
+  isLinear?: PdlpIsLinearRequestJson;
 
   /**
-   * @generated from field: bytes mp_model_proto = 3;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpFromMpModelRequest from_mp_model = 3;
    */
-  mpModelProto?: string;
+  fromMpModel?: PdlpFromMpModelRequestJson;
 
   /**
-   * @generated from field: bool relax_integer_variables = 4;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpToMpModelRequest to_mp_model = 4;
    */
-  relaxIntegerVariables?: boolean;
+  toMpModel?: PdlpToMpModelRequestJson;
 
   /**
-   * @generated from field: bool include_names = 5;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpSolveRequest solve = 5;
    */
-  includeNames?: boolean;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpSolveParameters parameters = 6;
-   */
-  parameters?: PdlpSolveParametersJson;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpInitialSolution initial_solution = 7;
-   */
-  initialSolution?: PdlpInitialSolutionJson;
+  solve?: PdlpSolveRequestJson;
 };
 
 export type PdlpBridgeRequestValid = PdlpBridgeRequest;
@@ -435,7 +620,7 @@ export type PdlpBridgeRequestValid = PdlpBridgeRequest;
  * Use `create(PdlpBridgeRequestSchema)` to create a new message.
  */
 export const PdlpBridgeRequestSchema: GenMessage<PdlpBridgeRequest, {jsonType: PdlpBridgeRequestJson, validType: PdlpBridgeRequestValid}> = /*@__PURE__*/
-  messageDesc(file_pdlp, 4);
+  messageDesc(file_pdlp, 9);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.PdlpSolverResult
@@ -504,36 +689,191 @@ export type PdlpSolverResultValid = PdlpSolverResult;
  * Use `create(PdlpSolverResultSchema)` to create a new message.
  */
 export const PdlpSolverResultSchema: GenMessage<PdlpSolverResult, {jsonType: PdlpSolverResultJson, validType: PdlpSolverResultValid}> = /*@__PURE__*/
-  messageDesc(file_pdlp, 5);
+  messageDesc(file_pdlp, 10);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpValidateResult
+ */
+export type PdlpValidateResult = Message<"ortools_wasm.bridge.v1.PdlpValidateResult"> & {
+  /**
+   * @generated from field: string message = 1;
+   */
+  message: string;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpValidateResult
+ */
+export type PdlpValidateResultJson = {
+  /**
+   * @generated from field: string message = 1;
+   */
+  message?: string;
+};
+
+export type PdlpValidateResultValid = PdlpValidateResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpValidateResult.
+ * Use `create(PdlpValidateResultSchema)` to create a new message.
+ */
+export const PdlpValidateResultSchema: GenMessage<PdlpValidateResult, {jsonType: PdlpValidateResultJson, validType: PdlpValidateResultValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 11);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpIsLinearResult
+ */
+export type PdlpIsLinearResult = Message<"ortools_wasm.bridge.v1.PdlpIsLinearResult"> & {
+  /**
+   * @generated from field: bool value = 1;
+   */
+  value: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpIsLinearResult
+ */
+export type PdlpIsLinearResultJson = {
+  /**
+   * @generated from field: bool value = 1;
+   */
+  value?: boolean;
+};
+
+export type PdlpIsLinearResultValid = PdlpIsLinearResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpIsLinearResult.
+ * Use `create(PdlpIsLinearResultSchema)` to create a new message.
+ */
+export const PdlpIsLinearResultSchema: GenMessage<PdlpIsLinearResult, {jsonType: PdlpIsLinearResultJson, validType: PdlpIsLinearResultValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 12);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpFromMpModelResult
+ */
+export type PdlpFromMpModelResult = Message<"ortools_wasm.bridge.v1.PdlpFromMpModelResult"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgram | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpFromMpModelResult
+ */
+export type PdlpFromMpModelResultJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 1;
+   */
+  quadraticProgram?: PdlpQuadraticProgramJson;
+};
+
+export type PdlpFromMpModelResultValid = PdlpFromMpModelResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpFromMpModelResult.
+ * Use `create(PdlpFromMpModelResultSchema)` to create a new message.
+ */
+export const PdlpFromMpModelResultSchema: GenMessage<PdlpFromMpModelResult, {jsonType: PdlpFromMpModelResultJson, validType: PdlpFromMpModelResultValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 13);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpToMpModelResult
+ */
+export type PdlpToMpModelResult = Message<"ortools_wasm.bridge.v1.PdlpToMpModelResult"> & {
+  /**
+   * @generated from field: bytes mp_model_proto = 1;
+   */
+  mpModelProto: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpToMpModelResult
+ */
+export type PdlpToMpModelResultJson = {
+  /**
+   * @generated from field: bytes mp_model_proto = 1;
+   */
+  mpModelProto?: string;
+};
+
+export type PdlpToMpModelResultValid = PdlpToMpModelResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpToMpModelResult.
+ * Use `create(PdlpToMpModelResultSchema)` to create a new message.
+ */
+export const PdlpToMpModelResultSchema: GenMessage<PdlpToMpModelResult, {jsonType: PdlpToMpModelResultJson, validType: PdlpToMpModelResultValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 14);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpSolveResult
+ */
+export type PdlpSolveResult = Message<"ortools_wasm.bridge.v1.PdlpSolveResult"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpSolverResult solver_result = 1;
+   */
+  solverResult?: PdlpSolverResult | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpSolveResult
+ */
+export type PdlpSolveResultJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpSolverResult solver_result = 1;
+   */
+  solverResult?: PdlpSolverResultJson;
+};
+
+export type PdlpSolveResultValid = PdlpSolveResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpSolveResult.
+ * Use `create(PdlpSolveResultSchema)` to create a new message.
+ */
+export const PdlpSolveResultSchema: GenMessage<PdlpSolveResult, {jsonType: PdlpSolveResultJson, validType: PdlpSolveResultValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 15);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.PdlpBridgeResponse
  */
 export type PdlpBridgeResponse = Message<"ortools_wasm.bridge.v1.PdlpBridgeResponse"> & {
   /**
-   * @generated from field: string validation_error = 1;
+   * @generated from oneof ortools_wasm.bridge.v1.PdlpBridgeResponse.payload
    */
-  validationError: string;
-
-  /**
-   * @generated from field: bool is_linear = 2;
-   */
-  isLinear: boolean;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 3;
-   */
-  quadraticProgram?: PdlpQuadraticProgram | undefined;
-
-  /**
-   * @generated from field: bytes mp_model_proto = 4;
-   */
-  mpModelProto: Uint8Array;
-
-  /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpSolverResult solver_result = 5;
-   */
-  solverResult?: PdlpSolverResult | undefined;
+  payload: {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpValidateResult validate_result = 1;
+     */
+    value: PdlpValidateResult;
+    case: "validateResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpIsLinearResult is_linear_result = 2;
+     */
+    value: PdlpIsLinearResult;
+    case: "isLinearResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpFromMpModelResult from_mp_model_result = 3;
+     */
+    value: PdlpFromMpModelResult;
+    case: "fromMpModelResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpToMpModelResult to_mp_model_result = 4;
+     */
+    value: PdlpToMpModelResult;
+    case: "toMpModelResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpSolveResult solve_result = 5;
+     */
+    value: PdlpSolveResult;
+    case: "solveResult";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -541,29 +881,29 @@ export type PdlpBridgeResponse = Message<"ortools_wasm.bridge.v1.PdlpBridgeRespo
  */
 export type PdlpBridgeResponseJson = {
   /**
-   * @generated from field: string validation_error = 1;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpValidateResult validate_result = 1;
    */
-  validationError?: string;
+  validateResult?: PdlpValidateResultJson;
 
   /**
-   * @generated from field: bool is_linear = 2;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpIsLinearResult is_linear_result = 2;
    */
-  isLinear?: boolean;
+  isLinearResult?: PdlpIsLinearResultJson;
 
   /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpQuadraticProgram quadratic_program = 3;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpFromMpModelResult from_mp_model_result = 3;
    */
-  quadraticProgram?: PdlpQuadraticProgramJson;
+  fromMpModelResult?: PdlpFromMpModelResultJson;
 
   /**
-   * @generated from field: bytes mp_model_proto = 4;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpToMpModelResult to_mp_model_result = 4;
    */
-  mpModelProto?: string;
+  toMpModelResult?: PdlpToMpModelResultJson;
 
   /**
-   * @generated from field: ortools_wasm.bridge.v1.PdlpSolverResult solver_result = 5;
+   * @generated from field: ortools_wasm.bridge.v1.PdlpSolveResult solve_result = 5;
    */
-  solverResult?: PdlpSolverResultJson;
+  solveResult?: PdlpSolveResultJson;
 };
 
 export type PdlpBridgeResponseValid = PdlpBridgeResponse;
@@ -573,51 +913,5 @@ export type PdlpBridgeResponseValid = PdlpBridgeResponse;
  * Use `create(PdlpBridgeResponseSchema)` to create a new message.
  */
 export const PdlpBridgeResponseSchema: GenMessage<PdlpBridgeResponse, {jsonType: PdlpBridgeResponseJson, validType: PdlpBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_pdlp, 6);
-
-/**
- * @generated from enum ortools_wasm.bridge.v1.PdlpOperation
- */
-export enum PdlpOperation {
-  /**
-   * @generated from enum value: PDLP_OPERATION_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: PDLP_OPERATION_VALIDATE = 1;
-   */
-  VALIDATE = 1,
-
-  /**
-   * @generated from enum value: PDLP_OPERATION_IS_LINEAR = 2;
-   */
-  IS_LINEAR = 2,
-
-  /**
-   * @generated from enum value: PDLP_OPERATION_FROM_MP_MODEL = 3;
-   */
-  FROM_MP_MODEL = 3,
-
-  /**
-   * @generated from enum value: PDLP_OPERATION_TO_MP_MODEL = 4;
-   */
-  TO_MP_MODEL = 4,
-
-  /**
-   * @generated from enum value: PDLP_OPERATION_SOLVE = 5;
-   */
-  SOLVE = 5,
-}
-
-/**
- * @generated from enum ortools_wasm.bridge.v1.PdlpOperation
- */
-export type PdlpOperationJson = "PDLP_OPERATION_UNSPECIFIED" | "PDLP_OPERATION_VALIDATE" | "PDLP_OPERATION_IS_LINEAR" | "PDLP_OPERATION_FROM_MP_MODEL" | "PDLP_OPERATION_TO_MP_MODEL" | "PDLP_OPERATION_SOLVE";
-
-/**
- * Describes the enum ortools_wasm.bridge.v1.PdlpOperation.
- */
-export const PdlpOperationSchema: GenEnum<PdlpOperation, PdlpOperationJson> = /*@__PURE__*/
-  enumDesc(file_pdlp, 0);
+  messageDesc(file_pdlp, 16);
 

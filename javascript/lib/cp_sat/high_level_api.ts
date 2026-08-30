@@ -9,10 +9,10 @@ import {
   type LinearExpressionProto,
   type ProtoInt64,
 } from '../generated/cp_model.js';
-import type { SatParameters } from '../generated/sat_parameters.js';
 import type {
   CpSatEventHandler,
   CpSatEventMask,
+  CpSatSolverParameters,
 } from './api.js';
 import type { ExecutorSelection } from '../executor_configuration.js';
 
@@ -21,7 +21,7 @@ const INT64_MAX: ProtoInt64 = { low: -1, high: 2147483647 };
 
 export type LinearExprLike = number | IntVar | NotBoolVar | LinearExpr;
 export type LiteralLike = number | boolean | BoolVar | NotBoolVar;
-export type CpSolverSolveOptions = SatParameters & {
+export type CpSolverSolveOptions = CpSatSolverParameters & {
   executor?: ExecutorSelection;
   solutionCallback?: CpSolverSolutionCallback;
   onEvent?: CpSatEventHandler;
@@ -2586,11 +2586,24 @@ export class CpSolverSolutionCallback {
 
 export class CpSolver {
   private lastResponse: CpSolverResponse | null = null;
-  readonly parameters: SatParameters = {};
+  private solving = false;
+  readonly parameters: CpSatSolverParameters = {};
   bestBoundCallback: ((bound: number) => void) | null = null;
   logCallback: ((message: string) => void) | null = null;
 
   async solve(model: CpModel, options: CpSolverSolveOptions = {}) {
+    if (this.solving) {
+      throw new RuntimeError('CpSolver.solve() is already in progress.');
+    }
+    this.solving = true;
+    try {
+      return await this.solveOnce(model, options);
+    } finally {
+      this.solving = false;
+    }
+  }
+
+  private async solveOnce(model: CpModel, options: CpSolverSolveOptions) {
     const {
       executor,
       solutionCallback = null,

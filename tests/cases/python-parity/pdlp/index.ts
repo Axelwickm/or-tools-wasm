@@ -1,58 +1,88 @@
-import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from '../../../harness/shared_case.ts';
+import type { ExecutorFixtureMode, FixtureMode, SharedCase, SharedCaseResult } from '../../../harness/shared_case.ts';
 import { assertServerExecutorIsRunning, executorFixtureModes, passedCase, serverExecutorConfiguration, solverJobStates } from '../../../harness/shared_case.ts';
 
 type PdlpApi = {
-  initPdlp(): Promise<void>;
   Pdlp: {
     QuadraticProgram: new (input?: Record<string, unknown>) => QuadraticProgramLike;
     PrimalAndDualSolution: new (input?: Record<string, unknown>) => PrimalAndDualSolutionLike;
-    validate_quadratic_program_dimensions(qp: QuadraticProgramLike): Promise<void>;
-    is_linear_program(qp: QuadraticProgramLike, options?: { onEvent?: (event: { type: string; status?: { state: number } }) => void }): Promise<boolean>;
-    qp_from_mpmodel_proto(proto: Uint8Array, relaxIntegerVariables?: boolean, includeNames?: boolean): Promise<QuadraticProgramLike>;
-    qp_to_mpmodel_proto(qp: QuadraticProgramLike): Promise<Uint8Array>;
-    primal_dual_hybrid_gradient(qp: QuadraticProgramLike, params?: PdlpParams, initialSolution?: PrimalAndDualSolutionLike): Promise<PdlpResultLike>;
+    validateQuadraticProgramDimensions(qp: QuadraticProgramLike, options?: PdlpOperationOptions): Promise<void>;
+    isLinearProgram(qp: QuadraticProgramLike, options?: PdlpOperationOptions): Promise<boolean>;
+    qpFromMpModelProto(proto: Uint8Array, options?: PdlpOperationOptions & {
+      relaxIntegerVariables?: boolean;
+      includeNames?: boolean;
+    }): Promise<QuadraticProgramLike>;
+    qpToMpModelProto(qp: QuadraticProgramLike, options?: PdlpOperationOptions): Promise<Uint8Array>;
+    solve(qp: QuadraticProgramLike, options?: PdlpParams & PdlpOperationOptions & {
+      initialSolution?: PrimalAndDualSolutionLike;
+    }): Promise<PdlpResultLike>;
   };
-  setExecutor(configuration: { type: 'auto' | 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
+type PdlpExecutorSelection = FixtureMode | ReturnType<typeof serverExecutorConfiguration>;
+
+type PdlpOperationOptions = {
+  executor?: PdlpExecutorSelection;
+  onEvent?: (event: { type: string; status?: { state: number } }) => void;
+  signal?: AbortSignal;
+};
+
+function withPdlpExecutor(api: PdlpApi, executor: PdlpExecutorSelection): PdlpApi {
+  return {
+    Pdlp: {
+      ...api.Pdlp,
+      validateQuadraticProgramDimensions: (qp, options = {}) =>
+        api.Pdlp.validateQuadraticProgramDimensions(qp, { ...options, executor }),
+      isLinearProgram: (qp, options = {}) =>
+        api.Pdlp.isLinearProgram(qp, { ...options, executor }),
+      qpFromMpModelProto: (proto, options = {}) =>
+        api.Pdlp.qpFromMpModelProto(proto, { ...options, executor }),
+      qpToMpModelProto: (qp, options = {}) =>
+        api.Pdlp.qpToMpModelProto(qp, { ...options, executor }),
+      solve: (qp, options = {}) =>
+        api.Pdlp.solve(qp, { ...options, executor }),
+    },
+  };
+}
+
 type QuadraticProgramLike = {
-  resize_and_initialize(numVariables: number, numConstraints: number): void;
-  set_objective_matrix_diagonal(values: number[]): void;
-  objective_vector: number[];
-  constraint_matrix: { dense?: number[][]; entries?: Array<{ row: number; column: number; value: number }> } | number[][];
-  constraint_lower_bounds: number[];
-  constraint_upper_bounds: number[];
-  variable_lower_bounds: number[];
-  variable_upper_bounds: number[];
-  variable_names: string[];
-  objective_offset: number;
+  resizeAndInitialize(numVariables: number, numConstraints: number): void;
+  setObjectiveMatrixDiagonal(values: number[]): void;
+  objectiveVector: number[];
+  constraintMatrix: { dense?: number[][]; entries?: Array<{ row: number; column: number; value: number }> } | number[][];
+  constraintLowerBounds: number[];
+  constraintUpperBounds: number[];
+  variableLowerBounds: number[];
+  variableUpperBounds: number[];
+  variableNames: string[];
+  objectiveOffset: number;
 };
 
 type PrimalAndDualSolutionLike = {
-  primal_solution: number[];
-  dual_solution: number[];
+  primalSolution: number[];
+  dualSolution: number[];
 };
 
 type PdlpParams = {
-  termination_criteria?: {
-    iteration_limit?: number;
-    simple_optimality_criteria?: {
-      eps_optimal_relative?: number;
-      eps_optimal_absolute?: number;
+  terminationCriteria?: {
+    iterationLimit?: number;
+    simpleOptimalityCriteria?: {
+      epsOptimalRelative?: number;
+      epsOptimalAbsolute?: number;
     };
   };
-  termination_check_frequency?: number;
-  l_inf_ruiz_iterations?: number;
-  l2_norm_rescaling?: boolean;
+  terminationCheckFrequency?: number;
+  lInfRuizIterations?: number;
+  l2NormRescaling?: boolean;
+  numThreads?: number;
 };
 
 type PdlpResultLike = {
-  primal_solution: number[];
-  dual_solution: number[];
-  reduced_costs: number[];
-  solve_log: {
-    termination_reason: string;
-    iteration_count: number;
+  primalSolution: number[];
+  dualSolution: number[];
+  reducedCosts: number[];
+  solveLog: {
+    terminationReason: string;
+    iterationCount: number;
   };
 };
 
@@ -407,13 +437,13 @@ function smallProtoQp(): Record<string, unknown> {
 
 function tinyLp(api: PdlpApi): QuadraticProgramLike {
   const qp = new api.Pdlp.QuadraticProgram();
-  qp.objective_offset = -14;
-  qp.objective_vector = [5, 2, 1, 1];
-  qp.constraint_lower_bounds = [12, 7, 1];
-  qp.constraint_upper_bounds = [12, Infinity, Infinity];
-  qp.variable_lower_bounds = [0, 0, 0, 0];
-  qp.variable_upper_bounds = [2, 4, 6, 3];
-  qp.constraint_matrix = {
+  qp.objectiveOffset = -14;
+  qp.objectiveVector = [5, 2, 1, 1];
+  qp.constraintLowerBounds = [12, 7, 1];
+  qp.constraintUpperBounds = [12, Infinity, Infinity];
+  qp.variableLowerBounds = [0, 0, 0, 0];
+  qp.variableUpperBounds = [2, 4, 6, 3];
+  qp.constraintMatrix = {
     dense: [
       [2, 1, 1, 2],
       [1, 0, 1, 0],
@@ -425,13 +455,13 @@ function tinyLp(api: PdlpApi): QuadraticProgramLike {
 
 function smallLp(api: PdlpApi): QuadraticProgramLike {
   const qp = new api.Pdlp.QuadraticProgram();
-  qp.objective_offset = -14;
-  qp.objective_vector = [5.5, -2, -1, 1];
-  qp.constraint_lower_bounds = [12, -Infinity, -4, -1];
-  qp.constraint_upper_bounds = [12, 7, Infinity, 1];
-  qp.variable_lower_bounds = [-Infinity, -2, -Infinity, 2.5];
-  qp.variable_upper_bounds = [Infinity, Infinity, 6, 3.5];
-  qp.constraint_matrix = {
+  qp.objectiveOffset = -14;
+  qp.objectiveVector = [5.5, -2, -1, 1];
+  qp.constraintLowerBounds = [12, -Infinity, -4, -1];
+  qp.constraintUpperBounds = [12, 7, Infinity, 1];
+  qp.variableLowerBounds = [-Infinity, -2, -Infinity, 2.5];
+  qp.variableUpperBounds = [Infinity, Infinity, 6, 3.5];
+  qp.constraintMatrix = {
     dense: [
       [2, 1, 1, 2],
       [1, 0, 1, 0],
@@ -501,120 +531,127 @@ const pdlpCaseDefinitions: RawPdlpCase[] = [
     name: 'QuadraticProgramTest.test_validate_quadratic_program_dimensions_for_empty_qp',
     async run(api) {
       const qp = new api.Pdlp.QuadraticProgram();
-      qp.resize_and_initialize(3, 2);
-      await api.Pdlp.validate_quadratic_program_dimensions(qp);
-      assert(await api.Pdlp.is_linear_program(qp), 'expected empty QP to be linear');
+      qp.resizeAndInitialize(3, 2);
+      await api.Pdlp.validateQuadraticProgramDimensions(qp);
+      assert(await api.Pdlp.isLinearProgram(qp), 'expected empty QP to be linear');
     },
   },
   {
     name: 'QuadraticProgramTest.test_converts_from_tiny_mpmodel_lp',
     async run(api) {
-      const qp = await api.Pdlp.qp_from_mpmodel_proto(encodeMPModelProto(smallProtoLp()), false);
-      await api.Pdlp.validate_quadratic_program_dimensions(qp);
-      assert(await api.Pdlp.is_linear_program(qp), 'expected LP to be linear');
-      assertSameElements(qp.objective_vector, [0, -2], 'objective_vector');
+      const qp = await api.Pdlp.qpFromMpModelProto(
+        encodeMPModelProto(smallProtoLp()),
+        { relaxIntegerVariables: false },
+      );
+      await api.Pdlp.validateQuadraticProgramDimensions(qp);
+      assert(await api.Pdlp.isLinearProgram(qp), 'expected LP to be linear');
+      assertSameElements(qp.objectiveVector, [0, -2], 'objectiveVector');
     },
   },
   {
     name: 'QuadraticProgramTest.test_converts_from_tiny_mpmodel_qp',
     async run(api) {
-      const qp = await api.Pdlp.qp_from_mpmodel_proto(encodeMPModelProto(smallProtoQp()), false);
-      await api.Pdlp.validate_quadratic_program_dimensions(qp);
-      assert(!(await api.Pdlp.is_linear_program(qp)), 'expected QP not to be linear');
-      assertSameElements(qp.objective_vector, [0, 0], 'objective_vector');
+      const qp = await api.Pdlp.qpFromMpModelProto(
+        encodeMPModelProto(smallProtoQp()),
+        { relaxIntegerVariables: false },
+      );
+      await api.Pdlp.validateQuadraticProgramDimensions(qp);
+      assert(!(await api.Pdlp.isLinearProgram(qp)), 'expected QP not to be linear');
+      assertSameElements(qp.objectiveVector, [0, 0], 'objectiveVector');
     },
   },
   {
     name: 'QuadraticProgramTest.test_build_lp',
     async run(api) {
       const qp = new api.Pdlp.QuadraticProgram();
-      qp.objective_vector = [0, -2];
-      qp.constraint_matrix = { dense: [[1, 1]] };
-      qp.constraint_lower_bounds = [-Infinity];
-      qp.constraint_upper_bounds = [1];
-      qp.variable_lower_bounds = [0, 0];
-      qp.variable_upper_bounds = [Infinity, Infinity];
-      qp.variable_names = ['x', 'y'];
-      assertProtoLp(decodeMPModelProto(await api.Pdlp.qp_to_mpmodel_proto(qp)));
+      qp.objectiveVector = [0, -2];
+      qp.constraintMatrix = { dense: [[1, 1]] };
+      qp.constraintLowerBounds = [-Infinity];
+      qp.constraintUpperBounds = [1];
+      qp.variableLowerBounds = [0, 0];
+      qp.variableUpperBounds = [Infinity, Infinity];
+      qp.variableNames = ['x', 'y'];
+      assertProtoLp(decodeMPModelProto(await api.Pdlp.qpToMpModelProto(qp)));
     },
   },
   {
     name: 'QuadraticProgramTest.test_build_qp',
     async run(api) {
       const qp = new api.Pdlp.QuadraticProgram();
-      qp.objective_vector = [0, 0];
-      qp.constraint_matrix = { dense: [[1, 1]] };
-      qp.set_objective_matrix_diagonal([4]);
-      qp.constraint_lower_bounds = [-Infinity];
-      qp.constraint_upper_bounds = [1];
-      qp.variable_lower_bounds = [0, 0];
-      qp.variable_upper_bounds = [Infinity, Infinity];
-      qp.variable_names = ['x', 'y'];
-      assertProtoQp(decodeMPModelProto(await api.Pdlp.qp_to_mpmodel_proto(qp)));
+      qp.objectiveVector = [0, 0];
+      qp.constraintMatrix = { dense: [[1, 1]] };
+      qp.setObjectiveMatrixDiagonal([4]);
+      qp.constraintLowerBounds = [-Infinity];
+      qp.constraintUpperBounds = [1];
+      qp.variableLowerBounds = [0, 0];
+      qp.variableUpperBounds = [Infinity, Infinity];
+      qp.variableNames = ['x', 'y'];
+      assertProtoQp(decodeMPModelProto(await api.Pdlp.qpToMpModelProto(qp)));
     },
   },
   {
     name: 'PrimalDualHybridGradientTest.test_iteration_limit',
     async run(api) {
-      const result = await api.Pdlp.primal_dual_hybrid_gradient(tinyLp(api), {
-        termination_criteria: { iteration_limit: 1 },
-        termination_check_frequency: 1,
+      const result = await api.Pdlp.solve(tinyLp(api), {
+        terminationCriteria: { iterationLimit: 1 },
+        terminationCheckFrequency: 1,
       });
-      assert(result.solve_log.iteration_count <= 1, 'expected iteration_count <= 1');
-      assert(result.solve_log.termination_reason === 'TERMINATION_REASON_ITERATION_LIMIT', `unexpected termination ${result.solve_log.termination_reason}`);
+      assert(result.solveLog.iterationCount <= 1, 'expected iterationCount <= 1');
+      assert(result.solveLog.terminationReason === 'TERMINATION_REASON_ITERATION_LIMIT', `unexpected termination ${result.solveLog.terminationReason}`);
     },
   },
   {
     name: 'PrimalDualHybridGradientTest.test_solution',
     async run(api) {
-      const result = await api.Pdlp.primal_dual_hybrid_gradient(tinyLp(api), {
-        termination_criteria: {
-          simple_optimality_criteria: {
-            eps_optimal_relative: 0,
-            eps_optimal_absolute: 1e-10,
+      const result = await api.Pdlp.solve(tinyLp(api), {
+        terminationCriteria: {
+          simpleOptimalityCriteria: {
+            epsOptimalRelative: 0,
+            epsOptimalAbsolute: 1e-10,
           },
         },
       });
-      assert(result.solve_log.termination_reason === 'TERMINATION_REASON_OPTIMAL', `unexpected termination ${result.solve_log.termination_reason}`);
-      assertSequenceAlmostEqual(result.primal_solution, [1, 0, 6, 2], 'primal_solution');
-      assertSequenceAlmostEqual(result.dual_solution, [0.5, 4, 0], 'dual_solution');
-      assertSequenceAlmostEqual(result.reduced_costs, [0, 1.5, -3.5, 0], 'reduced_costs');
+      assert(result.solveLog.terminationReason === 'TERMINATION_REASON_OPTIMAL', `unexpected termination ${result.solveLog.terminationReason}`);
+      assertSequenceAlmostEqual(result.primalSolution, [1, 0, 6, 2], 'primalSolution');
+      assertSequenceAlmostEqual(result.dualSolution, [0.5, 4, 0], 'dualSolution');
+      assertSequenceAlmostEqual(result.reducedCosts, [0, 1.5, -3.5, 0], 'reducedCosts');
     },
   },
   {
     name: 'PrimalDualHybridGradientTest.test_solution_2',
     async run(api) {
-      const result = await api.Pdlp.primal_dual_hybrid_gradient(smallLp(api), {
-        termination_criteria: {
-          simple_optimality_criteria: {
-            eps_optimal_relative: 0,
-            eps_optimal_absolute: 1e-10,
+      const result = await api.Pdlp.solve(smallLp(api), {
+        terminationCriteria: {
+          simpleOptimalityCriteria: {
+            epsOptimalRelative: 0,
+            epsOptimalAbsolute: 1e-10,
           },
         },
       });
-      assert(result.solve_log.termination_reason === 'TERMINATION_REASON_OPTIMAL', `unexpected termination ${result.solve_log.termination_reason}`);
-      assertSequenceAlmostEqual(result.primal_solution, [-1, 8, 1, 2.5], 'primal_solution');
-      assertSequenceAlmostEqual(result.dual_solution, [-2, 0, 2.375, 2 / 3], 'dual_solution');
+      assert(result.solveLog.terminationReason === 'TERMINATION_REASON_OPTIMAL', `unexpected termination ${result.solveLog.terminationReason}`);
+      assertSequenceAlmostEqual(result.primalSolution, [-1, 8, 1, 2.5], 'primalSolution');
+      assertSequenceAlmostEqual(result.dualSolution, [-2, 0, 2.375, 2 / 3], 'dualSolution');
     },
   },
   {
     name: 'PrimalDualHybridGradientTest.test_starting_point',
     async run(api) {
       const start = new api.Pdlp.PrimalAndDualSolution();
-      start.primal_solution = [1, 0, 6, 2];
-      start.dual_solution = [0.5, 4, 0];
-      const result = await api.Pdlp.primal_dual_hybrid_gradient(tinyLp(api), {
-        termination_criteria: {
-          simple_optimality_criteria: {
-            eps_optimal_relative: 0,
-            eps_optimal_absolute: 1e-10,
+      start.primalSolution = [1, 0, 6, 2];
+      start.dualSolution = [0.5, 4, 0];
+      const result = await api.Pdlp.solve(tinyLp(api), {
+        terminationCriteria: {
+          simpleOptimalityCriteria: {
+            epsOptimalRelative: 0,
+            epsOptimalAbsolute: 1e-10,
           },
         },
-        l_inf_ruiz_iterations: 0,
-        l2_norm_rescaling: false,
-      }, start);
-      assert(result.solve_log.termination_reason === 'TERMINATION_REASON_OPTIMAL', `unexpected termination ${result.solve_log.termination_reason}`);
-      assert(result.solve_log.iteration_count === 0, `expected iteration_count 0, got ${result.solve_log.iteration_count}`);
+        lInfRuizIterations: 0,
+        l2NormRescaling: false,
+        initialSolution: start,
+      });
+      assert(result.solveLog.terminationReason === 'TERMINATION_REASON_OPTIMAL', `unexpected termination ${result.solveLog.terminationReason}`);
+      assert(result.solveLog.iterationCount === 0, `expected iterationCount 0, got ${result.solveLog.iterationCount}`);
     },
   },
 ];
@@ -634,7 +671,7 @@ const pdlpCases: PdlpCase[] = pdlpCaseDefinitions.map((testCase) => ({
   solver: 'pdlp',
   source: testCase.name.startsWith('QuadraticProgramTest.')
     ? 'ortools/pdlp/python/quadratic_program_test.py'
-    : 'ortools/pdlp/python/primal_dual_hybrid_gradient_test.py',
+    : 'ortools/pdlp/python/solve_test.py',
   upstream: testCase.name,
   tags: ['python-parity'],
   async run(api) {
@@ -651,22 +688,20 @@ export async function runPdlpCases(
   const modes = options.modes ?? executorFixtureModes;
   if (modes.includes('server')) await assertServerExecutorIsRunning();
   for (const mode of modes) {
-    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
-    try {
-      await api.initPdlp();
-      const states: number[] = [];
-      await api.Pdlp.is_linear_program(new api.Pdlp.QuadraticProgram(), {
-        onEvent: (event) => { if (event.type === 'status' && event.status) states.push(event.status.state); },
-      });
-      if (!states.includes(solverJobStates.RUNNING) || !states.includes(solverJobStates.SUCCEEDED)) {
-        throw new Error(`PDLP (${mode}) did not emit the complete job lifecycle.`);
-      }
-      for (const testCase of pdlpCases) {
-        const result = await testCase.run(api, { mode });
-        results.push(passedCase(testCase, { mode }, result));
-      }
-    } finally {
-      api.setExecutor({ type: 'direct' });
+    const scopedApi = withPdlpExecutor(
+      api,
+      mode === 'server' ? serverExecutorConfiguration() : mode,
+    );
+    const states: number[] = [];
+    await scopedApi.Pdlp.isLinearProgram(new scopedApi.Pdlp.QuadraticProgram(), {
+      onEvent: (event) => { if (event.type === 'status' && event.status) states.push(event.status.state); },
+    });
+    if (!states.includes(solverJobStates.RUNNING) || !states.includes(solverJobStates.SUCCEEDED)) {
+      throw new Error(`PDLP (${mode}) did not emit the complete job lifecycle.`);
+    }
+    for (const testCase of pdlpCases) {
+      const result = await testCase.run(scopedApi, { mode });
+      results.push(passedCase(testCase, { mode }, result));
     }
   }
   return results;

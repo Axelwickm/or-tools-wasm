@@ -36,7 +36,7 @@ export type SolverJob<Response> = {
 
 export class SolverExecutorBusyError extends Error {
   constructor(solver: string) {
-    super(`${solver} worker executor already has an active job.`);
+    super(`${solver} executor already has an active job.`);
     this.name = 'SolverExecutorBusyError';
   }
 }

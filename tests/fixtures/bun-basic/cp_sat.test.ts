@@ -10,6 +10,7 @@ import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runn
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
+import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -21,6 +22,9 @@ await runBunFixture(async () => {
   assertAllCases('bun CP-SAT execution semantics', subsolverResults);
   assertAllCases('bun CP-SAT worker lifecycle', [
     await runCpSatWorkerLifecycleCase(CpSat as never),
+  ]);
+  assertAllCases('bun CP-SAT local concurrency', [
+    await runCpSatConcurrencyCase(CpSatApi as never),
   ]);
 
   const structureResults = await runCpSatSolverStructureCases(CpSatApi as never);
