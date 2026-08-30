@@ -1,7 +1,6 @@
 import {
+  type ExecutorConfiguration,
   GreedySolutionGenerator,
-  initSetCover,
-  setExecutor,
   SetCoverInvariant,
   SetCoverModel,
 } from 'or-tools-wasm/set-cover';
@@ -132,6 +131,7 @@ const statusEl = document.getElementById('status');
 const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const clearButton = document.getElementById('clear') as HTMLButtonElement | null;
+let readSetCoverExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let selectedSubsets: number[] = [];
 let coveredElements = new Set<number>();
@@ -153,9 +153,9 @@ function appendStatus(message: string) {
 function buildModel() {
   const model = new SetCoverModel();
   for (const region of regions) {
-    model.add_empty_subset(region.cost);
+    model.addEmptySubset(region.cost);
     for (const element of region.elements) {
-      model.add_element_to_last_subset(element);
+      model.addElementToLastSubset(element);
     }
   }
   return model;
@@ -268,21 +268,20 @@ async function runSetCover() {
     renderMap();
     renderSolution();
 
-    appendStatus('Initializing Set Cover runtime...');
-    await initSetCover();
-
     const model = buildModel();
     const inv = new SetCoverInvariant(model);
     const greedy = new GreedySolutionGenerator(inv);
 
     appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
-    const hasFound = await greedy.next_solution();
+    const hasFound = await greedy.nextSolution(undefined, {
+      executor: readSetCoverExecutor(),
+    });
     if (!hasFound) {
       appendStatus('No solution found by the greedy heuristic.');
       return;
     }
 
-    const solution = inv.export_solution_as_proto();
+    const solution = inv.exportSolutionAsProto();
     selectedSubsets = solution.subset;
     coveredElements = new Set();
     for (const subsetIndex of selectedSubsets) {
@@ -291,7 +290,7 @@ async function runSetCover() {
       }
     }
     lastCost = solution.cost;
-    lastUncovered = inv.num_uncovered_elements();
+    lastUncovered = inv.numUncoveredElements();
     renderMap();
     renderSolution();
     appendStatus(`Done. Cost ${inv.cost()}.`);
@@ -332,4 +331,4 @@ coverageLegend?.addEventListener('pointerout', (event) => {
 
 renderMap();
 renderSolution();
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+readSetCoverExecutor = configureSolverExecutorSelector(null, executorSelector);

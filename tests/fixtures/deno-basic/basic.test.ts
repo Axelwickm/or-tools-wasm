@@ -59,6 +59,9 @@ import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
 import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
 import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing/worker_lifecycle.ts';
 import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
+import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
+import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
+import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
 
 type NamedCaseResult = {
   id?: string;
@@ -162,8 +165,11 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   await runNetworkFlowWorkerLifecycleCase({ SimpleMaxFlow });
   await runNetworkFlowEventHandlerCase({ SimpleMaxFlow });
 
-  const setCoverResults = await runSetCoverCases(SetCoverApi as never);
+  const setCoverResults = await runSetCoverCases(SetCoverApi);
   await assertCaseSteps(t, 'deno Set Cover', setCoverResults);
+  await runSetCoverConcurrencyCase(SetCoverApi);
+  await runSetCoverWorkerLifecycleCase(SetCoverApi);
+  await runSetCoverEventHandlerCase(SetCoverApi);
 
   const rcpspResults = await runRcpspCases(RcpspApi as never);
   await assertCaseSteps(t, 'deno RCPSP', rcpspResults);

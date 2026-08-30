@@ -989,93 +989,68 @@ the proto solve path for knapsack-shaped 0-1 models.
 
 ## Set Cover
 
-The dedicated Set Cover API mirrors
-`ortools.set_cover.python.set_cover` for weighted set covering models,
-solution invariants, and heuristic searches. It uses its own Set Cover
-WebAssembly runtime.
+The Set Cover API provides weighted covering models, solution invariants, and
+heuristic searches. The runtime is loaded lazily and execution is selected per
+search, following the same execution contract as CP-SAT.
 
 ```ts
 import {
+  ConsistencyLevel,
   GreedySolutionGenerator,
-  initSetCover,
   SetCoverInvariant,
   SetCoverModel,
-  setWorkerBridgeEnabled,
 } from 'or-tools-wasm/set-cover';
 
-setWorkerBridgeEnabled(true);
-await initSetCover();
-
 const model = new SetCoverModel();
-model.add_empty_subset(2.0);
-model.add_element_to_last_subset(0);
-model.add_empty_subset(2.0);
-model.add_element_to_last_subset(1);
-model.add_empty_subset(1.0);
-model.add_element_to_last_subset(0);
-model.add_element_to_last_subset(1);
+model.addEmptySubset(2.0);
+model.addElementToLastSubset(0);
+model.addEmptySubset(2.0);
+model.addElementToLastSubset(1);
+model.addEmptySubset(1.0);
+model.addElementToLastSubset(0);
+model.addElementToLastSubset(1);
 
 const inv = new SetCoverInvariant(model);
 const greedy = new GreedySolutionGenerator(inv);
-if (await greedy.next_solution()) {
-  console.log(inv.cost(), inv.export_solution_as_proto().subset);
+if (await greedy.nextSolution(undefined, { executor: 'worker' })) {
+  console.log(inv.cost(), inv.exportSolutionAsProto().subset);
+  console.log(inv.checkConsistency(ConsistencyLevel.COST_AND_COVERAGE));
 }
 ```
 
-`initSetCover(): Promise<void>` loads the Set Cover runtime for direct solves.
-When the browser worker bridge is enabled, it is a no-op and heuristic search
-calls run through the worker bridge.
+`nextSolution(focus?, options?)` accepts `executor`, `signal`, and `onEvent`.
+`executor` supports `direct`, `worker`, `server`, `cloud`, and `auto`; the
+default is `auto`. There is no global initializer or executor setting.
 
-`SetCoverModel` exposes Python-style methods and properties:
+`SetCoverModel` exposes:
 
-- properties: `name`, `num_elements`, `num_subsets`, `num_nonzeros`,
-  `fill_rate`, `subset_costs`, `columns`, `rows`, `row_view_is_valid`,
-  `all_subsets`
-- `SubsetRange(): number[]`
-- `ElementRange(): number[]`
-- `set_name(name): void`
-- `add_empty_subset(cost): void`
-- `add_element_to_last_subset(element): void`
-- `add_element_to_subset(element, subset): void`
-- `set_subset_cost(subset, cost): void`
-- `create_sparse_row_view(): void`
-- `sort_elements_in_subsets(): void`
-- `compute_feasibility(): boolean`
-- `resize_num_subsets(numSubsets): void`
-- `reserve_num_elements_in_subset(numElements, subset): void`
-- `export_model_as_proto(): SetCoverModelProto`
-- `import_model_from_proto(proto): void`
-- `compute_cost_stats()`, `compute_row_stats()`, `compute_column_stats()`
-- `compute_row_deciles()`, `compute_column_deciles()`
+- properties: `name`, `numElements`, `numSubsets`, `numNonzeros`, `fillRate`,
+  `subsetCosts`, `columns`, `rows`, `rowViewIsValid`, `allSubsets`
+- `subsetRange()`, `elementRange()`
+- `setName(name)`
+- `addEmptySubset(cost)`, `addElementToLastSubset(element)`
+- `addElementToSubset(element, subset)`, `setSubsetCost(subset, cost)`
+- `createSparseRowView()`, `sortElementsInSubsets()`
+- `computeFeasibility()`
+- `resizeNumSubsets(numSubsets)`
+- `exportModelAsProto()`, `importModelFromProto(proto)`
+- `computeCostStats()`, `computeRowStats()`, `computeColumnStats()`
+- `computeRowDeciles()`, `computeColumnDeciles()`
 
 `SetCoverInvariant` exposes:
 
-- `initialize()`, `clear()`, `model()`
-- `cost(): number`
-- `num_uncovered_elements(): number`
-- `is_selected(): boolean[]`
-- `coverage(): number[]`
-- `num_free_elements(): number[]`
-- `num_coverage_le_1_elements(): number[]`
-- `compute_coverage_in_focus(focus): number[]`
-- `is_redundant(): boolean[]`
-- `trace(): SetCoverDecision[]`, `clear_trace()`, `compress_trace()`
-- `clear_removability_information()`, `newly_removable_subsets()`,
-  `newly_non_removable_subsets()`
-- `load_solution(solution): void`
-- `check_consistency(consistency): boolean`
-- `compute_is_redundant(subset): boolean`
-- `recompute(): void`
-- `select(subset, consistency): boolean`
-- `deselect(subset, consistency): boolean`
-- `export_solution_as_proto(): SetCoverSolutionResponse`
-- `import_solution_from_proto(proto): void`
+- `initialize()`, `clear()`, `model()`, `setModel(model)`
+- `cost()`, `numUncoveredElements()`, `isSelected()`, `coverage()`
+- `numFreeElements()`, `numCoverageLe1Elements()`
+- `computeCoverageInFocus(focus)`, `isRedundant()`, `computeIsRedundant(subset)`
+- `trace()`, `clearTrace()`, `compressTrace()`
+- `loadSolution(solution)`, `checkConsistency(consistency)`, `recompute()`
+- `select(subset, consistency)`, `deselect(subset, consistency)`
+- `exportSolutionAsProto()`, `importSolutionFromProto(proto)`
 
-`consistency_level` / `ConsistencyLevel` exposes
-`COST_AND_COVERAGE`, `FREE_AND_UNCOVERED`, and `REDUNDANCY`.
-
-Solution generators and searches expose `next_solution()` and
-`set_max_iterations()`:
+`ConsistencyLevel` exposes `COST_AND_COVERAGE`, `FREE_AND_UNCOVERED`, and
+`REDUNDANCY`. Solution generators and searches expose `nextSolution()` and
+`setMaxIterations()`:
 
 - `TrivialSolutionGenerator`
 - `RandomSolutionGenerator`
@@ -1086,24 +1061,14 @@ Solution generators and searches expose `next_solution()` and
 - `GuidedLocalSearch`
 - `GuidedTabuSearch`
 
-`GuidedTabuSearch` also exposes `set_lagrangian_factor()`,
-`get_lagrangian_factor()`, `set_epsilon()`, `get_epsilon()`,
-`set_penalty_factor()`, `get_penalty_factor()`, `set_tabu_list_size()`, and
-`get_tabu_list_size()`. `TabuList`, `clear_random_subsets()`, and
-`clear_most_covered_elements()` are available for compatibility with the
-Python wrapper surface.
+`TabuList` remains available. Model and solution proto conversion is
+object-based through the model and invariant methods; native filesystem helpers
+are not exposed.
 
-Model and solution proto helpers are object-based in the browser-oriented
-runtime: use `export_model_as_proto()` / `import_model_from_proto()` and
-`export_solution_as_proto()` / `import_solution_from_proto()`. File-based
-helpers such as `read_set_cover_proto()`, `write_set_cover_proto()`,
-`read_orlib_scp()`, `read_orlib_rail()`, and `read_fimi_dat()` are exported for
-API discoverability but throw because package consumers do not share a native
-OR-Tools filesystem.
-
-Set Cover is single-threaded in this package. It supports the shared browser
-worker bridge, so UI code can run heuristic searches off the main thread, but
-there is no solver thread-count parameter.
+Set Cover is single-threaded. Worker cancellation terminates and recreates the
+worker because the native heuristic has no interruption hook. Direct native
+search cannot be interrupted. Concurrent searches sharing an invariant are
+rejected, as are overlapping jobs on the singleton direct or worker executor.
 
 ## RCPSP
 

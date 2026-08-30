@@ -144,30 +144,25 @@
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import {
   GreedySolutionGenerator,
-  initSetCover,
   SetCoverInvariant,
   SetCoverModel,
-  setExecutor,
 } from 'or-tools-wasm/set-cover';
 
-setExecutor({ type: 'worker' });
-await initSetCover();
-
 const model = new SetCoverModel();
-model.add_empty_subset(2.0);
-model.add_element_to_last_subset(0);
-model.add_empty_subset(2.0);
-model.add_element_to_last_subset(1);
-model.add_empty_subset(1.0);
-model.add_element_to_last_subset(0);
-model.add_element_to_last_subset(1);
+model.addEmptySubset(2.0);
+model.addElementToLastSubset(0);
+model.addEmptySubset(2.0);
+model.addElementToLastSubset(1);
+model.addEmptySubset(1.0);
+model.addElementToLastSubset(0);
+model.addElementToLastSubset(1);
 
 const inv = new SetCoverInvariant(model);
 const greedy = new GreedySolutionGenerator(inv);
-const hasFound = await greedy.next_solution();
+const hasFound = await greedy.nextSolution(undefined, { executor: 'worker' });
 
 if (hasFound) {
-  const solution = inv.export_solution_as_proto();
+  const solution = inv.exportSolutionAsProto();
   console.log(solution.cost, solution.subset);
 }</code></pre>
       </details>

@@ -19,15 +19,13 @@ import {
   SimpleMinCostFlowStatus,
 } from 'or-tools-wasm/network-flow';
 import {
-  consistency_level,
+  ConsistencyLevel,
   ElementDegreeSolutionGenerator,
   GreedySolutionGenerator,
   GuidedLocalSearch,
-  initSetCover,
   RandomSolutionGenerator,
   SetCoverInvariant,
   SetCoverModel,
-  setExecutor as setSetCoverExecutor,
   SteepestSearch,
   TrivialSolutionGenerator,
 } from 'or-tools-wasm/set-cover';
@@ -70,6 +68,9 @@ import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
 import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
 import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing/worker_lifecycle.ts';
 import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
+import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
+import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
+import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
 
 type NamedCaseResult = {
   id?: string;
@@ -192,19 +193,29 @@ test('isolates Network Flow event-handler errors in Node', async () => {
 
 test('runs the shared Set Cover cases in Node', async (t) => {
   const setCoverResults = await runSetCoverCases({
-    initSetCover,
     SetCoverModel,
-    SetCoverInvariant: SetCoverInvariant as never,
-    TrivialSolutionGenerator: TrivialSolutionGenerator as never,
-    RandomSolutionGenerator: RandomSolutionGenerator as never,
-    GreedySolutionGenerator: GreedySolutionGenerator as never,
-    ElementDegreeSolutionGenerator: ElementDegreeSolutionGenerator as never,
-    SteepestSearch: SteepestSearch as never,
-    GuidedLocalSearch: GuidedLocalSearch as never,
-    consistency_level,
-    setExecutor: setSetCoverExecutor,
+    SetCoverInvariant,
+    TrivialSolutionGenerator,
+    RandomSolutionGenerator,
+    GreedySolutionGenerator,
+    ElementDegreeSolutionGenerator,
+    SteepestSearch,
+    GuidedLocalSearch,
+    ConsistencyLevel,
   });
   await assertCaseResults(t, 'node Set Cover', setCoverResults);
+});
+
+test('enforces Set Cover solve concurrency in Node', async () => {
+  await runSetCoverConcurrencyCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator });
+});
+
+test('cancels and recovers the Set Cover worker in Node', async () => {
+  await runSetCoverWorkerLifecycleCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator });
+});
+
+test('isolates Set Cover event-handler errors in Node', async () => {
+  await runSetCoverEventHandlerCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator });
 });
 
 test('runs the shared RCPSP cases in Node', async (t) => {

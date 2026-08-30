@@ -1,34 +1,19 @@
 export {
-  clear_most_covered_elements,
-  clear_random_subsets,
-  consistency_level,
   ConsistencyLevel,
   ElementDegreeSolutionGenerator,
   GreedySolutionGenerator,
   GuidedLocalSearch,
   GuidedTabuSearch,
-  initSetCover,
   LazyElementDegreeSolutionGenerator,
   RandomSolutionGenerator,
-  read_fimi_dat,
-  read_orlib_rail,
-  read_orlib_scp,
-  read_set_cover_proto,
-  read_set_cover_solution_proto,
-  read_set_cover_solution_text,
+  RuntimeError,
   SetCoverDecision,
   SetCoverInvariant,
   SetCoverModel,
   SetCoverModelStats,
-  setSetCoverExecutor as setExecutor,
   SteepestSearch,
   TabuList,
   TrivialSolutionGenerator,
-  write_orlib_rail,
-  write_orlib_scp,
-  write_set_cover_proto,
-  write_set_cover_solution_proto,
-  write_set_cover_solution_text,
 } from './set_cover/api.js';
 export type {
   SetCoverEvent,
@@ -36,5 +21,15 @@ export type {
   SetCoverSolveOptions,
   SetCoverSolutionResponse,
 } from './set_cover/api.js';
-export type { ExecutorConfiguration } from './executor_configuration.js';
+export { CloudExecutorUnavailableError } from './cloud_executor.js';
+export type { SolverJobEvent } from './solver_executor.js';
+export type {
+  AutoExecutorConfiguration,
+  CloudExecutorConfiguration,
+  DirectExecutorConfiguration,
+  ExecutorConfiguration,
+  ExecutorSelection,
+  ServerExecutorConfiguration,
+  WorkerExecutorConfiguration,
+} from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

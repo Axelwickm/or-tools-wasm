@@ -1,24 +1,25 @@
-import { create } from '@bufbuild/protobuf';
 import { CloudExecutor } from '../cloud_executor.js';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
-import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import {
-  SetCoverBridgeRequestSchema,
-  SetCoverOperation,
-  type SetCoverBridgeResponse,
-} from '../generated/bridge/set_cover_pb.js';
+  resolveExecutorConfiguration,
+  type ExecutorSelection,
+  type ResolvedExecutorConfiguration,
+} from '../executor_configuration.js';
+import { SolverServerExecutor } from '../solver_server_executor.js';
+import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
+import { DirectSetCoverExecutor } from './direct_executor.js';
+import {
+  setCoverProtocol,
+  type SetCoverAlgorithm,
+  type SetCoverExecutor,
+  type SetCoverOperation,
+} from './protocol.js';
 import type { SolverJobEvent } from '../solver_executor.js';
-import { SetCoverExecutor, type SetCoverExecutorLike } from './executor.js';
-import { SetCoverServerExecutor } from './server_executor.js';
-import { SetCoverWorkerExecutor } from './worker_executor.js';
 
 export enum ConsistencyLevel {
   COST_AND_COVERAGE = 1,
   FREE_AND_UNCOVERED = 2,
   REDUNDANCY = 3,
 }
-
-export const consistency_level = ConsistencyLevel;
 
 export type SetCoverModelProto = {
   subset: Array<{ cost: number; element: number[] }>;
@@ -36,69 +37,48 @@ export type SetCoverSolutionResponse = {
 
 export type SetCoverEvent = SolverJobEvent;
 export type SetCoverSolveOptions = {
+  executor?: ExecutorSelection;
   onEvent?: (event: SetCoverEvent) => void | Promise<void>;
   signal?: AbortSignal;
 };
 
-type NativeSetCoverOperation =
-  | 'trivial'
-  | 'greedy'
-  | 'elementDegree'
-  | 'lazyElementDegree'
-  | 'random'
-  | 'steepest'
-  | 'guidedLocal'
-  | 'guidedTabu';
-
-type SetCoverSolvePayload = {
-  operation: NativeSetCoverOperation;
-  costs: number[];
-  starts: number[];
-  elements: number[];
-  selected: boolean[];
-  focus: boolean[] | null;
-  maxIterations: number;
-};
-
-const bridgeOperation: Record<NativeSetCoverOperation, SetCoverOperation> = {
-  trivial: SetCoverOperation.TRIVIAL,
-  greedy: SetCoverOperation.GREEDY,
-  elementDegree: SetCoverOperation.ELEMENT_DEGREE,
-  lazyElementDegree: SetCoverOperation.LAZY_ELEMENT_DEGREE,
-  random: SetCoverOperation.RANDOM,
-  steepest: SetCoverOperation.STEEPEST,
-  guidedLocal: SetCoverOperation.GUIDED_LOCAL,
-  guidedTabu: SetCoverOperation.GUIDED_TABU,
-};
-
-const directExecutor = new SetCoverExecutor();
-const workerExecutor = new SetCoverWorkerExecutor();
-let executor: SetCoverExecutorLike = createExecutor({ type: 'auto' });
-
-function createExecutor(configuration: ExecutorConfiguration): SetCoverExecutorLike {
-  return createResolvedExecutor(resolveExecutorConfiguration(configuration));
+export class RuntimeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RuntimeError';
+  }
 }
 
-function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): SetCoverExecutorLike {
+async function createSetCoverWorker(): Promise<SolverWorkerLike> {
+  return new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module', name: 'ortools-executor-set-cover' },
+  );
+}
+
+const directExecutor = new DirectSetCoverExecutor();
+const workerExecutor = new SolverWorkerExecutor(setCoverProtocol, createSetCoverWorker);
+
+function createSetCoverExecutor(selection: ExecutorSelection = 'auto'): SetCoverExecutor {
+  return createResolvedExecutor(resolveExecutorConfiguration(selection));
+}
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): SetCoverExecutor {
   switch (configuration.type) {
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
-    case 'server': return new SetCoverServerExecutor(configuration);
+    case 'server': return new SolverServerExecutor(setCoverProtocol, configuration);
     case 'cloud': return new CloudExecutor('set-cover', { test: configuration.test });
   }
 }
 
-export async function initSetCover(): Promise<void> {
-  await executor.load();
-}
-
-export function setSetCoverExecutor(configuration: ExecutorConfiguration): void {
-  executor = createExecutor(configuration);
-}
-
 function abortError(signal: AbortSignal) {
   if (signal.reason instanceof Error) return signal.reason;
-  const error = new Error(signal.reason === undefined ? 'The Set Cover solve was aborted.' : String(signal.reason));
+  if (signal.reason !== undefined) return new Error(String(signal.reason));
+  if (typeof DOMException !== 'undefined') {
+    return new DOMException('The Set Cover solve was aborted.', 'AbortError');
+  }
+  const error = new Error('The Set Cover solve was aborted.');
   error.name = 'AbortError';
   return error;
 }
@@ -149,20 +129,19 @@ function deciles(values: number[]) {
   return Array.from({ length: 11 }, (_, index) => sorted[Math.min(sorted.length - 1, Math.floor((index * (sorted.length - 1)) / 10))]);
 }
 
-async function runNativeSetCover(payload: SetCoverSolvePayload, options: SetCoverSolveOptions = {}) {
+async function runNativeSetCover(operation: SetCoverOperation, options: SetCoverSolveOptions = {}) {
   if (options.signal?.aborted) throw abortError(options.signal);
-  const currentExecutor = executor;
-  const request = create(SetCoverBridgeRequestSchema, {
-    operation: bridgeOperation[payload.operation],
-    costs: payload.costs,
-    starts: payload.starts,
-    elements: payload.elements,
-    selected: payload.selected,
-    focus: payload.focus ?? [],
-    hasFocus: payload.focus !== null,
-    maxIterations: payload.maxIterations,
-  });
-  const job = currentExecutor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
+  const executor = createSetCoverExecutor(options.executor);
+  let callbackError: unknown = null;
+  const onEvent = async (event: SetCoverEvent) => {
+    if (callbackError) return;
+    try {
+      await options.onEvent?.(event);
+    } catch (error) {
+      callbackError = error;
+    }
+  };
+  const job = executor.execute(operation, { onEvent });
   let aborted: Error | null = null;
   const onAbort = () => {
     if (!options.signal) return;
@@ -173,6 +152,7 @@ async function runNativeSetCover(payload: SetCoverSolvePayload, options: SetCove
   if (options.signal?.aborted) onAbort();
   try {
     const result = await job.result;
+    if (callbackError) throw callbackError;
     if (aborted) throw aborted;
     return result;
   } finally {
@@ -189,11 +169,11 @@ export class SetCoverModelStats {
     public stddev: number,
   ) {}
 
-  get to_string() {
+  toString() {
     return `${this.min}, ${this.max}, ${this.median}, ${this.mean}, ${this.stddev}`;
   }
 
-  get to_verbose_string() {
+  toVerboseString() {
     return `min: ${this.min}, max: ${this.max}, median: ${this.median}, mean: ${this.mean}, stddev: ${this.stddev}`;
   }
 }
@@ -209,7 +189,7 @@ export class SetCoverModel {
     return this.modelName;
   }
 
-  get num_elements() {
+  get numElements() {
     let max = -1;
     for (const subset of this.subsetElements) {
       for (const element of subset) max = Math.max(max, element);
@@ -217,20 +197,20 @@ export class SetCoverModel {
     return max + 1;
   }
 
-  get num_subsets() {
+  get numSubsets() {
     return this.subsetElements.length;
   }
 
-  get num_nonzeros() {
+  get numNonzeros() {
     return this.subsetElements.reduce((sum, subset) => sum + subset.length, 0);
   }
 
-  get fill_rate() {
-    const denominator = this.num_elements * this.num_subsets;
-    return denominator === 0 ? 0 : this.num_nonzeros / denominator;
+  get fillRate() {
+    const denominator = this.numElements * this.numSubsets;
+    return denominator === 0 ? 0 : this.numNonzeros / denominator;
   }
 
-  get subset_costs() {
+  get subsetCosts() {
     return [...this.costs];
   }
 
@@ -239,61 +219,61 @@ export class SetCoverModel {
   }
 
   get rows() {
-    if (!this.validRows) this.create_sparse_row_view();
+    if (!this.validRows) this.createSparseRowView();
     return this.rowElements.map((row) => [...row]);
   }
 
-  get row_view_is_valid() {
+  get rowViewIsValid() {
     return this.validRows;
   }
 
-  get all_subsets() {
-    return this.SubsetRange();
+  get allSubsets() {
+    return this.subsetRange();
   }
 
-  SubsetRange() {
-    return Array.from({ length: this.num_subsets }, (_, index) => index);
+  subsetRange() {
+    return Array.from({ length: this.numSubsets }, (_, index) => index);
   }
 
-  ElementRange() {
-    return Array.from({ length: this.num_elements }, (_, index) => index);
+  elementRange() {
+    return Array.from({ length: this.numElements }, (_, index) => index);
   }
 
-  set_name(name: string) {
+  setName(name: string) {
     this.modelName = name;
   }
 
-  add_empty_subset(cost: number) {
-    if (!Number.isFinite(cost)) throw new Error('SetCoverModel.add_empty_subset: cost must be finite.');
+  addEmptySubset(cost: number) {
+    if (!Number.isFinite(cost)) throw new Error('SetCoverModel.addEmptySubset: cost must be finite.');
     this.costs.push(cost);
     this.subsetElements.push([]);
     this.validRows = false;
   }
 
-  add_element_to_last_subset(element: number) {
+  addElementToLastSubset(element: number) {
     if (!this.subsetElements.length) {
-      throw new Error('SetCoverModel.add_element_to_last_subset: no subset exists.');
+      throw new Error('SetCoverModel.addElementToLastSubset: no subset exists.');
     }
-    this.add_element_to_subset(element, this.subsetElements.length - 1);
+    this.addElementToSubset(element, this.subsetElements.length - 1);
   }
 
-  set_subset_cost(subset: number, cost: number) {
-    assertSubsetIndex(subset, this.num_subsets);
-    if (!Number.isFinite(cost)) throw new Error('SetCoverModel.set_subset_cost: cost must be finite.');
+  setSubsetCost(subset: number, cost: number) {
+    assertSubsetIndex(subset, this.numSubsets);
+    if (!Number.isFinite(cost)) throw new Error('SetCoverModel.setSubsetCost: cost must be finite.');
     this.costs[subset] = cost;
   }
 
-  add_element_to_subset(element: number, subset: number) {
-    assertSubsetIndex(subset, this.num_subsets);
+  addElementToSubset(element: number, subset: number) {
+    assertSubsetIndex(subset, this.numSubsets);
     if (!Number.isInteger(element) || element < 0) {
-      throw new Error('SetCoverModel.add_element_to_subset: element must be a non-negative integer.');
+      throw new Error('SetCoverModel.addElementToSubset: element must be a non-negative integer.');
     }
     this.subsetElements[subset].push(element);
     this.validRows = false;
   }
 
-  create_sparse_row_view() {
-    this.rowElements = Array.from({ length: this.num_elements }, () => []);
+  createSparseRowView() {
+    this.rowElements = Array.from({ length: this.numElements }, () => []);
     this.subsetElements.forEach((subset, subsetIndex) => {
       for (const element of subset) {
         this.rowElements[element]?.push(subsetIndex);
@@ -303,81 +283,85 @@ export class SetCoverModel {
     this.validRows = true;
   }
 
-  sort_elements_in_subsets() {
+  sortElementsInSubsets() {
     this.subsetElements.forEach((subset) => subset.sort((a, b) => a - b));
     this.validRows = false;
   }
 
-  compute_feasibility() {
+  computeFeasibility() {
     const covered = new Set<number>();
     for (const subset of this.subsetElements) {
       for (const element of subset) covered.add(element);
     }
-    for (let element = 0; element < this.num_elements; element++) {
+    for (let element = 0; element < this.numElements; element++) {
       if (!covered.has(element)) return false;
     }
-    return this.num_elements > 0 || this.num_subsets > 0;
+    return this.numElements > 0 || this.numSubsets > 0;
   }
 
-  resize_num_subsets(numSubsets: number) {
-    while (this.num_subsets < numSubsets) this.add_empty_subset(0);
+  resizeNumSubsets(numSubsets: number) {
+    while (this.numSubsets < numSubsets) this.addEmptySubset(0);
   }
 
-  reserve_num_elements_in_subset(_numElements: number, subset: number) {
-    assertSubsetIndex(subset, this.num_subsets);
-  }
-
-  export_model_as_proto(): SetCoverModelProto {
+  exportModelAsProto(): SetCoverModelProto {
     return {
       name: this.modelName,
       subset: this.subsetElements.map((element, index) => ({ cost: this.costs[index], element: [...element].sort((a, b) => a - b) })),
     };
   }
 
-  import_model_from_proto(proto: SetCoverModelProto) {
+  importModelFromProto(proto: SetCoverModelProto) {
     this.modelName = proto.name ?? 'SetCoverModel';
     this.costs = proto.subset.map((subset) => subset.cost ?? 0);
     this.subsetElements = proto.subset.map((subset) => [...(subset.element ?? [])]);
     this.validRows = false;
   }
 
-  compute_cost_stats() {
+  computeCostStats() {
     return stats(this.costs);
   }
 
-  compute_row_stats() {
+  computeRowStats() {
     return stats(this.rows.map((row) => row.length));
   }
 
-  compute_column_stats() {
+  computeColumnStats() {
     return stats(this.subsetElements.map((subset) => subset.length));
   }
 
-  compute_row_deciles() {
+  computeRowDeciles() {
     return deciles(this.rows.map((row) => row.length));
   }
 
-  compute_column_deciles() {
+  computeColumnDeciles() {
     return deciles(this.subsetElements.map((subset) => subset.length));
   }
 
-  _nativePayload(selected: boolean[], focus: boolean[] | null, operation: NativeSetCoverOperation, maxIterations: number): SetCoverSolvePayload {
-    const starts: number[] = [0];
-    const elements: number[] = [];
-    for (const subset of this.subsetElements) {
-      elements.push(...subset);
-      starts.push(elements.length);
-    }
-    return {
-      operation,
-      costs: [...this.costs],
-      starts,
-      elements,
-      selected,
-      focus,
-      maxIterations,
-    };
+}
+
+function createSetCoverOperation(
+  model: SetCoverModel,
+  selected: boolean[],
+  focus: boolean[] | null,
+  algorithm: SetCoverAlgorithm,
+  maxIterations: number,
+): SetCoverOperation {
+  const starts: number[] = [0];
+  const elements: number[] = [];
+  for (const subset of model.columns) {
+    elements.push(...subset);
+    starts.push(elements.length);
   }
+  return {
+    type: 'nextSolution',
+    algorithm,
+    costs: model.subsetCosts,
+    starts,
+    elements,
+    selected,
+    focus,
+    maxIterations,
+  };
 }
 
 export class SetCoverDecision {
@@ -410,7 +394,7 @@ export class SetCoverInvariant {
   }
 
   initialize() {
-    this.selected = Array.from({ length: this.currentModel.num_subsets }, () => false);
+    this.selected = Array.from({ length: this.currentModel.numSubsets }, () => false);
     this.solutionTrace = [];
     this.recompute();
   }
@@ -423,11 +407,7 @@ export class SetCoverInvariant {
     return this.currentModel;
   }
 
-  get model_property() {
-    return this.currentModel;
-  }
-
-  set model_property(model: SetCoverModel) {
+  setModel(model: SetCoverModel) {
     this.currentModel = model;
     this.initialize();
   }
@@ -436,19 +416,19 @@ export class SetCoverInvariant {
     return this.currentCost;
   }
 
-  num_uncovered_elements() {
+  numUncoveredElements() {
     return this.uncoveredElements;
   }
 
-  is_selected() {
+  isSelected() {
     return [...this.selected];
   }
 
-  num_free_elements() {
+  numFreeElements() {
     return [...this.freeElements];
   }
 
-  num_coverage_le_1_elements() {
+  numCoverageLe1Elements() {
     return [...this.coverageLe1Elements];
   }
 
@@ -456,17 +436,17 @@ export class SetCoverInvariant {
     return [...this.currentCoverage];
   }
 
-  compute_coverage_in_focus(focus: number[]) {
-    const coverage = Array.from({ length: this.currentModel.num_elements }, () => 0);
+  computeCoverageInFocus(focus: number[]) {
+    const coverage = Array.from({ length: this.currentModel.numElements }, () => 0);
     const columns = this.currentModel.columns;
     for (const subset of focus) {
-      assertSubsetIndex(subset, this.currentModel.num_subsets);
+      assertSubsetIndex(subset, this.currentModel.numSubsets);
       for (const element of columns[subset]) coverage[element]++;
     }
     return coverage;
   }
 
-  is_redundant() {
+  isRedundant() {
     return [...this.redundant];
   }
 
@@ -474,29 +454,19 @@ export class SetCoverInvariant {
     return [...this.solutionTrace];
   }
 
-  clear_trace() {
+  clearTrace() {
     this.solutionTrace = [];
   }
 
-  clear_removability_information() {}
-
-  newly_removable_subsets() {
-    return [];
-  }
-
-  newly_non_removable_subsets() {
-    return [];
-  }
-
-  compress_trace() {
+  compressTrace() {
     this.solutionTrace = this.selected
       .map((value, subset) => value ? new SetCoverDecision(subset, true) : null)
       .filter((value): value is SetCoverDecision => value !== null);
   }
 
-  load_solution(solution: boolean[]) {
-    if (solution.length !== this.currentModel.num_subsets) {
-      throw new Error('SetCoverInvariant.load_solution: solution length must match num_subsets.');
+  loadSolution(solution: boolean[]) {
+    if (solution.length !== this.currentModel.numSubsets) {
+      throw new Error('SetCoverInvariant.loadSolution: solution length must match numSubsets.');
     }
     this.selected = [...solution];
     this.solutionTrace = solution
@@ -505,21 +475,21 @@ export class SetCoverInvariant {
     this.recompute();
   }
 
-  check_consistency(_consistency: ConsistencyLevel) {
+  checkConsistency(_consistency: ConsistencyLevel) {
     this.recompute();
-    return this.currentCoverage.length === this.currentModel.num_elements &&
-      this.selected.length === this.currentModel.num_subsets;
+    return this.currentCoverage.length === this.currentModel.numElements &&
+      this.selected.length === this.currentModel.numSubsets;
   }
 
-  compute_is_redundant(subset: number) {
-    assertSubsetIndex(subset, this.currentModel.num_subsets);
+  computeIsRedundant(subset: number) {
+    assertSubsetIndex(subset, this.currentModel.numSubsets);
     return this.currentModel.columns[subset].every((element) => this.currentCoverage[element] > 1);
   }
 
   recompute() {
     const columns = this.currentModel.columns;
-    const costs = this.currentModel.subset_costs;
-    this.currentCoverage = Array.from({ length: this.currentModel.num_elements }, () => 0);
+    const costs = this.currentModel.subsetCosts;
+    this.currentCoverage = Array.from({ length: this.currentModel.numElements }, () => 0);
     this.currentCost = 0;
     this.selected.forEach((value, subset) => {
       if (!value) return;
@@ -533,7 +503,7 @@ export class SetCoverInvariant {
   }
 
   select(subset: number, _consistency: ConsistencyLevel) {
-    assertSubsetIndex(subset, this.currentModel.num_subsets);
+    assertSubsetIndex(subset, this.currentModel.numSubsets);
     if (this.selected[subset]) return false;
     this.selected[subset] = true;
     this.solutionTrace.push(new SetCoverDecision(subset, true));
@@ -542,7 +512,7 @@ export class SetCoverInvariant {
   }
 
   deselect(subset: number, _consistency: ConsistencyLevel) {
-    assertSubsetIndex(subset, this.currentModel.num_subsets);
+    assertSubsetIndex(subset, this.currentModel.numSubsets);
     if (!this.selected[subset]) return false;
     this.selected[subset] = false;
     this.solutionTrace.push(new SetCoverDecision(subset, false));
@@ -550,34 +520,33 @@ export class SetCoverInvariant {
     return true;
   }
 
-  export_solution_as_proto() {
+  exportSolutionAsProto() {
     const subsets = this.selected.flatMap((value, subset) => value ? [subset] : []);
-    return createSolutionResponse(subsets, this.currentCost, this.currentModel.num_subsets);
+    return createSolutionResponse(subsets, this.currentCost, this.currentModel.numSubsets);
   }
 
-  import_solution_from_proto(proto: SetCoverSolutionResponse) {
-    const selected = Array.from({ length: this.currentModel.num_subsets }, () => false);
+  importSolutionFromProto(proto: SetCoverSolutionResponse) {
+    const selected = Array.from({ length: this.currentModel.numSubsets }, () => false);
     for (const subset of proto.subset ?? []) {
-      assertSubsetIndex(subset, this.currentModel.num_subsets);
+      assertSubsetIndex(subset, this.currentModel.numSubsets);
       selected[subset] = true;
     }
-    this.load_solution(selected);
+    this.loadSolution(selected);
   }
 
-  _applyNativeResult(result: SetCoverBridgeResponse) {
-    this.selected = [...result.selected];
-    this.currentCost = result.cost;
-    this.uncoveredElements = result.numUncoveredElements;
-    this.currentCoverage = [...result.coverage];
-    this.freeElements = [...result.numFreeElements];
-    this.coverageLe1Elements = [...result.numCoverageLe1Elements];
-    this.redundant = [...result.isRedundant];
-    this.compress_trace();
-  }
+}
 
-  _nativeSelected() {
-    return [...this.selected];
+const activeSetCoverInvariants = new WeakSet<SetCoverInvariant>();
+
+function beginSetCoverSolve(invariant: SetCoverInvariant) {
+  if (activeSetCoverInvariants.has(invariant)) {
+    throw new RuntimeError('A Set Cover solve is already in progress for this invariant.');
   }
+  activeSetCoverInvariants.add(invariant);
+}
+
+function finishSetCoverSolve(invariant: SetCoverInvariant) {
+  activeSetCoverInvariants.delete(invariant);
 }
 
 abstract class SetCoverSolutionGenerator {
@@ -585,36 +554,42 @@ abstract class SetCoverSolutionGenerator {
 
   constructor(
     protected readonly invariant: SetCoverInvariant,
-    private readonly operation: NativeSetCoverOperation,
+    private readonly algorithm: SetCoverAlgorithm,
     private readonly generatorName: string,
   ) {}
 
-  set_max_iterations(maxIterations: number) {
+  setMaxIterations(maxIterations: number) {
     this.maxIterations = maxIterations;
   }
 
-  async next_solution(focus?: number[] | boolean[], options: SetCoverSolveOptions = {}) {
-    const model = this.invariant.model();
-    let focusMask: boolean[] | null = null;
-    if (Array.isArray(focus)) {
-      if (focus.every((value) => typeof value === 'boolean')) {
-        focusMask = [...focus as boolean[]];
-      } else {
-        focusMask = Array.from({ length: model.num_subsets }, () => false);
-        for (const subset of focus as number[]) {
-          assertSubsetIndex(subset, model.num_subsets);
-          focusMask[subset] = true;
+  async nextSolution(focus?: number[] | boolean[], options: SetCoverSolveOptions = {}) {
+    beginSetCoverSolve(this.invariant);
+    try {
+      const model = this.invariant.model();
+      let focusMask: boolean[] | null = null;
+      if (Array.isArray(focus)) {
+        if (focus.every((value) => typeof value === 'boolean')) {
+          focusMask = [...focus as boolean[]];
+        } else {
+          focusMask = Array.from({ length: model.numSubsets }, () => false);
+          for (const subset of focus as number[]) {
+            assertSubsetIndex(subset, model.numSubsets);
+            focusMask[subset] = true;
+          }
         }
       }
+      const result = await runNativeSetCover(createSetCoverOperation(
+        model,
+        this.invariant.isSelected(),
+        focusMask,
+        this.algorithm,
+        this.maxIterations,
+      ), options);
+      this.invariant.loadSolution(result.selected);
+      return result.nextSolution;
+    } finally {
+      finishSetCoverSolve(this.invariant);
     }
-    const result = await runNativeSetCover(model._nativePayload(
-      this.invariant._nativeSelected(),
-      focusMask,
-      this.operation,
-      this.maxIterations,
-    ), options);
-    this.invariant._applyNativeResult(result);
-    return result.nextSolution;
   }
 
   name() {
@@ -662,8 +637,6 @@ export class GuidedLocalSearch extends SetCoverSolutionGenerator {
   constructor(invariant: SetCoverInvariant) {
     super(invariant, 'guidedLocal', 'GuidedLocalSearch');
   }
-
-  initialize() {}
 }
 
 export class TabuList {
@@ -699,87 +672,7 @@ export class TabuList {
 }
 
 export class GuidedTabuSearch extends SetCoverSolutionGenerator {
-  private lagrangianFactor = 100;
-  private epsilon = 1e-6;
-  private penaltyFactor = 0.3;
-  private tabuListSize = 17;
-
   constructor(invariant: SetCoverInvariant) {
     super(invariant, 'guidedTabu', 'GuidedTabuSearch');
   }
-
-  initialize() {}
-
-  set_lagrangian_factor(factor: number) {
-    this.lagrangianFactor = factor;
-  }
-
-  get_lagrangian_factor() {
-    return this.lagrangianFactor;
-  }
-
-  set_epsilon(value: number) {
-    this.epsilon = value;
-  }
-
-  get_epsilon() {
-    return this.epsilon;
-  }
-
-  set_penalty_factor(factor: number) {
-    this.penaltyFactor = factor;
-  }
-
-  get_penalty_factor() {
-    return this.penaltyFactor;
-  }
-
-  set_tabu_list_size(size: number) {
-    this.tabuListSize = size;
-  }
-
-  get_tabu_list_size() {
-    return this.tabuListSize;
-  }
 }
-
-export function clear_random_subsets(numSubsetsOrFocus: number | number[], invariantOrNumSubsets: SetCoverInvariant | number, maybeInvariant?: SetCoverInvariant) {
-  const invariant = typeof numSubsetsOrFocus === 'number' ? invariantOrNumSubsets as SetCoverInvariant : maybeInvariant;
-  const numSubsets = typeof numSubsetsOrFocus === 'number' ? numSubsetsOrFocus : invariantOrNumSubsets as number;
-  if (!invariant) throw new Error('clear_random_subsets: invariant is required.');
-  const selected = invariant.is_selected();
-  const chosen: number[] = [];
-  for (let subset = 0; subset < selected.length && chosen.length < numSubsets; subset++) {
-    if (selected[subset]) {
-      invariant.deselect(subset, ConsistencyLevel.COST_AND_COVERAGE);
-      chosen.push(subset);
-    }
-  }
-  return chosen;
-}
-
-export const clear_most_covered_elements = clear_random_subsets;
-
-export function read_set_cover_proto(_filename: string, _binary?: boolean): SetCoverModel {
-  throw new Error('read_set_cover_proto is not available in the browser-oriented wasm runtime. Use import_model_from_proto().');
-}
-
-export function write_set_cover_proto(_model: SetCoverModel, _filename: string, _binary?: boolean): void {
-  throw new Error('write_set_cover_proto is not available in the browser-oriented wasm runtime. Use export_model_as_proto().');
-}
-
-export function read_set_cover_solution_proto(_filename: string, _binary?: boolean): SetCoverSolutionResponse {
-  throw new Error('read_set_cover_solution_proto is not available in the browser-oriented wasm runtime. Use import_solution_from_proto().');
-}
-
-export function write_set_cover_solution_proto(_model: SetCoverModel, _solution: boolean[], _filename: string, _binary?: boolean): void {
-  throw new Error('write_set_cover_solution_proto is not available in the browser-oriented wasm runtime. Use export_solution_as_proto().');
-}
-
-export const read_orlib_scp = read_set_cover_proto;
-export const read_orlib_rail = read_set_cover_proto;
-export const read_fimi_dat = read_set_cover_proto;
-export const write_orlib_scp = write_set_cover_proto;
-export const write_orlib_rail = write_set_cover_proto;
-export const write_set_cover_solution_text = write_set_cover_solution_proto;
-export const read_set_cover_solution_text = read_set_cover_solution_proto;

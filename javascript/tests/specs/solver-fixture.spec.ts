@@ -216,6 +216,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       name?: string;
       ok?: boolean;
     }>;
+    setCoverConcurrencyResult?: { ok?: boolean };
+    setCoverWorkerLifecycleResult?: { ok?: boolean };
+    setCoverEventHandlerResult?: { ok?: boolean };
     mathOptResults?: Array<{
       id?: string;
       name?: string;
@@ -657,6 +660,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     parsedStatus.setCoverWorkerStatsBefore?.executorWorkerRequests?.['set-cover'] ?? 0,
   );
   expectStableCaseIds(parsedStatus.setCoverResults, 'Set Cover');
+  expect(parsedStatus.setCoverConcurrencyResult?.ok).toBe(true);
+  expect(parsedStatus.setCoverWorkerLifecycleResult?.ok).toBe(true);
+  expect(parsedStatus.setCoverEventHandlerResult?.ok).toBe(true);
   expect(parsedStatus.rcpspWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
     parsedStatus.rcpspWorkerStatsBefore?.executorWorkerRequests?.['cp-sat'] ?? 0,
   );

@@ -27,6 +27,9 @@ import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { executorFixtureModes, serverExecutorUrl } from '../../harness/shared_case.ts';
 import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
 import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
+import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
+import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
+import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
 import type { BrowserFixtureGroup } from '../../harness/browser_groups.ts';
 
 type PackageModule = Record<string, any>;
@@ -351,7 +354,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     }, { modes: executorFixtureModes }))
   );
   const setCover = await runSelectedGroup(selectedGroup, 'set-cover', 'set-cover', () =>
-    runWithWorkerStats(workerSpy, () => runSetCoverCases(SetCoverApi as never, { modes: executorFixtureModes }))
+    runWithWorkerStats(workerSpy, () => runSetCoverCases(SetCoverApi, { modes: executorFixtureModes }))
   );
   const rcpsp = await runSelectedGroup(selectedGroup, 'rcpsp', 'rcpsp', () =>
     runWithWorkerStats(workerSpy, () => runRcpspCases(RcpspApi as never, { modes: executorFixtureModes }))
@@ -470,6 +473,24 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
       () => runNetworkFlowEventHandlerCase(NetworkFlowApi as never),
     ),
   );
+  const setCoverConcurrencyResult = await runSelectedGroup(
+    selectedGroup,
+    'set-cover',
+    'set-cover-concurrency',
+    () => runSetCoverConcurrencyCase(SetCoverApi),
+  );
+  const setCoverWorkerLifecycleResult = await runSelectedGroup(
+    selectedGroup,
+    'set-cover',
+    'set-cover-worker-lifecycle',
+    () => runWithWorkerStats(workerSpy, () => runSetCoverWorkerLifecycleCase(SetCoverApi)),
+  );
+  const setCoverEventHandlerResult = await runSelectedGroup(
+    selectedGroup,
+    'set-cover',
+    'set-cover-event-handler',
+    () => runWithWorkerStats(workerSpy, () => runSetCoverEventHandlerCase(SetCoverApi)),
+  );
   const cloudExecutorResult = await runSelectedGroup(selectedGroup, 'cp-sat', 'cloud', () =>
     runCloudExecutorCase(CpSatApi as never, {
       packageName: PackageApi.packageName,
@@ -489,6 +510,9 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     networkFlowConcurrencyResult,
     networkFlowWorkerLifecycleResult: networkFlowWorkerLifecycleResult?.result,
     networkFlowEventHandlerResult: networkFlowEventHandlerResult?.result,
+    setCoverConcurrencyResult,
+    setCoverWorkerLifecycleResult: setCoverWorkerLifecycleResult?.result,
+    setCoverEventHandlerResult: setCoverEventHandlerResult?.result,
     routingWorkerLifecycleResult: routingWorkerLifecycleResult?.result,
     solverConcurrencyResult,
     cpSatSolverStructureResults: cpSatSolverStructure?.result,
