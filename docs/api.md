@@ -1077,46 +1077,42 @@ The dedicated RCPSP API provides a Python-like parser surface for
 scheduling builder that compiles to CP-SAT scheduling constraints.
 
 ```ts
-import {
-  initRcpsp,
-  RcpspModelBuilder,
-  setWorkerBridgeEnabled,
-} from 'or-tools-wasm/rcpsp';
-
-setWorkerBridgeEnabled(true);
-await initRcpsp();
+import { RcpspModelBuilder } from 'or-tools-wasm/rcpsp';
 
 const project = new RcpspModelBuilder('house_project')
-  .add_resource({ name: 'crew', capacity: 3 })
-  .add_activity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
-  .add_activity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
-  .add_activity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
-  .add_activity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
-  .add_activity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
+  .addResource({ name: 'crew', capacity: 3 })
+  .addActivity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
+  .addActivity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
+  .addActivity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
+  .addActivity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
+  .addActivity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
   .build();
 
-const result = await project.solve({ numWorkers: 4, maxTimeInSeconds: 5 });
+const result = await project.solve({
+  numWorkers: 4,
+  maxTimeInSeconds: 5,
+  executor: 'worker',
+});
 console.log(result.statusName, result.makespan, result.tasks);
 ```
 
-`initRcpsp(): Promise<void>` is a compatibility no-op. RCPSP currently reuses
-the CP-SAT solve path instead of loading a separate native runtime; calling
-`solve()` loads or uses the CP-SAT runtime as needed.
+RCPSP reuses the CP-SAT solve path instead of loading a separate native runtime.
+The runtime is loaded lazily by `solve()`, and `executor` is selected per call.
 
 `RcpspModelBuilder` exposes:
 
-- `add_resource({ name, capacity, renewable? })`
-- `add_activity({ name, duration, demands?, successors? })`
+- `addResource({ name, capacity, renewable? })`
+- `addActivity({ name, duration, demands?, successors? })`
 - `build(): RcpspProblem`
 
 `RcpspProblem` exposes:
 
-- `RcpspProblem.from_proto(proto)` / `fromProto(proto)`
-- `RcpspProblem.from_psplib(text)` / `fromPsplib(text)`
+- `RcpspProblem.fromProto(proto)`
+- `RcpspProblem.fromPsplib(text)`
 - properties: `name`, `resources`, `tasks`, `horizon`
-- `export_model_as_proto()` / `exportModelAsProto()`
-- `to_cp_sat_model()` / `toCpSatModel()`
-- `solve(params?: SatParameters): Promise<RcpspSolveResult>`
+- `exportModelAsProto()`
+- `toCpSatModel()`
+- `solve(options?: RcpspSolveOptions): Promise<RcpspSolveResult>`
 
 `RcpspSolveResult` contains:
 
@@ -1128,17 +1124,20 @@ the CP-SAT solve path instead of loading a separate native runtime; calling
 - the generated `CpModel`, `starts`, `ends`, and `makespanVar` for callers that
   need the lower-level CP-SAT model path
 
-`RcpspParser` mirrors the upstream Python wrapper shape with `problem()` and
-`parse_string()`. `parse_file()` is exported for API discoverability but throws
-in this browser-oriented package because consumers do not share a native
-OR-Tools filesystem; pass file contents to `parse_string()` instead.
+`RcpspParser` exposes `problem()` and `parseString()`. Native filesystem helpers
+are not exposed; pass file contents to `parseString()`.
 
 The CP-SAT-backed builder supports the standard renewable-resource RCPSP case:
 activities, durations, precedence constraints, renewable resource capacities,
 and makespan minimization. RCPSP/Max delays, resource-investment objectives, and
 consumer/producer instances are parsed as proto data but rejected by
-`to_cp_sat_model()` / `solve()` until those variants have a dedicated model
+`toCpSatModel()` / `solve()` until those variants have a dedicated model
 translation.
+
+Solve options use the same shape as `CpSolver.solve()`: CP-SAT parameters,
+`executor`, `signal`, `eventMask`, and `onEvent` share one object. Overlapping
+calls on one `RcpspProblem` are rejected. Direct and worker execution otherwise
+inherit CP-SAT's concurrency and cancellation behavior.
 
 ## Network Flow
 

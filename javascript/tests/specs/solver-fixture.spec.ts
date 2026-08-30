@@ -211,6 +211,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       makespan?: number | null;
       statusName?: string;
     }>;
+    rcpspConcurrencyResult?: { ok?: boolean };
+    rcpspWorkerLifecycleResult?: { ok?: boolean };
+    rcpspEventHandlerResult?: { ok?: boolean };
     setCoverResults?: Array<{
       id?: string;
       name?: string;
@@ -692,6 +695,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     })] : []),
   ]));
   expectStableCaseIds(parsedStatus.rcpspResults, 'RCPSP');
+  expect(parsedStatus.rcpspConcurrencyResult?.ok).toBe(true);
+  expect(parsedStatus.rcpspWorkerLifecycleResult?.ok).toBe(true);
+  expect(parsedStatus.rcpspEventHandlerResult?.ok).toBe(true);
   expect(parsedStatus.mathOptWorkerStatsAfter?.executorWorkerRequests?.mathopt).toBeGreaterThan(
     parsedStatus.mathOptWorkerStatsBefore?.executorWorkerRequests?.mathopt ?? 0,
   );

@@ -1,8 +1,7 @@
 import {
-  initRcpsp,
+  type ExecutorConfiguration,
   RcpspModelBuilder,
   type RcpspScheduleTask,
-  setExecutor,
 } from 'or-tools-wasm/rcpsp';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
@@ -85,9 +84,9 @@ function syncActivitiesFromInputs() {
 
 function buildProject() {
   const builder = new RcpspModelBuilder('house_project')
-    .add_resource({ name: 'crew', capacity: 3 });
+    .addResource({ name: 'crew', capacity: 3 });
   for (const activity of activities) {
-    builder.add_activity({
+    builder.addActivity({
       name: activity.name,
       duration: activity.duration,
       demands: { crew: activity.crew },
@@ -196,10 +195,12 @@ async function solve() {
     renderTimeline();
 
     const workers = Math.max(1, Number(workersInput?.value || 1));
-    appendStatus('Initializing RCPSP surface...');
-    await initRcpsp();
     appendStatus(`Solving with the ${executorSelector?.value ?? 'auto'} executor...`);
-    const result = await buildProject().solve({ numWorkers: workers, maxTimeInSeconds: 5 });
+    const result = await buildProject().solve({
+      numWorkers: workers,
+      maxTimeInSeconds: 5,
+      executor: selectedExecutor() as ExecutorConfiguration,
+    });
     scheduleTasks = result.tasks;
     makespan = result.makespan;
     renderActivities();
@@ -214,7 +215,7 @@ async function solve() {
   }
 }
 
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
 
 activitiesEl?.addEventListener('pointerover', (event) => {
   const target = event.target;

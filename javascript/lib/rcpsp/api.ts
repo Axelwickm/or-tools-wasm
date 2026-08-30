@@ -3,29 +3,22 @@ import {
   CpSolver,
   CpSolverStatus,
   CpSolverSolutionCallback,
+  RuntimeError,
   type CpSolverStatus_Name,
   type BoolVar,
   type CpSatEvent,
   type CpSatEventMask,
+  type CpSatSolverParameters,
   type IntVar,
   type IntervalVar,
-  type SatParameters,
 } from '../cp-sat.js';
-import type {
-  ExecutorConfiguration,
-  ExecutorSelection,
-} from '../executor_configuration.js';
-
-let rcpspExecutor: ExecutorSelection = 'auto';
+import type { ExecutorSelection } from '../executor_configuration.js';
 
 export type RcpspResourceProto = {
   maxCapacity?: number;
-  max_capacity?: number;
   minCapacity?: number;
-  min_capacity?: number;
   renewable?: boolean;
   unitCost?: number;
-  unit_cost?: number;
   name?: string;
 };
 
@@ -45,23 +38,16 @@ export type RcpspProblemProto = {
   resources?: RcpspResourceProto[];
   tasks?: RcpspTaskProto[];
   isConsumerProducer?: boolean;
-  is_consumer_producer?: boolean;
   isResourceInvestment?: boolean;
-  is_resource_investment?: boolean;
   isRcpspMax?: boolean;
-  is_rcpsp_max?: boolean;
   deadline?: number;
   horizon?: number;
   releaseDate?: number;
-  release_date?: number;
   tardinessCost?: number;
-  tardiness_cost?: number;
   mpmTime?: number;
-  mpm_time?: number;
   seed?: number;
   basedata?: string;
   dueDate?: number;
-  due_date?: number;
   name?: string;
 };
 
@@ -114,7 +100,8 @@ export type RcpspEvent =
 
 export type RcpspEventMask = CpSatEventMask;
 
-export type RcpspSolveOptions = {
+export type RcpspSolveOptions = CpSatSolverParameters & {
+  executor?: ExecutorSelection;
   onEvent?: (event: RcpspEvent) => void | Promise<void>;
   eventMask?: RcpspEventMask;
   signal?: AbortSignal;
@@ -144,15 +131,15 @@ function clone<T>(value: T): T {
 }
 
 function maxCapacity(resource: RcpspResourceProto) {
-  return resource.maxCapacity ?? resource.max_capacity ?? 0;
+  return resource.maxCapacity ?? 0;
 }
 
 function minCapacity(resource: RcpspResourceProto) {
-  return resource.minCapacity ?? resource.min_capacity ?? 0;
+  return resource.minCapacity ?? 0;
 }
 
 function unitCost(resource: RcpspResourceProto) {
-  return resource.unitCost ?? resource.unit_cost ?? 0;
+  return resource.unitCost ?? 0;
 }
 
 function normalizeRecipe(recipe: RcpspRecipeProto, numResources: number): Required<RcpspRecipeProto> {
@@ -195,13 +182,13 @@ function normalizeProblem(proto: RcpspProblemProto): RcpspProblemProto {
     seed: proto.seed ?? 0,
     horizon: proto.horizon ?? computeHorizon({ tasks }),
     deadline: proto.deadline ?? 0,
-    releaseDate: proto.releaseDate ?? proto.release_date ?? 0,
-    dueDate: proto.dueDate ?? proto.due_date ?? 0,
-    tardinessCost: proto.tardinessCost ?? proto.tardiness_cost ?? 0,
-    mpmTime: proto.mpmTime ?? proto.mpm_time ?? 0,
-    isConsumerProducer: proto.isConsumerProducer ?? proto.is_consumer_producer ?? false,
-    isResourceInvestment: proto.isResourceInvestment ?? proto.is_resource_investment ?? false,
-    isRcpspMax: proto.isRcpspMax ?? proto.is_rcpsp_max ?? false,
+    releaseDate: proto.releaseDate ?? 0,
+    dueDate: proto.dueDate ?? 0,
+    tardinessCost: proto.tardinessCost ?? 0,
+    mpmTime: proto.mpmTime ?? 0,
+    isConsumerProducer: proto.isConsumerProducer ?? false,
+    isResourceInvestment: proto.isResourceInvestment ?? false,
+    isRcpspMax: proto.isRcpspMax ?? false,
     resources,
     tasks,
   };
@@ -299,6 +286,7 @@ function parseSingleModePsplib(text: string): RcpspProblemProto {
 
 export class RcpspProblem {
   private readonly problem: RcpspProblemProto;
+  private solving = false;
 
   constructor(problem: RcpspProblemProto = {}) {
     this.problem = normalizeProblem(problem);
@@ -308,16 +296,8 @@ export class RcpspProblem {
     return new RcpspProblem(proto);
   }
 
-  static from_proto(proto: RcpspProblemProto) {
-    return RcpspProblem.fromProto(proto);
-  }
-
   static fromPsplib(text: string) {
     return new RcpspProblem(parseSingleModePsplib(text));
-  }
-
-  static from_psplib(text: string) {
-    return RcpspProblem.fromPsplib(text);
   }
 
   get name() {
@@ -340,23 +320,34 @@ export class RcpspProblem {
     return clone(this.problem);
   }
 
-  export_model_as_proto() {
-    return this.exportModelAsProto();
-  }
-
   toCpSatModel() {
     return buildCpSatModel(this.problem).model;
   }
 
-  to_cp_sat_model() {
-    return this.toCpSatModel();
+  async solve(options: RcpspSolveOptions = {}): Promise<RcpspSolveResult> {
+    if (this.solving) {
+      throw new RuntimeError('RcpspProblem.solve() is already in progress.');
+    }
+    this.solving = true;
+    try {
+      return await this.solveOnce(options);
+    } finally {
+      this.solving = false;
+    }
   }
 
-  async solve(params: SatParameters = {}, options: RcpspSolveOptions = {}): Promise<RcpspSolveResult> {
+  private async solveOnce(options: RcpspSolveOptions): Promise<RcpspSolveResult> {
+    const {
+      executor,
+      onEvent,
+      eventMask: requestedEventMask,
+      signal,
+      ...params
+    } = options;
     const built = buildCpSatModel(this.problem);
     const solver = new CpSolver();
-    const eventMask = options.onEvent
-      ? options.eventMask ?? { solution: true, bestBound: true, log: true }
+    const eventMask = onEvent
+      ? requestedEventMask ?? { solution: true, bestBound: true, log: true }
       : {};
     let intermediateSolution: Omit<Extract<RcpspEvent, { type: 'solution' }>, 'type'> | null = null;
     const solutionCallback = eventMask.solution
@@ -366,17 +357,17 @@ export class RcpspProblem {
       : null;
     const status = await solver.solve(built.model, {
       ...params,
-      executor: rcpspExecutor,
+      executor,
       solutionCallback: solutionCallback ?? undefined,
-      signal: options.signal,
+      signal,
       eventMask,
-      onEvent: options.onEvent
+      onEvent: onEvent
         ? async (event) => {
           if (event.type === 'solution') {
             assert(intermediateSolution, 'RCPSP solution callback did not produce a schedule');
-            await options.onEvent?.({ type: 'solution', ...intermediateSolution });
+            await onEvent({ type: 'solution', ...intermediateSolution });
           } else {
-            await options.onEvent?.(event);
+            await onEvent(event);
           }
         }
         : undefined,
@@ -440,19 +431,11 @@ export class RcpspModelBuilder {
     return this;
   }
 
-  add_resource(input: RcpspResourceInput) {
-    return this.addResource(input);
-  }
-
   addActivity(input: RcpspActivityInput) {
     assert(input.name, 'activity name is required');
     assert(!this.activities.some((activity) => activity.name === input.name), `duplicate RCPSP activity ${input.name}`);
     this.activities.push({ ...input });
     return this;
-  }
-
-  add_activity(input: RcpspActivityInput) {
-    return this.addActivity(input);
   }
 
   build() {
@@ -517,50 +500,16 @@ export class RcpspParser {
     return true;
   }
 
-  parse_string(text: string) {
-    return this.parseString(text);
-  }
-
-  parse_file(_fileName: string): boolean {
-    throw new Error('RcpspParser.parse_file is not available in the browser-oriented wasm runtime. Use parse_string().');
-  }
-
-  parseFile(fileName: string) {
-    return this.parse_file(fileName);
-  }
-
   problem() {
     return this.currentProblem.exportModelAsProto();
   }
 }
 
-export async function initRcpsp(): Promise<void> {}
-
-export function setExecutor(configuration: ExecutorConfiguration): void {
-  rcpspExecutor = configuration;
-}
-
-export function importRcpspProblemFromProto(proto: RcpspProblemProto) {
-  return RcpspProblem.fromProto(proto);
-}
-
-export function import_rcpsp_problem_from_proto(proto: RcpspProblemProto) {
-  return importRcpspProblemFromProto(proto);
-}
-
-export function exportRcpspProblemToProto(problem: RcpspProblem) {
-  return problem.exportModelAsProto();
-}
-
-export function export_rcpsp_problem_to_proto(problem: RcpspProblem) {
-  return exportRcpspProblemToProto(problem);
-}
-
 function buildCpSatModel(problemProto: RcpspProblemProto): BuiltModel {
   const problem = normalizeProblem(problemProto);
-  assert(!(problem.isConsumerProducer ?? problem.is_consumer_producer), 'consumer/producer RCPSP is not supported by the CP-SAT builder yet');
-  assert(!(problem.isResourceInvestment ?? problem.is_resource_investment), 'resource-investment RCPSP is not supported by the CP-SAT builder yet');
-  assert(!(problem.isRcpspMax ?? problem.is_rcpsp_max), 'RCPSP/Max delays are not supported by the CP-SAT builder yet');
+  assert(!problem.isConsumerProducer, 'consumer/producer RCPSP is not supported by the CP-SAT builder yet');
+  assert(!problem.isResourceInvestment, 'resource-investment RCPSP is not supported by the CP-SAT builder yet');
+  assert(!problem.isRcpspMax, 'RCPSP/Max delays are not supported by the CP-SAT builder yet');
 
   const horizon = problem.horizon ?? computeHorizon(problem);
   const model = new CpModel();

@@ -55,6 +55,9 @@ import { runNetworkFlowEventHandlerCase } from '../../cases/or-tools-wasm/networ
 import { runNetworkFlowWorkerLifecycleCase } from '../../cases/or-tools-wasm/network_flow/worker_lifecycle.ts';
 import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
+import { runRcpspConcurrencyCase } from '../../cases/or-tools-wasm/rcpsp/concurrency.ts';
+import { runRcpspEventHandlerCase } from '../../cases/or-tools-wasm/rcpsp/event_handler.ts';
+import { runRcpspWorkerLifecycleCase } from '../../cases/or-tools-wasm/rcpsp/worker_lifecycle.ts';
 import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
 import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
 import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing/worker_lifecycle.ts';
@@ -171,8 +174,11 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   await runSetCoverWorkerLifecycleCase(SetCoverApi);
   await runSetCoverEventHandlerCase(SetCoverApi);
 
-  const rcpspResults = await runRcpspCases(RcpspApi as never);
+  const rcpspResults = await runRcpspCases(RcpspApi);
   await assertCaseSteps(t, 'deno RCPSP', rcpspResults);
+  await runRcpspConcurrencyCase(RcpspApi);
+  await runRcpspWorkerLifecycleCase(RcpspApi);
+  await runRcpspEventHandlerCase(RcpspApi);
 
   const mathOptResults = await runMathOptCases({
     MathOpt,

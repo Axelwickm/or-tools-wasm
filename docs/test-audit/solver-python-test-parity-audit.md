@@ -263,7 +263,7 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
 
 ## ortools/scheduling/python/rcpsp_test.py
 - RcpspTest
-  - ✅ 🔎 RcpspTest.testParseAndAccess - shared TS/WASM fixture uses the same `j301_1.sm` PSPLIB data and checks parser success plus `len(resources) == 4` and `len(tasks) == 32`; browser-oriented parity uses `parse_string()` instead of Python's filesystem-only `parse_file()` path.
+  - ✅ 🔎 RcpspTest.testParseAndAccess - shared TS/WASM fixture uses the same `j301_1.sm` PSPLIB data and checks parser success plus `len(resources) == 4` and `len(tasks) == 32`; browser-oriented parity passes the file contents to `parseString()` because it does not expose Python's filesystem-only `parse_file()` path.
 - Representative CP-SAT-backed RCPSP coverage
   - 🧪 Worker-bridge coverage note - shared TS/WASM fixtures also solve a small renewable-resource project schedule through the public `RcpspModelBuilder`, verify generated CP-SAT constraints, direct and worker-bridge solve status, makespan `8`, and selected activity starts/ends. This is not included in upstream Python test totals because upstream `rcpsp_test.py` only tests parser access.
 

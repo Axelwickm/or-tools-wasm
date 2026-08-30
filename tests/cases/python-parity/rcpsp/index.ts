@@ -34,14 +34,20 @@ type RcpspProblemProtoLike = {
 };
 
 type RcpspParserLike = {
-  parse_string(text: string): boolean;
+  parseString(text: string): boolean;
   problem(): RcpspProblemProtoLike;
 };
 
 type RcpspProblemLike = {
-  export_model_as_proto(): RcpspProblemProtoLike;
-  to_cp_sat_model(): { proto(): { constraints?: unknown[] } };
-  solve(params?: unknown, options?: {
+  exportModelAsProto(): RcpspProblemProtoLike;
+  toCpSatModel(): { proto(): { constraints?: unknown[] } };
+  solve(options?: {
+    numWorkers?: number;
+    maxTimeInSeconds?: number;
+    executor?:
+      | 'auto' | 'direct' | 'worker'
+      | { type: 'auto' | 'direct' | 'worker' }
+      | { type: 'server'; url: string; authToken?: string; statusIntervalMs?: number };
     onEvent?(event: RcpspEventLike): void | Promise<void>;
     eventMask?: { solution?: boolean; bestBound?: boolean; log?: boolean };
     signal?: AbortSignal;
@@ -53,23 +59,18 @@ type RcpspProblemLike = {
 };
 
 type RcpspModelBuilderLike = {
-  add_resource(input: { name: string; capacity: number; renewable?: boolean }): RcpspModelBuilderLike;
-  add_activity(input: { name: string; duration: number; demands?: Record<string, number>; successors?: string[] }): RcpspModelBuilderLike;
+  addResource(input: { name: string; capacity: number; renewable?: boolean }): RcpspModelBuilderLike;
+  addActivity(input: { name: string; duration: number; demands?: Record<string, number>; successors?: string[] }): RcpspModelBuilderLike;
   build(): RcpspProblemLike;
 };
 
 export type RcpspApi = {
-  initRcpsp(): Promise<void>;
   RcpspParser: { new(): RcpspParserLike };
   RcpspProblem: {
-    from_psplib(text: string): RcpspProblemLike;
-    from_proto(proto: RcpspProblemProtoLike): RcpspProblemLike;
+    fromPsplib(text: string): RcpspProblemLike;
+    fromProto(proto: RcpspProblemProtoLike): RcpspProblemLike;
   };
   RcpspModelBuilder: { new(name?: string): RcpspModelBuilderLike };
-  setExecutor(configuration:
-    | { type: 'auto' | 'direct' | 'worker' }
-    | { type: 'server'; url: string; authToken?: string; statusIntervalMs?: number }
-  ): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -172,10 +173,10 @@ RESOURCEAVAILABILITIES:
 
 async function runParserParity(api: RcpspApi): Promise<{ makespan: null }> {
   // TEMP: parity - mirrors ortools/scheduling/python/rcpsp_test.py
-  // RcpspTest.testParseAndAccess assertion-by-assertion, using parse_string()
+  // RcpspTest.testParseAndAccess assertion-by-assertion, using parseString()
   // because browser fixtures do not expose Python's filesystem parse_file path.
   const parser = new api.RcpspParser();
-  assert(parser.parse_string(J301_1_SM), 'RcpspTest.testParseAndAccess parse_string');
+  assert(parser.parseString(J301_1_SM), 'RcpspTest.testParseAndAccess parseString');
   const problem = parser.problem();
   assert(problem.resources?.length === 4, 'RcpspTest.testParseAndAccess resources length');
   assert(problem.tasks?.length === 32, 'RcpspTest.testParseAndAccess tasks length');
@@ -184,19 +185,22 @@ async function runParserParity(api: RcpspApi): Promise<{ makespan: null }> {
 
 async function runCpSatBackedSchedule(api: RcpspApi, mode: ExecutorFixtureMode): Promise<{ makespan: number | null; statusName: string }> {
   const problem = new api.RcpspModelBuilder('house_project')
-    .add_resource({ name: 'crew', capacity: 3 })
-    .add_activity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
-    .add_activity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
-    .add_activity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
-    .add_activity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
-    .add_activity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
+    .addResource({ name: 'crew', capacity: 3 })
+    .addActivity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
+    .addActivity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
+    .addActivity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
+    .addActivity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
+    .addActivity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
     .build();
-  const proto = problem.export_model_as_proto();
+  const proto = problem.exportModelAsProto();
   assert(proto.resources?.length === 1, `RCPSP CP-SAT sample (${mode}) resources length`);
   assert(proto.tasks?.length === 7, `RCPSP CP-SAT sample (${mode}) source/tasks/sink length`);
-  assert((problem.to_cp_sat_model().proto().constraints ?? []).length > 0, `RCPSP CP-SAT sample (${mode}) generated constraints`);
+  assert((problem.toCpSatModel().proto().constraints ?? []).length > 0, `RCPSP CP-SAT sample (${mode}) generated constraints`);
   const events: RcpspEventLike[] = [];
-  const result = await problem.solve({ numWorkers: 1, maxTimeInSeconds: 5 }, {
+  const result = await problem.solve({
+    numWorkers: 1,
+    maxTimeInSeconds: 5,
+    executor: mode === 'server' ? serverExecutorConfiguration() : mode,
     eventMask: { solution: true, bestBound: true },
     onEvent: (event) => {
       events.push(event);
@@ -219,7 +223,11 @@ async function runCpSatBackedSchedule(api: RcpspApi, mode: ExecutorFixtureMode):
   controller.abort();
   let cancellation: unknown = null;
   try {
-    await problem.solve({ numWorkers: 1 }, { signal: controller.signal });
+    await problem.solve({
+      numWorkers: 1,
+      executor: mode === 'server' ? serverExecutorConfiguration() : mode,
+      signal: controller.signal,
+    });
   } catch (error) {
     cancellation = error;
   }
@@ -252,7 +260,6 @@ export async function runRcpspCases(
   api: RcpspApi,
   options: { modes?: readonly ExecutorFixtureMode[] } = {},
 ): Promise<RcpspCaseResult[]> {
-  await api.initRcpsp();
   const results: RcpspCaseResult[] = [];
   const parserCase = rcpspCases[0];
   results.push(passedCase(parserCase, {}, await parserCase.run(api, {})));
@@ -260,14 +267,9 @@ export async function runRcpspCases(
   if (modes.includes('server')) await assertServerExecutorIsRunning();
   const solveCase = rcpspCases[1];
   for (const mode of modes) {
-    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
-    try {
-      const context = { mode };
-      const result = await solveCase.run(api, context);
-      results.push(passedCase({ ...solveCase, name: `${solveCase.name} (${mode})` }, context, result));
-    } finally {
-      api.setExecutor({ type: 'auto' });
-    }
+    const context = { mode };
+    const result = await solveCase.run(api, context);
+    results.push(passedCase({ ...solveCase, name: `${solveCase.name} (${mode})` }, context, result));
   }
   return results;
 }

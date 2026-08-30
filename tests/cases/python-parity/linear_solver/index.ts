@@ -5,6 +5,9 @@ import {
   serverExecutorConfiguration,
 } from '../../../harness/shared_case.ts';
 
+type MPSolverExecutor = Exclude<ExecutorFixtureMode, 'server'>
+  | ReturnType<typeof serverExecutorConfiguration>;
+
 export type MpSolverCaseResult = {
   id?: string;
   name: string;
@@ -122,10 +125,10 @@ type MPSolverLike = {
   objective(): MPObjectiveLike;
   solve(options?: {
     parameters?: MPSolverParametersLike;
-    executor?: ExecutorFixtureMode | ReturnType<typeof serverExecutorConfiguration>;
+    executor?: MPSolverExecutor;
   }): Promise<number>;
   solveWithProto(options?: {
-    executor?: ExecutorFixtureMode | ReturnType<typeof serverExecutorConfiguration>;
+    executor?: MPSolverExecutor;
     solverSpecificParameters?: string;
     loadSolution?: boolean;
   }): Promise<{
@@ -179,7 +182,7 @@ export type MPSolverApi = {
     solveModelRequest(
       request: Uint8Array | Record<string, unknown>,
       options?: {
-        executor?: ExecutorFixtureMode | ReturnType<typeof serverExecutorConfiguration>;
+        executor?: MPSolverExecutor;
       },
     ): Promise<{
       bytes: Uint8Array;

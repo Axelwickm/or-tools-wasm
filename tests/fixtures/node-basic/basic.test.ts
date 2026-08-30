@@ -64,6 +64,9 @@ import { runNetworkFlowEventHandlerCase } from '../../cases/or-tools-wasm/networ
 import { runNetworkFlowWorkerLifecycleCase } from '../../cases/or-tools-wasm/network_flow/worker_lifecycle.ts';
 import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
+import { runRcpspConcurrencyCase } from '../../cases/or-tools-wasm/rcpsp/concurrency.ts';
+import { runRcpspEventHandlerCase } from '../../cases/or-tools-wasm/rcpsp/event_handler.ts';
+import { runRcpspWorkerLifecycleCase } from '../../cases/or-tools-wasm/rcpsp/worker_lifecycle.ts';
 import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
 import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
 import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing/worker_lifecycle.ts';
@@ -219,8 +222,20 @@ test('isolates Set Cover event-handler errors in Node', async () => {
 });
 
 test('runs the shared RCPSP cases in Node', async (t) => {
-  const rcpspResults = await runRcpspCases(RcpspApi as never);
+  const rcpspResults = await runRcpspCases(RcpspApi);
   await assertCaseResults(t, 'node RCPSP', rcpspResults);
+});
+
+test('enforces RCPSP solve concurrency in Node', async () => {
+  await runRcpspConcurrencyCase(RcpspApi);
+});
+
+test('cancels and recovers the RCPSP worker in Node', async () => {
+  await runRcpspWorkerLifecycleCase(RcpspApi);
+});
+
+test('isolates RCPSP event-handler errors in Node', async () => {
+  await runRcpspEventHandlerCase(RcpspApi);
 });
 
 test('runs the shared MathOpt cases in Node', async (t) => {

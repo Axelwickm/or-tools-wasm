@@ -151,25 +151,22 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import {
-  initRcpsp,
-  RcpspModelBuilder,
-  setExecutor,
-} from 'or-tools-wasm/rcpsp';
-
-setExecutor({ type: 'worker' });
-await initRcpsp();
+        <pre class="code-block"><code data-highlight="ts">import { RcpspModelBuilder } from 'or-tools-wasm/rcpsp';
 
 const project = new RcpspModelBuilder('house_project')
-  .add_resource({ name: 'crew', capacity: 3 })
-  .add_activity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
-  .add_activity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
-  .add_activity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
-  .add_activity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
-  .add_activity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
+  .addResource({ name: 'crew', capacity: 3 })
+  .addActivity({ name: 'site', duration: 3, demands: { crew: 2 }, successors: ['frame'] })
+  .addActivity({ name: 'permit', duration: 2, demands: { crew: 1 }, successors: ['wire'] })
+  .addActivity({ name: 'frame', duration: 4, demands: { crew: 2 }, successors: ['inspect'] })
+  .addActivity({ name: 'wire', duration: 2, demands: { crew: 1 }, successors: ['inspect'] })
+  .addActivity({ name: 'inspect', duration: 1, demands: { crew: 1 } })
   .build();
 
-const result = await project.solve({ numWorkers: 4, maxTimeInSeconds: 5 });
+const result = await project.solve({
+  numWorkers: 4,
+  maxTimeInSeconds: 5,
+  executor: 'worker',
+});
 console.log(result.statusName, result.makespan, result.tasks);</code></pre>
       </details>
     </div>
