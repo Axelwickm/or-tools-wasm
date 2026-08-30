@@ -19,6 +19,9 @@ import { runKnapsackWorkerLifecycleCase } from '../../cases/or-tools-wasm/knapsa
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
 import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
 import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
+import { runNetworkFlowConcurrencyCase } from '../../cases/or-tools-wasm/network_flow/concurrency.ts';
+import { runNetworkFlowEventHandlerCase } from '../../cases/or-tools-wasm/network_flow/event_handler.ts';
+import { runNetworkFlowWorkerLifecycleCase } from '../../cases/or-tools-wasm/network_flow/worker_lifecycle.ts';
 import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { executorFixtureModes, serverExecutorUrl } from '../../harness/shared_case.ts';
@@ -339,11 +342,12 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   );
   const networkFlow = await runSelectedGroup(selectedGroup, 'network-flow', 'network-flow', () =>
     runWithWorkerStats(workerSpy, () => runNetworkFlowCases({
-      initNetworkFlow: NetworkFlowApi.initNetworkFlow,
       SimpleMaxFlow: NetworkFlowApi.SimpleMaxFlow,
+      SimpleMaxFlowStatus: NetworkFlowApi.SimpleMaxFlowStatus,
       SimpleMinCostFlow: NetworkFlowApi.SimpleMinCostFlow,
+      SimpleMinCostFlowStatus: NetworkFlowApi.SimpleMinCostFlowStatus,
       SimpleLinearSumAssignment: NetworkFlowApi.SimpleLinearSumAssignment,
-      setExecutor: NetworkFlowApi.setExecutor,
+      SimpleLinearSumAssignmentStatus: NetworkFlowApi.SimpleLinearSumAssignmentStatus,
     }, { modes: executorFixtureModes }))
   );
   const setCover = await runSelectedGroup(selectedGroup, 'set-cover', 'set-cover', () =>
@@ -442,6 +446,30 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
       () => runKnapsackEventHandlerCase(KnapsackApi as never),
     ),
   );
+  const networkFlowConcurrencyResult = await runSelectedGroup(
+    selectedGroup,
+    'network-flow',
+    'network-flow-concurrency',
+    () => runNetworkFlowConcurrencyCase(NetworkFlowApi as never),
+  );
+  const networkFlowWorkerLifecycleResult = await runSelectedGroup(
+    selectedGroup,
+    'network-flow',
+    'network-flow-worker-lifecycle',
+    () => runWithWorkerStats(
+      workerSpy,
+      () => runNetworkFlowWorkerLifecycleCase(NetworkFlowApi as never),
+    ),
+  );
+  const networkFlowEventHandlerResult = await runSelectedGroup(
+    selectedGroup,
+    'network-flow',
+    'network-flow-event-handler',
+    () => runWithWorkerStats(
+      workerSpy,
+      () => runNetworkFlowEventHandlerCase(NetworkFlowApi as never),
+    ),
+  );
   const cloudExecutorResult = await runSelectedGroup(selectedGroup, 'cp-sat', 'cloud', () =>
     runCloudExecutorCase(CpSatApi as never, {
       packageName: PackageApi.packageName,
@@ -458,6 +486,9 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     knapsackConcurrencyResult,
     knapsackWorkerLifecycleResult: knapsackWorkerLifecycleResult?.result,
     knapsackEventHandlerResult: knapsackEventHandlerResult?.result,
+    networkFlowConcurrencyResult,
+    networkFlowWorkerLifecycleResult: networkFlowWorkerLifecycleResult?.result,
+    networkFlowEventHandlerResult: networkFlowEventHandlerResult?.result,
     routingWorkerLifecycleResult: routingWorkerLifecycleResult?.result,
     solverConcurrencyResult,
     cpSatSolverStructureResults: cpSatSolverStructure?.result,

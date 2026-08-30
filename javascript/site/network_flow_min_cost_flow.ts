@@ -1,6 +1,5 @@
 import {
-  initNetworkFlow,
-  setExecutor,
+  type ExecutorConfiguration,
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
@@ -17,6 +16,7 @@ const transitCountInput = document.getElementById('transit-count') as HTMLInputE
 const demandCountInput = document.getElementById('demand-count') as HTMLInputElement | null;
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+let readNetworkFlowExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let nodes: Node[] = [];
 let arcs: Arc[] = [];
@@ -120,11 +120,11 @@ function generateGraph() {
 function renderSolution(minCostFlow: SimpleMinCostFlow, allArcs: number[]) {
   if (!solutionOutput) return;
   const rows = allArcs.map((arc) =>
-    `<tr><td>${minCostFlow.tail(arc)}</td><td>${minCostFlow.head(arc)}</td><td>${minCostFlow.capacity(arc)}</td><td>${minCostFlow.unit_cost(arc)}</td><td>${minCostFlow.flow(arc)}</td></tr>`,
+    `<tr><td>${minCostFlow.tail(arc)}</td><td>${minCostFlow.head(arc)}</td><td>${minCostFlow.capacity(arc)}</td><td>${minCostFlow.unitCost(arc)}</td><td>${minCostFlow.flow(arc)}</td></tr>`,
   ).join('');
   solutionOutput.innerHTML = `
-    <strong>Optimal cost:</strong> ${minCostFlow.optimal_cost()}<br>
-    <strong>Maximum flow:</strong> ${minCostFlow.maximum_flow()}
+    <strong>Optimal cost:</strong> ${minCostFlow.optimalCost()}<br>
+    <strong>Maximum flow:</strong> ${minCostFlow.maximumFlow()}
     <table>
       <thead><tr><th>Tail</th><th>Head</th><th>Capacity</th><th>Unit cost</th><th>Flow</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -183,26 +183,23 @@ async function runMinCostFlow() {
   setRunning(true);
   if (statusEl) statusEl.textContent = '';
   try {
-    appendStatus('Initializing Network Flow runtime...');
-    await initNetworkFlow();
-
     const minCostFlow = new SimpleMinCostFlow();
-    const allArcs = minCostFlow.add_arcs_with_capacity_and_unit_cost(
+    const allArcs = minCostFlow.addArcsWithCapacityAndUnitCost(
       arcs.map((arc) => arc.from),
       arcs.map((arc) => arc.to),
       arcs.map((arc) => arc.capacity),
       arcs.map((arc) => arc.unitCost),
     );
-    minCostFlow.set_nodes_supplies(nodes.map((node) => node.id), nodes.map((node) => node.supply));
+    minCostFlow.setNodesSupplies(nodes.map((node) => node.id), nodes.map((node) => node.supply));
 
     appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
-    const status = await minCostFlow.solve();
+    const status = await minCostFlow.solve({ executor: readNetworkFlowExecutor() });
     appendStatus(`Done. Status ${status}.`);
     arcs = allArcs.map((arc) => ({
       from: minCostFlow.tail(arc),
       to: minCostFlow.head(arc),
       capacity: minCostFlow.capacity(arc),
-      unitCost: minCostFlow.unit_cost(arc),
+      unitCost: minCostFlow.unitCost(arc),
       flow: minCostFlow.flow(arc),
     }));
     renderSolution(minCostFlow, allArcs);
@@ -238,4 +235,4 @@ demandCountInput?.addEventListener('change', () => {
 
 generateGraph();
 resetView();
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+readNetworkFlowExecutor = configureSolverExecutorSelector(null, executorSelector);

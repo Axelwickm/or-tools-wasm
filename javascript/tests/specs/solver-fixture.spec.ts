@@ -201,6 +201,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       status?: number;
       objectiveValue?: number;
     }>;
+    networkFlowConcurrencyResult?: { ok?: boolean };
+    networkFlowWorkerLifecycleResult?: { ok?: boolean };
+    networkFlowEventHandlerResult?: { ok?: boolean };
     rcpspResults?: Array<{
       id?: string;
       name?: string;
@@ -647,6 +650,9 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     })] : []),
   ]));
   expectStableCaseIds(parsedStatus.networkFlowResults, 'Network Flow');
+  expect(parsedStatus.networkFlowConcurrencyResult?.ok).toBe(true);
+  expect(parsedStatus.networkFlowWorkerLifecycleResult?.ok).toBe(true);
+  expect(parsedStatus.networkFlowEventHandlerResult?.ok).toBe(true);
   expect(parsedStatus.setCoverWorkerStatsAfter?.executorWorkerRequests?.['set-cover']).toBeGreaterThan(
     parsedStatus.setCoverWorkerStatsBefore?.executorWorkerRequests?.['set-cover'] ?? 0,
   );

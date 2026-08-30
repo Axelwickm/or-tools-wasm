@@ -28,10 +28,10 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleLinearSumAssignment, setExecutor } from 'or-tools-wasm/network-flow';
-
-setExecutor({ type: 'worker' });
-await initNetworkFlow();
+        <pre class="code-block"><code data-highlight="ts">import {
+  SimpleLinearSumAssignment,
+  SimpleLinearSumAssignmentStatus,
+} from 'or-tools-wasm/network-flow';
 
 const costs = [
   [90, 76, 75, 70],
@@ -52,13 +52,13 @@ for (let worker = 0; worker &lt; costs.length; ++worker) {
 }
 
 const assignment = new SimpleLinearSumAssignment();
-assignment.add_arcs_with_cost(leftNodes, rightNodes, arcCosts);
-const status = await assignment.solve();
+assignment.addArcsWithCost(leftNodes, rightNodes, arcCosts);
+const status = await assignment.solve({ executor: 'worker' });
 
-if (status === SimpleLinearSumAssignment.OPTIMAL) {
-  console.log(assignment.optimal_cost());
-  for (let worker = 0; worker &lt; assignment.num_nodes(); ++worker) {
-    console.log(worker, assignment.right_mate(worker), assignment.assignment_cost(worker));
+if (status === SimpleLinearSumAssignmentStatus.OPTIMAL) {
+  console.log(assignment.optimalCost());
+  for (let worker = 0; worker &lt; assignment.numNodes(); ++worker) {
+    console.log(worker, assignment.rightMate(worker), assignment.assignmentCost(worker));
   }
 }</code></pre>
       </details>

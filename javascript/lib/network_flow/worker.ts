@@ -1,10 +1,19 @@
 /// <reference lib="webworker" />
 
 import { installSolverWorker } from '../solver_worker.js';
-import { NetworkFlowExecutor, networkFlowBridgeCodec } from './executor.js';
+import { loadGraphRuntime } from '../runtime_loader.js';
+import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { DirectNetworkFlowExecutor } from './direct_executor.js';
+import { networkFlowProtocol } from './protocol.js';
+
+let modulePromise: Promise<OrToolsWasmModule> | null = null;
+
+function loadNetworkFlowWorkerRuntime() {
+  return modulePromise ??= loadGraphRuntime();
+}
 
 installSolverWorker(
   self as DedicatedWorkerGlobalScope,
-  new NetworkFlowExecutor(),
-  networkFlowBridgeCodec,
+  new DirectNetworkFlowExecutor(loadNetworkFlowWorkerRuntime),
+  networkFlowProtocol,
 );

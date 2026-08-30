@@ -1,6 +1,5 @@
 import {
-  initNetworkFlow,
-  setExecutor,
+  type ExecutorConfiguration,
   SimpleLinearSumAssignment,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
@@ -12,6 +11,7 @@ const executorSelector = document.getElementById('solver-executor') as HTMLSelec
 const sizeInput = document.getElementById('assignment-size') as HTMLInputElement | null;
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+let readNetworkFlowExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let costs: number[][] = [
   [90, 76, 75, 70],
@@ -70,11 +70,11 @@ function resetView() {
 
 function renderSolution(assignment: SimpleLinearSumAssignment) {
   if (!solutionOutput) return;
-  const rows = Array.from({ length: assignment.num_nodes() }, (_, worker) =>
-    `<tr><td>${worker}</td><td>${assignment.right_mate(worker)}</td><td>${assignment.assignment_cost(worker)}</td></tr>`,
+  const rows = Array.from({ length: assignment.numNodes() }, (_, worker) =>
+    `<tr><td>${worker}</td><td>${assignment.rightMate(worker)}</td><td>${assignment.assignmentCost(worker)}</td></tr>`,
   ).join('');
   solutionOutput.innerHTML = `
-    <strong>Optimal cost:</strong> ${assignment.optimal_cost()}
+    <strong>Optimal cost:</strong> ${assignment.optimalCost()}
     <table>
       <thead><tr><th>Worker</th><th>Task</th><th>Cost</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -142,21 +142,18 @@ async function runAssignment() {
   setRunning(true);
   if (statusEl) statusEl.textContent = '';
   try {
-    appendStatus('Initializing Network Flow runtime...');
-    await initNetworkFlow();
-
     const { leftNodes, rightNodes, arcCosts } = buildAssignmentData();
     const assignment = new SimpleLinearSumAssignment();
-    assignment.add_arcs_with_cost(leftNodes, rightNodes, arcCosts);
+    assignment.addArcsWithCost(leftNodes, rightNodes, arcCosts);
 
     appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
-    const status = await assignment.solve();
+    const status = await assignment.solve({ executor: readNetworkFlowExecutor() });
     appendStatus(`Done. Status ${status}.`);
     renderSolution(assignment);
-    renderGraph(Array.from({ length: assignment.num_nodes() }, (_, worker) => ({
+    renderGraph(Array.from({ length: assignment.numNodes() }, (_, worker) => ({
       worker,
-      task: assignment.right_mate(worker),
-      cost: assignment.assignment_cost(worker),
+      task: assignment.rightMate(worker),
+      cost: assignment.assignmentCost(worker),
     })));
   } catch (error) {
     appendStatus(error instanceof Error ? error.message : String(error));
@@ -177,4 +174,4 @@ sizeInput?.addEventListener('change', () => {
   resetView();
 });
 resetView();
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+readNetworkFlowExecutor = configureSolverExecutorSelector(null, executorSelector);

@@ -12,11 +12,12 @@ import {
   KnapsackSolverType,
 } from 'or-tools-wasm/knapsack';
 import {
-  initNetworkFlow,
-  setExecutor as setNetworkFlowExecutor,
   SimpleLinearSumAssignment,
+  SimpleLinearSumAssignmentStatus,
   SimpleMaxFlow,
+  SimpleMaxFlowStatus,
   SimpleMinCostFlow,
+  SimpleMinCostFlowStatus,
 } from 'or-tools-wasm/network-flow';
 import * as SetCoverApi from 'or-tools-wasm/set-cover';
 import * as RcpspApi from 'or-tools-wasm/rcpsp';
@@ -49,6 +50,9 @@ import { runKnapsackWorkerLifecycleCase } from '../../cases/or-tools-wasm/knapsa
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
 import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
 import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
+import { runNetworkFlowConcurrencyCase } from '../../cases/or-tools-wasm/network_flow/concurrency.ts';
+import { runNetworkFlowEventHandlerCase } from '../../cases/or-tools-wasm/network_flow/event_handler.ts';
+import { runNetworkFlowWorkerLifecycleCase } from '../../cases/or-tools-wasm/network_flow/worker_lifecycle.ts';
 import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
@@ -146,13 +150,17 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   await runKnapsackEventHandlerCase({ KnapsackSolver, KnapsackSolverType });
 
   const networkFlowResults = await runNetworkFlowCases({
-    initNetworkFlow,
     SimpleMaxFlow,
+    SimpleMaxFlowStatus,
     SimpleMinCostFlow,
+    SimpleMinCostFlowStatus,
     SimpleLinearSumAssignment,
-    setExecutor: setNetworkFlowExecutor,
+    SimpleLinearSumAssignmentStatus,
   });
   await assertCaseSteps(t, 'deno Network Flow', networkFlowResults);
+  await runNetworkFlowConcurrencyCase({ SimpleMaxFlow });
+  await runNetworkFlowWorkerLifecycleCase({ SimpleMaxFlow });
+  await runNetworkFlowEventHandlerCase({ SimpleMaxFlow });
 
   const setCoverResults = await runSetCoverCases(SetCoverApi as never);
   await assertCaseSteps(t, 'deno Set Cover', setCoverResults);

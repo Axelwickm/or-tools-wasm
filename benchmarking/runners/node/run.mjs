@@ -24,7 +24,6 @@ import {
   KnapsackSolverType,
 } from 'or-tools-wasm/knapsack';
 import {
-  initNetworkFlow,
   SimpleMaxFlow,
   SimpleMaxFlowStatus,
 } from 'or-tools-wasm/network-flow';
@@ -254,7 +253,6 @@ async function solveKnapsack(problem, threads) {
 
 async function solveMaxFlow(problem, threads) {
   void threads;
-  await initNetworkFlow();
   const layers = Number(problem.layers);
   const width = Number(problem.width);
   const source = 0;
@@ -290,11 +288,11 @@ async function solveMaxFlow(problem, threads) {
   }
 
   const maxFlow = new SimpleMaxFlow();
-  maxFlow.add_arcs_with_capacity(tails, heads, capacities);
+  maxFlow.addArcsWithCapacity(tails, heads, capacities);
   const status = await maxFlow.solve(source, sink);
   return [
     statusName(status, SimpleMaxFlowStatus),
-    status === SimpleMaxFlow.OPTIMAL ? String(maxFlow.optimal_flow()) : '',
+    status === SimpleMaxFlowStatus.OPTIMAL ? String(maxFlow.optimalFlow()) : '',
   ];
 }
 

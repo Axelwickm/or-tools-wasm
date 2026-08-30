@@ -29,14 +29,11 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleMaxFlow, setExecutor } from 'or-tools-wasm/network-flow';
-
-setExecutor({ type: 'worker' });
-await initNetworkFlow();
+        <pre class="code-block"><code data-highlight="ts">import { SimpleMaxFlow } from 'or-tools-wasm/network-flow';
 
 const maxFlow = new SimpleMaxFlow();
-maxFlow.add_arcs_with_capacity(startNodes, endNodes, capacities);
-const status = await maxFlow.solve(sourceNode, sinkNode);</code></pre>
+maxFlow.addArcsWithCapacity(startNodes, endNodes, capacities);
+const status = await maxFlow.solve(sourceNode, sinkNode, { executor: 'worker' });</code></pre>
       </details>
     </div>
     <ul class="example-notes">

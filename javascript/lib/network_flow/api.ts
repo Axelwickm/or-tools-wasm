@@ -1,88 +1,55 @@
-import { create } from '@bufbuild/protobuf';
 import { CloudExecutor } from '../cloud_executor.js';
 import {
-  LinearSumAssignmentRequestSchema,
-  MaxFlowRequestSchema,
-  MinCostFlowRequestSchema,
-  type NetworkFlowBridgeResponse,
-} from '../generated/bridge/network_flow_pb.js';
-import {
   resolveExecutorConfiguration,
-  type ExecutorConfiguration,
+  type ExecutorSelection,
   type ResolvedExecutorConfiguration,
 } from '../executor_configuration.js';
-import { NetworkFlowExecutor, type NetworkFlowExecutorLike } from './executor.js';
-import { NetworkFlowWorkerExecutor } from './worker_executor.js';
-import { NetworkFlowServerExecutor } from './server_executor.js';
+import { SolverServerExecutor } from '../solver_server_executor.js';
+import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
+import { DirectNetworkFlowExecutor } from './direct_executor.js';
+import {
+  networkFlowProtocol,
+  type NetworkFlowExecutor,
+  type NetworkFlowOperation,
+  type NetworkFlowResult,
+} from './protocol.js';
 import type { SolverJobEvent } from '../solver_executor.js';
 
 export type NetworkFlowEvent = SolverJobEvent;
 export type NetworkFlowSolveOptions = {
+  executor?: ExecutorSelection;
   onEvent?: (event: NetworkFlowEvent) => void | Promise<void>;
   signal?: AbortSignal;
 };
 
-type NativeSuccess = {
-  status: number;
-  optimalFlow?: number;
-  optimalCost?: number;
-  maximumFlow?: number;
-  numNodes: number;
-  numArcs: number;
-  flows?: number[];
-  sourceSideMinCut?: number[];
-  sinkSideMinCut?: number[];
-  rightMates?: number[];
-  assignmentCosts?: number[];
-};
-
-type MaxFlowSolvePayload = {
-  algorithm: 'maxFlow';
-  tails: number[];
-  heads: number[];
-  capacities: number[];
-  source: number;
-  sink: number;
-};
-
-type MinCostFlowSolvePayload = {
-  algorithm: 'minCostFlow';
-  tails: number[];
-  heads: number[];
-  capacities: number[];
-  unitCosts: number[];
-  supplies: number[];
-  solveMaxFlowWithMinCost: boolean;
-};
-
-type LinearSumAssignmentSolvePayload = {
-  algorithm: 'linearSumAssignment';
-  leftNodes: number[];
-  rightNodes: number[];
-  costs: number[];
-};
-
-export type GraphSolvePayload = MaxFlowSolvePayload | MinCostFlowSolvePayload | LinearSumAssignmentSolvePayload;
-
-const directExecutor = new NetworkFlowExecutor();
-const workerExecutor = new NetworkFlowWorkerExecutor();
-let executor: NetworkFlowExecutorLike = createExecutor({ type: 'auto' });
-
-function createExecutor(configuration: ExecutorConfiguration): NetworkFlowExecutorLike {
-  return createResolvedExecutor(resolveExecutorConfiguration(configuration));
-}
-
-function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): NetworkFlowExecutorLike {
-  switch (configuration.type) {
-    case 'direct': return directExecutor;
-    case 'worker': return workerExecutor;
-    case 'server': return new NetworkFlowServerExecutor(configuration);
-    case 'cloud': return new CloudExecutor('network-flow', { test: configuration.test });
+export class RuntimeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RuntimeError';
   }
 }
 
-export async function initNetworkFlow(): Promise<void> {
-  await executor.load();
+async function createNetworkFlowWorker(): Promise<SolverWorkerLike> {
+  return new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module', name: 'ortools-executor-network-flow' },
+  );
+}
+
+const directExecutor = new DirectNetworkFlowExecutor();
+const workerExecutor = new SolverWorkerExecutor(networkFlowProtocol, createNetworkFlowWorker);
+
+function createNetworkFlowExecutor(selection: ExecutorSelection = 'auto'): NetworkFlowExecutor {
+  return createResolvedExecutor(resolveExecutorConfiguration(selection));
+}
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): NetworkFlowExecutor {
+  switch (configuration.type) {
+    case 'direct': return directExecutor;
+    case 'worker': return workerExecutor;
+    case 'server': return new SolverServerExecutor(networkFlowProtocol, configuration);
+    case 'cloud': return new CloudExecutor('network-flow', { test: configuration.test });
+  }
 }
 
 function assertEqualLengths(name: string, ...values: number[][]) {
@@ -111,29 +78,31 @@ function assertIndex(index: number, length: number, label: string) {
 
 function abortError(signal: AbortSignal) {
   if (signal.reason instanceof Error) return signal.reason;
-  const error = new Error(signal.reason === undefined ? 'The Network Flow solve was aborted.' : String(signal.reason));
+  if (signal.reason !== undefined) return new Error(String(signal.reason));
+  if (typeof DOMException !== 'undefined') {
+    return new DOMException('The Network Flow solve was aborted.', 'AbortError');
+  }
+  const error = new Error('The Network Flow solve was aborted.');
   error.name = 'AbortError';
   return error;
 }
 
-export async function solveGraphPayload(
-  payload: GraphSolvePayload,
+async function solveNetworkFlow(
+  operation: NetworkFlowOperation,
   options: NetworkFlowSolveOptions = {},
-): Promise<NativeSuccess> {
+): Promise<NetworkFlowResult> {
   if (options.signal?.aborted) throw abortError(options.signal);
-  let request: Parameters<NetworkFlowExecutorLike['execute']>[0];
-  if (payload.algorithm === 'maxFlow') {
-    request = { case: 'maxFlow', value: create(MaxFlowRequestSchema, payload) };
-  } else if (payload.algorithm === 'minCostFlow') {
-    request = { case: 'minCostFlow', value: create(MinCostFlowRequestSchema, payload) };
-  } else {
-    request = {
-      case: 'linearSumAssignment',
-      value: create(LinearSumAssignmentRequestSchema, payload),
-    };
-  }
-  const currentExecutor = executor;
-  const job = currentExecutor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
+  const executor = createNetworkFlowExecutor(options.executor);
+  let callbackError: unknown = null;
+  const onEvent = async (event: NetworkFlowEvent) => {
+    if (callbackError) return;
+    try {
+      await options.onEvent?.(event);
+    } catch (error) {
+      callbackError = error;
+    }
+  };
+  const job = executor.execute(operation, { onEvent });
   let aborted: Error | null = null;
   const onAbort = () => {
     if (!options.signal) return;
@@ -143,33 +112,13 @@ export async function solveGraphPayload(
   options.signal?.addEventListener('abort', onAbort, { once: true });
   if (options.signal?.aborted) onAbort();
   try {
-    const result = await bridgeResult(job.result);
+    const result = await job.result;
+    if (callbackError) throw callbackError;
     if (aborted) throw aborted;
     return result;
   } finally {
     options.signal?.removeEventListener('abort', onAbort);
   }
-}
-
-async function bridgeResult(result: Promise<NetworkFlowBridgeResponse>): Promise<NativeSuccess> {
-  const value = await result;
-  return {
-    status: value.status,
-    optimalFlow: value.optimalFlow,
-    optimalCost: value.optimalCost,
-    maximumFlow: value.maximumFlow,
-    numNodes: value.numNodes,
-    numArcs: value.numArcs,
-    flows: value.flows,
-    sourceSideMinCut: value.sourceSideMinCut,
-    sinkSideMinCut: value.sinkSideMinCut,
-    rightMates: value.rightMates,
-    assignmentCosts: value.assignmentCosts,
-  };
-}
-
-export function setNetworkFlowExecutor(configuration: ExecutorConfiguration): void {
-  executor = createExecutor(configuration);
 }
 
 export enum SimpleMaxFlowStatus {
@@ -197,17 +146,13 @@ export enum SimpleLinearSumAssignmentStatus {
 }
 
 export class SimpleMaxFlow {
-  static readonly OPTIMAL = SimpleMaxFlowStatus.OPTIMAL;
-  static readonly POSSIBLE_OVERFLOW = SimpleMaxFlowStatus.POSSIBLE_OVERFLOW;
-  static readonly BAD_INPUT = SimpleMaxFlowStatus.BAD_INPUT;
-  static readonly BAD_RESULT = SimpleMaxFlowStatus.BAD_RESULT;
-
   private tails: number[] = [];
   private heads: number[] = [];
   private capacities: number[] = [];
-  private result: NativeSuccess | null = null;
+  private result: NetworkFlowResult | null = null;
+  private solving = false;
 
-  add_arc_with_capacity(tail: number, head: number, capacity: number): number {
+  addArcWithCapacity(tail: number, head: number, capacity: number): number {
     const arc = this.tails.length;
     this.tails.push(...toNumberArray([tail], 'tail'));
     this.heads.push(...toNumberArray([head], 'head'));
@@ -216,57 +161,33 @@ export class SimpleMaxFlow {
     return arc;
   }
 
-  addArcWithCapacity(tail: number, head: number, capacity: number): number {
-    return this.add_arc_with_capacity(tail, head, capacity);
-  }
-
-  add_arcs_with_capacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>): number[] {
+  addArcsWithCapacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>): number[] {
     const tailValues = toNumberArray(tails, 'tails');
     const headValues = toNumberArray(heads, 'heads');
     const capacityValues = toNumberArray(capacities, 'capacities');
-    assertEqualLengths('SimpleMaxFlow.add_arcs_with_capacity', tailValues, headValues, capacityValues);
-    return tailValues.map((tail, index) => this.add_arc_with_capacity(tail, headValues[index], capacityValues[index]));
+    assertEqualLengths('SimpleMaxFlow.addArcsWithCapacity', tailValues, headValues, capacityValues);
+    return tailValues.map((tail, index) => this.addArcWithCapacity(tail, headValues[index], capacityValues[index]));
   }
 
-  addArcsWithCapacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>): number[] {
-    return this.add_arcs_with_capacity(tails, heads, capacities);
-  }
-
-  set_arc_capacity(arc: number, capacity: number): void {
+  setArcCapacity(arc: number, capacity: number): void {
     assertIndex(arc, this.capacities.length, 'arc');
     this.capacities[arc] = toNumberArray([capacity], 'capacity')[0];
     this.result = null;
   }
 
-  setArcCapacity(arc: number, capacity: number): void {
-    this.set_arc_capacity(arc, capacity);
-  }
-
-  set_arcs_capacity(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
+  setArcsCapacity(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
     const arcValues = toNumberArray(arcs, 'arcs');
     const capacityValues = toNumberArray(capacities, 'capacities');
-    assertEqualLengths('SimpleMaxFlow.set_arcs_capacity', arcValues, capacityValues);
-    for (const [index, arc] of arcValues.entries()) this.set_arc_capacity(arc, capacityValues[index]);
-  }
-
-  setArcsCapacity(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
-    this.set_arcs_capacity(arcs, capacities);
-  }
-
-  num_nodes(): number {
-    return this.tails.reduce((maxNode, tail, index) => Math.max(maxNode, tail, this.heads[index]), -1) + 1;
+    assertEqualLengths('SimpleMaxFlow.setArcsCapacity', arcValues, capacityValues);
+    for (const [index, arc] of arcValues.entries()) this.setArcCapacity(arc, capacityValues[index]);
   }
 
   numNodes(): number {
-    return this.num_nodes();
-  }
-
-  num_arcs(): number {
-    return this.tails.length;
+    return this.tails.reduce((maxNode, tail, index) => Math.max(maxNode, tail, this.heads[index]), -1) + 1;
   }
 
   numArcs(): number {
-    return this.num_arcs();
+    return this.tails.length;
   }
 
   tail(arc: number): number {
@@ -285,24 +206,26 @@ export class SimpleMaxFlow {
   }
 
   async solve(source: number, sink: number, options: NetworkFlowSolveOptions = {}): Promise<number> {
-    const result = await solveGraphPayload({
-      algorithm: 'maxFlow',
-      tails: this.tails,
-      heads: this.heads,
-      capacities: this.capacities,
-      source,
-      sink,
-    }, options);
-    this.result = result;
-    return result.status;
-  }
-
-  optimal_flow(): number {
-    return this.result?.optimalFlow ?? 0;
+    if (this.solving) throw new RuntimeError('SimpleMaxFlow.solve() is already in progress.');
+    this.solving = true;
+    try {
+      const result = await solveNetworkFlow({
+        type: 'maxFlow',
+        tails: this.tails,
+        heads: this.heads,
+        capacities: this.capacities,
+        source,
+        sink,
+      }, options);
+      this.result = result;
+      return result.status;
+    } finally {
+      this.solving = false;
+    }
   }
 
   optimalFlow(): number {
-    return this.optimal_flow();
+    return this.result?.optimalFlow ?? 0;
   }
 
   flow(arc: number): number {
@@ -314,41 +237,25 @@ export class SimpleMaxFlow {
     return toNumberArray(arcs, 'arcs').map((arc) => this.flow(arc));
   }
 
-  get_source_side_min_cut(): number[] {
+  getSourceSideMinCut(): number[] {
     return [...(this.result?.sourceSideMinCut ?? [])];
   }
 
-  getSourceSideMinCut(): number[] {
-    return this.get_source_side_min_cut();
-  }
-
-  get_sink_side_min_cut(): number[] {
-    return [...(this.result?.sinkSideMinCut ?? [])];
-  }
-
   getSinkSideMinCut(): number[] {
-    return this.get_sink_side_min_cut();
+    return [...(this.result?.sinkSideMinCut ?? [])];
   }
 }
 
 export class SimpleMinCostFlow {
-  static readonly NOT_SOLVED = SimpleMinCostFlowStatus.NOT_SOLVED;
-  static readonly OPTIMAL = SimpleMinCostFlowStatus.OPTIMAL;
-  static readonly FEASIBLE = SimpleMinCostFlowStatus.FEASIBLE;
-  static readonly INFEASIBLE = SimpleMinCostFlowStatus.INFEASIBLE;
-  static readonly UNBALANCED = SimpleMinCostFlowStatus.UNBALANCED;
-  static readonly BAD_RESULT = SimpleMinCostFlowStatus.BAD_RESULT;
-  static readonly BAD_COST_RANGE = SimpleMinCostFlowStatus.BAD_COST_RANGE;
-  static readonly BAD_CAPACITY_RANGE = SimpleMinCostFlowStatus.BAD_CAPACITY_RANGE;
-
   private tails: number[] = [];
   private heads: number[] = [];
   private capacities: number[] = [];
   private unitCosts: number[] = [];
   private nodeSupplies: number[] = [];
-  private result: NativeSuccess | null = null;
+  private result: NetworkFlowResult | null = null;
+  private solving = false;
 
-  add_arc_with_capacity_and_unit_cost(tail: number, head: number, capacity: number, unitCost: number): number {
+  addArcWithCapacityAndUnitCost(tail: number, head: number, capacity: number, unitCost: number): number {
     const arc = this.tails.length;
     this.tails.push(...toNumberArray([tail], 'tail'));
     this.heads.push(...toNumberArray([head], 'head'));
@@ -358,11 +265,7 @@ export class SimpleMinCostFlow {
     return arc;
   }
 
-  addArcWithCapacityAndUnitCost(tail: number, head: number, capacity: number, unitCost: number): number {
-    return this.add_arc_with_capacity_and_unit_cost(tail, head, capacity, unitCost);
-  }
-
-  add_arcs_with_capacity_and_unit_cost(
+  addArcsWithCapacityAndUnitCost(
     tails: ArrayLike<number>,
     heads: ArrayLike<number>,
     capacities: ArrayLike<number>,
@@ -372,80 +275,47 @@ export class SimpleMinCostFlow {
     const headValues = toNumberArray(heads, 'heads');
     const capacityValues = toNumberArray(capacities, 'capacities');
     const unitCostValues = toNumberArray(unitCosts, 'unitCosts');
-    assertEqualLengths('SimpleMinCostFlow.add_arcs_with_capacity_and_unit_cost', tailValues, headValues, capacityValues, unitCostValues);
+    assertEqualLengths('SimpleMinCostFlow.addArcsWithCapacityAndUnitCost', tailValues, headValues, capacityValues, unitCostValues);
     return tailValues.map((tail, index) =>
-      this.add_arc_with_capacity_and_unit_cost(tail, headValues[index], capacityValues[index], unitCostValues[index]));
+      this.addArcWithCapacityAndUnitCost(tail, headValues[index], capacityValues[index], unitCostValues[index]));
   }
 
-  addArcsWithCapacityAndUnitCost(
-    tails: ArrayLike<number>,
-    heads: ArrayLike<number>,
-    capacities: ArrayLike<number>,
-    unitCosts: ArrayLike<number>,
-  ): number[] {
-    return this.add_arcs_with_capacity_and_unit_cost(tails, heads, capacities, unitCosts);
-  }
-
-  set_arc_capacity(arc: number, capacity: number): void {
+  setArcCapacity(arc: number, capacity: number): void {
     assertIndex(arc, this.capacities.length, 'arc');
     this.capacities[arc] = toNumberArray([capacity], 'capacity')[0];
     this.result = null;
   }
 
-  setArcCapacity(arc: number, capacity: number): void {
-    this.set_arc_capacity(arc, capacity);
-  }
-
-  set_arc_capacities(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
+  setArcCapacities(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
     const arcValues = toNumberArray(arcs, 'arcs');
     const capacityValues = toNumberArray(capacities, 'capacities');
-    assertEqualLengths('SimpleMinCostFlow.set_arc_capacities', arcValues, capacityValues);
-    for (const [index, arc] of arcValues.entries()) this.set_arc_capacity(arc, capacityValues[index]);
+    assertEqualLengths('SimpleMinCostFlow.setArcCapacities', arcValues, capacityValues);
+    for (const [index, arc] of arcValues.entries()) this.setArcCapacity(arc, capacityValues[index]);
   }
 
-  setArcCapacities(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
-    this.set_arc_capacities(arcs, capacities);
-  }
-
-  set_node_supply(node: number, supply: number): void {
+  setNodeSupply(node: number, supply: number): void {
     const nodeValue = toNumberArray([node], 'node')[0];
     while (this.nodeSupplies.length <= nodeValue) this.nodeSupplies.push(0);
     this.nodeSupplies[nodeValue] = toNumberArray([supply], 'supply')[0];
     this.result = null;
   }
 
-  setNodeSupply(node: number, supply: number): void {
-    this.set_node_supply(node, supply);
-  }
-
-  set_nodes_supplies(nodes: ArrayLike<number>, supplies: ArrayLike<number>): void {
+  setNodesSupplies(nodes: ArrayLike<number>, supplies: ArrayLike<number>): void {
     const nodeValues = toNumberArray(nodes, 'nodes');
     const supplyValues = toNumberArray(supplies, 'supplies');
-    assertEqualLengths('SimpleMinCostFlow.set_nodes_supplies', nodeValues, supplyValues);
-    for (const [index, node] of nodeValues.entries()) this.set_node_supply(node, supplyValues[index]);
+    assertEqualLengths('SimpleMinCostFlow.setNodesSupplies', nodeValues, supplyValues);
+    for (const [index, node] of nodeValues.entries()) this.setNodeSupply(node, supplyValues[index]);
   }
 
-  setNodesSupplies(nodes: ArrayLike<number>, supplies: ArrayLike<number>): void {
-    this.set_nodes_supplies(nodes, supplies);
-  }
-
-  num_nodes(): number {
+  numNodes(): number {
     return Math.max(
       this.nodeSupplies.length,
       this.tails.reduce((maxNode, tail, index) => Math.max(maxNode, tail, this.heads[index]), -1) + 1,
     );
   }
 
-  numNodes(): number {
-    return this.num_nodes();
-  }
-
-  num_arcs(): number {
-    return this.tails.length;
-  }
-
   numArcs(): number {
-    return this.num_arcs();
+    return this.tails.length;
   }
 
   tail(arc: number): number {
@@ -464,65 +334,52 @@ export class SimpleMinCostFlow {
   }
 
   supply(node: number): number {
-    assertIndex(node, this.num_nodes(), 'node');
+    assertIndex(node, this.numNodes(), 'node');
     return this.nodeSupplies[node] ?? 0;
   }
 
-  unit_cost(arc: number): number {
+  unitCost(arc: number): number {
     assertIndex(arc, this.unitCosts.length, 'arc');
     return this.unitCosts[arc];
   }
 
-  unitCost(arc: number): number {
-    return this.unit_cost(arc);
-  }
-
   async solve(options: NetworkFlowSolveOptions = {}): Promise<number> {
-    const result = await solveGraphPayload({
-      algorithm: 'minCostFlow',
-      tails: this.tails,
-      heads: this.heads,
-      capacities: this.capacities,
-      unitCosts: this.unitCosts,
-      supplies: this.nodeSupplies,
-      solveMaxFlowWithMinCost: false,
-    }, options);
-    this.result = result;
-    return result.status;
+    return this.solveInternal(false, options);
   }
 
-  async solve_max_flow_with_min_cost(options: NetworkFlowSolveOptions = {}): Promise<number> {
-    const result = await solveGraphPayload({
-      algorithm: 'minCostFlow',
-      tails: this.tails,
-      heads: this.heads,
-      capacities: this.capacities,
-      unitCosts: this.unitCosts,
-      supplies: this.nodeSupplies,
-      solveMaxFlowWithMinCost: true,
-    }, options);
-    this.result = result;
-    return result.status;
+  async solveMaxFlowWithMinCost(options: NetworkFlowSolveOptions = {}): Promise<number> {
+    return this.solveInternal(true, options);
   }
 
-  solveMaxFlowWithMinCost(options: NetworkFlowSolveOptions = {}): Promise<number> {
-    return this.solve_max_flow_with_min_cost(options);
-  }
-
-  optimal_cost(): number {
-    return this.result?.optimalCost ?? 0;
+  private async solveInternal(
+    solveMaxFlowWithMinCost: boolean,
+    options: NetworkFlowSolveOptions,
+  ): Promise<number> {
+    if (this.solving) throw new RuntimeError('SimpleMinCostFlow.solve() is already in progress.');
+    this.solving = true;
+    try {
+      const result = await solveNetworkFlow({
+        type: 'minCostFlow',
+        tails: this.tails,
+        heads: this.heads,
+        capacities: this.capacities,
+        unitCosts: this.unitCosts,
+        supplies: this.nodeSupplies,
+        solveMaxFlowWithMinCost,
+      }, options);
+      this.result = result;
+      return result.status;
+    } finally {
+      this.solving = false;
+    }
   }
 
   optimalCost(): number {
-    return this.optimal_cost();
-  }
-
-  maximum_flow(): number {
-    return this.result?.maximumFlow ?? 0;
+    return this.result?.optimalCost ?? 0;
   }
 
   maximumFlow(): number {
-    return this.maximum_flow();
+    return this.result?.maximumFlow ?? 0;
   }
 
   flow(arc: number): number {
@@ -536,16 +393,13 @@ export class SimpleMinCostFlow {
 }
 
 export class SimpleLinearSumAssignment {
-  static readonly OPTIMAL = SimpleLinearSumAssignmentStatus.OPTIMAL;
-  static readonly INFEASIBLE = SimpleLinearSumAssignmentStatus.INFEASIBLE;
-  static readonly POSSIBLE_OVERFLOW = SimpleLinearSumAssignmentStatus.POSSIBLE_OVERFLOW;
-
   private leftNodes: number[] = [];
   private rightNodes: number[] = [];
   private costs: number[] = [];
-  private result: NativeSuccess | null = null;
+  private result: NetworkFlowResult | null = null;
+  private solving = false;
 
-  add_arc_with_cost(leftNode: number, rightNode: number, cost: number): number {
+  addArcWithCost(leftNode: number, rightNode: number, cost: number): number {
     const arc = this.leftNodes.length;
     this.leftNodes.push(...toNumberArray([leftNode], 'leftNode'));
     this.rightNodes.push(...toNumberArray([rightNode], 'rightNode'));
@@ -554,54 +408,30 @@ export class SimpleLinearSumAssignment {
     return arc;
   }
 
-  addArcWithCost(leftNode: number, rightNode: number, cost: number): number {
-    return this.add_arc_with_cost(leftNode, rightNode, cost);
-  }
-
-  add_arcs_with_cost(leftNodes: ArrayLike<number>, rightNodes: ArrayLike<number>, costs: ArrayLike<number>): number[] {
+  addArcsWithCost(leftNodes: ArrayLike<number>, rightNodes: ArrayLike<number>, costs: ArrayLike<number>): number[] {
     const leftValues = toNumberArray(leftNodes, 'leftNodes');
     const rightValues = toNumberArray(rightNodes, 'rightNodes');
     const costValues = toNumberArray(costs, 'costs');
-    assertEqualLengths('SimpleLinearSumAssignment.add_arcs_with_cost', leftValues, rightValues, costValues);
-    return leftValues.map((leftNode, index) => this.add_arc_with_cost(leftNode, rightValues[index], costValues[index]));
-  }
-
-  addArcsWithCost(leftNodes: ArrayLike<number>, rightNodes: ArrayLike<number>, costs: ArrayLike<number>): number[] {
-    return this.add_arcs_with_cost(leftNodes, rightNodes, costs);
-  }
-
-  num_nodes(): number {
-    return this.leftNodes.reduce((maxNode, leftNode, index) => Math.max(maxNode, leftNode, this.rightNodes[index]), -1) + 1;
+    assertEqualLengths('SimpleLinearSumAssignment.addArcsWithCost', leftValues, rightValues, costValues);
+    return leftValues.map((leftNode, index) => this.addArcWithCost(leftNode, rightValues[index], costValues[index]));
   }
 
   numNodes(): number {
-    return this.num_nodes();
-  }
-
-  num_arcs(): number {
-    return this.leftNodes.length;
+    return this.leftNodes.reduce((maxNode, leftNode, index) => Math.max(maxNode, leftNode, this.rightNodes[index]), -1) + 1;
   }
 
   numArcs(): number {
-    return this.num_arcs();
+    return this.leftNodes.length;
   }
 
-  left_node(arc: number): number {
+  leftNode(arc: number): number {
     assertIndex(arc, this.leftNodes.length, 'arc');
     return this.leftNodes[arc];
   }
 
-  leftNode(arc: number): number {
-    return this.left_node(arc);
-  }
-
-  right_node(arc: number): number {
+  rightNode(arc: number): number {
     assertIndex(arc, this.rightNodes.length, 'arc');
     return this.rightNodes[arc];
-  }
-
-  rightNode(arc: number): number {
-    return this.right_node(arc);
   }
 
   cost(arc: number): number {
@@ -610,50 +440,33 @@ export class SimpleLinearSumAssignment {
   }
 
   async solve(options: NetworkFlowSolveOptions = {}): Promise<number> {
-    const result = await solveGraphPayload({
-      algorithm: 'linearSumAssignment',
-      leftNodes: this.leftNodes,
-      rightNodes: this.rightNodes,
-      costs: this.costs,
-    }, options);
-    this.result = result;
-    return result.status;
-  }
-
-  optimal_cost(): number {
-    return this.result?.optimalCost ?? 0;
+    if (this.solving) throw new RuntimeError('SimpleLinearSumAssignment.solve() is already in progress.');
+    this.solving = true;
+    try {
+      const result = await solveNetworkFlow({
+        type: 'linearSumAssignment',
+        leftNodes: this.leftNodes,
+        rightNodes: this.rightNodes,
+        costs: this.costs,
+      }, options);
+      this.result = result;
+      return result.status;
+    } finally {
+      this.solving = false;
+    }
   }
 
   optimalCost(): number {
-    return this.optimal_cost();
-  }
-
-  right_mate(leftNode: number): number {
-    assertIndex(leftNode, this.num_nodes(), 'leftNode');
-    return this.result?.rightMates?.[leftNode] ?? -1;
+    return this.result?.optimalCost ?? 0;
   }
 
   rightMate(leftNode: number): number {
-    return this.right_mate(leftNode);
-  }
-
-  assignment_cost(leftNode: number): number {
-    assertIndex(leftNode, this.num_nodes(), 'leftNode');
-    return this.result?.assignmentCosts?.[leftNode] ?? 0;
+    assertIndex(leftNode, this.numNodes(), 'leftNode');
+    return this.result?.rightMates?.[leftNode] ?? -1;
   }
 
   assignmentCost(leftNode: number): number {
-    return this.assignment_cost(leftNode);
+    assertIndex(leftNode, this.numNodes(), 'leftNode');
+    return this.result?.assignmentCosts?.[leftNode] ?? 0;
   }
 }
-
-export const NetworkFlow = {
-  initNetworkFlow,
-  setExecutor: setNetworkFlowExecutor,
-  SimpleMaxFlow,
-  SimpleMinCostFlow,
-  SimpleLinearSumAssignment,
-  SimpleMaxFlowStatus,
-  SimpleMinCostFlowStatus,
-  SimpleLinearSumAssignmentStatus,
-};

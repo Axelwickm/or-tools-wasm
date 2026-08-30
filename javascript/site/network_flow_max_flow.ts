@@ -1,6 +1,5 @@
 import {
-  initNetworkFlow,
-  setExecutor,
+  type ExecutorConfiguration,
   SimpleMaxFlow,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
@@ -15,6 +14,7 @@ const executorSelector = document.getElementById('solver-executor') as HTMLSelec
 const middleCountInput = document.getElementById('middle-count') as HTMLInputElement | null;
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
+let readNetworkFlowExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let nodes: Node[] = [];
 let arcs: Arc[] = [];
@@ -125,18 +125,17 @@ async function runMaxFlow() {
   setRunning(true);
   if (statusEl) statusEl.textContent = '';
   try {
-    appendStatus('Initializing Network Flow runtime...');
-    await initNetworkFlow();
-
     const maxFlow = new SimpleMaxFlow();
-    const allArcs = maxFlow.add_arcs_with_capacity(
+    const allArcs = maxFlow.addArcsWithCapacity(
       arcs.map((arc) => arc.from),
       arcs.map((arc) => arc.to),
       arcs.map((arc) => arc.capacity),
     );
 
     appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
-    const status = await maxFlow.solve(0, nodes.length - 1);
+    const status = await maxFlow.solve(0, nodes.length - 1, {
+      executor: readNetworkFlowExecutor(),
+    });
     appendStatus(`Done. Status ${status}.`);
 
     arcs = allArcs.map((arc) => ({
@@ -148,9 +147,9 @@ async function runMaxFlow() {
     renderGraph(true);
     if (solutionOutput) {
       solutionOutput.innerHTML = `
-        <strong>Optimal flow:</strong> ${maxFlow.optimal_flow()}<br>
-        <strong>Source-side min cut:</strong> ${maxFlow.get_source_side_min_cut().join(', ')}<br>
-        <strong>Sink-side min cut:</strong> ${maxFlow.get_sink_side_min_cut().join(', ')}
+        <strong>Optimal flow:</strong> ${maxFlow.optimalFlow()}<br>
+        <strong>Source-side min cut:</strong> ${maxFlow.getSourceSideMinCut().join(', ')}<br>
+        <strong>Sink-side min cut:</strong> ${maxFlow.getSinkSideMinCut().join(', ')}
       `;
     }
   } catch (error) {
@@ -174,4 +173,4 @@ middleCountInput?.addEventListener('change', () => {
 
 generateGraph();
 resetView();
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+readNetworkFlowExecutor = configureSolverExecutorSelector(null, executorSelector);

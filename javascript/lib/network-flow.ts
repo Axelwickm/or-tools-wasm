@@ -1,16 +1,22 @@
 export {
-  initNetworkFlow as init,
-  initNetworkFlow,
-  NetworkFlow,
+  RuntimeError,
   SimpleLinearSumAssignment,
   SimpleLinearSumAssignmentStatus,
   SimpleMaxFlow,
   SimpleMaxFlowStatus,
   SimpleMinCostFlow,
   SimpleMinCostFlowStatus,
-  setNetworkFlowExecutor as setExecutor,
-  solveGraphPayload,
 } from './network_flow/api.js';
-export type { GraphSolvePayload, NetworkFlowEvent, NetworkFlowSolveOptions } from './network_flow/api.js';
-export type { ExecutorConfiguration } from './executor_configuration.js';
+export type { NetworkFlowEvent, NetworkFlowSolveOptions } from './network_flow/api.js';
+export { CloudExecutorUnavailableError } from './cloud_executor.js';
+export type { SolverJobEvent } from './solver_executor.js';
+export type {
+  AutoExecutorConfiguration,
+  CloudExecutorConfiguration,
+  DirectExecutorConfiguration,
+  ExecutorConfiguration,
+  ExecutorSelection,
+  ServerExecutorConfiguration,
+  WorkerExecutorConfiguration,
+} from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

@@ -1177,85 +1177,88 @@ translation.
 
 ## Network Flow
 
-The dedicated Network Flow API mirrors the Python graph wrappers for
-`SimpleMaxFlow`, `SimpleMinCostFlow`, and `SimpleLinearSumAssignment`.
+The dedicated Network Flow API provides camelCase builders for
+`SimpleMaxFlow`, `SimpleMinCostFlow`, and `SimpleLinearSumAssignment`. Like
+CP-SAT, the runtime is loaded lazily and execution is selected per solve.
 
 ```ts
-import { initNetworkFlow, SimpleMaxFlow, setWorkerBridgeEnabled } from 'or-tools-wasm/network-flow';
-
-setWorkerBridgeEnabled(true);
-await initNetworkFlow();
+import { SimpleMaxFlow, SimpleMaxFlowStatus } from 'or-tools-wasm/network-flow';
 
 const maxFlow = new SimpleMaxFlow();
-const arcs = maxFlow.add_arcs_with_capacity(
+const arcs = maxFlow.addArcsWithCapacity(
   [0, 0, 0, 1, 1, 2, 2, 3, 3],
   [1, 2, 3, 2, 4, 3, 4, 2, 4],
   [20, 30, 10, 40, 30, 10, 20, 5, 20],
 );
-const status = await maxFlow.solve(0, 4);
-if (status === SimpleMaxFlow.OPTIMAL) {
-  console.log(maxFlow.optimal_flow(), maxFlow.flows(arcs));
+const status = await maxFlow.solve(0, 4, { executor: 'worker' });
+if (status === SimpleMaxFlowStatus.OPTIMAL) {
+  console.log(maxFlow.optimalFlow(), maxFlow.flows(arcs));
 }
 ```
 
-`initNetworkFlow(): Promise<void>` loads the graph WebAssembly runtime for
-direct solves. When the browser worker bridge is enabled, it is a no-op and
-graph solves run through the worker bridge.
+Every solve accepts `executor`, `signal`, and `onEvent`. `executor` supports
+the shared `direct`, `worker`, `server`, `cloud`, and `auto` selections. The
+default is `auto`; browser main-thread calls select a worker while environments
+without browser workers select direct execution. There is no global initializer
+or executor setting.
 
-`SimpleMaxFlow` exposes Python-style snake_case methods and camelCase aliases:
+`SimpleMaxFlow` exposes:
 
-- status constants: `OPTIMAL`, `POSSIBLE_OVERFLOW`, `BAD_INPUT`, `BAD_RESULT`
-- `add_arc_with_capacity(tail, head, capacity): number`
-- `add_arcs_with_capacity(tails, heads, capacities): number[]`
-- `set_arc_capacity(arc, capacity): void`
-- `set_arcs_capacity(arcs, capacities): void`
-- `num_nodes()` / `numNodes(): number`
-- `num_arcs()` / `numArcs(): number`
+- `SimpleMaxFlowStatus`: `OPTIMAL`, `POSSIBLE_OVERFLOW`, `BAD_INPUT`, `BAD_RESULT`
+- `addArcWithCapacity(tail, head, capacity): number`
+- `addArcsWithCapacity(tails, heads, capacities): number[]`
+- `setArcCapacity(arc, capacity): void`
+- `setArcsCapacity(arcs, capacities): void`
+- `numNodes(): number`
+- `numArcs(): number`
 - `tail(arc)`, `head(arc)`, `capacity(arc): number`
-- `solve(source, sink): Promise<number>`
-- `optimal_flow()` / `optimalFlow(): number`
+- `solve(source, sink, options?): Promise<number>`
+- `optimalFlow(): number`
 - `flow(arc): number`
 - `flows(arcs): number[]`
-- `get_source_side_min_cut()` / `getSourceSideMinCut(): number[]`
-- `get_sink_side_min_cut()` / `getSinkSideMinCut(): number[]`
+- `getSourceSideMinCut(): number[]`
+- `getSinkSideMinCut(): number[]`
 
 `SimpleMinCostFlow` exposes:
 
-- status constants: `NOT_SOLVED`, `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
+- `SimpleMinCostFlowStatus`: `NOT_SOLVED`, `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
   `UNBALANCED`, `BAD_RESULT`, `BAD_COST_RANGE`, `BAD_CAPACITY_RANGE`
-- `add_arc_with_capacity_and_unit_cost(tail, head, capacity, unitCost): number`
-- `add_arcs_with_capacity_and_unit_cost(tails, heads, capacities, unitCosts): number[]`
-- `set_arc_capacity(arc, capacity): void`
-- `set_arc_capacities(arcs, capacities): void`
-- `set_node_supply(node, supply): void`
-- `set_nodes_supplies(nodes, supplies): void`
-- `num_nodes()`, `num_arcs()`, `tail(arc)`, `head(arc)`, `capacity(arc)`
-- `supply(node)`, `unit_cost(arc)` / `unitCost(arc)`
-- `solve(): Promise<number>`
-- `solve_max_flow_with_min_cost()` / `solveMaxFlowWithMinCost(): Promise<number>`
-- `optimal_cost()` / `optimalCost(): number`
-- `maximum_flow()` / `maximumFlow(): number`
+- `addArcWithCapacityAndUnitCost(tail, head, capacity, unitCost): number`
+- `addArcsWithCapacityAndUnitCost(tails, heads, capacities, unitCosts): number[]`
+- `setArcCapacity(arc, capacity): void`
+- `setArcCapacities(arcs, capacities): void`
+- `setNodeSupply(node, supply): void`
+- `setNodesSupplies(nodes, supplies): void`
+- `numNodes()`, `numArcs()`, `tail(arc)`, `head(arc)`, `capacity(arc)`
+- `supply(node)`, `unitCost(arc)`
+- `solve(options?): Promise<number>`
+- `solveMaxFlowWithMinCost(options?): Promise<number>`
+- `optimalCost(): number`
+- `maximumFlow(): number`
 - `flow(arc): number`
 - `flows(arcs): number[]`
 
 `SimpleLinearSumAssignment` exposes:
 
-- status constants: `OPTIMAL`, `INFEASIBLE`, `POSSIBLE_OVERFLOW`
-- `add_arc_with_cost(leftNode, rightNode, cost): number`
-- `add_arcs_with_cost(leftNodes, rightNodes, costs): number[]`
-- `num_nodes()` / `numNodes(): number`
-- `num_arcs()` / `numArcs(): number`
-- `left_node(arc)` / `leftNode(arc): number`
-- `right_node(arc)` / `rightNode(arc): number`
+- `SimpleLinearSumAssignmentStatus`: `OPTIMAL`, `INFEASIBLE`, `POSSIBLE_OVERFLOW`
+- `addArcWithCost(leftNode, rightNode, cost): number`
+- `addArcsWithCost(leftNodes, rightNodes, costs): number[]`
+- `numNodes(): number`
+- `numArcs(): number`
+- `leftNode(arc): number`
+- `rightNode(arc): number`
 - `cost(arc): number`
-- `solve(): Promise<number>`
-- `optimal_cost()` / `optimalCost(): number`
-- `right_mate(leftNode)` / `rightMate(leftNode): number`
-- `assignment_cost(leftNode)` / `assignmentCost(leftNode): number`
+- `solve(options?): Promise<number>`
+- `optimalCost(): number`
+- `rightMate(leftNode): number`
+- `assignmentCost(leftNode): number`
 
-Network Flow algorithms are single-threaded in this package. They support the
-shared browser worker bridge, so UI code can run graph solves off the main
-thread, but there is no solver thread-count parameter.
+Network Flow algorithms are single-threaded, so there is no solver thread-count
+parameter. A worker solve can be cancelled by terminating its worker; the
+underlying direct native solve has no cancellation hook. Concurrent solves on
+the same solver instance are rejected, and the singleton direct and worker
+executors each reject overlapping jobs. Lifecycle events use the same
+`SolverJobEvent` shape as CP-SAT.
 
 ## MathOpt
 

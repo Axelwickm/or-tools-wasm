@@ -28,10 +28,10 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initNetworkFlow, SimpleMinCostFlow, setExecutor } from 'or-tools-wasm/network-flow';
-
-setExecutor({ type: 'worker' });
-await initNetworkFlow();
+        <pre class="code-block"><code data-highlight="ts">import {
+  SimpleMinCostFlow,
+  SimpleMinCostFlowStatus,
+} from 'or-tools-wasm/network-flow';
 
 const startNodes = [0, 0, 1, 1, 1, 2, 2, 3, 4];
 const endNodes = [1, 2, 2, 3, 4, 3, 4, 4, 2];
@@ -40,22 +40,22 @@ const unitCosts = [4, 4, 2, 2, 6, 1, 3, 2, 3];
 const supplies = [20, 0, 0, -5, -15];
 
 const minCostFlow = new SimpleMinCostFlow();
-const allArcs = minCostFlow.add_arcs_with_capacity_and_unit_cost(
+const allArcs = minCostFlow.addArcsWithCapacityAndUnitCost(
   startNodes,
   endNodes,
   capacities,
   unitCosts,
 );
-minCostFlow.set_nodes_supplies([0, 1, 2, 3, 4], supplies);
+minCostFlow.setNodesSupplies([0, 1, 2, 3, 4], supplies);
 
-const status = await minCostFlow.solve();
-if (status === SimpleMinCostFlow.OPTIMAL) {
-  console.log(minCostFlow.optimal_cost(), minCostFlow.maximum_flow());
+const status = await minCostFlow.solve({ executor: 'worker' });
+if (status === SimpleMinCostFlowStatus.OPTIMAL) {
+  console.log(minCostFlow.optimalCost(), minCostFlow.maximumFlow());
   console.log(allArcs.map((arc) => ({
     tail: minCostFlow.tail(arc),
     head: minCostFlow.head(arc),
     capacity: minCostFlow.capacity(arc),
-    cost: minCostFlow.unit_cost(arc),
+    cost: minCostFlow.unitCost(arc),
     flow: minCostFlow.flow(arc),
   })));
 }</code></pre>

@@ -7,9 +7,8 @@ import {
   MPSolver,
 } from 'or-tools-wasm/mp-solver';
 import {
-  initNetworkFlow,
-  setExecutor as setNetworkFlowExecutor,
   SimpleMaxFlow,
+  SimpleMaxFlowStatus,
 } from 'or-tools-wasm/network-flow';
 import { MathOpt } from 'or-tools-wasm/mathopt';
 import { runBunFixture } from './shared.ts';
@@ -50,13 +49,11 @@ async function runMPSolverSmoke() {
 }
 
 async function runNetworkFlowSmoke() {
-  setNetworkFlowExecutor({ type: 'direct' });
-  await initNetworkFlow();
   const maxFlow = new SimpleMaxFlow();
-  maxFlow.add_arcs_with_capacity([0, 0, 1, 2], [1, 2, 3, 3], [5, 3, 4, 4]);
-  const status = await maxFlow.solve(0, 3);
-  assert(status === SimpleMaxFlow.OPTIMAL, `SimpleMaxFlow expected OPTIMAL, got ${status}`);
-  assert(maxFlow.optimal_flow() === 7, `SimpleMaxFlow expected flow 7, got ${maxFlow.optimal_flow()}`);
+  maxFlow.addArcsWithCapacity([0, 0, 1, 2], [1, 2, 3, 3], [5, 3, 4, 4]);
+  const status = await maxFlow.solve(0, 3, { executor: 'direct' });
+  assert(status === SimpleMaxFlowStatus.OPTIMAL, `SimpleMaxFlow expected OPTIMAL, got ${status}`);
+  assert(maxFlow.optimalFlow() === 7, `SimpleMaxFlow expected flow 7, got ${maxFlow.optimalFlow()}`);
 }
 
 async function runMathOptSmoke() {
@@ -84,6 +81,5 @@ await runBunFixture(async () => {
   await terminateLoadedRuntimeThreads();
   console.log('bun mixed runtime smoke passed');
 }, async () => {
-  setNetworkFlowExecutor({ type: 'auto' });
   await terminateLoadedRuntimeThreads();
 });

@@ -11,11 +11,12 @@ import {
   KnapsackSolverType,
 } from 'or-tools-wasm/knapsack';
 import {
-  initNetworkFlow,
-  setExecutor as setNetworkFlowExecutor,
   SimpleLinearSumAssignment,
+  SimpleLinearSumAssignmentStatus,
   SimpleMaxFlow,
+  SimpleMaxFlowStatus,
   SimpleMinCostFlow,
+  SimpleMinCostFlowStatus,
 } from 'or-tools-wasm/network-flow';
 import {
   consistency_level,
@@ -60,6 +61,9 @@ import { runKnapsackWorkerLifecycleCase } from '../../cases/or-tools-wasm/knapsa
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
 import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
 import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
+import { runNetworkFlowConcurrencyCase } from '../../cases/or-tools-wasm/network_flow/concurrency.ts';
+import { runNetworkFlowEventHandlerCase } from '../../cases/or-tools-wasm/network_flow/event_handler.ts';
+import { runNetworkFlowWorkerLifecycleCase } from '../../cases/or-tools-wasm/network_flow/worker_lifecycle.ts';
 import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
@@ -164,13 +168,26 @@ test('isolates Knapsack event-handler errors in Node', async () => {
 
 test('runs the shared Network Flow cases in Node', async (t) => {
   const networkFlowResults = await runNetworkFlowCases({
-    initNetworkFlow,
     SimpleMaxFlow,
+    SimpleMaxFlowStatus,
     SimpleMinCostFlow,
+    SimpleMinCostFlowStatus,
     SimpleLinearSumAssignment,
-    setExecutor: setNetworkFlowExecutor,
+    SimpleLinearSumAssignmentStatus,
   });
   await assertCaseResults(t, 'node Network Flow', networkFlowResults);
+});
+
+test('enforces Network Flow solve concurrency in Node', async () => {
+  await runNetworkFlowConcurrencyCase({ SimpleMaxFlow });
+});
+
+test('cancels and recovers the Network Flow worker in Node', async () => {
+  await runNetworkFlowWorkerLifecycleCase({ SimpleMaxFlow });
+});
+
+test('isolates Network Flow event-handler errors in Node', async () => {
+  await runNetworkFlowEventHandlerCase({ SimpleMaxFlow });
 });
 
 test('runs the shared Set Cover cases in Node', async (t) => {
