@@ -18,7 +18,7 @@ import {
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm/routing';
-import { initMPSolver, MPSolver } from 'or-tools-wasm/mp-solver';
+import { MPSolver } from 'or-tools-wasm/mp-solver';
 import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
 import {
   initKnapsack,
@@ -177,39 +177,36 @@ async function solveRouting(problem, threads) {
 }
 
 async function solveMpsolver(problem, threads) {
-  await initMPSolver();
+  const execution = { executor: 'direct' };
   const variableCount = Number(problem.variables);
   const constraintCount = Number(problem.constraints);
-  const solver = MPSolver.CreateSolver('SAT');
+  const solver = MPSolver.createSolver('SAT');
   if (!solver) return ['UNAVAILABLE', ''];
 
-  try {
-    solver.SetNumThreads(threads);
-    const variables = Array.from({ length: variableCount }, (_, index) => solver.BoolVar(`x${index}`));
-    for (let row = 0; row < constraintCount; row++) {
-      const constraint = solver.RowConstraint(-solver.infinity(), 25 * variableCount / constraintCount, `c${row}`);
-      variables.forEach((variable, column) => {
-        constraint.SetCoefficient(variable, deterministicValue(row * variableCount + column, 17, 1));
-      });
-    }
-
-    const objective = solver.Objective();
+  solver.setNumThreads(threads);
+  const variables = Array.from({ length: variableCount }, (_, index) => solver.addBoolVariable(`x${index}`));
+  for (let row = 0; row < constraintCount; row++) {
+    const constraint = solver.addConstraint(-solver.infinity(), 25 * variableCount / constraintCount, `c${row}`);
     variables.forEach((variable, column) => {
-      objective.SetCoefficient(variable, deterministicValue(column, 101, 1));
+      constraint.setCoefficient(variable, deterministicValue(row * variableCount + column, 17, 1));
     });
-    objective.SetMaximization();
-
-    const result = await solver.SolveWithProto({
-      timeLimitSeconds: Number(problem.timeLimitSeconds ?? 5),
-      solverSpecificParameters: `num_workers: ${threads}`,
-    });
-    if (!result.loaded) return ['LOAD_FAILED', ''];
-    const status = String(result.response.status ?? 'UNKNOWN');
-    const objectiveValue = objective.Value();
-    return [status, Number.isFinite(objectiveValue) ? String(objectiveValue) : ''];
-  } finally {
-    solver.delete();
   }
+
+  const objective = solver.objective();
+  variables.forEach((variable, column) => {
+    objective.setCoefficient(variable, deterministicValue(column, 101, 1));
+  });
+  objective.setMaximization();
+
+  const result = await solver.solveWithProto({
+    ...execution,
+    timeLimitSeconds: Number(problem.timeLimitSeconds ?? 5),
+    solverSpecificParameters: `num_workers: ${threads}`,
+  });
+  if (!result.loaded) return ['LOAD_FAILED', ''];
+  const status = String(result.response.status ?? 'UNKNOWN');
+  const objectiveValue = objective.value();
+  return [status, Number.isFinite(objectiveValue) ? String(objectiveValue) : ''];
 }
 
 async function solveMathOpt(problem, threads) {

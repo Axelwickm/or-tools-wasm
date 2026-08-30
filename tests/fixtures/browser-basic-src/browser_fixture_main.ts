@@ -6,6 +6,8 @@ import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/s
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
+import { runMpSolverConcurrencyCase } from '../../cases/or-tools-wasm/mp_solver/concurrency.ts';
+import { runMpSolverWorkerLifecycleCase } from '../../cases/or-tools-wasm/mp_solver/worker_lifecycle.ts';
 import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
 import { withCpSatExecutor } from '../../harness/cpsat_types.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
@@ -319,10 +321,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   );
   const mpSolver = await runSelectedGroup(selectedGroup, 'mp-solver', 'mp-solver', () =>
     runWithWorkerStats(workerSpy, () => runMPSolverCases({
-      initMPSolver: MPSolverApi.initMPSolver,
       MPSolver: MPSolverApi.MPSolver,
       MPSolverParameters: MPSolverApi.MPSolverParameters,
-      setExecutor: MPSolverApi.setExecutor,
     }, {
       modes: executorFixtureModes,
       onProgress: (caseName, context) => setStatus({ ok: false, phase: 'mp-solver', caseName, ...context }),
@@ -387,6 +387,21 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     'mathopt-pdlp-concurrency',
     () => runSolverConcurrencyCase(MathOptApi as never, PdlpApi as never),
   );
+  const mpSolverConcurrencyResult = await runSelectedGroup(
+    selectedGroup,
+    'mp-solver',
+    'mp-solver-concurrency',
+    () => runMpSolverConcurrencyCase(MPSolverApi as never),
+  );
+  const mpSolverWorkerLifecycleResult = await runSelectedGroup(
+    selectedGroup,
+    'mp-solver',
+    'mp-solver-worker-lifecycle',
+    () => runWithWorkerStats(
+      workerSpy,
+      () => runMpSolverWorkerLifecycleCase(MPSolverApi as never),
+    ),
+  );
   const cloudExecutorResult = await runSelectedGroup(selectedGroup, 'cp-sat', 'cloud', () =>
     runCloudExecutorCase(CpSatApi as never, {
       packageName: PackageApi.packageName,
@@ -397,6 +412,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     ok: true,
     cloudExecutorResult,
     cpSatConcurrencyResult,
+    mpSolverConcurrencyResult,
+    mpSolverWorkerLifecycleResult: mpSolverWorkerLifecycleResult?.result,
     solverConcurrencyResult,
     cpSatSolverStructureResults: cpSatSolverStructure?.result,
     cpSatWorkerLifecycleResult: cpSatWorkerLifecycle?.result,

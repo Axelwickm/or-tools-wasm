@@ -1,4 +1,9 @@
-import { initMPSolver, MPSolver, setExecutor, type MPVariable } from 'or-tools-wasm/mp-solver';
+import {
+  MPSolver,
+  type ExecutorConfiguration,
+  type MPVariable,
+  type MPSolverExecutionOptions,
+} from 'or-tools-wasm/mp-solver';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 type VariableKind = 'continuous' | 'integer';
@@ -39,13 +44,18 @@ export function appendStatus(element: HTMLElement | null, message: string): void
   element.textContent += `${message}\n`;
 }
 
+let readMPSolverExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
+
 export function configureMPSolverExecutor(selector: HTMLSelectElement | null): void {
-  configureSolverExecutorSelector({ setExecutor }, selector);
+  readMPSolverExecutor = configureSolverExecutorSelector(null, selector);
 }
 
 export function currentMPSolverExecutor(): 'direct' | 'worker' | 'server' {
-  const selector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-  return (selector?.value as 'direct' | 'worker' | 'server' | undefined) ?? 'worker';
+  return readMPSolverExecutor().type as 'direct' | 'worker' | 'server';
+}
+
+export function currentMPSolverExecutionOptions(): MPSolverExecutionOptions {
+  return { executor: readMPSolverExecutor() };
 }
 
 export function configureSolverThreadsInput(input: HTMLInputElement | null, maxThreads = 8): void {
@@ -71,11 +81,11 @@ export function applySolverThreads(solver: MPSolver, threads: number): {
   active: number;
 } {
   const requested = Math.max(1, Math.trunc(threads));
-  const accepted = solver.SetNumThreads(requested);
+  const accepted = solver.setNumThreads(requested);
   return {
     requested,
     accepted,
-    active: solver.GetNumThreads(),
+    active: solver.getNumThreads(),
   };
 }
 
@@ -84,30 +94,30 @@ function supportsNodeCount(solverId: SimpleMpConfig['solverId']): boolean {
 }
 
 export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<SimpleMpResult> {
-  await initMPSolver();
+  const executionOptions = currentMPSolverExecutionOptions();
 
-  const solver = MPSolver.CreateSolver(config.solverId);
+  const solver = MPSolver.createSolver(config.solverId);
   if (!solver) {
     throw new Error(`${config.solverId} is not available in this build.`);
   }
 
-  try {
+  {
     const infinity = solver.infinity();
     const makeVariable = config.variableKind === 'integer'
-      ? (name: string): MPVariable => solver.IntVar(0, 1, name)
-      : (name: string): MPVariable => solver.NumVar(0, 1, name);
+      ? (name: string): MPVariable => solver.addIntVariable(0, 1, name)
+      : (name: string): MPVariable => solver.addNumVariable(0, 1, name);
 
     const x = makeVariable('x');
     const y = makeVariable('y');
 
-    const c0 = solver.Constraint(-infinity, 1, 'c0');
-    c0.SetCoefficient(x, 1);
-    c0.SetCoefficient(y, 1);
+    const c0 = solver.addConstraint(-infinity, 1, 'c0');
+    c0.setCoefficient(x, 1);
+    c0.setCoefficient(y, 1);
 
-    const objective = solver.Objective();
-    objective.SetCoefficient(x, 2);
-    objective.SetCoefficient(y, 1);
-    objective.SetMaximization();
+    const objective = solver.objective();
+    objective.setCoefficient(x, 2);
+    objective.setCoefficient(y, 1);
+    objective.setMaximization();
 
     const solverThreads = config.solverThreads ?? config.workerCount;
     const threadConfig = solverThreads ? applySolverThreads(solver, solverThreads) : undefined;
@@ -116,7 +126,8 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       : undefined;
     let status: number | string = MPSolver.OPTIMAL;
     if (config.solverId === 'SAT') {
-      const protoResult = await solver.SolveWithProto({
+      const protoResult = await solver.solveWithProto({
+        ...executionOptions,
         solverSpecificParameters: workerCount ? `num_workers: ${workerCount}` : undefined,
       });
       if (!protoResult.loaded) {
@@ -124,18 +135,18 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       }
       status = protoResult.response.status ?? MPSolver.OPTIMAL;
     } else {
-      status = await solver.Solve();
+      status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
     }
     const result = {
       status,
-      objective: objective.Value(),
-      x: x.solution_value(),
-      y: y.solution_value(),
-      variables: solver.NumVariables(),
-      constraints: solver.NumConstraints(),
-      wallTime: solver.WallTime(),
-      iterations: solver.Iterations(),
+      objective: objective.value(),
+      x: x.solutionValue(),
+      y: y.solutionValue(),
+      variables: solver.numVariables(),
+      constraints: solver.numConstraints(),
+      wallTime: solver.wallTime(),
+      iterations: solver.iterations(),
       nodes: supportsNodeCount(config.solverId) ? solver.nodes() : undefined,
       executor: currentMPSolverExecutor(),
       workerCount,
@@ -145,8 +156,6 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
     };
     assertExpectedObjective(result, config.expectedObjective);
     return result;
-  } finally {
-    solver.delete();
   }
 }
 

@@ -736,36 +736,34 @@ supported parameter subset is valid.
 Import:
 
 ```ts
-import { initMPSolver, MPSolver, MPSolverParameters } from 'or-tools-wasm/mp-solver';
+import { MPSolver, MPSolverParameters } from 'or-tools-wasm/mp-solver';
 ```
 
-Initialize before constructing solvers:
+Build the model and select the executor at the solve boundary:
 
 ```ts
-await initMPSolver();
-
-const solver = MPSolver.CreateSolver('GLOP'); // or 'CLP' / 'GLPK_LP' for LP backends
+const solver = MPSolver.createSolver('GLOP'); // or 'CLP' / 'GLPK_LP' for LP backends
 if (!solver) throw new Error('LP backend unavailable');
 
-const x = solver.NumVar(0, solver.infinity(), 'x');
-const y = solver.NumVar(0, solver.infinity(), 'y');
-const c = solver.Constraint(-solver.infinity(), 14, 'c');
-c.SetCoefficient(x, 1);
-c.SetCoefficient(y, 2);
-solver.Objective().SetCoefficient(x, 3);
-solver.Objective().SetCoefficient(y, 1);
-solver.Objective().SetMaximization();
+const x = solver.addNumVariable(0, solver.infinity(), 'x');
+const y = solver.addNumVariable(0, solver.infinity(), 'y');
+const c = solver.addConstraint(-solver.infinity(), 14, 'c');
+c.setCoefficient(x, 1);
+c.setCoefficient(y, 2);
+solver.objective().setCoefficient(x, 3);
+solver.objective().setCoefficient(y, 1);
+solver.objective().setMaximization();
 
-const status = await solver.Solve();
+const status = await solver.solve({ executor: 'worker' });
 ```
 
-### Initialization
-
-`initMPSolver(): Promise<void>`
-
-Loads the MPSolver WebAssembly runtime for direct solves. When the browser
-worker bridge is enabled, model objects use bridge-backed handles and
-`initMPSolver()` is a no-op.
+`solve()`, `solveWithProto()`, and `MPSolver.solveModelRequest()` accept the
+same execution controls as CP-SAT: choose an executor with `executor`, cancel
+with an `AbortSignal` in `signal`, and observe lifecycle events with `onEvent`.
+Cancellation should use the worker executor. GLOP, SAT, and PDLP solves are
+interrupted natively; for backends without native interruption support, the
+worker is terminated and recreated. Direct execution cannot stop native work
+already in progress.
 
 ### Solver Types And Status
 
@@ -776,7 +774,7 @@ worker bridge is enabled, model objects use bridge-backed handles and
 `CBC_MIXED_INTEGER_PROGRAMMING`, `BOP_INTEGER_PROGRAMMING`,
 `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, and
 others. Only problem types compiled into the WebAssembly runtime will be supported at runtime; use
-`MPSolver.SupportsProblemType()`.
+`MPSolver.supportsProblemType()`.
 
 The default package runtime currently includes `GLOP`, `CLP`, and `GLPK_LP` for
 continuous linear programming, plus `SAT`, `GLPK`, `SCIP`, `CBC`, `BOP`, and
@@ -785,7 +783,7 @@ continuous linear programming, plus `SAT`, `GLPK`, `SCIP`, `CBC`, `BOP`, and
 `MPSolverResultStatus` contains `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`,
 `UNBOUNDED`, `ABNORMAL`, `MODEL_INVALID`, and `NOT_SOLVED`.
 
-Basis status values are returned by `basis_status()` and are also exposed as
+Basis status values are returned by `basisStatus()` and are also exposed as
 static constants on `MPSolver`: `FREE`, `AT_LOWER_BOUND`, `AT_UPPER_BOUND`,
 `FIXED_VALUE`, and `BASIC`.
 
@@ -793,16 +791,16 @@ static constants on `MPSolver`: `FREE`, `AT_LOWER_BOUND`, `AT_UPPER_BOUND`,
 
 Static helpers:
 
-- `CreateSolver(solverId): MPSolver | null`
-- `Infinity(): number`
-- `SupportsProblemType(problemType): boolean`
-- `ParseSolverType(solverId): OptimizationProblemType | null`
-- `ParseAndCheckSupportForProblemType(solverId): OptimizationProblemType | null`
-- `getLinearSolverSchemas(): Promise<LinearSolverSchemas>`
+- `createSolver(solverId): MPSolver | null`
+- `infinity(): number`
+- `supportsProblemType(problemType): boolean`
+- `parseSolverType(solverId): OptimizationProblemType | null`
+- `parseAndCheckSupportForProblemType(solverId): OptimizationProblemType | null`
+- `getLinearSolverSchemas(options?): Promise<LinearSolverSchemas>`
 - `createModelRequest(request): Promise<Uint8Array>`
 - `createSolutionResponse(response): Promise<Uint8Array>`
 - `decodeSolutionResponse(bytes): Promise<MPSolverSolutionResponse>`
-- `solveModelRequest(request): Promise<MPSolverProtoSolveResult>`
+- `solveModelRequest(request, options?): Promise<MPSolverProtoSolveResult>`
 
 Construction:
 
@@ -812,135 +810,128 @@ new MPSolver(name, problemType)
 
 Core model methods:
 
-- `Name(): string`
-- `ProblemType(): OptimizationProblemType`
-- `IsMIP()` / `IsMip(): boolean`
-- `Clear(): void`
+- `name(): string`
+- `problemType(): OptimizationProblemType`
+- `isMip(): boolean`
+- `clear(): void`
 - `infinity(): number`
-- `NumVariables(): number`
-- `NumConstraints(): number`
+- `numVariables(): number`
+- `numConstraints(): number`
 - `variable(index): MPVariable`
 - `variables(): MPVariable[]`
 - `constraint(index): MPConstraint`
 - `constraints(): MPConstraint[]`
-- `LookupVariableOrNull(name): MPVariable | null`
-- `LookupVariable(name): MPVariable | null`
-- `LookupConstraintOrNull(name): MPConstraint | null`
-- `LookupConstraint(name): MPConstraint | null`
-- `Objective(): MPObjective`
+- `lookupVariable(name): MPVariable | null`
+- `lookupConstraint(name): MPConstraint | null`
+- `objective(): MPObjective`
 
 Variables:
 
-- `Var(lb, ub, integer, name): MPVariable`
-- `NumVar(lb, ub, name): MPVariable`
-- `IntVar(lb, ub, name): MPVariable`
-- `BoolVar(name): MPVariable`
+- `addVariable(lb, ub, integer, name): MPVariable`
+- `addNumVariable(lb, ub, name): MPVariable`
+- `addIntVariable(lb, ub, name): MPVariable`
+- `addBoolVariable(name): MPVariable`
 
 Constraints:
 
-- `Constraint(): MPConstraint`
-- `Constraint(name): MPConstraint`
-- `Constraint(lb, ub, name?): MPConstraint`
-- `RowConstraint(...)`: same overloads as `Constraint`
+- `addConstraint(): MPConstraint`
+- `addConstraint(name): MPConstraint`
+- `addConstraint(lb, ub, name?): MPConstraint`
 
 Solving and solution loading:
 
-- `Solve(parameters?): Promise<MPSolverResultStatus>`
-- `SolveWithProto(options?): Promise<MPSolverProtoSolveResult & { loaded: boolean }>`
-- `LoadSolutionFromProto(response?, tolerance?): Promise<boolean>`
-- `exportModelProto(): Promise<Uint8Array>`
+- `solve(options?): Promise<MPSolverResultStatus>`
+- `solveWithProto(options?): Promise<MPSolverProtoSolveResult & { loaded: boolean }>`
+- `loadSolutionFromProto(response?, tolerance?, options?): Promise<boolean>`
+- `exportModelProto(options?): Promise<Uint8Array>`
 - `exportModelRequestProto(options?): Promise<Uint8Array>`
-- `VerifySolution(tolerance, logErrors): boolean`
-- `Reset(): void`
-- `InterruptSolve(): boolean`
-- `NextSolution(): boolean`
+- `verifySolution(tolerance, logErrors): boolean`
+- `reset(): void`
+- `nextSolution(): boolean`
 
 Options and output:
 
-- `EnableOutput(): void`
-- `SuppressOutput(): void`
-- `OutputIsEnabled(): boolean`
-- `SetTimeLimit(milliseconds): void`
-- `set_time_limit(milliseconds): void`
-- `time_limit(): number`
-- `SetNumThreads(numThreads): boolean`
-- `GetNumThreads(): number`
-- `SetSolverSpecificParametersAsString(parameters): boolean`
-- `GetSolverSpecificParametersAsString(): string`
-- `SolverVersion(): string`
-- `ComputeConstraintActivities(): number[]`
-- `ComputeExactConditionNumber(): number`
-- `SetHint(variables, values): void`
-- `ExportModelAsLpFormat(obfuscate): string`
-- `ExportModelAsMpsFormat(fixedFormat, obfuscate): string`
-- `WallTime()` / `wall_time(): number`
-- `Iterations()` / `iterations(): number`
+- `enableOutput(): void`
+- `suppressOutput(): void`
+- `outputIsEnabled(): boolean`
+- `setTimeLimit(milliseconds): void`
+- `timeLimit(): number`
+- `setNumThreads(numThreads): boolean`
+- `getNumThreads(): number`
+- `setSolverSpecificParametersAsString(parameters): boolean`
+- `getSolverSpecificParametersAsString(): string`
+- `solverVersion(): string`
+- `computeConstraintActivities(): number[]`
+- `computeExactConditionNumber(): number`
+- `setHint(variables, values): void`
+- `exportModelAsLpFormat(obfuscate): string`
+- `exportModelAsMpsFormat(fixedFormat, obfuscate): string`
+- `wallTime(): number`
+- `iterations(): number`
 - `nodes(): number`
-- `delete(): void`
 
 ### `MPVariable`
 
-- `SolutionValue()` / `solution_value(): number`
-- `unrounded_solution_value(): number`
-- `ReducedCost()` / `reduced_cost(): number`
-- `basis_status(): number`
+- `solutionValue(): number`
+- `unroundedSolutionValue(): number`
+- `reducedCost(): number`
+- `basisStatus(): number`
 - `index(): number`
 - `name(): string`
-- `Lb(): number`
-- `Ub(): number`
-- `SetBounds(lb, ub): void`
-- `SetLb(lb)` / `SetLB(lb): void`
-- `SetUb(ub)` / `SetUB(ub): void`
-- `Integer(): boolean`
-- `SetInteger(integer): void`
-- `branching_priority(): number`
-- `SetBranchingPriority(priority): void`
+- `lowerBound(): number`
+- `upperBound(): number`
+- `setBounds(lb, ub): void`
+- `setLowerBound(lb): void`
+- `setUpperBound(ub): void`
+- `isInteger(): boolean`
+- `setInteger(integer): void`
+- `branchingPriority(): number`
+- `setBranchingPriority(priority): void`
 
 ### `MPConstraint`
 
-- `SetCoefficient(variable, coefficient): void`
-- `GetCoefficient(variable): number`
-- `Clear(): void`
+- `setCoefficient(variable, coefficient): void`
+- `getCoefficient(variable): number`
+- `clear(): void`
 - `index(): number`
 - `name(): string`
-- `Lb(): number`
-- `Ub(): number`
-- `SetBounds(lb, ub): void`
-- `SetLb(lb)` / `SetLB(lb): void`
-- `SetUb(ub)` / `SetUB(ub): void`
-- `DualValue()` / `dual_value(): number`
-- `basis_status(): number`
-- `is_lazy(): boolean`
-- `set_is_lazy(laziness): void`
+- `lowerBound(): number`
+- `upperBound(): number`
+- `setBounds(lb, ub): void`
+- `setLowerBound(lb): void`
+- `setUpperBound(ub): void`
+- `dualValue(): number`
+- `basisStatus(): number`
+- `isLazy(): boolean`
+- `setIsLazy(laziness): void`
 
 ### `MPObjective`
 
-- `Clear(): void`
-- `SetCoefficient(variable, coefficient): void`
-- `GetCoefficient(variable): number`
-- `SetOffset(offset): void`
-- `AddOffset(offset): void`
-- `Offset()` / `offset(): number`
-- `SetOptimizationDirection(maximize): void`
-- `SetMinimization(): void`
-- `SetMaximization(): void`
-- `Value(): number`
-- `BestBound(): number`
-- `maximization(): boolean`
-- `minimization(): boolean`
+- `clear(): void`
+- `setCoefficient(variable, coefficient): void`
+- `getCoefficient(variable): number`
+- `setOffset(offset): void`
+- `addOffset(offset): void`
+- `offset(): number`
+- `setOptimizationDirection(maximize): void`
+- `setMinimization(): void`
+- `setMaximization(): void`
+- `value(): number`
+- `bestBound(): number`
+- `isMaximization(): boolean`
+- `isMinimization(): boolean`
 
 ### `MPSolverParameters`
 
-Use `new MPSolverParameters()` and pass it to `solver.Solve(parameters)`.
+Use `new MPSolverParameters()` and pass it as `solver.solve({ parameters, ...options })`.
 
-- `SetDoubleParam(param, value): void`
-- `GetDoubleParam(param): number`
-- `ResetDoubleParam(param): void`
-- `SetIntegerParam(param, value): void`
-- `GetIntegerParam(param): number`
-- `ResetIntegerParam(param): void`
-- `Reset(): void`
-- `delete(): void`
+- `setDoubleParam(param, value): void`
+- `getDoubleParam(param): number`
+- `resetDoubleParam(param): void`
+- `setIntegerParam(param, value): void`
+- `getIntegerParam(param): number`
+- `resetIntegerParam(param): void`
+- `reset(): void`
 
 Parameter enums:
 
@@ -1006,7 +997,7 @@ solve path runs through the worker bridge.
 `SetUseReduction()`, and `set_time_limit()` / `SetTimeLimit()`.
 
 The MPSolver frontend also exposes
-`KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.CreateSolver('KNAPSACK')`, and
+`KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.createSolver('KNAPSACK')`, and
 the proto solve path for knapsack-shaped 0-1 models.
 
 ## Set Cover
@@ -2016,8 +2007,6 @@ cleanup is supported:
 
 - `RoutingIndexManager.delete()`
 - `RoutingModel.delete()`
-- `MPSolver.delete()`
-- `MPSolverParameters.delete()`
 
 For long-running applications that create many native objects, call `delete()`
 when a model is no longer needed.

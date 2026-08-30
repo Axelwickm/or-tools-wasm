@@ -1,9 +1,13 @@
 // Minimal C API surface for MPSolver over WASM.
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -18,6 +22,7 @@
 #include "ortools/algorithms/knapsack_solver.h"
 #include "ortools/linear_solver/linear_solver.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
+#include "ortools/linear_solver/solve_mp_model.h"
 
 namespace {
 
@@ -53,6 +58,14 @@ std::unordered_map<int, VariableHandle> g_variables;
 std::unordered_map<int, ConstraintHandle> g_constraints;
 std::unordered_map<int, std::unique_ptr<MPSolverParameters>> g_parameters;
 std::string g_string_result;
+std::atomic<bool> g_mp_solver_interrupt_requested = false;
+
+class ResetMpSolverInterruptOnExit {
+ public:
+  ~ResetMpSolverInterruptOnExit() {
+    g_mp_solver_interrupt_requested.store(false);
+  }
+};
 
 MPSolver* GetSolver(int solver_handle) {
   const auto it = g_solvers.find(solver_handle);
@@ -151,8 +164,9 @@ uint8_t* CopyStringToBuffer(const std::string& data, size_t* out_len) {
   return buffer;
 }
 
-uint8_t* SolveModelRequestWithThreads(const MPModelRequest& request,
-                                      int num_threads, size_t* out_len) {
+uint8_t* SolveModelRequestWithThreads(
+    const MPModelRequest& request, int num_threads,
+    std::atomic<bool>* interrupt, size_t* out_len) {
   MPSolutionResponse response;
   if (!request.has_model()) {
     response.set_status(operations_research::MPSOLVER_MODEL_INVALID);
@@ -214,7 +228,26 @@ uint8_t* SolveModelRequestWithThreads(const MPModelRequest& request,
     }
   }
 
+  std::atomic<bool> solve_finished = false;
+  std::thread interrupt_thread;
+  if (interrupt != nullptr) {
+    if (!operations_research::SolverTypeSupportsInterruption(
+            request.solver_type())) {
+      response.set_status(operations_research::MPSOLVER_INCOMPATIBLE_OPTIONS);
+      response.set_status_str(
+          "MPSolver: the selected backend does not support interruption.");
+      return CopyProtoToBuffer(response, out_len);
+    }
+    interrupt_thread = std::thread([&solver, &solve_finished, interrupt] {
+      while (!solve_finished.load()) {
+        if (interrupt->load()) solver.InterruptSolve();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+    });
+  }
   solver.Solve();
+  solve_finished.store(true);
+  if (interrupt_thread.joinable()) interrupt_thread.join();
   solver.FillSolutionResponseProto(&response);
   return CopyProtoToBuffer(response, out_len);
 }
@@ -222,6 +255,10 @@ uint8_t* SolveModelRequestWithThreads(const MPModelRequest& request,
 }  // namespace
 
 extern "C" {
+
+EMSCRIPTEN_KEEPALIVE uintptr_t mp_solver_interrupt_address() {
+  return reinterpret_cast<uintptr_t>(&g_mp_solver_interrupt_requested);
+}
 
 #ifndef ORTOOLS_WASM_NO_LOCAL_FREE_BUFFER
 EMSCRIPTEN_KEEPALIVE void free_buffer(uint8_t* ptr) { std::free(ptr); }
@@ -683,8 +720,10 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_export_model_request_proto(
 }
 
 EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request(
-    const uint8_t* request_data, size_t request_len, size_t* out_len) {
+    const uint8_t* request_data, size_t request_len, int enable_interrupt,
+    size_t* out_len) {
   if (out_len == nullptr) return nullptr;
+  const ResetMpSolverInterruptOnExit reset_interrupt;
   MPModelRequest request;
   MPSolutionResponse response;
   if (request_data == nullptr ||
@@ -694,16 +733,22 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request(
     return CopyProtoToBuffer(response, out_len);
   }
   if (request.solver_type() == MPModelRequest::SAT_INTEGER_PROGRAMMING) {
-    return SolveModelRequestWithThreads(request, 1, out_len);
+    return SolveModelRequestWithThreads(
+        request, 1,
+        enable_interrupt ? &g_mp_solver_interrupt_requested : nullptr,
+        out_len);
   }
-  MPSolver::SolveWithProto(request, &response);
+  MPSolver::SolveWithProto(
+      request, &response,
+      enable_interrupt ? &g_mp_solver_interrupt_requested : nullptr);
   return CopyProtoToBuffer(response, out_len);
 }
 
 EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request_with_threads(
     const uint8_t* request_data, size_t request_len, int num_threads,
-    size_t* out_len) {
+    int enable_interrupt, size_t* out_len) {
   if (out_len == nullptr) return nullptr;
+  const ResetMpSolverInterruptOnExit reset_interrupt;
   MPModelRequest request;
   MPSolutionResponse response;
   if (request_data == nullptr ||
@@ -714,12 +759,20 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request_with_threads(
   }
   if (num_threads <= 1) {
     if (request.solver_type() == MPModelRequest::SAT_INTEGER_PROGRAMMING) {
-      return SolveModelRequestWithThreads(request, 1, out_len);
+      return SolveModelRequestWithThreads(
+          request, 1,
+          enable_interrupt ? &g_mp_solver_interrupt_requested : nullptr,
+          out_len);
     }
-    MPSolver::SolveWithProto(request, &response);
+    MPSolver::SolveWithProto(
+        request, &response,
+        enable_interrupt ? &g_mp_solver_interrupt_requested : nullptr);
     return CopyProtoToBuffer(response, out_len);
   }
-  return SolveModelRequestWithThreads(request, num_threads, out_len);
+  return SolveModelRequestWithThreads(
+      request, num_threads,
+      enable_interrupt ? &g_mp_solver_interrupt_requested : nullptr,
+      out_len);
 }
 
 EMSCRIPTEN_KEEPALIVE int mp_solver_load_solution_proto(

@@ -4,9 +4,7 @@ import {
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/cp-sat';
 import {
-  initMPSolver,
   MPSolver,
-  setExecutor as setMPSolverExecutor,
 } from 'or-tools-wasm/mp-solver';
 import {
   initNetworkFlow,
@@ -37,21 +35,18 @@ async function runCpSatSmoke() {
 }
 
 async function runMPSolverSmoke() {
-  setMPSolverExecutor({ type: 'worker' });
-  await initMPSolver();
   const solver = new MPSolver('bun_mixed_runtime_mp', MPSolver.GLOP_LINEAR_PROGRAMMING);
-  const x = solver.NumVar(0, solver.infinity(), 'x');
-  const y = solver.NumVar(0, solver.infinity(), 'y');
-  const capacity = solver.Constraint(0, 14);
-  capacity.SetCoefficient(x, 1);
-  capacity.SetCoefficient(y, 2);
-  solver.Objective().SetCoefficient(x, 3);
-  solver.Objective().SetCoefficient(y, 4);
-  solver.Objective().SetMaximization();
-  const status = await solver.Solve();
+  const x = solver.addNumVariable(0, solver.infinity(), 'x');
+  const y = solver.addNumVariable(0, solver.infinity(), 'y');
+  const capacity = solver.addConstraint(0, 14);
+  capacity.setCoefficient(x, 1);
+  capacity.setCoefficient(y, 2);
+  solver.objective().setCoefficient(x, 3);
+  solver.objective().setCoefficient(y, 4);
+  solver.objective().setMaximization();
+  const status = await solver.solve({ executor: 'worker' });
   assert(status === MPSolver.OPTIMAL, `MPSolver expected OPTIMAL, got ${status}`);
-  assert(Math.abs(solver.Objective().Value() - 42) < 1e-7, `MPSolver objective mismatch: ${solver.Objective().Value()}`);
-  solver.delete();
+  assert(Math.abs(solver.objective().value() - 42) < 1e-7, `MPSolver objective mismatch: ${solver.objective().value()}`);
 }
 
 async function runNetworkFlowSmoke() {
@@ -89,7 +84,6 @@ await runBunFixture(async () => {
   await terminateLoadedRuntimeThreads();
   console.log('bun mixed runtime smoke passed');
 }, async () => {
-  setMPSolverExecutor({ type: 'direct' });
   setNetworkFlowExecutor({ type: 'auto' });
   await terminateLoadedRuntimeThreads();
 });

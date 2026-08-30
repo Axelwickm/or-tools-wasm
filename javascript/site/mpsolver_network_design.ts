@@ -1,9 +1,10 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
   configureMPSolverExecutor,
+  currentMPSolverExecutionOptions,
   currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
@@ -295,83 +296,81 @@ async function solveNetworkDesign() {
   if (statusEl) statusEl.textContent = '';
   try {
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
-    await initMPSolver();
+    const executionOptions = currentMPSolverExecutionOptions();
     const solverId = solverSelect?.value || 'SCIP';
-    const solver = MPSolver.CreateSolver(solverId);
+    const solver = MPSolver.createSolver(solverId);
     if (!solver) throw new Error(`${solverId} backend is unavailable`);
 
-    try {
+    {
       const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
       const threadConfig = applySolverThreads(solver, solverThreads);
-      const open: MPVariable[] = arcs.map((arc) => solver.BoolVar(`open_${arc.id}`));
+      const open: MPVariable[] = arcs.map((arc) => solver.addBoolVariable(`open_${arc.id}`));
       const flow: MPVariable[][] = arcs.map((arc) =>
-        demands.map((demand) => solver.NumVar(0, solver.infinity(), `flow_${arc.id}_${demand.id}`)));
+        demands.map((demand) => solver.addNumVariable(0, solver.infinity(), `flow_${arc.id}_${demand.id}`)));
 
       for (const [arcIndex, arc] of arcs.entries()) {
-        const capacity = solver.Constraint(-solver.infinity(), 0, `capacity_${arc.id}`);
-        capacity.SetCoefficient(open[arcIndex], -arc.capacity);
+        const capacity = solver.addConstraint(-solver.infinity(), 0, `capacity_${arc.id}`);
+        capacity.setCoefficient(open[arcIndex], -arc.capacity);
         for (const demandIndex of demands.keys()) {
-          capacity.SetCoefficient(flow[arcIndex][demandIndex], 1);
+          capacity.setCoefficient(flow[arcIndex][demandIndex], 1);
         }
 
         for (const [demandIndex, demand] of demands.entries()) {
-          const useOpenLane = solver.Constraint(-solver.infinity(), 0, `open_bound_${arc.id}_${demand.id}`);
-          useOpenLane.SetCoefficient(flow[arcIndex][demandIndex], 1);
-          useOpenLane.SetCoefficient(open[arcIndex], -Math.min(arc.capacity, demand.amount));
+          const useOpenLane = solver.addConstraint(-solver.infinity(), 0, `open_bound_${arc.id}_${demand.id}`);
+          useOpenLane.setCoefficient(flow[arcIndex][demandIndex], 1);
+          useOpenLane.setCoefficient(open[arcIndex], -Math.min(arc.capacity, demand.amount));
         }
       }
 
       for (const [demandIndex, demand] of demands.entries()) {
         for (const node of nodes) {
           const balance = node.id === demand.from ? demand.amount : node.id === demand.to ? -demand.amount : 0;
-          const conservation = solver.Constraint(balance, balance, `flow_${demand.id}_${node.id}`);
+          const conservation = solver.addConstraint(balance, balance, `flow_${demand.id}_${node.id}`);
           for (const [arcIndex, arc] of arcs.entries()) {
-            if (arc.from === node.id) conservation.SetCoefficient(flow[arcIndex][demandIndex], 1);
-            if (arc.to === node.id) conservation.SetCoefficient(flow[arcIndex][demandIndex], -1);
+            if (arc.from === node.id) conservation.setCoefficient(flow[arcIndex][demandIndex], 1);
+            if (arc.to === node.id) conservation.setCoefficient(flow[arcIndex][demandIndex], -1);
           }
         }
       }
 
-      const objective = solver.Objective();
+      const objective = solver.objective();
       for (const [arcIndex, arc] of arcs.entries()) {
-        objective.SetCoefficient(open[arcIndex], arc.fixedCost);
+        objective.setCoefficient(open[arcIndex], arc.fixedCost);
         for (const demandIndex of demands.keys()) {
-          objective.SetCoefficient(flow[arcIndex][demandIndex], arc.unitCost);
+          objective.setCoefficient(flow[arcIndex][demandIndex], arc.unitCost);
         }
       }
-      objective.SetMinimization();
+      objective.setMinimization();
 
-      appendStatus(statusEl, `Solving fixed-charge network design with ${solver.SolverVersion()}, requested solver threads=${solverThreads}...`);
-      const status = await solver.Solve();
+      appendStatus(statusEl, `Solving fixed-charge network design with ${solver.solverVersion()}, requested solver threads=${solverThreads}...`);
+      const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL && status !== MPSolver.FEASIBLE) {
         throw new Error(`expected OPTIMAL or FEASIBLE, got ${status}`);
       }
 
       const arcSolutions = arcs.map((arc, arcIndex) => {
-        const demandFlows = demands.map((_, demandIndex) => flow[arcIndex][demandIndex].solution_value());
+        const demandFlows = demands.map((_, demandIndex) => flow[arcIndex][demandIndex].solutionValue());
         const totalFlow = demandFlows.reduce((sum, value) => sum + value, 0);
-        return { arc, open: open[arcIndex].solution_value() > 0.5, totalFlow, demandFlows };
+        return { arc, open: open[arcIndex].solutionValue() > 0.5, totalFlow, demandFlows };
       });
       currentSolution = {
         status: status === MPSolver.OPTIMAL ? 'OPTIMAL' : 'FEASIBLE',
-        objective: objective.Value(),
+        objective: objective.value(),
         openedLanes: arcSolutions.filter((arcSolution) => arcSolution.open).length,
         shipped: demands.reduce((sum, demand) => sum + demand.amount, 0),
         saturated: arcSolutions.filter((arcSolution) => arcSolution.open && arcSolution.totalFlow >= arcSolution.arc.capacity - 1e-8).length,
         solverThreads: threadConfig.requested,
         solverThreadsAccepted: threadConfig.accepted,
         activeSolverThreads: threadConfig.active,
-        wallTime: solver.WallTime(),
+        wallTime: solver.wallTime(),
         nodes: solver.nodes(),
         arcSolutions,
       };
       activeDemand = null;
       activeArc = null;
       renderAll();
-      appendStatus(statusEl, `Total cost: $${formatNumber(objective.Value())}`);
+      appendStatus(statusEl, `Total cost: $${formatNumber(objective.value())}`);
       appendStatus(statusEl, `Opened lanes: ${currentSolution.openedLanes}`);
-    } finally {
-      solver.delete();
     }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);

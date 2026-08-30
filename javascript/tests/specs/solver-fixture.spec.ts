@@ -88,6 +88,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       id?: string;
       ok?: boolean;
     };
+    mpSolverConcurrencyResult?: {
+      id?: string;
+      ok?: boolean;
+    };
+    mpSolverWorkerLifecycleResult?: {
+      id?: string;
+      ok?: boolean;
+    };
     solverConcurrencyResult?: {
       id?: string;
       ok?: boolean;
@@ -238,6 +246,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   }));
   expect(parsedStatus.cpSatConcurrencyResult).toEqual(expect.objectContaining({
     id: 'cp_sat.executor.concurrency',
+    ok: true,
+  }));
+  expect(parsedStatus.mpSolverConcurrencyResult).toEqual(expect.objectContaining({
+    id: 'mp_solver.executor.concurrency',
+    ok: true,
+  }));
+  expect(parsedStatus.mpSolverWorkerLifecycleResult).toEqual(expect.objectContaining({
+    id: 'mp_solver.worker.lifecycle',
     ok: true,
   }));
   expect(parsedStatus.solverConcurrencyResult).toEqual(expect.objectContaining({

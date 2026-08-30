@@ -20,7 +20,7 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setExecutor } from 'or-tools-wasm/mp-solver';
+        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
 
 const costs = [
   [90, 76, 75, 70, 50, 74, 12, 68],
@@ -36,39 +36,36 @@ const costs = [
 ];
 const taskSizes = [10, 7, 3, 12, 15, 4, 11, 5];
 const totalSizeMax = 15;
-
-setExecutor({ type: 'worker' });
-await initMPSolver();
-const solver = MPSolver.CreateSolver('SCIP');
+const solver = MPSolver.createSolver('SCIP');
 if (!solver) throw new Error('SCIP backend is unavailable');
-solver.SetNumThreads(4);
+solver.setNumThreads(4);
 
 const x = costs.map((row, worker) =>
-  row.map((_, task) => solver.BoolVar(`x[${worker},${task}]`)));
+  row.map((_, task) => solver.addBoolVariable(`x[${worker},${task}]`)));
 
 for (let worker = 0; worker &lt; costs.length; worker++) {
-  const capacity = solver.Constraint(-solver.infinity(), totalSizeMax);
+  const capacity = solver.addConstraint(-solver.infinity(), totalSizeMax);
   for (let task = 0; task &lt; taskSizes.length; task++) {
-    capacity.SetCoefficient(x[worker][task], taskSizes[task]);
+    capacity.setCoefficient(x[worker][task], taskSizes[task]);
   }
 }
 for (let task = 0; task &lt; taskSizes.length; task++) {
-  const assignedOnce = solver.Constraint(1, 1);
+  const assignedOnce = solver.addConstraint(1, 1);
   for (let worker = 0; worker &lt; costs.length; worker++) {
-    assignedOnce.SetCoefficient(x[worker][task], 1);
+    assignedOnce.setCoefficient(x[worker][task], 1);
   }
 }
 
-const objective = solver.Objective();
+const objective = solver.objective();
 for (let worker = 0; worker &lt; costs.length; worker++) {
   for (let task = 0; task &lt; taskSizes.length; task++) {
-    objective.SetCoefficient(x[worker][task], costs[worker][task]);
+    objective.setCoefficient(x[worker][task], costs[worker][task]);
   }
 }
-objective.SetMinimization();
+objective.setMinimization();
 
-const status = await solver.Solve();
-console.log(status, objective.Value());</code></pre>
+const status = await solver.solve({ executor: 'worker' });
+console.log(status, objective.value());</code></pre>
       </details>
     </div>
     <p>

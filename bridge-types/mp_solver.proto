@@ -8,6 +8,7 @@ package ortools_wasm.bridge.v1;
 message MpSolverSolveRequest {
   bytes request_proto = 1;
   int32 num_threads = 2;
+  bool interruptible = 3;
 }
 
 message MpSolverSchemaRequest {}

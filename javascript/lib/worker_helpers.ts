@@ -40,9 +40,10 @@ type PendingRequest<Response> = {
   eventChain: Promise<void>;
 };
 
-type WorkerJobState = {
+type WorkerJobState<Request> = {
   cancelled: boolean;
   createdAtMs: bigint;
+  request: Request;
   error?: Error;
 };
 
@@ -230,13 +231,15 @@ implements SolverExecutor<Request, Response, Event> {
   readonly solver: string;
   private nextRequestId = 1;
   private readonly worker: ManagedWorker<Uint8Array, SolverWorkerMessage>;
-  private activeJob: WorkerJobState | null = null;
+  private activeJob: WorkerJobState<Request> | null = null;
   private cancellation: SolverWorkerCancellationMessage | null = null;
 
   constructor(
     private readonly codec: SolverBridgeCodec<Request, Response, Event>,
     createWorker: () => Promise<SolverWorkerLike>,
-    private readonly supportsSharedCancellation = false,
+    private readonly supportsSharedCancellation:
+      | boolean
+      | ((request: Request) => boolean) = false,
   ) {
     this.solver = codec.solver;
     this.worker = new ManagedWorker({
@@ -268,9 +271,10 @@ implements SolverExecutor<Request, Response, Event> {
   execute(request: Request, options: SolverExecutionOptions<Event>): SolverJob<Response> {
     if (this.activeJob) throw new SolverExecutorBusyError(this.codec.label);
     const requestId = this.nextRequestId++;
-    const state: WorkerJobState = {
+    const state: WorkerJobState<Request> = {
       cancelled: false,
       createdAtMs: BigInt(Date.now()),
+      request,
     };
     this.activeJob = state;
     return {
@@ -294,7 +298,7 @@ implements SolverExecutor<Request, Response, Event> {
     requestId: number,
     request: Request,
     options: SolverExecutionOptions<Event>,
-    state: WorkerJobState,
+    state: WorkerJobState<Request>,
   ): Promise<Response> {
     const bytes = encodeSolverBridgeRequest({
       requestId,
@@ -367,7 +371,7 @@ implements SolverExecutor<Request, Response, Event> {
   private async cancel(
     targetRequestId: number,
     options: SolverExecutionOptions<Event>,
-    state: WorkerJobState,
+    state: WorkerJobState<Request>,
   ): Promise<void> {
     if (this.activeJob !== state || state.cancelled) return;
     state.cancelled = true;
@@ -378,7 +382,10 @@ implements SolverExecutor<Request, Response, Event> {
       SolverJobState.CANCELLING,
       state.createdAtMs,
     ));
-    if (!this.supportsSharedCancellation) {
+    const supportsSharedCancellation = typeof this.supportsSharedCancellation === 'function'
+      ? this.supportsSharedCancellation(state.request)
+      : this.supportsSharedCancellation;
+    if (!supportsSharedCancellation) {
       this.worker.terminate(state.error);
       return;
     }

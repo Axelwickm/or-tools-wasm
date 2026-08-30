@@ -1,9 +1,10 @@
-import { initMPSolver, MPSolver } from 'or-tools-wasm/mp-solver';
+import { MPSolver } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
   configureMPSolverExecutor,
+  currentMPSolverExecutionOptions,
   currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
@@ -32,50 +33,48 @@ async function runSimpleGlop() {
   if (statusEl) statusEl.textContent = '';
   try {
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
-    await initMPSolver();
-    const solver = MPSolver.CreateSolver(solverId);
+    const executionOptions = currentMPSolverExecutionOptions();
+    const solver = MPSolver.createSolver(solverId);
     if (!solver) throw new Error(`${solverId} is unavailable in this build.`);
-    try {
+    {
       const infinity = solver.infinity();
-      const x = solver.NumVar(0, infinity, 'x');
-      const y = solver.NumVar(0, infinity, 'y');
+      const x = solver.addNumVariable(0, infinity, 'x');
+      const y = solver.addNumVariable(0, infinity, 'y');
 
-      const c0 = solver.Constraint(-infinity, 17.5, 'c0');
-      c0.SetCoefficient(x, 1);
-      c0.SetCoefficient(y, 7);
-      const c1 = solver.Constraint(-infinity, 3.5, 'c1');
-      c1.SetCoefficient(x, 1);
+      const c0 = solver.addConstraint(-infinity, 17.5, 'c0');
+      c0.setCoefficient(x, 1);
+      c0.setCoefficient(y, 7);
+      const c1 = solver.addConstraint(-infinity, 3.5, 'c1');
+      c1.setCoefficient(x, 1);
 
-      const objective = solver.Objective();
-      objective.SetCoefficient(x, 1);
-      objective.SetCoefficient(y, 10);
-      objective.SetMaximization();
+      const objective = solver.objective();
+      objective.setCoefficient(x, 1);
+      objective.setCoefficient(y, 10);
+      objective.setMaximization();
 
       const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
       const threadConfig = applySolverThreads(solver, solverThreads);
-      appendStatus(statusEl, `Solving with ${solver.SolverVersion()}, requested solver threads=${solverThreads}...`);
-      const status = await solver.Solve();
+      appendStatus(statusEl, `Solving with ${solver.solverVersion()}, requested solver threads=${solverThreads}...`);
+      const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
 
       renderSimpleMpResult(solutionOutput, {
         status,
-        objective: objective.Value(),
-        x: x.solution_value(),
-        y: y.solution_value(),
-        variables: solver.NumVariables(),
-        constraints: solver.NumConstraints(),
-        wallTime: solver.WallTime(),
-        iterations: solver.Iterations(),
+        objective: objective.value(),
+        x: x.solutionValue(),
+        y: y.solutionValue(),
+        variables: solver.numVariables(),
+        constraints: solver.numConstraints(),
+        wallTime: solver.wallTime(),
+        iterations: solver.iterations(),
         executor: currentMPSolverExecutor(),
         solverThreads: threadConfig.requested,
         solverThreadsAccepted: threadConfig.accepted,
         activeSolverThreads: threadConfig.active,
       });
-      appendStatus(statusEl, `Objective: ${formatNumber(objective.Value())}`);
-      appendStatus(statusEl, `x = ${formatNumber(x.solution_value())}`);
-      appendStatus(statusEl, `y = ${formatNumber(y.solution_value())}`);
-    } finally {
-      solver.delete();
+      appendStatus(statusEl, `Objective: ${formatNumber(objective.value())}`);
+      appendStatus(statusEl, `x = ${formatNumber(x.solutionValue())}`);
+      appendStatus(statusEl, `y = ${formatNumber(y.solutionValue())}`);
     }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);

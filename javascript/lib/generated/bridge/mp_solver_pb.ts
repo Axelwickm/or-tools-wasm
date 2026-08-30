@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mp_solver.proto.
  */
 export const file_mp_solver: GenFile = /*@__PURE__*/
-  fileDesc("Cg9tcF9zb2x2ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEiQgoUTXBTb2x2ZXJTb2x2ZVJlcXVlc3QSFQoNcmVxdWVzdF9wcm90bxgBIAEoDBITCgtudW1fdGhyZWFkcxgCIAEoBSIXChVNcFNvbHZlclNjaGVtYVJlcXVlc3QiYQoUTXBTb2x2ZXJTY2hlbWFSZXN1bHQSIgoabGluZWFyX3NvbHZlcl9wcm90b19zY2hlbWEYASABKAkSJQodb3B0aW9uYWxfYm9vbGVhbl9wcm90b19zY2hlbWEYAiABKAkiogEKFU1wU29sdmVyQnJpZGdlUmVxdWVzdBI9CgVzb2x2ZRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTb2x2ZVJlcXVlc3RIABI/CgZzY2hlbWEYAiABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyU2NoZW1hUmVxdWVzdEgAQgkKB3BheWxvYWQifQoWTXBTb2x2ZXJCcmlkZ2VSZXNwb25zZRIYCg5yZXNwb25zZV9wcm90bxgBIAEoDEgAEj4KBnNjaGVtYRgCIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTY2hlbWFSZXN1bHRIAEIJCgdwYXlsb2FkYgZwcm90bzM");
+  fileDesc("Cg9tcF9zb2x2ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEiWQoUTXBTb2x2ZXJTb2x2ZVJlcXVlc3QSFQoNcmVxdWVzdF9wcm90bxgBIAEoDBITCgtudW1fdGhyZWFkcxgCIAEoBRIVCg1pbnRlcnJ1cHRpYmxlGAMgASgIIhcKFU1wU29sdmVyU2NoZW1hUmVxdWVzdCJhChRNcFNvbHZlclNjaGVtYVJlc3VsdBIiChpsaW5lYXJfc29sdmVyX3Byb3RvX3NjaGVtYRgBIAEoCRIlCh1vcHRpb25hbF9ib29sZWFuX3Byb3RvX3NjaGVtYRgCIAEoCSKiAQoVTXBTb2x2ZXJCcmlkZ2VSZXF1ZXN0Ej0KBXNvbHZlGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNvbHZlUmVxdWVzdEgAEj8KBnNjaGVtYRgCIAEoCzItLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTY2hlbWFSZXF1ZXN0SABCCQoHcGF5bG9hZCJ9ChZNcFNvbHZlckJyaWRnZVJlc3BvbnNlEhgKDnJlc3BvbnNlX3Byb3RvGAEgASgMSAASPgoGc2NoZW1hGAIgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNjaGVtYVJlc3VsdEgAQgkKB3BheWxvYWRiBnByb3RvMw");
 
 /**
  * The nested payloads retain their existing OR-Tools protobuf types:
@@ -29,6 +29,11 @@ export type MpSolverSolveRequest = Message<"ortools_wasm.bridge.v1.MpSolverSolve
    * @generated from field: int32 num_threads = 2;
    */
   numThreads: number;
+
+  /**
+   * @generated from field: bool interruptible = 3;
+   */
+  interruptible: boolean;
 };
 
 /**
@@ -48,6 +53,11 @@ export type MpSolverSolveRequestJson = {
    * @generated from field: int32 num_threads = 2;
    */
   numThreads?: number;
+
+  /**
+   * @generated from field: bool interruptible = 3;
+   */
+  interruptible?: boolean;
 };
 
 export type MpSolverSolveRequestValid = MpSolverSolveRequest;

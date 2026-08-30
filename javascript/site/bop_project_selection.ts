@@ -1,9 +1,10 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
   configureMPSolverExecutor,
+  currentMPSolverExecutionOptions,
   currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
@@ -255,60 +256,58 @@ async function runBopProjectSelection() {
   if (statusEl) statusEl.textContent = '';
   try {
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
-    await initMPSolver();
-    const solver = MPSolver.CreateSolver('BOP');
+    const executionOptions = currentMPSolverExecutionOptions();
+    const solver = MPSolver.createSolver('BOP');
     if (!solver) throw new Error('BOP backend is unavailable in this build.');
 
-    try {
+    {
       const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
       const threadConfig = applySolverThreads(solver, solverThreads);
       const variables = Object.fromEntries(projects.map((project) => [
         project.key,
-        solver.BoolVar(project.key),
+        solver.addBoolVariable(project.key),
       ])) as Record<string, MPVariable>;
 
-      const budget = solver.Constraint(-solver.infinity(), capacities.budget, 'budget');
-      const engineering = solver.Constraint(-solver.infinity(), capacities.engineering, 'engineering_team');
-      const design = solver.Constraint(-solver.infinity(), capacities.design, 'design_team');
+      const budget = solver.addConstraint(-solver.infinity(), capacities.budget, 'budget');
+      const engineering = solver.addConstraint(-solver.infinity(), capacities.engineering, 'engineering_team');
+      const design = solver.addConstraint(-solver.infinity(), capacities.design, 'design_team');
       for (const project of projects) {
-        budget.SetCoefficient(variables[project.key], project.budget);
-        engineering.SetCoefficient(variables[project.key], project.engineering);
-        design.SetCoefficient(variables[project.key], project.design);
+        budget.setCoefficient(variables[project.key], project.budget);
+        engineering.setCoefficient(variables[project.key], project.engineering);
+        design.setCoefficient(variables[project.key], project.design);
       }
 
-      const objective = solver.Objective();
+      const objective = solver.objective();
       for (const project of projects) {
-        objective.SetCoefficient(variables[project.key], project.value);
+        objective.setCoefficient(variables[project.key], project.value);
       }
-      objective.SetMaximization();
+      objective.setMaximization();
 
       appendStatus(statusEl, `Solving with BOP via ${currentMPSolverExecutor()}, requested solver threads=${solverThreads}...`);
-      const status = await solver.Solve();
+      const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
-      if (!solver.VerifySolution(1e-7, true)) throw new Error('solution verification failed');
+      if (!solver.verifySolution(1e-7, true)) throw new Error('solution verification failed');
 
       optimalSelection = new Set(projects
-        .filter((project) => variables[project.key].solution_value() > 0.5)
+        .filter((project) => variables[project.key].solutionValue() > 0.5)
         .map((project) => project.key));
 
       render();
       renderResult({
-        objective: objective.Value(),
+        objective: objective.value(),
         selected: optimalSelection,
         executor: currentMPSolverExecutor(),
         solverThreads: threadConfig.requested,
         solverThreadsAccepted: threadConfig.accepted,
         activeSolverThreads: threadConfig.active,
-        wallTime: solver.WallTime(),
+        wallTime: solver.wallTime(),
         nodes: solver.nodes(),
       });
 
-      appendStatus(statusEl, `Objective: ${formatNumber(objective.Value())}`);
+      appendStatus(statusEl, `Objective: ${formatNumber(objective.value())}`);
       for (const project of projects) {
         appendStatus(statusEl, `${project.key} = ${optimalSelection.has(project.key) ? 1 : 0}`);
       }
-    } finally {
-      solver.delete();
     }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);

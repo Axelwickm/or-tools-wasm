@@ -140,44 +140,42 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver } from 'or-tools-wasm/mp-solver';
+        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
+const solver = MPSolver.createSolver('SCIP');
+solver.setNumThreads(4);
 
-await initMPSolver();
-const solver = MPSolver.CreateSolver('SCIP');
-solver.SetNumThreads(4);
-
-const open = arcs.map((arc) =&gt; solver.BoolVar(`open_${arc.id}`));
+const open = arcs.map((arc) =&gt; solver.addBoolVariable(`open_${arc.id}`));
 const flow = arcs.map((arc) =&gt;
-  demands.map((demand) =&gt; solver.NumVar(0, solver.infinity(), `flow_${arc.id}_${demand.id}`)));
+  demands.map((demand) =&gt; solver.addNumVariable(0, solver.infinity(), `flow_${arc.id}_${demand.id}`)));
 
 for (const [arcIndex, arc] of arcs.entries()) {
-  const capacity = solver.Constraint(-solver.infinity(), 0);
-  capacity.SetCoefficient(open[arcIndex], -arc.capacity);
+  const capacity = solver.addConstraint(-solver.infinity(), 0);
+  capacity.setCoefficient(open[arcIndex], -arc.capacity);
   for (const demandIndex of demands.keys()) {
-    capacity.SetCoefficient(flow[arcIndex][demandIndex], 1);
+    capacity.setCoefficient(flow[arcIndex][demandIndex], 1);
   }
 }
 
 for (const [demandIndex, demand] of demands.entries()) {
   for (const node of nodes) {
     const rhs = node.id === demand.from ? demand.amount : node.id === demand.to ? -demand.amount : 0;
-    const conservation = solver.Constraint(rhs, rhs);
+    const conservation = solver.addConstraint(rhs, rhs);
     for (const [arcIndex, arc] of arcs.entries()) {
-      if (arc.from === node.id) conservation.SetCoefficient(flow[arcIndex][demandIndex], 1);
-      if (arc.to === node.id) conservation.SetCoefficient(flow[arcIndex][demandIndex], -1);
+      if (arc.from === node.id) conservation.setCoefficient(flow[arcIndex][demandIndex], 1);
+      if (arc.to === node.id) conservation.setCoefficient(flow[arcIndex][demandIndex], -1);
     }
   }
 }
 
-const objective = solver.Objective();
+const objective = solver.objective();
 for (const [arcIndex, arc] of arcs.entries()) {
-  objective.SetCoefficient(open[arcIndex], arc.fixedCost);
+  objective.setCoefficient(open[arcIndex], arc.fixedCost);
   for (const demandIndex of demands.keys()) {
-    objective.SetCoefficient(flow[arcIndex][demandIndex], arc.unitCost);
+    objective.setCoefficient(flow[arcIndex][demandIndex], arc.unitCost);
   }
 }
-objective.SetMinimization();
-await solver.Solve();</code></pre>
+objective.setMinimization();
+await solver.solve({ executor: 'worker' });</code></pre>
       </details>
     </div>
     <ul class="example-notes">

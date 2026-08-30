@@ -19,27 +19,24 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setExecutor } from 'or-tools-wasm/mp-solver';
-
-setExecutor({ type: 'worker' });
-await initMPSolver();
-const solver = MPSolver.CreateSolver('GLPK_LP');
+        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
+const solver = MPSolver.createSolver('GLPK_LP');
 if (!solver) throw new Error('GLPK_LP is unavailable');
-solver.SetNumThreads(4);
+solver.setNumThreads(4);
 
-const x = solver.NumVar(0, solver.infinity(), 'x');
-const y = solver.NumVar(0, solver.infinity(), 'y');
-const c0 = solver.Constraint(-solver.infinity(), 17.5);
-c0.SetCoefficient(x, 1);
-c0.SetCoefficient(y, 7);
-const c1 = solver.Constraint(-solver.infinity(), 3.5);
-c1.SetCoefficient(x, 1);
-const objective = solver.Objective();
-objective.SetCoefficient(x, 1);
-objective.SetCoefficient(y, 10);
-objective.SetMaximization();
+const x = solver.addNumVariable(0, solver.infinity(), 'x');
+const y = solver.addNumVariable(0, solver.infinity(), 'y');
+const c0 = solver.addConstraint(-solver.infinity(), 17.5);
+c0.setCoefficient(x, 1);
+c0.setCoefficient(y, 7);
+const c1 = solver.addConstraint(-solver.infinity(), 3.5);
+c1.setCoefficient(x, 1);
+const objective = solver.objective();
+objective.setCoefficient(x, 1);
+objective.setCoefficient(y, 10);
+objective.setMaximization();
 
-await solver.Solve();</code></pre>
+await solver.solve({ executor: 'worker' });</code></pre>
       </details>
     </div>
     <p>

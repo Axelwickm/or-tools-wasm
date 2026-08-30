@@ -1,9 +1,10 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
   configureMPSolverExecutor,
+  currentMPSolverExecutionOptions,
   currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
@@ -41,11 +42,11 @@ async function runAssignment() {
   if (statusEl) statusEl.textContent = '';
   try {
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
-    await initMPSolver();
-    const solver = MPSolver.CreateSolver('SCIP');
+    const executionOptions = currentMPSolverExecutionOptions();
+    const solver = MPSolver.createSolver('SCIP');
     if (!solver) throw new Error('SCIP backend is unavailable');
 
-    try {
+    {
       const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
       const threadConfig = applySolverThreads(solver, solverThreads);
       const numWorkers = costs.length;
@@ -54,34 +55,34 @@ async function runAssignment() {
       for (let worker = 0; worker < numWorkers; worker++) {
         x[worker] = [];
         for (let task = 0; task < numTasks; task++) {
-          x[worker][task] = solver.BoolVar(`x[${worker},${task}]`);
+          x[worker][task] = solver.addBoolVariable(`x[${worker},${task}]`);
         }
       }
 
       for (let worker = 0; worker < numWorkers; worker++) {
-        const capacity = solver.Constraint(-solver.infinity(), totalSizeMax, `capacity_${worker}`);
+        const capacity = solver.addConstraint(-solver.infinity(), totalSizeMax, `capacity_${worker}`);
         for (let task = 0; task < numTasks; task++) {
-          capacity.SetCoefficient(x[worker][task], taskSizes[task]);
+          capacity.setCoefficient(x[worker][task], taskSizes[task]);
         }
       }
 
       for (let task = 0; task < numTasks; task++) {
-        const assignedOnce = solver.Constraint(1, 1, `task_${task}`);
+        const assignedOnce = solver.addConstraint(1, 1, `task_${task}`);
         for (let worker = 0; worker < numWorkers; worker++) {
-          assignedOnce.SetCoefficient(x[worker][task], 1);
+          assignedOnce.setCoefficient(x[worker][task], 1);
         }
       }
 
-      const objective = solver.Objective();
+      const objective = solver.objective();
       for (let worker = 0; worker < numWorkers; worker++) {
         for (let task = 0; task < numTasks; task++) {
-          objective.SetCoefficient(x[worker][task], costs[worker][task]);
+          objective.setCoefficient(x[worker][task], costs[worker][task]);
         }
       }
-      objective.SetMinimization();
+      objective.setMinimization();
 
       appendStatus(statusEl, `Solving assignment MIP with SCIP, requested solver threads=${solverThreads}...`);
-      const status = await solver.Solve();
+      const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL && status !== MPSolver.FEASIBLE) {
         throw new Error(`expected OPTIMAL or FEASIBLE, got ${status}`);
       }
@@ -89,7 +90,7 @@ async function runAssignment() {
       const assignments: Array<{ worker: number; task: number; cost: number; size: number }> = [];
       for (let worker = 0; worker < numWorkers; worker++) {
         for (let task = 0; task < numTasks; task++) {
-          if (x[worker][task].solution_value() > 0.5) {
+          if (x[worker][task].solutionValue() > 0.5) {
             assignments.push({ worker, task, cost: costs[worker][task], size: taskSizes[task] });
           }
         }
@@ -104,9 +105,9 @@ async function runAssignment() {
               <tr><th>Requested solver threads</th><td>${threadConfig.requested}</td></tr>
               <tr><th>Thread request accepted</th><td>${threadConfig.accepted ? 'yes' : 'no'}</td></tr>
               <tr><th>Active solver threads</th><td>${threadConfig.active}</td></tr>
-              <tr><th>Total cost</th><td>${formatNumber(objective.Value())}</td></tr>
-              <tr><th>Variables</th><td>${solver.NumVariables()}</td></tr>
-              <tr><th>Constraints</th><td>${solver.NumConstraints()}</td></tr>
+              <tr><th>Total cost</th><td>${formatNumber(objective.value())}</td></tr>
+              <tr><th>Variables</th><td>${solver.numVariables()}</td></tr>
+              <tr><th>Constraints</th><td>${solver.numConstraints()}</td></tr>
               <tr><th>Branch-and-bound nodes</th><td>${solver.nodes()}</td></tr>
             </tbody>
           </table>
@@ -118,10 +119,8 @@ async function runAssignment() {
           </table>
         `;
       }
-      appendStatus(statusEl, `Total cost: ${formatNumber(objective.Value())}`);
+      appendStatus(statusEl, `Total cost: ${formatNumber(objective.value())}`);
       appendStatus(statusEl, `Assignments: ${assignments.length}`);
-    } finally {
-      solver.delete();
     }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);

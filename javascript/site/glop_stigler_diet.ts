@@ -1,9 +1,10 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
   configureMPSolverExecutor,
+  currentMPSolverExecutionOptions,
   formatNumber,
   getSelectedSolverThreads,
   setRunning,
@@ -310,34 +311,34 @@ async function runStiglerDiet() {
     if (!data.length) throw new Error('Add at least one food before solving.');
     data.forEach(normalizeFoodNutrients);
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
-    await initMPSolver();
-    const solver = MPSolver.CreateSolver(solverId);
+    const executionOptions = currentMPSolverExecutionOptions();
+    const solver = MPSolver.createSolver(solverId);
     if (!solver) throw new Error(`${solverId} is unavailable in this build.`);
-    try {
+    {
       const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
       const threadConfig = applySolverThreads(solver, solverThreads);
-      const foods: MPVariable[] = data.map((food) => solver.NumVar(0, solver.infinity(), food.name));
+      const foods: MPVariable[] = data.map((food) => solver.addNumVariable(0, solver.infinity(), food.name));
       for (const [nutrientIndex, nutrient] of nutrients.entries()) {
-        const constraint = solver.Constraint(nutrient.minimum, solver.infinity(), nutrient.name);
+        const constraint = solver.addConstraint(nutrient.minimum, solver.infinity(), nutrient.name);
         for (const [foodIndex, food] of data.entries()) {
-          constraint.SetCoefficient(foods[foodIndex], food.nutrients[nutrientIndex]);
+          constraint.setCoefficient(foods[foodIndex], food.nutrients[nutrientIndex]);
         }
       }
 
-      const objective = solver.Objective();
+      const objective = solver.objective();
       for (const food of foods) {
-        objective.SetCoefficient(food, 1);
+        objective.setCoefficient(food, 1);
       }
-      objective.SetMinimization();
+      objective.setMinimization();
 
-      appendStatus(statusEl, `Solving with ${solver.SolverVersion()}, requested solver threads=${solverThreads}...`);
-      const status = await solver.Solve();
+      appendStatus(statusEl, `Solving with ${solver.solverVersion()}, requested solver threads=${solverThreads}...`);
+      const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
 
       const nutrientTotals = Array.from({ length: nutrients.length }, () => 0);
       const selectedFoods: Array<{ food: Food; dailyUnits: number }> = [];
       for (const [foodIndex, variable] of foods.entries()) {
-        const dailyUnits = variable.solution_value();
+        const dailyUnits = variable.solutionValue();
         if (dailyUnits > 1e-8) {
           selectedFoods.push({ food: data[foodIndex], dailyUnits });
           for (const nutrientIndex of nutrients.keys()) {
@@ -347,19 +348,17 @@ async function runStiglerDiet() {
       }
 
       renderDietResult(
-        365 * objective.Value(),
+        365 * objective.value(),
         selectedFoods,
         nutrientTotals,
-        solver.WallTime(),
-        solver.Iterations(),
+        solver.wallTime(),
+        solver.iterations(),
         `threads ${threadConfig.requested}, accepted ${threadConfig.accepted ? 'yes' : 'no'}, active ${threadConfig.active}`,
       );
-      appendStatus(statusEl, `Objective: $${formatNumber(365 * objective.Value())} annual cost`);
-      appendStatus(statusEl, `Variables: ${solver.NumVariables()}`);
-      appendStatus(statusEl, `Constraints: ${solver.NumConstraints()}`);
-      appendStatus(statusEl, `Iterations: ${solver.Iterations()}`);
-    } finally {
-      solver.delete();
+      appendStatus(statusEl, `Objective: $${formatNumber(365 * objective.value())} annual cost`);
+      appendStatus(statusEl, `Variables: ${solver.numVariables()}`);
+      appendStatus(statusEl, `Constraints: ${solver.numConstraints()}`);
+      appendStatus(statusEl, `Iterations: ${solver.iterations()}`);
     }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);

@@ -19,28 +19,25 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setExecutor } from 'or-tools-wasm/mp-solver';
+        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
 
-setExecutor({ type: 'worker' });
-await initMPSolver();
-
-const solver = MPSolver.CreateSolver('GLOP');
+const solver = MPSolver.createSolver('GLOP');
 if (!solver) throw new Error('GLOP is unavailable');
-solver.SetNumThreads(4);
+solver.setNumThreads(4);
 
-const x = solver.NumVar(0, 1, 'x');
-const y = solver.NumVar(0, 1, 'y');
-const c0 = solver.Constraint(-solver.infinity(), 1);
-c0.SetCoefficient(x, 1);
-c0.SetCoefficient(y, 1);
+const x = solver.addNumVariable(0, 1, 'x');
+const y = solver.addNumVariable(0, 1, 'y');
+const c0 = solver.addConstraint(-solver.infinity(), 1);
+c0.setCoefficient(x, 1);
+c0.setCoefficient(y, 1);
 
-const objective = solver.Objective();
-objective.SetCoefficient(x, 2);
-objective.SetCoefficient(y, 1);
-objective.SetMaximization();
+const objective = solver.objective();
+objective.setCoefficient(x, 2);
+objective.setCoefficient(y, 1);
+objective.setMaximization();
 
-await solver.SolveWithProto();
-console.log(x.solution_value(), y.solution_value());</code></pre>
+await solver.solveWithProto({ executor: 'worker' });
+console.log(x.solutionValue(), y.solutionValue());</code></pre>
       </details>
     </div>
     <p>

@@ -203,14 +203,11 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setExecutor } from 'or-tools-wasm/mp-solver';
+        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
 
-setExecutor({ type: 'worker' });
-await initMPSolver();
-
-const solver = MPSolver.CreateSolver('BOP');
+const solver = MPSolver.createSolver('BOP');
 if (!solver) throw new Error('BOP backend is unavailable');
-solver.SetNumThreads(4);
+solver.setNumThreads(4);
 
 const projects = [
   { name: 'analytics', value: 82, budget: 36, engineering: 28, design: 8 },
@@ -218,21 +215,21 @@ const projects = [
   { name: 'alerts', value: 58, budget: 18, engineering: 16, design: 6 },
 ];
 
-const x = Object.fromEntries(projects.map((project) =&gt; [project.name, solver.BoolVar(project.name)]));
-const budget = solver.Constraint(-solver.infinity(), 105, 'budget');
-const engineering = solver.Constraint(-solver.infinity(), 92, 'engineering_team');
-const design = solver.Constraint(-solver.infinity(), 48, 'design_team');
+const x = Object.fromEntries(projects.map((project) =&gt; [project.name, solver.addBoolVariable(project.name)]));
+const budget = solver.addConstraint(-solver.infinity(), 105, 'budget');
+const engineering = solver.addConstraint(-solver.infinity(), 92, 'engineering_team');
+const design = solver.addConstraint(-solver.infinity(), 48, 'design_team');
 
-const objective = solver.Objective();
+const objective = solver.objective();
 for (const project of projects) {
-  budget.SetCoefficient(x[project.name], project.budget);
-  engineering.SetCoefficient(x[project.name], project.engineering);
-  design.SetCoefficient(x[project.name], project.design);
-  objective.SetCoefficient(x[project.name], project.value);
+  budget.setCoefficient(x[project.name], project.budget);
+  engineering.setCoefficient(x[project.name], project.engineering);
+  design.setCoefficient(x[project.name], project.design);
+  objective.setCoefficient(x[project.name], project.value);
 }
-objective.SetMaximization();
+objective.setMaximization();
 
-const status = await solver.Solve();
+const status = await solver.solve({ executor: 'worker' });
 if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);</code></pre>
       </details>
     </div>

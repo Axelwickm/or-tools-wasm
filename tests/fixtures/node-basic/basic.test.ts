@@ -3,10 +3,8 @@ import {
 } from 'or-tools-wasm/cp-sat';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import {
-  initMPSolver,
   MPSolver,
   MPSolverParameters,
-  setExecutor as setMPSolverExecutor,
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
@@ -131,10 +129,8 @@ test('runs the shared Routing cases in Node', async (t) => {
 
 test('runs the shared MPSolver cases in Node', async (t) => {
   const mpSolverResults = await runMPSolverCases({
-    initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setExecutor: setMPSolverExecutor,
   }, { modes: executorFixtureModes });
   await assertCaseResults(t, 'node MPSolver', mpSolverResults);
 });

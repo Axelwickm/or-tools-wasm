@@ -479,6 +479,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       endforeach()
     endif()
 
+    if(RUNTIME_NAME STREQUAL "mp_solver_runtime")
+      foreach(MP_SOLVER_TARGET
+          ${RUNTIME_NAME}
+          ${RUNTIME_NAME}_asyncify
+          ${RUNTIME_NAME}_node
+          ${RUNTIME_NAME}_node_asyncify)
+        target_link_options(${MP_SOLVER_TARGET} PRIVATE
+          "-sEXPORTED_FUNCTIONS=['_malloc','_free','_mp_solver_interrupt_address']")
+      endforeach()
+    endif()
+
     list(APPEND ORTOOLS_WASM_RUNTIME_TARGETS
       ${RUNTIME_NAME}
       ${RUNTIME_NAME}_asyncify

@@ -4,10 +4,8 @@ import {
 import { packageName, version } from 'or-tools-wasm';
 import * as CpSatApi from 'or-tools-wasm/cp-sat';
 import {
-  initMPSolver,
   MPSolver,
   MPSolverParameters,
-  setExecutor as setMPSolverExecutor,
 } from 'or-tools-wasm/mp-solver';
 import {
   initKnapsack,
@@ -126,10 +124,8 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   await assertCaseSteps(t, 'deno routing', routingResults);
 
   const mpSolverResults = await runMPSolverCases({
-    initMPSolver,
     MPSolver,
     MPSolverParameters,
-    setExecutor: setMPSolverExecutor,
   }, { modes: executorFixtureModes });
   await assertCaseSteps(t, 'deno MPSolver', mpSolverResults);
 

@@ -122,13 +122,10 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setExecutor } from 'or-tools-wasm/mp-solver';
-
-setExecutor({ type: 'worker' });
-await initMPSolver();
-const solver = MPSolver.CreateSolver('CLP');
+        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
+const solver = MPSolver.createSolver('CLP');
 if (!solver) throw new Error('CLP is unavailable');
-solver.SetNumThreads(4);
+solver.setNumThreads(4);
 
 const plants = [
   { name: 'Detroit', supply: 350 },
@@ -149,29 +146,29 @@ const costs = [
 
 const ship = plants.map((plant, plantId) =&gt;
   warehouses.map((warehouse, warehouseId) =&gt;
-    solver.NumVar(0, solver.infinity(), `ship_${plant.name}_${warehouse.name}`),
+    solver.addNumVariable(0, solver.infinity(), `ship_${plant.name}_${warehouse.name}`),
   ),
 );
 
 plants.forEach((plant, plantId) =&gt; {
-  const ct = solver.Constraint(0, plant.supply);
-  warehouses.forEach((_, warehouseId) =&gt; ct.SetCoefficient(ship[plantId][warehouseId], 1));
+  const ct = solver.addConstraint(0, plant.supply);
+  warehouses.forEach((_, warehouseId) =&gt; ct.setCoefficient(ship[plantId][warehouseId], 1));
 });
 warehouses.forEach((warehouse, warehouseId) =&gt; {
-  const ct = solver.Constraint(warehouse.demand, warehouse.demand);
-  plants.forEach((_, plantId) =&gt; ct.SetCoefficient(ship[plantId][warehouseId], 1));
+  const ct = solver.addConstraint(warehouse.demand, warehouse.demand);
+  plants.forEach((_, plantId) =&gt; ct.setCoefficient(ship[plantId][warehouseId], 1));
 });
 
-const objective = solver.Objective();
+const objective = solver.objective();
 plants.forEach((_, plantId) =&gt; {
   warehouses.forEach((_, warehouseId) =&gt; {
-    objective.SetCoefficient(ship[plantId][warehouseId], costs[plantId][warehouseId]);
+    objective.setCoefficient(ship[plantId][warehouseId], costs[plantId][warehouseId]);
   });
 });
-objective.SetMinimization();
+objective.setMinimization();
 
-await solver.Solve();
-console.log(objective.Value());</code></pre>
+await solver.solve({ executor: 'worker' });
+console.log(objective.value());</code></pre>
       </details>
     </div>
     <p>

@@ -144,12 +144,9 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { initMPSolver, MPSolver, setExecutor } from 'or-tools-wasm/mp-solver';
-
-setExecutor({ type: 'worker' });
-await initMPSolver();
-const solver = MPSolver.CreateSolver('GLOP');
-solver.SetNumThreads(4);
+        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
+const solver = MPSolver.createSolver('GLOP');
+solver.setNumThreads(4);
 
 const nutrients = [
   { name: 'Calories (kcal)', minimum: 3 },
@@ -164,19 +161,19 @@ const data = [
   { name: 'Spinach', nutrients: [1.1, 106, 0] },
 ];
 
-const foods = data.map((food) =&gt; solver.NumVar(0, solver.infinity(), food.name));
+const foods = data.map((food) =&gt; solver.addNumVariable(0, solver.infinity(), food.name));
 
 nutrients.forEach((nutrient, nutrientIndex) =&gt; {
-  const ct = solver.Constraint(nutrient.minimum, solver.infinity());
+  const ct = solver.addConstraint(nutrient.minimum, solver.infinity());
   data.forEach((food, foodIndex) =&gt; {
-    ct.SetCoefficient(foods[foodIndex], food.nutrients[nutrientIndex]);
+    ct.setCoefficient(foods[foodIndex], food.nutrients[nutrientIndex]);
   });
 });
 
-const objective = solver.Objective();
-foods.forEach((food) =&gt; objective.SetCoefficient(food, 1));
-objective.SetMinimization();
-await solver.Solve();</code></pre>
+const objective = solver.objective();
+foods.forEach((food) =&gt; objective.setCoefficient(food, 1));
+objective.setMinimization();
+await solver.solve({ executor: 'worker' });</code></pre>
       </details>
     </div>
     <ul class="example-notes">

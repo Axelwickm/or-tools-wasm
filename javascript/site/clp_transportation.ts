@@ -1,9 +1,10 @@
-import { initMPSolver, MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
+import { MPSolver, type MPVariable } from 'or-tools-wasm/mp-solver';
 import {
   appendStatus,
   applySolverThreads,
   configureSolverThreadsInput,
   configureMPSolverExecutor,
+  currentMPSolverExecutionOptions,
   currentMPSolverExecutor,
   formatNumber,
   getSelectedSolverThreads,
@@ -76,7 +77,7 @@ function escapeHtml(value: string) {
 }
 
 function shipmentMatrix(shipments: MPVariable[][]) {
-  return shipments.map((row) => row.map((variable) => variable.solution_value()));
+  return shipments.map((row) => row.map((variable) => variable.solutionValue()));
 }
 
 function readNumberInput(selector: string, fallback: number) {
@@ -375,52 +376,50 @@ async function runTransportation() {
   renderTransportationVisualization();
   try {
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
-    await initMPSolver();
-    const solver = MPSolver.CreateSolver('CLP');
+    const executionOptions = currentMPSolverExecutionOptions();
+    const solver = MPSolver.createSolver('CLP');
     if (!solver) throw new Error('CLP is unavailable in this build.');
-    try {
+    {
       const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
       const threadConfig = applySolverThreads(solver, solverThreads);
       const { plants, warehouses, costs } = problem;
       const shipments = plants.map((plant) =>
         warehouses.map((warehouse) =>
-          solver.NumVar(0, solver.infinity(), `ship_${plant.name}_${warehouse.name}`),
+          solver.addNumVariable(0, solver.infinity(), `ship_${plant.name}_${warehouse.name}`),
         ),
       );
 
       for (const [plantId, plant] of plants.entries()) {
-        const constraint = solver.Constraint(0, plant.supply, `supply_${plant.name}`);
+        const constraint = solver.addConstraint(0, plant.supply, `supply_${plant.name}`);
         for (const warehouseId of warehouses.keys()) {
-          constraint.SetCoefficient(shipments[plantId][warehouseId], 1);
+          constraint.setCoefficient(shipments[plantId][warehouseId], 1);
         }
       }
 
       for (const [warehouseId, warehouse] of warehouses.entries()) {
-        const constraint = solver.Constraint(warehouse.demand, warehouse.demand, `demand_${warehouse.name}`);
+        const constraint = solver.addConstraint(warehouse.demand, warehouse.demand, `demand_${warehouse.name}`);
         for (const plantId of plants.keys()) {
-          constraint.SetCoefficient(shipments[plantId][warehouseId], 1);
+          constraint.setCoefficient(shipments[plantId][warehouseId], 1);
         }
       }
 
-      const objective = solver.Objective();
+      const objective = solver.objective();
       for (const plantId of plants.keys()) {
         for (const warehouseId of warehouses.keys()) {
-          objective.SetCoefficient(shipments[plantId][warehouseId], costs[plantId][warehouseId]);
+          objective.setCoefficient(shipments[plantId][warehouseId], costs[plantId][warehouseId]);
         }
       }
-      objective.SetMinimization();
+      objective.setMinimization();
 
-      appendStatus(statusEl, `Solving with ${solver.SolverVersion()}, requested solver threads=${solverThreads}...`);
-      const status = await solver.Solve();
+      appendStatus(statusEl, `Solving with ${solver.solverVersion()}, requested solver threads=${solverThreads}...`);
+      const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
 
-      renderTransportationResult(shipments, objective.Value(), solver.WallTime(), solver.Iterations(), threadConfig);
-      appendStatus(statusEl, `Objective: ${formatNumber(objective.Value())}`);
-      appendStatus(statusEl, `Variables: ${solver.NumVariables()}`);
-      appendStatus(statusEl, `Constraints: ${solver.NumConstraints()}`);
-      appendStatus(statusEl, `Iterations: ${solver.Iterations()}`);
-    } finally {
-      solver.delete();
+      renderTransportationResult(shipments, objective.value(), solver.wallTime(), solver.iterations(), threadConfig);
+      appendStatus(statusEl, `Objective: ${formatNumber(objective.value())}`);
+      appendStatus(statusEl, `Variables: ${solver.numVariables()}`);
+      appendStatus(statusEl, `Constraints: ${solver.numConstraints()}`);
+      appendStatus(statusEl, `Iterations: ${solver.iterations()}`);
     }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);
