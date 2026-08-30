@@ -20,7 +20,6 @@ import {
 import { MPSolver } from 'or-tools-wasm/mp-solver';
 import { initMathOpt, MathOpt } from 'or-tools-wasm/mathopt';
 import {
-  initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
 } from 'or-tools-wasm/knapsack';
@@ -236,7 +235,6 @@ async function solveMathOpt(problem, threads) {
 
 async function solveKnapsack(problem, threads) {
   void threads;
-  await initKnapsack();
   const itemCount = Number(problem.items);
   const dimensionCount = Number(problem.dimensions);
   const values = Array.from({ length: itemCount }, (_, index) => deterministicValue(index, 500, 50));
@@ -251,7 +249,7 @@ async function solveKnapsack(problem, threads) {
   );
   solver.init(values, weights, capacities);
   const objective = await solver.solve();
-  return [solver.is_solution_optimal() ? 'OPTIMAL' : 'FEASIBLE', String(objective)];
+  return [solver.isSolutionOptimal() ? 'OPTIMAL' : 'FEASIBLE', String(objective)];
 }
 
 async function solveMaxFlow(problem, threads) {

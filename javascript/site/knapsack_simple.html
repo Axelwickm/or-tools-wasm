@@ -98,14 +98,9 @@
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import {
-  initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
-  setExecutor,
 } from 'or-tools-wasm/knapsack';
-
-setExecutor({ type: 'worker' });
-await initKnapsack();
 
 const values = [
   360, 83, 59, 130, 431, 67, 230, 52, 93, 125, 670, 892, 600, 38, 48, 147,
@@ -124,10 +119,10 @@ const solver = new KnapsackSolver(
 );
 solver.init(values, weights, capacities);
 
-const computedValue = await solver.solve();
+const computedValue = await solver.solve({ executor: 'worker' });
 const packedItems = values
   .map((_, item) => item)
-  .filter((item) => solver.best_solution_contains(item));
+  .filter((item) => solver.bestSolutionContains(item));
 
 console.log(computedValue, packedItems);</code></pre>
       </details>

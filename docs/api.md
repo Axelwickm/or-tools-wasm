@@ -940,14 +940,9 @@ MPSolver WebAssembly runtime.
 
 ```ts
 import {
-  initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
-  setWorkerBridgeEnabled,
 } from 'or-tools-wasm/knapsack';
-
-setWorkerBridgeEnabled(true);
-await initKnapsack();
 
 const solver = new KnapsackSolver(
   KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER,
@@ -959,14 +954,18 @@ solver.init(
   [50],
 );
 
-const profit = await solver.solve();
-const selected = [0, 1, 2, 3].filter((item) => solver.best_solution_contains(item));
-console.log(profit, selected, solver.is_solution_optimal());
+const profit = await solver.solve({ executor: 'worker' });
+const selected = [0, 1, 2, 3].filter((item) => solver.bestSolutionContains(item));
+console.log(profit, selected, solver.isSolutionOptimal());
 ```
 
-`initKnapsack(): Promise<void>` loads the shared MPSolver/Knapsack runtime for
-direct solves. When the browser worker bridge is enabled, it is a no-op and the
-solve path runs through the worker bridge.
+The runtime is loaded lazily. Select execution for each solve with
+`executor: 'auto' | 'direct' | 'worker'` or a server/cloud executor
+configuration. `signal` cancels worker and remote jobs; a direct native solve
+cannot be interrupted after it starts. Knapsack emits the shared solver
+lifecycle events through `onEvent` but has no native solution-progress callback.
+A solver instance accepts one solve at a time, and an `onEvent` error is reported
+after the active executor job settles so the executor remains reusable.
 
 `KnapsackSolverType` exposes the upstream solver ids:
 
@@ -981,10 +980,8 @@ solve path runs through the worker bridge.
 - `KNAPSACK_DIVIDE_AND_CONQUER_SOLVER`
 - `KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER`
 
-`KnapsackSolver` supports `init()` / `Init()`, `solve()` / `Solve()`,
-`best_solution_contains()` / `BestSolutionContains()`,
-`is_solution_optimal()` / `IsSolutionOptimal()`, `set_use_reduction()` /
-`SetUseReduction()`, and `set_time_limit()` / `SetTimeLimit()`.
+`KnapsackSolver` supports `init()`, `solve()`, `bestSolutionContains()`,
+`isSolutionOptimal()`, `setUseReduction()`, `setTimeLimit()`, and `getName()`.
 
 The MPSolver frontend also exposes
 `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.createSolver('KNAPSACK')`, and

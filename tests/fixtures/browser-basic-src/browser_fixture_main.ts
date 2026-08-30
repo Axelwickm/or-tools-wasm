@@ -13,6 +13,9 @@ import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing
 import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
 import { withCpSatExecutor } from '../../harness/cpsat_types.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
+import { runKnapsackConcurrencyCase } from '../../cases/or-tools-wasm/knapsack/concurrency.ts';
+import { runKnapsackEventHandlerCase } from '../../cases/or-tools-wasm/knapsack/event_handler.ts';
+import { runKnapsackWorkerLifecycleCase } from '../../cases/or-tools-wasm/knapsack/worker_lifecycle.ts';
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
 import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
 import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
@@ -330,10 +333,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   );
   const knapsack = await runSelectedGroup(selectedGroup, 'knapsack', 'knapsack', () =>
     runWithWorkerStats(workerSpy, () => runKnapsackCases({
-      initKnapsack: KnapsackApi.initKnapsack,
       KnapsackSolver: KnapsackApi.KnapsackSolver,
       KnapsackSolverType: KnapsackApi.KnapsackSolverType,
-      setExecutor: KnapsackApi.setExecutor,
     }, { modes: executorFixtureModes }))
   );
   const networkFlow = await runSelectedGroup(selectedGroup, 'network-flow', 'network-flow', () =>
@@ -417,6 +418,30 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
       () => runRoutingWorkerLifecycleCase(RoutingApiModule as never),
     ),
   );
+  const knapsackConcurrencyResult = await runSelectedGroup(
+    selectedGroup,
+    'knapsack',
+    'knapsack-concurrency',
+    () => runKnapsackConcurrencyCase(KnapsackApi as never),
+  );
+  const knapsackWorkerLifecycleResult = await runSelectedGroup(
+    selectedGroup,
+    'knapsack',
+    'knapsack-worker-lifecycle',
+    () => runWithWorkerStats(
+      workerSpy,
+      () => runKnapsackWorkerLifecycleCase(KnapsackApi as never),
+    ),
+  );
+  const knapsackEventHandlerResult = await runSelectedGroup(
+    selectedGroup,
+    'knapsack',
+    'knapsack-event-handler',
+    () => runWithWorkerStats(
+      workerSpy,
+      () => runKnapsackEventHandlerCase(KnapsackApi as never),
+    ),
+  );
   const cloudExecutorResult = await runSelectedGroup(selectedGroup, 'cp-sat', 'cloud', () =>
     runCloudExecutorCase(CpSatApi as never, {
       packageName: PackageApi.packageName,
@@ -430,6 +455,9 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     mpSolverConcurrencyResult,
     mpSolverWorkerLifecycleResult: mpSolverWorkerLifecycleResult?.result,
     routingConcurrencyResult,
+    knapsackConcurrencyResult,
+    knapsackWorkerLifecycleResult: knapsackWorkerLifecycleResult?.result,
+    knapsackEventHandlerResult: knapsackEventHandlerResult?.result,
     routingWorkerLifecycleResult: routingWorkerLifecycleResult?.result,
     solverConcurrencyResult,
     cpSatSolverStructureResults: cpSatSolverStructure?.result,

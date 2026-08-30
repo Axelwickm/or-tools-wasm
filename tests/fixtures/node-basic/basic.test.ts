@@ -7,10 +7,8 @@ import {
   MPSolverParameters,
 } from 'or-tools-wasm/mp-solver';
 import {
-  initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
-  setExecutor as setKnapsackExecutor,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
@@ -56,6 +54,9 @@ import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/s
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
+import { runKnapsackConcurrencyCase } from '../../cases/or-tools-wasm/knapsack/concurrency.ts';
+import { runKnapsackEventHandlerCase } from '../../cases/or-tools-wasm/knapsack/event_handler.ts';
+import { runKnapsackWorkerLifecycleCase } from '../../cases/or-tools-wasm/knapsack/worker_lifecycle.ts';
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
 import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
 import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
@@ -143,12 +144,22 @@ test('runs the shared MPSolver cases in Node', async (t) => {
 
 test('runs the shared Knapsack cases in Node', async (t) => {
   const knapsackResults = await runKnapsackCases({
-    initKnapsack,
     KnapsackSolver,
     KnapsackSolverType,
-    setExecutor: setKnapsackExecutor,
   });
   await assertCaseResults(t, 'node Knapsack', knapsackResults);
+});
+
+test('cancels and recovers the Knapsack worker in Node', async () => {
+  await runKnapsackWorkerLifecycleCase({ KnapsackSolver, KnapsackSolverType });
+});
+
+test('enforces Knapsack local solve concurrency in Node', async () => {
+  await runKnapsackConcurrencyCase({ KnapsackSolver, KnapsackSolverType });
+});
+
+test('isolates Knapsack event-handler errors in Node', async () => {
+  await runKnapsackEventHandlerCase({ KnapsackSolver, KnapsackSolverType });
 });
 
 test('runs the shared Network Flow cases in Node', async (t) => {

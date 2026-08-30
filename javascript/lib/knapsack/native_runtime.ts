@@ -1,12 +1,5 @@
-import { loadMPSolverRuntime } from '../runtime_loader.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { readWasmResult, withWasmCString } from '../wasm_memory.js';
-
-let modulePromise: Promise<OrToolsWasmModule> | null = null;
-
-export function loadKnapsackNativeModule(): Promise<OrToolsWasmModule> {
-  return modulePromise ??= loadMPSolverRuntime();
-}
 
 export type NativeKnapsackResult = {
   ok: boolean;
@@ -35,7 +28,8 @@ function flattenKnapsackWeights(weights: number[][], itemCount: number): number[
   return flattened;
 }
 
-export async function executeKnapsackNative(
+export async function executeKnapsackWithModule(
+  module: OrToolsWasmModule,
   solverType: number,
   name: string,
   useReduction: boolean,
@@ -44,7 +38,6 @@ export async function executeKnapsackNative(
   weights: number[][],
   capacities: number[],
 ): Promise<NativeKnapsackResult> {
-  const module = await loadKnapsackNativeModule();
   const flattenedWeights = flattenKnapsackWeights(weights, profits.length);
   const profitsPtr = copyFloat64ToHeap(module, profits);
   const weightsPtr = copyFloat64ToHeap(module, flattenedWeights);

@@ -1,8 +1,7 @@
 import {
-  initKnapsack,
+  type ExecutorConfiguration,
   KnapsackSolver,
   KnapsackSolverType,
-  setExecutor,
 } from 'or-tools-wasm/knapsack';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
@@ -31,6 +30,7 @@ let resourceNames = ['Weight', 'Volume'];
 let selectedItems: number[] = [];
 let lastProfit: number | null = null;
 let lastOptimal = false;
+let readKnapsackExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 function setRunning(running: boolean) {
   if (!runButton) return;
@@ -181,9 +181,6 @@ async function runKnapsack() {
     renderMatrix();
     renderSolution();
 
-    appendStatus('Initializing Knapsack runtime...');
-    await initKnapsack();
-
     const solver = new KnapsackSolver(
       KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER,
       'KnapsackExample',
@@ -191,11 +188,11 @@ async function runKnapsack() {
     solver.init(values, weights, capacities);
 
     appendStatus(`Solving with ${executorSelector?.value ?? 'auto'} executor...`);
-    lastProfit = await solver.solve();
+    lastProfit = await solver.solve({ executor: readKnapsackExecutor() });
     selectedItems = values
       .map((_, item) => item)
-      .filter((item) => solver.best_solution_contains(item));
-    lastOptimal = solver.is_solution_optimal();
+      .filter((item) => solver.bestSolutionContains(item));
+    lastOptimal = solver.isSolutionOptimal();
     renderMatrix();
     renderSolution();
     appendStatus(`Done. Total value ${lastProfit}.`);
@@ -257,4 +254,4 @@ removeResourceButton?.addEventListener('click', removeResource);
 
 renderMatrix();
 renderSolution();
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+readKnapsackExecutor = configureSolverExecutorSelector(null, executorSelector);

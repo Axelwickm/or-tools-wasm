@@ -6,6 +6,7 @@ import {
   serverExecutorConfiguration,
   solverJobStates,
 } from '../../../harness/shared_case.ts';
+import { knapsackExecutionOptions, setKnapsackMode } from './execution.ts';
 
 export type KnapsackCaseResult = {
   id: string;
@@ -23,26 +24,29 @@ export type KnapsackCaseResult = {
 
 type KnapsackSolverLike = {
   init(profits: number[], weights: number[][], capacities: number[]): void;
-  solve(options?: { onEvent?: (event: { type: string; status?: { state: number } }) => void }): Promise<number>;
-  best_solution_contains(itemId: number): boolean;
-  is_solution_optimal(): boolean;
-  set_use_reduction(useReduction: boolean): void;
+  solve(options?: {
+    executor?: 'direct' | 'worker' | ReturnType<typeof serverExecutorConfiguration>;
+    onEvent?: (event: { type: string; status?: { state: number } }) => void;
+  }): Promise<number>;
+  bestSolutionContains(itemId: number): boolean;
+  isSolutionOptimal(): boolean;
+  setUseReduction(useReduction: boolean): void;
 };
 
+type KnapsackSolverTypeLike = 0 | 1 | 2 | 5 | 6 | 9;
+
 export type KnapsackApi = {
-  initKnapsack(): Promise<void>;
   KnapsackSolver: {
-    new(solverType: number, name: string): KnapsackSolverLike;
+    new(solverType: KnapsackSolverTypeLike, name: string): KnapsackSolverLike;
   };
   KnapsackSolverType: {
-    KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER: number;
-    KNAPSACK_BRUTE_FORCE_SOLVER: number;
-    KNAPSACK_64ITEMS_SOLVER: number;
-    KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER: number;
-    KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER: number;
-    KNAPSACK_DIVIDE_AND_CONQUER_SOLVER: number;
+    KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER: 5;
+    KNAPSACK_BRUTE_FORCE_SOLVER: 0;
+    KNAPSACK_64ITEMS_SOLVER: 1;
+    KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER: 2;
+    KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER: 6;
+    KNAPSACK_DIVIDE_AND_CONQUER_SOLVER: 9;
   };
-  setExecutor(configuration: { type: 'auto' | 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -56,14 +60,15 @@ async function realSolve(
   profits: number[],
   weights: number[][],
   capacities: number[],
-  solverType: number,
+  solverType: KnapsackSolverTypeLike,
   useReduction: boolean,
 ) {
   const solver = new api.KnapsackSolver(solverType, 'solver');
-  solver.set_use_reduction(useReduction);
+  solver.setUseReduction(useReduction);
   solver.init(profits, weights, capacities);
   const states: number[] = [];
   const profit = await solver.solve({
+    ...knapsackExecutionOptions(),
     onEvent: (event) => {
       if (event.type === 'status' && event.status) states.push(event.status.state);
     },
@@ -72,8 +77,8 @@ async function realSolve(
   assert(states.includes(solverJobStates.SUCCEEDED), 'Knapsack solve did not emit SUCCEEDED status');
   return {
     profit,
-    selectedItems: profits.map((_, item) => item).filter((item) => solver.best_solution_contains(item)),
-    optimal: solver.is_solution_optimal(),
+    selectedItems: profits.map((_, item) => item).filter((item) => solver.bestSolutionContains(item)),
+    optimal: solver.isSolutionOptimal(),
   };
 }
 
@@ -82,7 +87,7 @@ async function solveKnapsackProblemUsingSpecificSolver(
   profits: number[],
   weights: number[][],
   capacities: number[],
-  solverType: number,
+  solverType: KnapsackSolverTypeLike,
 ) {
   const resultWhenReduction = await realSolve(api, profits, weights, capacities, solverType, true);
   const resultWhenNoReduction = await realSolve(api, profits, weights, capacities, solverType, false);
@@ -283,16 +288,12 @@ export async function runKnapsackCases(
   const modes = options.modes ?? executorFixtureModes;
   if (modes.includes('server')) await assertServerExecutorIsRunning();
   for (const mode of modes) {
-    api.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
-    try {
-      await api.initKnapsack();
-      for (const testCase of knapsackCases) {
-        const result = await testCase.run(api, { mode });
-        results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
-      }
-    } finally {
-      api.setExecutor({ type: 'auto' });
+    setKnapsackMode(mode);
+    for (const testCase of knapsackCases) {
+      const result = await testCase.run(api, { mode });
+      results.push(passedCase({ ...testCase, name: `${testCase.name} (${mode})` }, { mode }, result));
     }
   }
+  setKnapsackMode('direct');
   return results;
 }

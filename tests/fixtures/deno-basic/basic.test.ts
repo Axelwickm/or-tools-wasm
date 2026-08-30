@@ -8,10 +8,8 @@ import {
   MPSolverParameters,
 } from 'or-tools-wasm/mp-solver';
 import {
-  initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
-  setExecutor as setKnapsackExecutor,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
@@ -45,6 +43,9 @@ import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/wo
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
+import { runKnapsackConcurrencyCase } from '../../cases/or-tools-wasm/knapsack/concurrency.ts';
+import { runKnapsackEventHandlerCase } from '../../cases/or-tools-wasm/knapsack/event_handler.ts';
+import { runKnapsackWorkerLifecycleCase } from '../../cases/or-tools-wasm/knapsack/worker_lifecycle.ts';
 import { runMathOptCases } from '../../cases/python-parity/mathopt/runner.ts';
 import { runMPSolverCases } from '../../cases/python-parity/linear_solver/runner.ts';
 import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/index.ts';
@@ -136,12 +137,13 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   await assertCaseSteps(t, 'deno MPSolver', mpSolverResults);
 
   const knapsackResults = await runKnapsackCases({
-    initKnapsack,
     KnapsackSolver,
     KnapsackSolverType,
-    setExecutor: setKnapsackExecutor,
   });
   await assertCaseSteps(t, 'deno Knapsack', knapsackResults);
+  await runKnapsackWorkerLifecycleCase({ KnapsackSolver, KnapsackSolverType });
+  await runKnapsackConcurrencyCase({ KnapsackSolver, KnapsackSolverType });
+  await runKnapsackEventHandlerCase({ KnapsackSolver, KnapsackSolverType });
 
   const networkFlowResults = await runNetworkFlowCases({
     initNetworkFlow,

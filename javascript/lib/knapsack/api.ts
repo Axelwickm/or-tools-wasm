@@ -1,15 +1,11 @@
-import { create } from '@bufbuild/protobuf';
 import { CloudExecutor } from '../cloud_executor.js';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
+import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import type { SolverJobEvent } from '../solver_executor.js';
-import {
-  KnapsackBridgeRequestSchema,
-  KnapsackWeightDimensionSchema,
-} from '../generated/bridge/knapsack_pb.js';
-import { KnapsackExecutor, type KnapsackExecutorLike } from './executor.js';
-import { KnapsackWorkerExecutor } from './worker_executor.js';
-import { KnapsackServerExecutor } from './server_executor.js';
+import { SolverServerExecutor } from '../solver_server_executor.js';
+import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
+import { DirectKnapsackExecutor } from './direct_executor.js';
+import { knapsackProtocol, type KnapsackExecutor } from './protocol.js';
 
 export enum KnapsackSolverType {
   KNAPSACK_BRUTE_FORCE_SOLVER = 0,
@@ -26,30 +22,48 @@ export enum KnapsackSolverType {
 
 export type KnapsackEvent = SolverJobEvent;
 export type KnapsackSolveOptions = {
+  executor?: ExecutorSelection;
   onEvent?: (event: KnapsackEvent) => void | Promise<void>;
   signal?: AbortSignal;
 };
 
-const directExecutor = new KnapsackExecutor();
-const workerExecutor = new KnapsackWorkerExecutor();
-let executor: KnapsackExecutorLike = createExecutor({ type: 'auto' });
-
-function createExecutor(configuration: ExecutorConfiguration): KnapsackExecutorLike {
-  return createResolvedExecutor(resolveExecutorConfiguration(configuration));
+export class RuntimeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RuntimeError';
+  }
 }
 
-function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): KnapsackExecutorLike {
+async function createKnapsackWorker(): Promise<SolverWorkerLike> {
+  return new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module', name: 'ortools-executor-knapsack' },
+  );
+}
+
+const directExecutor = new DirectKnapsackExecutor();
+const workerExecutor = new SolverWorkerExecutor(knapsackProtocol, createKnapsackWorker);
+
+function createKnapsackExecutor(selection: ExecutorSelection = 'auto'): KnapsackExecutor {
+  return createResolvedExecutor(resolveExecutorConfiguration(selection));
+}
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): KnapsackExecutor {
   switch (configuration.type) {
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
-    case 'server': return new KnapsackServerExecutor(configuration);
+    case 'server': return new SolverServerExecutor(knapsackProtocol, configuration);
     case 'cloud': return new CloudExecutor('knapsack', { test: configuration.test });
   }
 }
 
 function abortError(signal: AbortSignal) {
   if (signal.reason instanceof Error) return signal.reason;
-  const error = new Error(signal.reason === undefined ? 'The Knapsack solve was aborted.' : String(signal.reason));
+  if (signal.reason !== undefined) return new Error(String(signal.reason));
+  if (typeof DOMException !== 'undefined') {
+    return new DOMException('The Knapsack solve was aborted.', 'AbortError');
+  }
+  const error = new Error('The Knapsack solve was aborted.');
   error.name = 'AbortError';
   return error;
 }
@@ -76,22 +90,6 @@ function validateInput(profits: number[], weights: number[][], capacities: numbe
 }
 
 export class KnapsackSolver {
-  static readonly SolverType = KnapsackSolverType;
-  static readonly KNAPSACK_BRUTE_FORCE_SOLVER = KnapsackSolverType.KNAPSACK_BRUTE_FORCE_SOLVER;
-  static readonly KNAPSACK_64ITEMS_SOLVER = KnapsackSolverType.KNAPSACK_64ITEMS_SOLVER;
-  static readonly KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER = KnapsackSolverType.KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER;
-  static readonly KNAPSACK_DIVIDE_AND_CONQUER_SOLVER = KnapsackSolverType.KNAPSACK_DIVIDE_AND_CONQUER_SOLVER;
-  static readonly KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER = KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER;
-
-  static setExecutor(configuration: ExecutorConfiguration): void {
-    executor = createExecutor(configuration);
-  }
-
   private profits: number[] = [];
   private weights: number[][] = [];
   private capacities: number[] = [];
@@ -99,6 +97,7 @@ export class KnapsackSolver {
   private timeLimitSeconds = 0;
   private solutionContains: boolean[] = [];
   private solutionOptimal = false;
+  private solving = false;
 
   constructor(
     private readonly solverType: KnapsackSolverType,
@@ -118,21 +117,40 @@ export class KnapsackSolver {
     this.solutionOptimal = false;
   }
 
-  Init(profits: number[], weights: number[][], capacities: number[]): void { this.init(profits, weights, capacities); }
-
   async solve(options: KnapsackSolveOptions = {}): Promise<number> {
+    if (this.solving) {
+      throw new RuntimeError('KnapsackSolver.solve() is already in progress.');
+    }
+    this.solving = true;
+    try {
+      return await this.solveOnce(options);
+    } finally {
+      this.solving = false;
+    }
+  }
+
+  private async solveOnce(options: KnapsackSolveOptions): Promise<number> {
     if (options.signal?.aborted) throw abortError(options.signal);
-    const currentExecutor = executor;
-    const request = create(KnapsackBridgeRequestSchema, {
+    const executor = createKnapsackExecutor(options.executor);
+    const operation = {
       solverType: this.solverType,
       name: this.solverName,
       useReduction: this.useReduction,
       timeLimitSeconds: this.timeLimitSeconds,
       profits: this.profits,
-      weights: this.weights.map((values) => create(KnapsackWeightDimensionSchema, { values })),
+      weights: this.weights,
       capacities: this.capacities,
-    });
-    const job = currentExecutor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
+    };
+    let callbackError: unknown = null;
+    const onEvent = async (event: KnapsackEvent) => {
+      if (callbackError) return;
+      try {
+        await options.onEvent?.(event);
+      } catch (error) {
+        callbackError = error;
+      }
+    };
+    const job = executor.execute(operation, { onEvent });
     let aborted: Error | null = null;
     const onAbort = () => {
       if (!options.signal) return;
@@ -143,6 +161,7 @@ export class KnapsackSolver {
     if (options.signal?.aborted) onAbort();
     try {
       const result = await job.result;
+      if (callbackError) throw callbackError;
       if (aborted) throw aborted;
       this.solutionContains = [...result.contains];
       this.solutionOptimal = result.optimal;
@@ -152,28 +171,14 @@ export class KnapsackSolver {
     }
   }
 
-  Solve(options: KnapsackSolveOptions = {}): Promise<number> { return this.solve(options); }
-  best_solution_contains(itemId: number): boolean { return this.solutionContains[itemId] === true; }
-  BestSolutionContains(itemId: number): boolean { return this.best_solution_contains(itemId); }
-  is_solution_optimal(): boolean { return this.solutionOptimal; }
-  IsSolutionOptimal(): boolean { return this.is_solution_optimal(); }
-  set_use_reduction(useReduction: boolean): void { this.useReduction = useReduction; }
-  SetUseReduction(useReduction: boolean): void { this.set_use_reduction(useReduction); }
-  set_time_limit(timeLimitSeconds: number): void {
+  bestSolutionContains(itemId: number): boolean { return this.solutionContains[itemId] === true; }
+  isSolutionOptimal(): boolean { return this.solutionOptimal; }
+  setUseReduction(useReduction: boolean): void { this.useReduction = useReduction; }
+  setTimeLimit(timeLimitSeconds: number): void {
     if (!Number.isFinite(timeLimitSeconds) || timeLimitSeconds < 0) {
-      throw new Error('KnapsackSolver.set_time_limit: time limit must be finite and non-negative.');
+      throw new Error('KnapsackSolver.setTimeLimit: time limit must be finite and non-negative.');
     }
     this.timeLimitSeconds = timeLimitSeconds;
   }
-  SetTimeLimit(timeLimitSeconds: number): void { this.set_time_limit(timeLimitSeconds); }
   getName(): string { return this.solverName; }
-  GetName(): string { return this.getName(); }
-}
-
-export async function initKnapsack(): Promise<void> {
-  await executor.load();
-}
-
-export function setExecutor(configuration: ExecutorConfiguration): void {
-  KnapsackSolver.setExecutor(configuration);
 }

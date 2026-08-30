@@ -104,6 +104,18 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       id?: string;
       ok?: boolean;
     };
+    knapsackConcurrencyResult?: {
+      id?: string;
+      ok?: boolean;
+    };
+    knapsackWorkerLifecycleResult?: {
+      id?: string;
+      ok?: boolean;
+    };
+    knapsackEventHandlerResult?: {
+      id?: string;
+      ok?: boolean;
+    };
     solverConcurrencyResult?: {
       id?: string;
       ok?: boolean;
@@ -270,6 +282,18 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   }));
   expect(parsedStatus.routingWorkerLifecycleResult).toEqual(expect.objectContaining({
     id: 'routing.worker.lifecycle',
+    ok: true,
+  }));
+  expect(parsedStatus.knapsackConcurrencyResult).toEqual(expect.objectContaining({
+    id: 'knapsack.executor.concurrency',
+    ok: true,
+  }));
+  expect(parsedStatus.knapsackWorkerLifecycleResult).toEqual(expect.objectContaining({
+    id: 'knapsack.worker.lifecycle',
+    ok: true,
+  }));
+  expect(parsedStatus.knapsackEventHandlerResult).toEqual(expect.objectContaining({
+    id: 'knapsack.event-handler.recovery',
     ok: true,
   }));
   expect(parsedStatus.solverConcurrencyResult).toEqual(expect.objectContaining({

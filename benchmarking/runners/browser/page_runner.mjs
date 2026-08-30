@@ -22,10 +22,8 @@ import {
   setWorkerBridgeEnabled as setMathOptWorkerBridgeEnabled,
 } from 'or-tools-wasm/mathopt';
 import {
-  initKnapsack,
   KnapsackSolver,
   KnapsackSolverType,
-  setWorkerBridgeEnabled as setKnapsackWorkerBridgeEnabled,
 } from 'or-tools-wasm/knapsack';
 import {
   initNetworkFlow,
@@ -187,7 +185,6 @@ async function solveMathOpt(problem, threads) {
 
 async function solveKnapsack(problem, threads) {
   void threads;
-  await initKnapsack();
   const itemCount = Number(problem.items);
   const dimensionCount = Number(problem.dimensions);
   const values = Array.from({ length: itemCount }, (_, index) => deterministicValue(index, 500, 50));
@@ -201,8 +198,8 @@ async function solveKnapsack(problem, threads) {
     problem.problem,
   );
   solver.init(values, weights, capacities);
-  const objective = await solver.solve();
-  return [solver.is_solution_optimal() ? 'OPTIMAL' : 'FEASIBLE', String(objective)];
+  const objective = await solver.solve({ executor: 'direct' });
+  return [solver.isSolutionOptimal() ? 'OPTIMAL' : 'FEASIBLE', String(objective)];
 }
 
 async function solveMaxFlow(problem, threads) {
@@ -265,7 +262,6 @@ function configureWorkerBridges() {
     setCpSatWorkerBridgeEnabled,
     setRoutingWorkerBridgeEnabled,
     setMathOptWorkerBridgeEnabled,
-    setKnapsackWorkerBridgeEnabled,
     setNetworkFlowWorkerBridgeEnabled,
   ]) {
     setEnabled(false);
