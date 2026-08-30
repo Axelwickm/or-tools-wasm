@@ -1,48 +1,6 @@
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
-import { loadRoutingRuntime } from '../runtime_loader.js';
 import { withWasmCString } from '../wasm_memory.js';
-
-export type RoutingModelOperation =
-  | { type: 'addDimension'; transitMatrix: BigInt64Array; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addDimensionWithVehicleCapacity'; transitMatrix: BigInt64Array; slackMax: number; capacities: number[]; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addDimensionWithVehicleTransits'; transitMatrices: BigInt64Array[]; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addConstantDimension'; value: number; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addVectorDimension'; values: number[]; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addMatrixDimension'; matrix: number[][]; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addDisjunction'; indices: number[]; penalty?: number }
-  | { type: 'addPickupAndDelivery'; pickup: number; delivery: number }
-  | { type: 'addVehicleEqualityConstraint'; left: number; right: number }
-  | { type: 'addCumulLessOrEqualConstraint'; dimensionName: string; left: number; right: number }
-  | { type: 'setSoftSpanUpperBound'; dimensionName: string; bound: number; cost: number; vehicle: number }
-  | { type: 'setQuadraticCostSoftSpanUpperBound'; dimensionName: string; bound: number; cost: number; vehicle: number };
-
-export type RoutingSolveRequest = {
-  numLocations: number;
-  numVehicles: number;
-  starts: number[];
-  ends: number[];
-  firstSolutionStrategy: number;
-  solutionLimit: number;
-  transitMatrix: BigInt64Array;
-  transitMatrixDimension: number;
-  operations: RoutingModelOperation[];
-  dimensionNames: string[];
-  initialAssignment?: {
-    routes: number[][];
-    ignoreInactiveIndices: boolean;
-  };
-};
-
-export type RoutingSolveResult = {
-  status: number;
-  objectiveValue: number;
-  nextValues: number[];
-  starts: number[];
-  ends: number[];
-  dimensionCumulValues: Record<string, number[]>;
-};
-
-let modulePromise: Promise<OrToolsWasmModule> | null = null;
+import type { RoutingSolveRequest, RoutingSolveResult } from './protocol.js';
 
 function toNumber(value: unknown): number {
   return typeof value === 'number' ? value : Number(value);
@@ -50,11 +8,6 @@ function toNumber(value: unknown): number {
 
 function toInt64(value: number): bigint {
   return globalThis.BigInt(value);
-}
-
-function loadModule() {
-  modulePromise ??= loadRoutingRuntime();
-  return modulePromise;
 }
 
 function copyInt32Array(module: OrToolsWasmModule, values: number[]): number {
@@ -123,9 +76,10 @@ async function registerTransitMatrix(
   }
 }
 
-async function solveRoutingWithModule(
+export async function solveRoutingWithModule(
   module: OrToolsWasmModule,
   message: RoutingSolveRequest,
+  interruptible = false,
 ): Promise<RoutingSolveResult | null> {
   let managerHandle = 0;
   let modelHandle = 0;
@@ -304,8 +258,8 @@ async function solveRoutingWithModule(
           ? await ccallNumber(
               module,
               'routing_solve_from_assignment_with_parameters',
-              ['number', 'number', 'number'],
-              [modelHandle, message.firstSolutionStrategy, message.solutionLimit],
+              ['number', 'number', 'number', 'number'],
+              [modelHandle, message.firstSolutionStrategy, message.solutionLimit, interruptible ? 1 : 0],
             )
           : 0;
       } finally {
@@ -316,8 +270,8 @@ async function solveRoutingWithModule(
       ok = await ccallNumber(
         module,
         'routing_solve_with_parameters_ext',
-        ['number', 'number', 'number'],
-        [modelHandle, message.firstSolutionStrategy, message.solutionLimit],
+        ['number', 'number', 'number', 'number'],
+        [modelHandle, message.firstSolutionStrategy, message.solutionLimit, interruptible ? 1 : 0],
       );
     }
     if (ok !== 1) {
@@ -374,8 +328,4 @@ async function solveRoutingWithModule(
     if (startsPtr) module._free(startsPtr);
     if (endsPtr) module._free(endsPtr);
   }
-}
-
-export async function solveRoutingNative(message: RoutingSolveRequest): Promise<RoutingSolveResult | null> {
-  return await solveRoutingWithModule(await loadModule(), message);
 }

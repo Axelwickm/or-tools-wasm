@@ -490,6 +490,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       endforeach()
     endif()
 
+    if(RUNTIME_NAME STREQUAL "routing_runtime")
+      foreach(ROUTING_TARGET
+          ${RUNTIME_NAME}
+          ${RUNTIME_NAME}_asyncify
+          ${RUNTIME_NAME}_node
+          ${RUNTIME_NAME}_node_asyncify)
+        target_link_options(${ROUTING_TARGET} PRIVATE
+          "-sEXPORTED_FUNCTIONS=['_malloc','_free','_routing_interrupt_address']")
+      endforeach()
+    endif()
+
     list(APPEND ORTOOLS_WASM_RUNTIME_TARGETS
       ${RUNTIME_NAME}
       ${RUNTIME_NAME}_asyncify

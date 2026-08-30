@@ -1,38 +1,38 @@
 type RoutingApi = {
-  DefaultRoutingSearchParameters(): { firstSolutionStrategy?: number };
+  defaultRoutingSearchParameters(): { firstSolutionStrategy?: number };
   FirstSolutionStrategy?: {
     FIRST_UNBOUND_MIN_VALUE?: number;
   };
-  initRouting(): Promise<void>;
   RoutingIndexManager: new (...args: unknown[]) => RoutingIndexManagerLike;
   RoutingModel: new (manager: RoutingIndexManagerLike) => RoutingModelLike;
 };
 
 type RoutingIndexManagerLike = {
-  IndexToNode(index: number): number;
-  GetNumberOfIndices(): number;
-  delete(): void;
+  indexToNode(index: number): number;
+  getNumberOfIndices(): number;
 };
 
 type RoutingAssignmentLike = {
-  ObjectiveValue(): number;
-  Value(index: number): number;
+  objectiveValue(): number;
+  value(index: number): number;
 };
 
 type RoutingModelLike = {
-  RegisterTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
-  RegisterTransitMatrix(matrix: number[][]): number;
-  RegisterUnaryTransitCallback(callback: (fromIndex: number) => number): number;
-  RegisterUnaryTransitVector(values: number[]): number;
-  SetArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
-  Solve(): Promise<RoutingAssignmentLike | null>;
-  SolveWithParameters(parameters?: { firstSolutionStrategy?: number }): Promise<RoutingAssignmentLike | null>;
-  Start(vehicle: number): number;
-  IsEnd(index: number): boolean;
-  NextVar(index: number): number;
-  GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  registerTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
+  registerTransitMatrix(matrix: number[][]): number;
+  registerUnaryTransitCallback(callback: (fromIndex: number) => number): number;
+  registerUnaryTransitVector(values: number[]): number;
+  setArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
+  solve(options?: unknown): Promise<RoutingAssignmentLike | null>;
+  solveWithParameters(
+    parameters?: { firstSolutionStrategy?: number },
+    options?: unknown,
+  ): Promise<RoutingAssignmentLike | null>;
+  start(vehicle: number): number;
+  isEnd(index: number): boolean;
+  nextVar(index: number): number;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
   status(): number;
-  delete(): void;
 };
 
 type RoutingCase = {
@@ -59,10 +59,10 @@ function extractRoute(
   vehicle: number,
 ): number[] {
   const route: number[] = [];
-  let index = routing.Start(vehicle);
-  while (!routing.IsEnd(index)) {
-    const next = assignment.Value(routing.NextVar(index));
-    route.push(manager.IndexToNode(next));
+  let index = routing.start(vehicle);
+  while (!routing.isEnd(index)) {
+    const next = assignment.value(routing.nextVar(index));
+    route.push(manager.indexToNode(next));
     index = next;
   }
   return route;
@@ -88,26 +88,19 @@ export const transitContractCases: RoutingCase[] = [
     async run(routingApi) {
       // TEMP: parity - TestPyWrapRoutingModel.testTransitMatrix matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testTransitMatrix';
-      await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(5, 1, 0);
       const routing = new routingApi.RoutingModel(manager);
+      const matrix = [[1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]];
 
-      try {
-        const matrix = [[1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]];
-
-        const transitIdx = routing.RegisterTransitMatrix(matrix);
-        assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
-        routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-        const assignment = await routing.Solve();
-        assert(assignment, `${caseName} did not return a solution`);
-        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
-        assertNumber(assignment?.ObjectiveValue(), 15, `${caseName} objectiveValue`);
-        return `${caseName} PASS`;
-      } finally {
-        routing.delete();
-        manager.delete();
-      }
+      const transitIdx = routing.registerTransitMatrix(matrix);
+      assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
+      routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
+      assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+      const assignment = await routing.solve(routingExecutionOptions());
+      assert(assignment, `${caseName} did not return a solution`);
+      assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
+      assertNumber(assignment?.objectiveValue(), 15, `${caseName} objectiveValue`);
+      return `${caseName} PASS`;
     },
   },
   {
@@ -116,26 +109,19 @@ export const transitContractCases: RoutingCase[] = [
     async run(routingApi) {
       // TEMP: parity - TestPyWrapRoutingModel.testUnaryTransitCallback matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testUnaryTransitCallback';
-      await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(5, 1, 0);
       const routing = new routingApi.RoutingModel(manager);
+      const unaryDistance = (fromIndex: number) => manager.indexToNode(fromIndex);
 
-      try {
-        const unaryDistance = (fromIndex: number) => manager.IndexToNode(fromIndex);
-
-        const transitIdx = routing.RegisterUnaryTransitCallback(unaryDistance);
-        assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
-        routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-        const assignment = await routing.Solve();
-        assert(assignment, `${caseName} did not return a solution`);
-        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
-        assertNumber(assignment?.ObjectiveValue(), 10, `${caseName} objectiveValue`);
-        return `${caseName} PASS`;
-      } finally {
-        routing.delete();
-        manager.delete();
-      }
+      const transitIdx = routing.registerUnaryTransitCallback(unaryDistance);
+      assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
+      routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
+      assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+      const assignment = await routing.solve(routingExecutionOptions());
+      assert(assignment, `${caseName} did not return a solution`);
+      assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
+      assertNumber(assignment?.objectiveValue(), 10, `${caseName} objectiveValue`);
+      return `${caseName} PASS`;
     },
   },
   {
@@ -144,26 +130,19 @@ export const transitContractCases: RoutingCase[] = [
     async run(routingApi) {
       // TEMP: parity - TestPyWrapRoutingModel.testUnaryTransitLambda matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testUnaryTransitLambda';
-      await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(5, 1, 0);
       const routing = new routingApi.RoutingModel(manager);
+      const unaryLambda = (_fromIndex: number) => 1;
 
-      try {
-        const unaryLambda = (_fromIndex: number) => 1;
-
-        const transitIdx = routing.RegisterUnaryTransitCallback(unaryLambda);
-        assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
-        routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-        const assignment = await routing.Solve();
-        assert(assignment, `${caseName} did not return a solution`);
-        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
-        assertNumber(assignment?.ObjectiveValue(), 5, `${caseName} objectiveValue`);
-        return `${caseName} PASS`;
-      } finally {
-        routing.delete();
-        manager.delete();
-      }
+      const transitIdx = routing.registerUnaryTransitCallback(unaryLambda);
+      assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
+      routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
+      assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+      const assignment = await routing.solve(routingExecutionOptions());
+      assert(assignment, `${caseName} did not return a solution`);
+      assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
+      assertNumber(assignment?.objectiveValue(), 5, `${caseName} objectiveValue`);
+      return `${caseName} PASS`;
     },
   },
   {
@@ -172,26 +151,19 @@ export const transitContractCases: RoutingCase[] = [
     async run(routingApi) {
       // TEMP: parity - TestPyWrapRoutingModel.testUnaryTransitVector matches upstream callback index, status, solve, and objective assertions.
       const caseName = 'TestPyWrapRoutingModel.testUnaryTransitVector';
-      await routingApi.initRouting();
       const manager = new routingApi.RoutingIndexManager(10, 1, 0);
       const routing = new routingApi.RoutingModel(manager);
+      const vector = Array.from({ length: 10 }, (_, index) => index);
 
-      try {
-        const vector = Array.from({ length: 10 }, (_, index) => index);
-
-        const transitIdx = routing.RegisterUnaryTransitVector(vector);
-        assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
-        routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
-        assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-        const assignment = await routing.Solve();
-        assert(assignment, `${caseName} did not return a solution`);
-        assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
-        assertNumber(assignment?.ObjectiveValue(), 45, `${caseName} objectiveValue`);
-        return `${caseName} PASS`;
-      } finally {
-        routing.delete();
-        manager.delete();
-      }
+      const transitIdx = routing.registerUnaryTransitVector(vector);
+      assert(transitIdx === 1, `${caseName} expected first callback index 1, got ${transitIdx}`);
+      routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
+      assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
+      const assignment = await routing.solve(routingExecutionOptions());
+      assert(assignment, `${caseName} did not return a solution`);
+      assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
+      assertNumber(assignment?.objectiveValue(), 45, `${caseName} objectiveValue`);
+      return `${caseName} PASS`;
     },
   },
   {
@@ -199,35 +171,34 @@ export const transitContractCases: RoutingCase[] = [
     source: 'ortools/constraint_solver/python/pywraprouting_test.py',
     async run(routingApi) {
       const caseName = 'TestPyWrapRoutingModel.testVRP';
-      await routingApi.initRouting();
-      const manager = new (routingApi.RoutingIndexManager as new (...args: unknown[]) => RoutingIndexManagerLike)(10, 2, [0, 1], [1, 0]);
+      const manager = new (routingApi.RoutingIndexManager as new (...args: unknown[]) => RoutingIndexManagerLike)(
+        10,
+        2,
+        [0, 1],
+        [1, 0],
+      );
       const routing = new routingApi.RoutingModel(manager);
+      const transitIdx = routing.registerTransitCallback((fromIndex, toIndex) => {
+        const fromNode = manager.indexToNode(fromIndex);
+        const toNode = manager.indexToNode(toIndex);
+        return fromNode + toNode;
+      });
+      routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
 
-      try {
-        const transitIdx = routing.RegisterTransitCallback((fromIndex, toIndex) => {
-          const fromNode = manager.IndexToNode(fromIndex);
-          const toNode = manager.IndexToNode(toIndex);
-          return fromNode + toNode;
-        });
-        routing.SetArcCostEvaluatorOfAllVehicles(transitIdx);
+      const parameters = routingApi.defaultRoutingSearchParameters();
+      parameters.firstSolutionStrategy = firstUnboundStrategy(routingApi);
+      const assignment = await routing.solveWithParameters(parameters, routingExecutionOptions());
+      assert(assignment, `${caseName} did not return a solution`);
+      assertNumber(assignment?.objectiveValue(), 89, `${caseName} objectiveValue`);
 
-        const parameters = routingApi.DefaultRoutingSearchParameters();
-        parameters.firstSolutionStrategy = firstUnboundStrategy(routingApi);
-        const assignment = await routing.SolveWithParameters(parameters);
-        assert(assignment, `${caseName} did not return a solution`);
-        assertNumber(assignment?.ObjectiveValue(), 89, `${caseName} objectiveValue`);
-
-        const route = extractRoute(manager, routing, assignment, 1);
-        assertRoute([2, 4, 6, 8, 3, 5, 7, 9, 0], route, caseName);
-        assert(
-          routing.IsEnd(assignment.Value(routing.NextVar(routing.Start(0)))),
-          `${caseName} expected vehicle 0 to be empty`,
-        );
-        return `${caseName} PASS`;
-      } finally {
-        routing.delete();
-        manager.delete();
-      }
+      const route = extractRoute(manager, routing, assignment, 1);
+      assertRoute([2, 4, 6, 8, 3, 5, 7, 9, 0], route, caseName);
+      assert(
+        routing.isEnd(assignment.value(routing.nextVar(routing.start(0)))),
+        `${caseName} expected vehicle 0 to be empty`,
+      );
+      return `${caseName} PASS`;
     },
   },
 ];
+import { routingExecutionOptions } from './execution.ts';

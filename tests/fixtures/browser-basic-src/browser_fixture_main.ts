@@ -8,6 +8,8 @@ import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concur
 import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
 import { runMpSolverConcurrencyCase } from '../../cases/or-tools-wasm/mp_solver/concurrency.ts';
 import { runMpSolverWorkerLifecycleCase } from '../../cases/or-tools-wasm/mp_solver/worker_lifecycle.ts';
+import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
+import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing/worker_lifecycle.ts';
 import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
 import { withCpSatExecutor } from '../../harness/cpsat_types.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
@@ -287,15 +289,13 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     BOOL_FALSE: RoutingApiModule.BOOL_FALSE,
     BOOL_UNSPECIFIED: RoutingApiModule.BOOL_UNSPECIFIED,
     BoundCost: RoutingApiModule.BoundCost,
-    DefaultRoutingModelParameters: RoutingApiModule.DefaultRoutingModelParameters,
-    DefaultRoutingSearchParameters: RoutingApiModule.DefaultRoutingSearchParameters,
-    FindErrorInRoutingSearchParameters: RoutingApiModule.FindErrorInRoutingSearchParameters,
+    defaultRoutingModelParameters: RoutingApiModule.defaultRoutingModelParameters,
+    defaultRoutingSearchParameters: RoutingApiModule.defaultRoutingSearchParameters,
+    findErrorInRoutingSearchParameters: RoutingApiModule.findErrorInRoutingSearchParameters,
     FirstSolutionStrategy: RoutingApiModule.FirstSolutionStrategy,
-    initRouting: RoutingApiModule.initRouting,
     LocalSearchMetaheuristic: RoutingApiModule.LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingApiModule.RoutingIndexManager,
     RoutingModel: RoutingApiModule.RoutingModel,
-    setExecutor: RoutingApiModule.setExecutor,
   };
   const highLevelCpSat = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat-high-level', () =>
     runWithWorkerStats(workerSpy, () => runCpSatHighLevelParityCasesForPackage(CpSatApi as never))
@@ -402,6 +402,21 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
       () => runMpSolverWorkerLifecycleCase(MPSolverApi as never),
     ),
   );
+  const routingConcurrencyResult = await runSelectedGroup(
+    selectedGroup,
+    'routing',
+    'routing-concurrency',
+    () => runRoutingConcurrencyCase(RoutingApiModule as never),
+  );
+  const routingWorkerLifecycleResult = await runSelectedGroup(
+    selectedGroup,
+    'routing',
+    'routing-worker-lifecycle',
+    () => runWithWorkerStats(
+      workerSpy,
+      () => runRoutingWorkerLifecycleCase(RoutingApiModule as never),
+    ),
+  );
   const cloudExecutorResult = await runSelectedGroup(selectedGroup, 'cp-sat', 'cloud', () =>
     runCloudExecutorCase(CpSatApi as never, {
       packageName: PackageApi.packageName,
@@ -414,6 +429,8 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     cpSatConcurrencyResult,
     mpSolverConcurrencyResult,
     mpSolverWorkerLifecycleResult: mpSolverWorkerLifecycleResult?.result,
+    routingConcurrencyResult,
+    routingWorkerLifecycleResult: routingWorkerLifecycleResult?.result,
     solverConcurrencyResult,
     cpSatSolverStructureResults: cpSatSolverStructure?.result,
     cpSatWorkerLifecycleResult: cpSatWorkerLifecycle?.result,

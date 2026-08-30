@@ -7,9 +7,8 @@ import {
   weightedSum,
 } from 'or-tools-wasm/cp-sat';
 import {
-  DefaultRoutingSearchParameters,
+  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   RoutingIndexManager,
   RoutingModel,
   setWorkerBridgeEnabled as setRoutingWorkerBridgeEnabled,
@@ -102,29 +101,23 @@ async function solveCpSat(problem, threads) {
 
 async function solveRouting(problem, threads) {
   void threads;
-  await initRouting();
   const points = deterministicPoints(Number(problem.size));
   const manager = new RoutingIndexManager(points.length, 1, 0);
   const routing = new RoutingModel(manager);
-  try {
-    const transit = routing.RegisterTransitCallback((fromIndex, toIndex) => {
-      const fromNode = manager.IndexToNode(fromIndex);
-      const toNode = manager.IndexToNode(toIndex);
+  const transit = routing.registerTransitCallback((fromIndex, toIndex) => {
+      const fromNode = manager.indexToNode(fromIndex);
+      const toNode = manager.indexToNode(toIndex);
       const [ax, ay] = points[fromNode];
       const [bx, by] = points[toNode];
       return Math.round(Math.hypot(ax - bx, ay - by));
     });
-    routing.SetArcCostEvaluatorOfAllVehicles(transit);
-    const params = DefaultRoutingSearchParameters();
+    routing.setArcCostEvaluatorOfAllVehicles(transit);
+    const params = defaultRoutingSearchParameters();
     params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
     if (params.timeLimit) params.timeLimit.seconds = Number(problem.timeLimitSeconds ?? 5);
-    const assignment = await routing.SolveWithParameters(params);
+    const assignment = await routing.solveWithParameters(params, { executor: 'direct' });
     if (!assignment) return ['NO_SOLUTION', ''];
-    return ['OK', String(assignment.ObjectiveValue())];
-  } finally {
-    routing.delete();
-    manager.delete();
-  }
+    return ['OK', String(assignment.objectiveValue())];
 }
 
 async function solveMpsolver(problem, threads) {

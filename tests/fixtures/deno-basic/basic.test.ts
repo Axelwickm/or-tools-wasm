@@ -28,15 +28,13 @@ import {
   BOOL_FALSE,
   BOOL_UNSPECIFIED,
   BoundCost,
-  DefaultRoutingSearchParameters,
-  DefaultRoutingModelParameters,
-  FindErrorInRoutingSearchParameters,
+  defaultRoutingSearchParameters,
+  defaultRoutingModelParameters,
+  findErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
-  setExecutor as setRoutingExecutor,
 } from 'or-tools-wasm/routing';
 import { executorFixtureModes } from '../../harness/shared_case.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
@@ -53,6 +51,8 @@ import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/inde
 import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
+import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
+import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing/worker_lifecycle.ts';
 import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 
 type NamedCaseResult = {
@@ -88,6 +88,14 @@ Deno.test('enforces CP-SAT local solve concurrency in Deno', async () => {
   await runCpSatConcurrencyCase(CpSatApi as never);
 });
 
+Deno.test('enforces the Routing worker job lifecycle in Deno', async () => {
+  await runRoutingWorkerLifecycleCase({ RoutingIndexManager, RoutingModel } as never);
+});
+
+Deno.test('enforces Routing local solve concurrency in Deno', async () => {
+  await runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never);
+});
+
 Deno.test('cloud executor checks service status without sending the model', async () => {
   await runCloudExecutorCase(CpSatApi as never, { packageName, version });
 });
@@ -111,15 +119,13 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     BOOL_FALSE,
     BOOL_UNSPECIFIED,
     BoundCost,
-    DefaultRoutingModelParameters,
-    DefaultRoutingSearchParameters,
-    FindErrorInRoutingSearchParameters,
+    defaultRoutingModelParameters,
+    defaultRoutingSearchParameters,
+    findErrorInRoutingSearchParameters,
     FirstSolutionStrategy,
-    initRouting,
     LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
-    setExecutor: setRoutingExecutor,
   }, { modes: executorFixtureModes });
   await assertCaseSteps(t, 'deno routing', routingResults);
 

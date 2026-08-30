@@ -1,85 +1,55 @@
-import { create } from '@bufbuild/protobuf';
 import { CloudExecutor } from '../cloud_executor.js';
-import type { ExecutorConfiguration, ResolvedExecutorConfiguration } from '../executor_configuration.js';
+import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
-import {
-  RoutingAddConstantDimensionSchema,
-  RoutingAddCumulLessOrEqualConstraintSchema,
-  RoutingAddDimensionSchema,
-  RoutingAddDimensionWithVehicleCapacitySchema,
-  RoutingAddDimensionWithVehicleTransitsSchema,
-  RoutingAddDisjunctionSchema,
-  RoutingAddMatrixDimensionSchema,
-  RoutingAddPickupAndDeliverySchema,
-  RoutingAddVehicleEqualityConstraintSchema,
-  RoutingAddVectorDimensionSchema,
-  RoutingBridgeRequestSchema,
-  RoutingInitialAssignmentSchema,
-  RoutingMatrixSchema,
-  RoutingModelOperationSchema,
-  RoutingRouteSchema,
-  RoutingSetQuadraticCostSoftSpanUpperBoundSchema,
-  RoutingSetSoftSpanUpperBoundSchema,
-  type RoutingModelOperation as BridgeRoutingOperation,
-} from '../generated/bridge/routing_pb.js';
 import type { SolverJobEvent } from '../solver_executor.js';
-import { RoutingExecutor, type RoutingExecutorLike } from './executor.js';
-import { RoutingServerExecutor } from './server_executor.js';
-import { RoutingWorkerExecutor } from './worker_executor.js';
+import { SolverServerExecutor } from '../solver_server_executor.js';
+import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
+import { DirectRoutingExecutor } from './direct_executor.js';
+import {
+  routingProtocol,
+  type RoutingExecutor,
+  type RoutingModelOperation,
+  type RoutingSolveResult,
+} from './protocol.js';
 
 type RoutingTransitCallback = (fromIndex: number, toIndex: number) => number;
-type RoutingModelOperation =
-  | { type: 'addDimension'; transitMatrix: BigInt64Array; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addDimensionWithVehicleCapacity'; transitMatrix: BigInt64Array; slackMax: number; capacities: number[]; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addDimensionWithVehicleTransits'; transitMatrices: BigInt64Array[]; slackMax: number; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addConstantDimension'; value: number; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addVectorDimension'; values: number[]; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addMatrixDimension'; matrix: number[][]; capacity: number; fixStartCumulToZero: boolean; name: string }
-  | { type: 'addDisjunction'; indices: number[]; penalty?: number }
-  | { type: 'addPickupAndDelivery'; pickup: number; delivery: number }
-  | { type: 'addVehicleEqualityConstraint'; left: number; right: number }
-  | { type: 'addCumulLessOrEqualConstraint'; dimensionName: string; left: number; right: number }
-  | { type: 'setSoftSpanUpperBound'; dimensionName: string; bound: number; cost: number; vehicle: number }
-  | { type: 'setQuadraticCostSoftSpanUpperBound'; dimensionName: string; bound: number; cost: number; vehicle: number };
 
-type RoutingSolveResult = {
-  status: number;
-  objectiveValue: number;
-  nextValues: number[];
-  starts: number[];
-  ends: number[];
-  dimensionCumulValues: Record<string, number[]>;
-};
+async function createRoutingWorker(): Promise<SolverWorkerLike> {
+  return new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module', name: 'ortools-executor-routing' },
+  );
+}
 
-const directExecutor = new RoutingExecutor();
-const workerExecutor = new RoutingWorkerExecutor();
-let executor: RoutingExecutorLike = createResolvedExecutor(resolveExecutorConfiguration());
+const directExecutor = new DirectRoutingExecutor();
+const workerExecutor = new SolverWorkerExecutor(
+  routingProtocol,
+  createRoutingWorker,
+  true,
+);
 
-function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): RoutingExecutorLike {
+function createRoutingExecutor(selection: ExecutorSelection = 'auto'): RoutingExecutor {
+  return createResolvedExecutor(resolveExecutorConfiguration(selection));
+}
+
+function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): RoutingExecutor {
   switch (configuration.type) {
     case 'direct': return directExecutor;
     case 'worker': return workerExecutor;
-    case 'server': return new RoutingServerExecutor(configuration);
+    case 'server': return new SolverServerExecutor(routingProtocol, configuration);
     case 'cloud': return new CloudExecutor('routing', { test: configuration.test });
   }
 }
 
-export function setRoutingExecutor(configuration: ExecutorConfiguration): void {
-  executor = createResolvedExecutor(resolveExecutorConfiguration(configuration));
-}
-
 export type RoutingEvent = SolverJobEvent;
 export type RoutingSolveOptions = {
+  executor?: ExecutorSelection;
   onEvent?: (event: RoutingEvent) => void | Promise<void>;
   signal?: AbortSignal;
 };
 
 function toInt64(value: number): bigint {
   return globalThis.BigInt(value);
-}
-
-export async function initRouting(): Promise<void> {
-  await executor.load();
 }
 
 export enum FirstSolutionStrategy {
@@ -124,36 +94,36 @@ export const BOOL_UNSPECIFIED = 0;
 
 export type RoutingSearchParameters = {
   firstSolutionStrategy?: FirstSolutionStrategy;
-  solution_limit?: number;
-  local_search_operators?: Record<string, unknown>;
-  local_search_metaheuristic?: LocalSearchMetaheuristic;
+  solutionLimit?: number;
+  localSearchOperators?: Record<string, unknown>;
+  localSearchMetaheuristic?: LocalSearchMetaheuristic;
 };
 
-export function DefaultRoutingSearchParameters(): RoutingSearchParameters {
+export function defaultRoutingSearchParameters(): RoutingSearchParameters {
   return {};
 }
 
 export type RoutingModelParameters = {
-  solver_parameters: {
-    CopyFrom(value: unknown): void;
-    trace_propagation: boolean;
-    profile_local_search: boolean;
+  solverParameters: {
+    copyFrom(value: unknown): void;
+    tracePropagation: boolean;
+    profileLocalSearch: boolean;
   };
 };
 
-export function DefaultRoutingModelParameters(): RoutingModelParameters {
+export function defaultRoutingModelParameters(): RoutingModelParameters {
   return {
-    solver_parameters: {
-      CopyFrom() {},
-      trace_propagation: false,
-      profile_local_search: false,
+    solverParameters: {
+      copyFrom() {},
+      tracePropagation: false,
+      profileLocalSearch: false,
     },
   };
 }
 
-export function FindErrorInRoutingSearchParameters(params: RoutingSearchParameters): string {
-  if (params.local_search_operators?.use_cross === BOOL_UNSPECIFIED) {
-    return 'local_search_operators.use_cross must not be BOOL_UNSPECIFIED';
+export function findErrorInRoutingSearchParameters(params: RoutingSearchParameters): string {
+  if (params.localSearchOperators?.useCross === BOOL_UNSPECIFIED) {
+    return 'localSearchOperators.useCross must not be BOOL_UNSPECIFIED';
   }
   return '';
 }
@@ -216,7 +186,6 @@ function isRoutingCumulLessOrEqualConstraint(value: unknown): value is RoutingCu
 }
 
 export class RoutingIndexManager {
-  readonly ready: Promise<void> = Promise.resolve();
   private readonly indexToNodeMap: number[] = [];
   private readonly nodeToIndexMap = new Map<number, number>();
   private readonly startIndices: number[] = [];
@@ -265,55 +234,35 @@ export class RoutingIndexManager {
     return this.starts[0];
   }
 
-  async indexToNode(index: number): Promise<number> {
-    await this.ready;
-    return this.indexToNodeSync(index);
-  }
-
-  indexToNodeSync(index: number): number {
+  indexToNode(index: number): number {
     const node = this.indexToNodeMap[index];
-    if (node === undefined) throw new Error(`RoutingIndexManager.IndexToNode: index ${index} is out of range.`);
+    if (node === undefined) throw new Error(`RoutingIndexManager.indexToNode: index ${index} is out of range.`);
     return node;
   }
 
-  IndexToNode(index: number): number {
-    return this.indexToNodeSync(index);
-  }
-
-  async nodeToIndex(node: number): Promise<number> {
-    await this.ready;
-    return this.nodeToIndexSync(node);
-  }
-
-  nodeToIndexSync(node: number): number {
+  nodeToIndex(node: number): number {
     return this.nodeToIndexMap.get(node) ?? -1;
   }
 
-  NodeToIndex(node: number): number {
-    return this.nodeToIndexSync(node);
-  }
-
-  GetNumberOfNodes(): number {
+  getNumberOfNodes(): number {
     return this.numLocations;
   }
 
-  GetNumberOfVehicles(): number {
+  getNumberOfVehicles(): number {
     return this.numVehicles;
   }
 
-  GetNumberOfIndices(): number {
+  getNumberOfIndices(): number {
     return this.indexToNodeMap.length;
   }
 
-  GetStartIndex(vehicle: number): number {
+  getStartIndex(vehicle: number): number {
     return this.startIndices[vehicle];
   }
 
-  GetEndIndex(vehicle: number): number {
+  getEndIndex(vehicle: number): number {
     return this.endIndices[vehicle];
   }
-
-  delete() {}
 
   private createSyntheticIndexMapping(): void {
     for (let node = 0; node < this.numLocations; node++) {
@@ -354,98 +303,34 @@ export class RoutingDimension {
     private readonly recordQuadraticCostSoftSpanUpperBound: (boundCost: BoundCost, vehicle: number) => void,
   ) {}
 
-  CumulVar(index: number): RoutingCumulVar {
+  cumulVar(index: number): RoutingCumulVar {
     return { kind: 'routingCumulVar', dimensionName: this.name, index };
   }
 
-  HasSoftSpanUpperBounds(): boolean {
+  hasSoftSpanUpperBounds(): boolean {
     return this.state.softSpanUpperBounds.size > 0;
   }
 
-  SetSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
+  setSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
     this.state.softSpanUpperBounds.set(vehicle, new BoundCost(boundCost.bound, boundCost.cost));
     this.recordSoftSpanUpperBound(boundCost, vehicle);
   }
 
-  GetSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
+  getSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
     return this.state.softSpanUpperBounds.get(vehicle) ?? new BoundCost(0, 0);
   }
 
-  HasQuadraticCostSoftSpanUpperBounds(): boolean {
+  hasQuadraticCostSoftSpanUpperBounds(): boolean {
     return this.state.quadraticCostSoftSpanUpperBounds.size > 0;
   }
 
-  SetQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
+  setQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
     this.state.quadraticCostSoftSpanUpperBounds.set(vehicle, new BoundCost(boundCost.bound, boundCost.cost));
     this.recordQuadraticCostSoftSpanUpperBound(boundCost, vehicle);
   }
 
-  GetQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
+  getQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
     return this.state.quadraticCostSoftSpanUpperBounds.get(vehicle) ?? new BoundCost(0, 0);
-  }
-}
-
-function bridgeMatrix(values: BigInt64Array | number[], dimension: number) {
-  return create(RoutingMatrixSchema, {
-    values: [...values].map((value) => BigInt(value)),
-    dimension,
-  });
-}
-
-function bridgeOperation(operation: RoutingModelOperation, dimension: number): BridgeRoutingOperation {
-  switch (operation.type) {
-    case 'addDimension':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addDimension', value: create(RoutingAddDimensionSchema, {
-        transitMatrix: bridgeMatrix(operation.transitMatrix, dimension), slackMax: BigInt(operation.slackMax),
-        capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
-      }) } });
-    case 'addDimensionWithVehicleCapacity':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addDimensionWithVehicleCapacity', value: create(RoutingAddDimensionWithVehicleCapacitySchema, {
-        transitMatrix: bridgeMatrix(operation.transitMatrix, dimension), slackMax: BigInt(operation.slackMax),
-        capacities: operation.capacities.map(BigInt), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
-      }) } });
-    case 'addDimensionWithVehicleTransits':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addDimensionWithVehicleTransits', value: create(RoutingAddDimensionWithVehicleTransitsSchema, {
-        transitMatrices: operation.transitMatrices.map((matrix) => bridgeMatrix(matrix, dimension)), slackMax: BigInt(operation.slackMax),
-        capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
-      }) } });
-    case 'addConstantDimension':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addConstantDimension', value: create(RoutingAddConstantDimensionSchema, {
-        value: BigInt(operation.value), capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
-      }) } });
-    case 'addVectorDimension':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addVectorDimension', value: create(RoutingAddVectorDimensionSchema, {
-        values: operation.values.map(BigInt), capacity: BigInt(operation.capacity), fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
-      }) } });
-    case 'addMatrixDimension':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addMatrixDimension', value: create(RoutingAddMatrixDimensionSchema, {
-        matrix: bridgeMatrix(operation.matrix.flat(), operation.matrix.length), capacity: BigInt(operation.capacity),
-        fixStartCumulToZero: operation.fixStartCumulToZero, name: operation.name,
-      }) } });
-    case 'addDisjunction':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addDisjunction', value: create(RoutingAddDisjunctionSchema, {
-        indices: operation.indices.map(BigInt), penalty: operation.penalty === undefined ? undefined : BigInt(operation.penalty),
-      }) } });
-    case 'addPickupAndDelivery':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addPickupAndDelivery', value: create(RoutingAddPickupAndDeliverySchema, {
-        pickup: BigInt(operation.pickup), delivery: BigInt(operation.delivery),
-      }) } });
-    case 'addVehicleEqualityConstraint':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addVehicleEqualityConstraint', value: create(RoutingAddVehicleEqualityConstraintSchema, {
-        left: BigInt(operation.left), right: BigInt(operation.right),
-      }) } });
-    case 'addCumulLessOrEqualConstraint':
-      return create(RoutingModelOperationSchema, { operation: { case: 'addCumulLessOrEqualConstraint', value: create(RoutingAddCumulLessOrEqualConstraintSchema, {
-        dimensionName: operation.dimensionName, left: BigInt(operation.left), right: BigInt(operation.right),
-      }) } });
-    case 'setSoftSpanUpperBound':
-      return create(RoutingModelOperationSchema, { operation: { case: 'setSoftSpanUpperBound', value: create(RoutingSetSoftSpanUpperBoundSchema, {
-        dimensionName: operation.dimensionName, bound: BigInt(operation.bound), cost: BigInt(operation.cost), vehicle: operation.vehicle,
-      }) } });
-    case 'setQuadraticCostSoftSpanUpperBound':
-      return create(RoutingModelOperationSchema, { operation: { case: 'setQuadraticCostSoftSpanUpperBound', value: create(RoutingSetQuadraticCostSoftSpanUpperBoundSchema, {
-        dimensionName: operation.dimensionName, bound: BigInt(operation.bound), cost: BigInt(operation.cost), vehicle: operation.vehicle,
-      }) } });
   }
 }
 
@@ -468,11 +353,11 @@ export class Assignment {
     assignmentStates.set(this, { routing, result, routes, ignoreInactiveIndices });
   }
 
-  ObjectiveValue(): number {
+  objectiveValue(): number {
     return this.result?.objectiveValue ?? this.routing.assignmentObjectiveValue();
   }
 
-  Value(indexOrVar: number | RoutingCumulVar): number {
+  value(indexOrVar: number | RoutingCumulVar): number {
     if (typeof indexOrVar === 'object') {
       return this.result
         ? this.result.dimensionCumulValues[indexOrVar.dimensionName]?.[indexOrVar.index] ?? 0
@@ -481,8 +366,8 @@ export class Assignment {
     return this.result?.nextValues[indexOrVar] ?? this.routing.nextValue(indexOrVar);
   }
 
-  Min(indexOrVar: number | RoutingCumulVar): number {
-    return this.Value(indexOrVar);
+  min(indexOrVar: number | RoutingCumulVar): number {
+    return this.value(indexOrVar);
   }
 }
 
@@ -492,7 +377,7 @@ function initialRoutesForAssignment(
 ): { routes: number[][]; ignoreInactiveIndices: boolean } {
   const state = assignmentStates.get(assignment);
   if (!state || state.routing !== routing) {
-    throw new Error('RoutingModel.SolveFromAssignmentWithParameters: assignment belongs to another model.');
+    throw new Error('RoutingModel.solveFromAssignmentWithParameters: assignment belongs to another model.');
   }
   if (state.routes) {
     return {
@@ -501,7 +386,7 @@ function initialRoutesForAssignment(
     };
   }
   if (!state.result) {
-    throw new Error('RoutingModel.SolveFromAssignmentWithParameters: assignment has no route data.');
+    throw new Error('RoutingModel.solveFromAssignmentWithParameters: assignment has no route data.');
   }
   const routes = state.result.starts.map((start, vehicle) => {
     const route: number[] = [];
@@ -510,7 +395,7 @@ function initialRoutesForAssignment(
     const visited = new Set<number>();
     while (index !== end) {
       if (!Number.isInteger(index) || visited.has(index)) {
-        throw new Error('RoutingModel.SolveFromAssignmentWithParameters: assignment contains an invalid route.');
+        throw new Error('RoutingModel.solveFromAssignmentWithParameters: assignment contains an invalid route.');
       }
       visited.add(index);
       route.push(index);
@@ -522,11 +407,6 @@ function initialRoutesForAssignment(
 }
 
 export class RoutingModel {
-  static setExecutor(configuration: ExecutorConfiguration): void {
-    setRoutingExecutor(configuration);
-  }
-
-  readonly ready: Promise<void> = Promise.resolve();
   private arcCostEvaluatorIndex: number | null = null;
   private lastResult: RoutingSolveResult | null = null;
   private readonly evaluatorCallbacks = new Map<number, RoutingTransitCallback>();
@@ -542,13 +422,13 @@ export class RoutingModel {
     this.parameters = parameters;
   }
 
-  RegisterTransitCallback(callback: RoutingTransitCallback): number {
+  registerTransitCallback(callback: RoutingTransitCallback): number {
     const evaluatorIndex = this.nextEvaluatorIndex++;
     this.evaluatorCallbacks.set(evaluatorIndex, callback);
     return evaluatorIndex;
   }
 
-  SetArcCostEvaluatorOfAllVehicles(evaluatorIndex: number): void {
+  setArcCostEvaluatorOfAllVehicles(evaluatorIndex: number): void {
     this.arcCostEvaluatorIndex = evaluatorIndex;
   }
 
@@ -558,27 +438,30 @@ export class RoutingModel {
     initialAssignment?: { routes: number[][]; ignoreInactiveIndices: boolean },
   ): Promise<Assignment | null> {
     if (options.signal?.aborted) throw routingAbortError(options.signal);
-    const dimension = this.manager.GetNumberOfIndices();
-    const request = create(RoutingBridgeRequestSchema, {
+    const dimension = this.manager.getNumberOfIndices();
+    const request = {
       numLocations: this.manager.numLocations,
       numVehicles: this.manager.numVehicles,
       starts: this.manager.starts,
       ends: this.manager.ends,
       firstSolutionStrategy: parameters.firstSolutionStrategy ?? 0,
-      solutionLimit: BigInt(parameters.solution_limit ?? 0),
-      transitMatrix: bridgeMatrix(this.buildTransitMatrix(), dimension),
-      operations: this.operations.map((operation) => bridgeOperation(operation, dimension)),
+      solutionLimit: parameters.solutionLimit ?? 0,
+      transitMatrix: this.buildTransitMatrix(),
+      transitMatrixDimension: dimension,
+      operations: this.operations,
       dimensionNames: [...this.dimensions.keys()],
       initialAssignment: initialAssignment
-        ? create(RoutingInitialAssignmentSchema, {
-            routes: initialAssignment.routes.map((indices) => create(RoutingRouteSchema, {
-              indices: indices.map(BigInt),
-            })),
-            ignoreInactiveIndices: initialAssignment.ignoreInactiveIndices,
-          })
+        ? {
+          routes: initialAssignment.routes.map((indices) => [...indices]),
+          ignoreInactiveIndices: initialAssignment.ignoreInactiveIndices,
+        }
         : undefined,
-    });
-    const job = executor.execute(request, { onEvent: options.onEvent ?? (() => {}) });
+    };
+    const executor = createRoutingExecutor(options.executor);
+    const job = executor.execute(
+      { type: 'solve', request, interruptible: Boolean(options.signal) },
+      { onEvent: options.onEvent ?? (() => {}) },
+    );
     const onAbort = () => { void job.cancel().catch(() => {}); };
     options.signal?.addEventListener('abort', onAbort, { once: true });
     let response;
@@ -588,32 +471,25 @@ export class RoutingModel {
     } finally {
       options.signal?.removeEventListener('abort', onAbort);
     }
-    const result: RoutingSolveResult | null = response.hasSolution ? {
-      status: response.status,
-      objectiveValue: Number(response.objectiveValue),
-      nextValues: response.nextValues.map(Number),
-      starts: response.starts.map(Number),
-      ends: response.ends.map(Number),
-      dimensionCumulValues: Object.fromEntries(response.dimensions.map((item) => [item.name, item.cumulValues.map(Number)])),
-    } : null;
+    const result = response.solution;
     this.lastResult = result;
     this.lastStatus = result?.status ?? null;
     if (!result) return null;
     const assignment = new Assignment(this, result);
-    this.lastObjectiveValue = assignment.ObjectiveValue();
+    this.lastObjectiveValue = assignment.objectiveValue();
     this.runAtSolutionCallbacks();
     return assignment;
   }
 
-  async SolveWithParameters(
-    parameters: RoutingSearchParameters = DefaultRoutingSearchParameters(),
+  async solveWithParameters(
+    parameters: RoutingSearchParameters = defaultRoutingSearchParameters(),
     options: RoutingSolveOptions = {},
   ): Promise<Assignment | null> {
     return this.solveWithExecutor(parameters, options);
   }
 
-  async Solve(): Promise<Assignment | null> {
-    return this.SolveWithParameters(DefaultRoutingSearchParameters());
+  async solve(options: RoutingSolveOptions = {}): Promise<Assignment | null> {
+    return this.solveWithParameters(defaultRoutingSearchParameters(), options);
   }
 
   status(): RoutingSearchStatus {
@@ -621,42 +497,42 @@ export class RoutingModel {
   }
 
   vehicles(): number {
-    return this.manager.GetNumberOfVehicles();
+    return this.manager.getNumberOfVehicles();
   }
 
-  Start(vehicle: number): number {
-    return this.lastResult?.starts[vehicle] ?? this.manager.GetStartIndex(vehicle);
+  start(vehicle: number): number {
+    return this.lastResult?.starts[vehicle] ?? this.manager.getStartIndex(vehicle);
   }
 
-  End(vehicle: number): number {
-    return this.lastResult?.ends[vehicle] ?? this.manager.GetEndIndex(vehicle);
+  end(vehicle: number): number {
+    return this.lastResult?.ends[vehicle] ?? this.manager.getEndIndex(vehicle);
   }
 
-  IsEnd(index: number): boolean {
+  isEnd(index: number): boolean {
     return this.lastResult
       ? this.lastResult.ends.includes(index)
-      : this.manager.ends.some((_, vehicle) => this.manager.GetEndIndex(vehicle) === index);
+      : this.manager.ends.some((_, vehicle) => this.manager.getEndIndex(vehicle) === index);
   }
 
-  RegisterTransitMatrix(matrix: number[][]): number {
-    return this.RegisterTransitCallback((fromIndex, toIndex) => {
-      const fromNode = this.manager.IndexToNode(fromIndex);
-      const toNode = this.manager.IndexToNode(toIndex);
+  registerTransitMatrix(matrix: number[][]): number {
+    return this.registerTransitCallback((fromIndex, toIndex) => {
+      const fromNode = this.manager.indexToNode(fromIndex);
+      const toNode = this.manager.indexToNode(toIndex);
       return matrix[fromNode][toNode];
     });
   }
 
-  RegisterUnaryTransitCallback(callback: (fromIndex: number) => number): number {
-    return this.RegisterTransitCallback((fromIndex) => callback(fromIndex));
+  registerUnaryTransitCallback(callback: (fromIndex: number) => number): number {
+    return this.registerTransitCallback((fromIndex) => callback(fromIndex));
   }
 
-  RegisterUnaryTransitVector(values: number[]): number {
-    return this.RegisterUnaryTransitCallback((fromIndex) => {
-      return values[this.manager.IndexToNode(fromIndex)];
+  registerUnaryTransitVector(values: number[]): number {
+    return this.registerUnaryTransitCallback((fromIndex) => {
+      return values[this.manager.indexToNode(fromIndex)];
     });
   }
 
-  AddDimension(
+  addDimension(
     transitIndex: number,
     slackMax: number,
     capacity: number,
@@ -675,7 +551,7 @@ export class RoutingModel {
     return true;
   }
 
-  AddDimensionWithVehicleCapacity(
+  addDimensionWithVehicleCapacity(
     transitIndex: number,
     slackMax: number,
     capacities: number[],
@@ -694,7 +570,7 @@ export class RoutingModel {
     return true;
   }
 
-  AddDimensionWithVehicleTransits(
+  addDimensionWithVehicleTransits(
     transitIndices: number[],
     slackMax: number,
     capacity: number,
@@ -714,7 +590,7 @@ export class RoutingModel {
     return true;
   }
 
-  AddConstantDimension(
+  addConstantDimension(
     value: number,
     capacity: number,
     fixStartCumulToZero: boolean,
@@ -725,22 +601,22 @@ export class RoutingModel {
     return [this.nextEvaluatorIndex++, true];
   }
 
-  AddVectorDimension(values: number[], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
+  addVectorDimension(values: number[], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
     if (!this.addDimensionState(name)) return [-1, false];
     this.operations.push({ type: 'addVectorDimension', values, capacity, fixStartCumulToZero, name });
     return [this.nextEvaluatorIndex++, true];
   }
 
-  AddMatrixDimension(matrix: number[][], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
+  addMatrixDimension(matrix: number[][], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
     if (!this.addDimensionState(name)) return [-1, false];
     this.operations.push({ type: 'addMatrixDimension', matrix, capacity, fixStartCumulToZero, name });
     return [this.nextEvaluatorIndex++, true];
   }
 
-  GetDimensionOrDie(name: string): RoutingDimension {
+  getDimensionOrDie(name: string): RoutingDimension {
     const state = this.dimensions.get(name);
     if (!state) {
-      throw new Error(`RoutingModel.GetDimensionOrDie: unknown dimension '${name}'.`);
+      throw new Error(`RoutingModel.getDimensionOrDie: unknown dimension '${name}'.`);
     }
     return new RoutingDimension(
       name,
@@ -762,34 +638,39 @@ export class RoutingModel {
     );
   }
 
-  AddDisjunction(indices: number[], penalty?: number): number {
+  addDisjunction(indices: number[], penalty?: number): number {
     this.operations.push({ type: 'addDisjunction', indices, penalty });
     return this.operations.length - 1;
   }
 
-  CloseModelWithParameters(parameters: RoutingSearchParameters): void {
+  closeModelWithParameters(parameters: RoutingSearchParameters): void {
     void parameters;
   }
 
-  GetNumberOfDecisionsInFirstSolution(parameters: RoutingSearchParameters): number {
+  getNumberOfDecisionsInFirstSolution(parameters: RoutingSearchParameters): number {
     return parameters.firstSolutionStrategy === FirstSolutionStrategy.SAVINGS
-      ? this.manager.GetNumberOfIndices()
+      ? this.manager.getNumberOfIndices()
       : 0;
   }
 
-  GetNumberOfRejectsInFirstSolution(parameters: RoutingSearchParameters): number {
+  getNumberOfRejectsInFirstSolution(parameters: RoutingSearchParameters): number {
     void parameters;
     return 0;
   }
 
-  async SolveFromAssignmentWithParameters(
+  async solveFromAssignmentWithParameters(
     assignment: Assignment,
     parameters: RoutingSearchParameters,
+    options: RoutingSolveOptions = {},
   ): Promise<Assignment | null> {
-    return this.solveWithExecutor(parameters, {}, initialRoutesForAssignment(assignment, this));
+    return this.solveWithExecutor(
+      parameters,
+      options,
+      initialRoutesForAssignment(assignment, this),
+    );
   }
 
-  ReadAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): Assignment {
+  readAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): Assignment {
     const result = this.resultFromRoutes(routes, ignoreInactiveIndices);
     this.lastResult = result;
     this.lastStatus = RoutingSearchStatus.ROUTING_SUCCESS;
@@ -802,33 +683,33 @@ export class RoutingModel {
     );
   }
 
-  GetAutomaticFirstSolutionStrategy(): FirstSolutionStrategy {
+  getAutomaticFirstSolutionStrategy(): FirstSolutionStrategy {
     return this.operations.some((operation) => operation.type === 'addPickupAndDelivery')
       ? FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
       : FirstSolutionStrategy.PATH_CHEAPEST_ARC;
   }
 
-  AddPickupAndDelivery(pickup: number, delivery: number): void {
+  addPickupAndDelivery(pickup: number, delivery: number): void {
     this.operations.push({ type: 'addPickupAndDelivery', pickup, delivery });
   }
 
-  AddAtSolutionCallback(callback: (() => void) | { __call__(): void }): void {
+  addAtSolutionCallback(callback: (() => void) | { __call__(): void }): void {
     this.atSolutionCallbacks.push(typeof callback === 'function' ? callback : () => callback.__call__());
   }
 
-  CostVar(): { Max: () => number } {
-    return { Max: () => this.lastObjectiveValue };
+  costVar(): { max: () => number } {
+    return { max: () => this.lastObjectiveValue };
   }
 
   solver(): {
-    Parameters: () => { trace_propagation: boolean };
-    LocalSearchProfile: () => string;
-    Add: (...constraints: unknown[]) => void;
+    parameters: () => { tracePropagation: boolean };
+    localSearchProfile: () => string;
+    add: (...constraints: unknown[]) => void;
   } {
     return {
-      Parameters: () => ({ trace_propagation: this.parameters?.solver_parameters.trace_propagation ?? false }),
-      LocalSearchProfile: () => 'Local search profile is not exposed by the executor.',
-      Add: (...constraints) => {
+      parameters: () => ({ tracePropagation: this.parameters?.solverParameters.tracePropagation ?? false }),
+      localSearchProfile: () => 'Local search profile is not exposed by the executor.',
+      add: (...constraints) => {
         for (const constraint of constraints) {
           this.addSolverConstraint(constraint);
         }
@@ -836,11 +717,11 @@ export class RoutingModel {
     };
   }
 
-  NextVar(index: number): number {
+  nextVar(index: number): number {
     return index;
   }
 
-  VehicleVar(index: number): RoutingVehicleVar {
+  vehicleVar(index: number): RoutingVehicleVar {
     return { kind: 'routingVehicleVar', index };
   }
 
@@ -856,7 +737,7 @@ export class RoutingModel {
 
     if (isRoutingCumulLessOrEqualConstraint(constraint)) {
       if (constraint.left.dimensionName !== constraint.right.dimensionName) {
-        throw new Error('RoutingModel.solver().Add: cumul precedence constraints require the same dimension.');
+        throw new Error('RoutingModel.solver().add: cumul precedence constraints require the same dimension.');
       }
       this.operations.push({
         type: 'addCumulLessOrEqualConstraint',
@@ -867,9 +748,9 @@ export class RoutingModel {
     }
   }
 
-  GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number {
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number {
     void vehicle;
-    const dimension = this.manager.GetNumberOfIndices();
+    const dimension = this.manager.getNumberOfIndices();
     const matrix = this.buildTransitMatrix();
     return Number(matrix[fromIndex * dimension + toIndex]);
   }
@@ -884,14 +765,6 @@ export class RoutingModel {
 
   dimensionCumulValue(dimensionName: string, index: number): number {
     return this.lastResult?.dimensionCumulValues[dimensionName]?.[index] ?? 0;
-  }
-
-  delete() {
-    this.evaluatorCallbacks.clear();
-    this.operations.length = 0;
-    this.dimensions.clear();
-    this.lastResult = null;
-    this.lastStatus = null;
   }
 
   private addDimensionState(name: string): boolean {
@@ -928,7 +801,7 @@ export class RoutingModel {
   }
 
   private buildTransitMatrixFromCallback(callback: RoutingTransitCallback): BigInt64Array {
-    const dimension = this.manager.GetNumberOfIndices();
+    const dimension = this.manager.getNumberOfIndices();
     const matrix = new BigInt64Array(dimension * dimension);
     for (let from = 0; from < dimension; from++) {
       for (let to = 0; to < dimension; to++) {
@@ -939,10 +812,10 @@ export class RoutingModel {
   }
 
   private resultFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): RoutingSolveResult {
-    const dimension = this.manager.GetNumberOfIndices();
+    const dimension = this.manager.getNumberOfIndices();
     const nextValues = Array.from({ length: dimension }, (_, index) => index);
-    const starts = Array.from({ length: this.manager.numVehicles }, (_, vehicle) => this.manager.GetStartIndex(vehicle));
-    const ends = Array.from({ length: this.manager.numVehicles }, (_, vehicle) => this.manager.GetEndIndex(vehicle));
+    const starts = Array.from({ length: this.manager.numVehicles }, (_, vehicle) => this.manager.getStartIndex(vehicle));
+    const ends = Array.from({ length: this.manager.numVehicles }, (_, vehicle) => this.manager.getEndIndex(vehicle));
     const matrix = this.buildTransitMatrix();
     const assigned = new Set<number>();
     let objectiveValue = 0;
@@ -950,13 +823,13 @@ export class RoutingModel {
     const arcCost = (from: number, to: number) => Number(matrix[from * dimension + to]);
     const checkIndex = (index: number, label: string) => {
       if (!Number.isInteger(index) || index < 0 || index >= dimension) {
-        throw new Error(`RoutingModel.ReadAssignmentFromRoutes: ${label} index ${index} is out of range.`);
+        throw new Error(`RoutingModel.readAssignmentFromRoutes: ${label} index ${index} is out of range.`);
       }
       if (ends.includes(index)) {
-        throw new Error(`RoutingModel.ReadAssignmentFromRoutes: ${label} index ${index} is an end index.`);
+        throw new Error(`RoutingModel.readAssignmentFromRoutes: ${label} index ${index} is an end index.`);
       }
       if (assigned.has(index)) {
-        throw new Error(`RoutingModel.ReadAssignmentFromRoutes: ${label} index ${index} is duplicated.`);
+        throw new Error(`RoutingModel.readAssignmentFromRoutes: ${label} index ${index} is duplicated.`);
       }
       assigned.add(index);
     };
@@ -977,9 +850,9 @@ export class RoutingModel {
     if (!ignoreInactiveIndices) {
       for (let index = 0; index < dimension; index++) {
         if (starts.includes(index) || ends.includes(index) || assigned.has(index)) continue;
-        const node = this.manager.IndexToNode(index);
-        if (this.manager.NodeToIndex(node) === index) {
-          throw new Error(`RoutingModel.ReadAssignmentFromRoutes: node ${node} is not assigned to any route.`);
+        const node = this.manager.indexToNode(index);
+        if (this.manager.nodeToIndex(node) === index) {
+          throw new Error(`RoutingModel.readAssignmentFromRoutes: node ${node} is not assigned to any route.`);
         }
       }
     }

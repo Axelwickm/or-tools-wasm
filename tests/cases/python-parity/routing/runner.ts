@@ -3,8 +3,8 @@ import type { ExecutorFixtureMode } from '../../../harness/shared_case.ts';
 import {
   assertServerExecutorIsRunning,
   executorFixtureModes,
-  serverExecutorConfiguration,
 } from '../../../harness/shared_case.ts';
+import { setRoutingMode } from './execution.ts';
 
 export type RoutingCaseResult = {
   id: string;
@@ -23,80 +23,78 @@ export type RoutingCaseResult = {
 type RoutingIndexManagerLike = {
   numLocations: number;
   numVehicles: number;
-  IndexToNode(index: number): number;
-  NodeToIndex(node: number): number;
-  GetNumberOfNodes(): number;
-  GetNumberOfVehicles(): number;
-  GetNumberOfIndices(): number;
-  GetStartIndex(vehicle: number): number;
-  GetEndIndex(vehicle: number): number;
-  delete(): void;
+  indexToNode(index: number): number;
+  nodeToIndex(node: number): number;
+  getNumberOfNodes(): number;
+  getNumberOfVehicles(): number;
+  getNumberOfIndices(): number;
+  getStartIndex(vehicle: number): number;
+  getEndIndex(vehicle: number): number;
 };
 
 type RoutingAssignmentLike = {
-  ObjectiveValue(): number;
-  Value(index: unknown): number;
-  Min(index: unknown): number;
+  objectiveValue(): number;
+  value(index: unknown): number;
+  min(index: unknown): number;
 };
 
 type RoutingModelLike = {
-  RegisterTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
-  RegisterTransitMatrix(matrix: number[][]): number;
-  RegisterUnaryTransitCallback(callback: (fromIndex: number) => number): number;
-  RegisterUnaryTransitVector(values: number[]): number;
-  SetArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
-  Solve(): Promise<RoutingAssignmentLike | null>;
-  SolveWithParameters(parameters: { firstSolutionStrategy?: number; solution_limit?: number }): Promise<RoutingAssignmentLike | null>;
-  SolveFromAssignmentWithParameters(assignment: RoutingAssignmentLike, parameters: { firstSolutionStrategy?: number; solution_limit?: number }): Promise<RoutingAssignmentLike | null>;
-  ReadAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): RoutingAssignmentLike;
-  CloseModelWithParameters(parameters: { firstSolutionStrategy?: number; solution_limit?: number }): void;
-  GetNumberOfDecisionsInFirstSolution(parameters: { firstSolutionStrategy?: number; solution_limit?: number }): number;
-  GetNumberOfRejectsInFirstSolution(parameters: { firstSolutionStrategy?: number; solution_limit?: number }): number;
-  GetAutomaticFirstSolutionStrategy(): number;
-  AddAtSolutionCallback(callback: (() => void) | { __call__(): void }): void;
-  CostVar(): { Max(): number };
-  AddDimension(transitIndex: number, slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
-  AddDimensionWithVehicleCapacity(transitIndex: number, slackMax: number, capacities: number[], fixStartCumulToZero: boolean, name: string): boolean;
-  AddDimensionWithVehicleTransits(transitIndices: number[], slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
-  AddConstantDimension(value: number, capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean];
-  AddVectorDimension(values: number[], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean];
-  AddMatrixDimension(matrix: number[][], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean];
-  AddDisjunction(indices: number[], penalty?: number): number;
-  AddPickupAndDelivery(pickup: number, delivery: number): void;
-  GetDimensionOrDie(name: string): {
-    CumulVar(index: number): unknown;
-    HasSoftSpanUpperBounds(): boolean;
-    SetSoftSpanUpperBoundForVehicle(boundCost: { bound: number; cost: number }, vehicle: number): void;
-    GetSoftSpanUpperBoundForVehicle(vehicle: number): { bound: number; cost: number };
-    HasQuadraticCostSoftSpanUpperBounds(): boolean;
-    SetQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: { bound: number; cost: number }, vehicle: number): void;
-    GetQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): { bound: number; cost: number };
+  registerTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
+  registerTransitMatrix(matrix: number[][]): number;
+  registerUnaryTransitCallback(callback: (fromIndex: number) => number): number;
+  registerUnaryTransitVector(values: number[]): number;
+  setArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
+  solve(options?: unknown): Promise<RoutingAssignmentLike | null>;
+  solveWithParameters(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): Promise<RoutingAssignmentLike | null>;
+  solveFromAssignmentWithParameters(assignment: RoutingAssignmentLike, parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): Promise<RoutingAssignmentLike | null>;
+  readAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): RoutingAssignmentLike;
+  closeModelWithParameters(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): void;
+  getNumberOfDecisionsInFirstSolution(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): number;
+  getNumberOfRejectsInFirstSolution(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): number;
+  getAutomaticFirstSolutionStrategy(): number;
+  addAtSolutionCallback(callback: (() => void) | { __call__(): void }): void;
+  costVar(): { max(): number };
+  addDimension(transitIndex: number, slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
+  addDimensionWithVehicleCapacity(transitIndex: number, slackMax: number, capacities: number[], fixStartCumulToZero: boolean, name: string): boolean;
+  addDimensionWithVehicleTransits(transitIndices: number[], slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
+  addConstantDimension(value: number, capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean];
+  addVectorDimension(values: number[], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean];
+  addMatrixDimension(matrix: number[][], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean];
+  addDisjunction(indices: number[], penalty?: number): number;
+  addPickupAndDelivery(pickup: number, delivery: number): void;
+  getDimensionOrDie(name: string): {
+    cumulVar(index: number): unknown;
+    hasSoftSpanUpperBounds(): boolean;
+    setSoftSpanUpperBoundForVehicle(boundCost: { bound: number; cost: number }, vehicle: number): void;
+    getSoftSpanUpperBoundForVehicle(vehicle: number): { bound: number; cost: number };
+    hasQuadraticCostSoftSpanUpperBounds(): boolean;
+    setQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: { bound: number; cost: number }, vehicle: number): void;
+    getQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): { bound: number; cost: number };
   };
-  Start(vehicle: number): number;
-  End(vehicle: number): number;
-  IsEnd(index: number): boolean;
-  NextVar(index: number): number;
-  GetArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  start(vehicle: number): number;
+  end(vehicle: number): number;
+  isEnd(index: number): boolean;
+  nextVar(index: number): number;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
   status(): number;
   vehicles(): number;
   solver(): {
-    Parameters(): { trace_propagation: boolean };
-    LocalSearchProfile(): string;
-    Add(...constraints: unknown[]): void;
+    parameters(): { tracePropagation: boolean };
+    localSearchProfile(): string;
+    add(...constraints: unknown[]): void;
   };
-  delete(): void;
 };
 
 export type RoutingApi = {
-  DefaultRoutingSearchParameters(): { firstSolutionStrategy?: number; solution_limit?: number; local_search_operators?: Record<string, unknown>; local_search_metaheuristic?: number };
-  DefaultRoutingModelParameters(): {
-    solver_parameters: {
-      CopyFrom(value: unknown): void;
-      trace_propagation: boolean;
-      profile_local_search: boolean;
+  defaultRoutingSearchParameters(): { firstSolutionStrategy?: number; solutionLimit?: number; localSearchOperators?: Record<string, unknown>; localSearchMetaheuristic?: number };
+  defaultRoutingModelParameters(): {
+    solverParameters: {
+      copyFrom(value: unknown): void;
+      tracePropagation: boolean;
+      profileLocalSearch: boolean;
     };
   };
-  FindErrorInRoutingSearchParameters(parameters: unknown): string;
+  findErrorInRoutingSearchParameters(parameters: unknown): string;
   FirstSolutionStrategy: {
     PATH_CHEAPEST_ARC: number;
     FIRST_UNBOUND_MIN_VALUE: number;
@@ -107,7 +105,6 @@ export type RoutingApi = {
   BOOL_FALSE: number;
   BOOL_UNSPECIFIED: number;
   BoundCost: new (bound?: number, cost?: number) => { bound: number; cost: number };
-  initRouting(): Promise<void>;
   RoutingIndexManager: new (
     numLocations: number,
     numVehicles: number,
@@ -115,7 +112,6 @@ export type RoutingApi = {
     maybeEnds?: number[],
   ) => RoutingIndexManagerLike;
   RoutingModel: new (manager: never, parameters?: unknown) => RoutingModelLike;
-  setExecutor(configuration: { type: 'direct' | 'worker' } | ReturnType<typeof serverExecutorConfiguration>): void;
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -136,8 +132,7 @@ export async function runRoutingCases(
   if (modes.includes('server')) await assertServerExecutorIsRunning();
 
   for (const mode of modes) {
-    routingApi.setExecutor(mode === 'server' ? serverExecutorConfiguration() : { type: mode });
-    await routingApi.initRouting();
+    setRoutingMode(mode);
     for (const routingCase of routingContractCases) {
       options.onProgress?.(routingCase.name, mode);
       const message = await routingCase.run(routingApi as never);

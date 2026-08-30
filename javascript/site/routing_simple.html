@@ -47,16 +47,12 @@
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import {
-  DefaultRoutingSearchParameters,
+  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   RoutingIndexManager,
   RoutingModel,
-  setExecutor,
 } from 'or-tools-wasm/routing';
 
-setExecutor({ type: 'worker' });
-await initRouting();
 
 const locations = [
   { x: 480, y: 310 },
@@ -68,16 +64,16 @@ const locations = [
 
 const manager = new RoutingIndexManager(locations.length, 1, 0);
 const routing = new RoutingModel(manager);
-const transit = routing.RegisterTransitCallback((from, to) =&gt; {
-  const a = locations[manager.IndexToNode(from)];
-  const b = locations[manager.IndexToNode(to)];
+const transit = routing.registerTransitCallback((from, to) =&gt; {
+  const a = locations[manager.indexToNode(from)];
+  const b = locations[manager.indexToNode(to)];
   return Math.round(Math.hypot(a.x - b.x, a.y - b.y));
 });
-routing.SetArcCostEvaluatorOfAllVehicles(transit);
+routing.setArcCostEvaluatorOfAllVehicles(transit);
 
-const params = DefaultRoutingSearchParameters();
+const params = defaultRoutingSearchParameters();
 params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-const assignment = await routing.SolveWithParameters(params);</code></pre>
+const assignment = await routing.solveWithParameters(params, { executor: 'worker' });</code></pre>
 			</details>
 		</div>
 		<ul class="example-notes">

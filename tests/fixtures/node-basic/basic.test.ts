@@ -39,15 +39,13 @@ import {
   BOOL_FALSE,
   BOOL_UNSPECIFIED,
   BoundCost,
-  DefaultRoutingSearchParameters,
-  DefaultRoutingModelParameters,
-  FindErrorInRoutingSearchParameters,
+  defaultRoutingSearchParameters,
+  defaultRoutingModelParameters,
+  findErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
-  setExecutor as setRoutingExecutor,
 } from 'or-tools-wasm/routing';
 import { executorFixtureModes } from '../../harness/shared_case.ts';
 import assert from 'node:assert/strict';
@@ -64,6 +62,8 @@ import { runNetworkFlowCases } from '../../cases/python-parity/network_flow/inde
 import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { runRoutingCases } from '../../cases/python-parity/routing/runner.ts';
+import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
+import { runRoutingWorkerLifecycleCase } from '../../cases/or-tools-wasm/routing/worker_lifecycle.ts';
 import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 
 type NamedCaseResult = {
@@ -114,17 +114,23 @@ test('runs the shared Routing cases in Node', async (t) => {
     BOOL_FALSE,
     BOOL_UNSPECIFIED,
     BoundCost,
-    DefaultRoutingModelParameters,
-    DefaultRoutingSearchParameters,
-    FindErrorInRoutingSearchParameters,
+    defaultRoutingModelParameters,
+    defaultRoutingSearchParameters,
+    findErrorInRoutingSearchParameters,
     FirstSolutionStrategy,
-    initRouting,
     LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingIndexManager as never,
     RoutingModel: RoutingModel as never,
-    setExecutor: setRoutingExecutor,
   }, { modes: executorFixtureModes });
   await assertCaseResults(t, 'node routing', routingResults);
+});
+
+test('enforces the Routing worker job lifecycle in Node', async () => {
+  await runRoutingWorkerLifecycleCase({ RoutingIndexManager, RoutingModel } as never);
+});
+
+test('enforces Routing local solve concurrency in Node', async () => {
+  await runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never);
 });
 
 test('runs the shared MPSolver cases in Node', async (t) => {

@@ -1,13 +1,17 @@
 import {
-  DefaultRoutingSearchParameters,
+  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   RoutingIndexManager,
   RoutingModel,
-  setExecutor,
 } from 'or-tools-wasm/routing';
-import { appendStatus, extractRoutes, setRunning, type RouteSummary } from './routing_helpers.js';
-import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import {
+  appendStatus,
+  configureRoutingExecutor,
+  currentRoutingExecutionOptions,
+  extractRoutes,
+  setRunning,
+  type RouteSummary,
+} from './routing_helpers.js';
 
 type Priority = 'standard' | 'express' | 'critical';
 
@@ -57,7 +61,7 @@ const priorityPenalty = {
 let stops: Stop[] = [];
 let vehicles: Vehicle[] = [];
 
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+configureRoutingExecutor(executorSelector);
 
 const deliveryCount = () => {
   const value = Number.parseInt(deliveryCountInput?.value ?? '60', 10);
@@ -344,24 +348,21 @@ async function runDispatch() {
   renderMap();
   try {
     appendStatus(statusEl, 'Initializing routing runtime...');
-    await initRouting();
-
     const vehicleTotal = vehicleCount();
     const starts = Array.from({ length: vehicleTotal }, (_, index) => index);
     const manager = new RoutingIndexManager(stops.length, vehicleTotal, starts, starts);
     const routing = new RoutingModel(manager);
-    try {
-      const distanceCallbackIndex = routing.RegisterTransitCallback((fromIndex, toIndex) => {
-        const fromNode = manager.IndexToNode(fromIndex);
-        const toNode = manager.IndexToNode(toIndex);
+    const distanceCallbackIndex = routing.registerTransitCallback((fromIndex, toIndex) => {
+        const fromNode = manager.indexToNode(fromIndex);
+        const toNode = manager.indexToNode(toIndex);
         return distance(fromNode, toNode);
       });
-      routing.SetArcCostEvaluatorOfAllVehicles(distanceCallbackIndex);
+      routing.setArcCostEvaluatorOfAllVehicles(distanceCallbackIndex);
 
-      const demandCallbackIndex = routing.RegisterUnaryTransitCallback((fromIndex) => {
-        return stops[manager.IndexToNode(fromIndex)].demand;
+      const demandCallbackIndex = routing.registerUnaryTransitCallback((fromIndex) => {
+        return stops[manager.indexToNode(fromIndex)].demand;
       });
-      const capacityAdded = routing.AddDimensionWithVehicleCapacity(
+      const capacityAdded = routing.addDimensionWithVehicleCapacity(
         demandCallbackIndex,
         0,
         vehicles.map((vehicle) => vehicle.capacity),
@@ -370,19 +371,22 @@ async function runDispatch() {
       );
       if (!capacityAdded) throw new Error('Could not add vehicle capacity dimension.');
 
-      const distanceAdded = routing.AddDimension(distanceCallbackIndex, 0, distanceCap(), true, 'distance');
+      const distanceAdded = routing.addDimension(distanceCallbackIndex, 0, distanceCap(), true, 'distance');
       if (!distanceAdded) throw new Error('Could not add route distance dimension.');
 
       for (let node = vehicleTotal; node < stops.length; node++) {
-        routing.AddDisjunction([manager.NodeToIndex(node)], priorityPenalty[stops[node].priority]);
+        routing.addDisjunction([manager.nodeToIndex(node)], priorityPenalty[stops[node].priority]);
       }
 
-      const searchParameters = DefaultRoutingSearchParameters();
+      const searchParameters = defaultRoutingSearchParameters();
       searchParameters.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-      searchParameters.solution_limit = 1;
+      searchParameters.solutionLimit = 1;
 
       appendStatus(statusEl, 'Solving capacitated multi-depot vehicle routes...');
-      const assignment = await routing.SolveWithParameters(searchParameters);
+      const assignment = await routing.solveWithParameters(
+        searchParameters,
+        currentRoutingExecutionOptions(),
+      );
       if (!assignment) {
         if (routeOutput) routeOutput.textContent = 'No solution found.';
         appendStatus(statusEl, 'No solution found.');
@@ -394,15 +398,11 @@ async function runDispatch() {
       renderDispatchSummary(routes, dropped);
       renderDispatchRoutes(routes, dropped);
       renderMap(routes, dropped, true);
-      appendStatus(statusEl, `Objective: ${assignment.ObjectiveValue()}`);
+      appendStatus(statusEl, `Objective: ${assignment.objectiveValue()}`);
       appendStatus(statusEl, `Total distance: ${routes.reduce((sum, route) => sum + route.distance, 0)}m`);
       appendStatus(statusEl, `Vehicle loads: ${routes.map((route) => `${route.load}/${route.capacity}`).join(', ')}`);
       appendStatus(statusEl, `Dropped stops: ${dropped.length}`);
       appendStatus(statusEl, 'Capacity, maximum route distance, and optional drop penalties are active.');
-    } finally {
-      routing.delete();
-      manager.delete();
-    }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);
   } finally {

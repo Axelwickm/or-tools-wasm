@@ -1,13 +1,17 @@
 import {
-  DefaultRoutingSearchParameters,
+  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   RoutingIndexManager,
   RoutingModel,
-  setExecutor,
 } from 'or-tools-wasm/routing';
-import { appendStatus, extractRoutes, renderRouteList, setRunning } from './routing_helpers.js';
-import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import {
+  appendStatus,
+  configureRoutingExecutor,
+  currentRoutingExecutionOptions,
+  extractRoutes,
+  renderRouteList,
+  setRunning,
+} from './routing_helpers.js';
 
 const routeOutput = document.getElementById('route-output');
 const statusEl = document.getElementById('status');
@@ -28,7 +32,7 @@ const mapHeight = 620;
 const depotLocation: Location = { name: 'Depot', x: mapWidth / 2, y: mapHeight / 2 };
 let locations: Location[] = [];
 
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+configureRoutingExecutor(executorSelector);
 
 const destinationCount = () => {
   const value = Number.parseInt(nodeCountInput?.value ?? '20', 10);
@@ -144,28 +148,27 @@ async function runSimpleRouting() {
   }
   renderMap();
   try {
-    appendStatus(statusEl, 'Initializing routing runtime...');
-    await initRouting();
-
     const numLocations = locations.length;
     const numVehicles = 1;
     const depot = 0;
     const manager = new RoutingIndexManager(numLocations, numVehicles, depot);
     const routing = new RoutingModel(manager);
 
-    try {
-      const transitCallbackIndex = routing.RegisterTransitCallback((fromIndex, toIndex) => {
-        const fromNode = manager.IndexToNode(fromIndex);
-        const toNode = manager.IndexToNode(toIndex);
+    const transitCallbackIndex = routing.registerTransitCallback((fromIndex, toIndex) => {
+        const fromNode = manager.indexToNode(fromIndex);
+        const toNode = manager.indexToNode(toIndex);
         return distance(fromNode, toNode);
       });
-      routing.SetArcCostEvaluatorOfAllVehicles(transitCallbackIndex);
+      routing.setArcCostEvaluatorOfAllVehicles(transitCallbackIndex);
 
-      const searchParameters = DefaultRoutingSearchParameters();
+      const searchParameters = defaultRoutingSearchParameters();
       searchParameters.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 
       appendStatus(statusEl, 'Solving...');
-      const assignment = await routing.SolveWithParameters(searchParameters);
+      const assignment = await routing.solveWithParameters(
+        searchParameters,
+        currentRoutingExecutionOptions(),
+      );
       if (!assignment) {
         if (routeOutput) {
           routeOutput.textContent = 'No solution found.';
@@ -177,12 +180,8 @@ async function runSimpleRouting() {
       const routes = extractRoutes(manager, routing, assignment);
       renderRouteList(routeOutput, routes);
       renderMap(routes[0]?.nodes ?? null, true);
-      appendStatus(statusEl, `Objective: ${assignment.ObjectiveValue()}`);
+      appendStatus(statusEl, `Objective: ${assignment.objectiveValue()}`);
       appendStatus(statusEl, `Distance of the route: ${routes[0]?.distance ?? 0}m`);
-    } finally {
-      routing.delete();
-      manager.delete();
-    }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);
   } finally {

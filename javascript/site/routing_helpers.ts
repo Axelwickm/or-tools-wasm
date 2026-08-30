@@ -1,4 +1,11 @@
-import { type Assignment, type RoutingIndexManager, type RoutingModel } from 'or-tools-wasm/routing';
+import {
+  type Assignment,
+  type ExecutorConfiguration,
+  type RoutingIndexManager,
+  type RoutingModel,
+  type RoutingSolveOptions,
+} from 'or-tools-wasm/routing';
+import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 
 export type RouteSummary = {
   vehicle: number;
@@ -6,6 +13,16 @@ export type RouteSummary = {
   distance: number;
   used: boolean;
 };
+
+let readRoutingExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
+
+export function configureRoutingExecutor(selector: HTMLSelectElement | null): void {
+  readRoutingExecutor = configureSolverExecutorSelector(null, selector);
+}
+
+export function currentRoutingExecutionOptions(): RoutingSolveOptions {
+  return { executor: readRoutingExecutor() };
+}
 
 export function appendStatus(statusEl: HTMLElement | null, text: string) {
   if (statusEl) {
@@ -25,18 +42,18 @@ export function extractRoutes(
   assignment: Assignment,
 ): RouteSummary[] {
   const routes: RouteSummary[] = [];
-  for (let vehicle = 0; vehicle < manager.GetNumberOfVehicles(); vehicle++) {
-    let index = routing.Start(vehicle);
-    const nodes = [manager.IndexToNode(index)];
+  for (let vehicle = 0; vehicle < manager.getNumberOfVehicles(); vehicle++) {
+    let index = routing.start(vehicle);
+    const nodes = [manager.indexToNode(index)];
     let distance = 0;
     let step = 0;
-    while (!routing.IsEnd(index)) {
+    while (!routing.isEnd(index)) {
       const previousIndex = index;
-      index = assignment.Value(routing.NextVar(index));
-      distance += routing.GetArcCostForVehicle(previousIndex, index, vehicle);
-      nodes.push(manager.IndexToNode(index));
+      index = assignment.value(routing.nextVar(index));
+      distance += routing.getArcCostForVehicle(previousIndex, index, vehicle);
+      nodes.push(manager.indexToNode(index));
       step++;
-      if (step > manager.GetNumberOfIndices() + manager.GetNumberOfVehicles()) {
+      if (step > manager.getNumberOfIndices() + manager.getNumberOfVehicles()) {
         throw new Error(`Route ${vehicle} did not terminate.`);
       }
     }

@@ -4,18 +4,26 @@ export {
   BOOL_TRUE,
   BOOL_UNSPECIFIED,
   BoundCost,
-  DefaultRoutingModelParameters,
-  DefaultRoutingSearchParameters,
-  FindErrorInRoutingSearchParameters,
+  defaultRoutingModelParameters,
+  defaultRoutingSearchParameters,
+  findErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   LocalSearchMetaheuristic,
   RoutingDimension,
   RoutingIndexManager,
   RoutingModel,
   RoutingSearchStatus,
-  setRoutingExecutor as setExecutor,
 } from './routing/api.js';
+export { CloudExecutorUnavailableError } from './cloud_executor.js';
 export type { RoutingEvent, RoutingModelParameters, RoutingSearchParameters, RoutingSolveOptions } from './routing/api.js';
-export type { ExecutorConfiguration } from './executor_configuration.js';
+export type { SolverJobEvent } from './solver_executor.js';
+export type {
+  AutoExecutorConfiguration,
+  CloudExecutorConfiguration,
+  DirectExecutorConfiguration,
+  ExecutorConfiguration,
+  ExecutorSelection,
+  ServerExecutorConfiguration,
+  WorkerExecutorConfiguration,
+} from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';

@@ -1,13 +1,18 @@
 import {
-  DefaultRoutingSearchParameters,
+  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
-  initRouting,
   RoutingIndexManager,
   RoutingModel,
-  setExecutor,
 } from 'or-tools-wasm/routing';
-import { appendStatus, extractRoutes, renderRouteList, setRunning, type RouteSummary } from './routing_helpers.js';
-import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import {
+  appendStatus,
+  configureRoutingExecutor,
+  currentRoutingExecutionOptions,
+  extractRoutes,
+  renderRouteList,
+  setRunning,
+  type RouteSummary,
+} from './routing_helpers.js';
 
 type Location = {
   name: string;
@@ -31,7 +36,7 @@ const routeColors = ['#0969da', '#cf222e', '#1a7f37', '#8250df', '#bf8700', '#d1
 const routeRevealSeconds = 2;
 let locations: Location[] = [];
 
-configureSolverExecutorSelector({ setExecutor }, executorSelector);
+configureRoutingExecutor(executorSelector);
 
 const destinationCount = () => {
   const value = Number.parseInt(destinationCountInput?.value ?? '60', 10);
@@ -164,22 +169,19 @@ async function runVrp() {
   renderMap();
   try {
     appendStatus(statusEl, 'Initializing routing runtime...');
-    await initRouting();
-
     const manager = new RoutingIndexManager(locations.length, vehicleCount(), 0);
     const routing = new RoutingModel(manager);
-    try {
-      const transitCallbackIndex = routing.RegisterTransitCallback((fromIndex, toIndex) => {
-        const fromNode = manager.IndexToNode(fromIndex);
-        const toNode = manager.IndexToNode(toIndex);
+    const transitCallbackIndex = routing.registerTransitCallback((fromIndex, toIndex) => {
+        const fromNode = manager.indexToNode(fromIndex);
+        const toNode = manager.indexToNode(toIndex);
         return distance(fromNode, toNode);
       });
-      routing.SetArcCostEvaluatorOfAllVehicles(transitCallbackIndex);
+      routing.setArcCostEvaluatorOfAllVehicles(transitCallbackIndex);
 
-      const demandCallbackIndex = routing.RegisterUnaryTransitCallback((fromIndex) => {
-        return manager.IndexToNode(fromIndex) === 0 ? 0 : 1;
+      const demandCallbackIndex = routing.registerUnaryTransitCallback((fromIndex) => {
+        return manager.indexToNode(fromIndex) === 0 ? 0 : 1;
       });
-      const capacityAdded = routing.AddDimensionWithVehicleCapacity(
+      const capacityAdded = routing.addDimensionWithVehicleCapacity(
         demandCallbackIndex,
         0,
         Array(vehicleCount()).fill(vehicleCapacity()),
@@ -190,11 +192,14 @@ async function runVrp() {
         throw new Error('Could not add vehicle load dimension.');
       }
 
-      const searchParameters = DefaultRoutingSearchParameters();
+      const searchParameters = defaultRoutingSearchParameters();
       searchParameters.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 
       appendStatus(statusEl, 'Solving...');
-      const assignment = await routing.SolveWithParameters(searchParameters);
+      const assignment = await routing.solveWithParameters(
+        searchParameters,
+        currentRoutingExecutionOptions(),
+      );
       if (!assignment) {
         if (routeOutput) routeOutput.textContent = 'No solution found.';
         appendStatus(statusEl, 'No solution found.');
@@ -204,14 +209,10 @@ async function runVrp() {
       const routes = extractRoutes(manager, routing, assignment);
       renderRouteList(routeOutput, routes);
       renderMap(routes, true);
-      appendStatus(statusEl, `Objective: ${assignment.ObjectiveValue()}`);
+      appendStatus(statusEl, `Objective: ${assignment.objectiveValue()}`);
       appendStatus(statusEl, `Total distance: ${routes.reduce((sum, route) => sum + route.distance, 0)}m`);
       appendStatus(statusEl, `Active vehicles: ${routes.filter((route) => route.used).length}/${vehicleCount()}`);
       appendStatus(statusEl, `Vehicle capacity: ${vehicleCapacity()} destinations`);
-    } finally {
-      routing.delete();
-      manager.delete();
-    }
   } catch (error) {
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);
   } finally {

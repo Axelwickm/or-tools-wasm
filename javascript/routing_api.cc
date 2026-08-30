@@ -1,7 +1,10 @@
 // Minimal C API surface for routing over WASM.
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -38,6 +41,34 @@ int g_next_manager_handle = 1;
 int g_next_model_handle = 1;
 std::unordered_map<int, std::unique_ptr<RoutingIndexManager>> g_managers;
 std::unordered_map<int, RoutingModelHandle> g_models;
+std::atomic<bool> g_routing_interrupt_requested = false;
+
+class ResetRoutingInterruptOnExit {
+ public:
+  ~ResetRoutingInterruptOnExit() {
+    g_routing_interrupt_requested.store(false);
+  }
+};
+
+template <typename Solve>
+const Assignment* SolveInterruptibly(RoutingModel* model,
+                                     int enable_interrupt,
+                                     Solve&& solve) {
+  if (enable_interrupt == 0) return solve();
+  std::atomic<bool> solve_finished = false;
+  std::thread interrupt_thread([model, &solve_finished] {
+    while (!solve_finished.load()) {
+      if (g_routing_interrupt_requested.load()) {
+        model->solver()->FinishCurrentSearch();
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  });
+  const Assignment* assignment = solve();
+  solve_finished.store(true);
+  interrupt_thread.join();
+  return assignment;
+}
 
 RoutingIndexManager* GetManager(int handle) {
   const auto it = g_managers.find(handle);
@@ -107,6 +138,10 @@ EM_JS(int64_t, CallRoutingTransitCallback,
 }  // namespace
 
 extern "C" {
+
+EMSCRIPTEN_KEEPALIVE uintptr_t routing_interrupt_address() {
+  return reinterpret_cast<uintptr_t>(&g_routing_interrupt_requested);
+}
 
 EMSCRIPTEN_KEEPALIVE int routing_create_index_manager(int num_locations,
                                                       int num_vehicles,
@@ -345,22 +380,27 @@ EMSCRIPTEN_KEEPALIVE int routing_status(int model_handle) {
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_solve_with_parameters_ext(
-    int model_handle, int first_solution_strategy, int solution_limit);
+    int model_handle, int first_solution_strategy, int solution_limit,
+    int enable_interrupt);
 
 EMSCRIPTEN_KEEPALIVE int routing_solve_with_parameters(
     int model_handle, int first_solution_strategy) {
   return routing_solve_with_parameters_ext(model_handle, first_solution_strategy,
-                                           0);
+                                           0, 0);
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_solve_with_parameters_ext(
-    int model_handle, int first_solution_strategy, int solution_limit) {
+    int model_handle, int first_solution_strategy, int solution_limit,
+    int enable_interrupt) {
+  const ResetRoutingInterruptOnExit reset_interrupt;
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return 0;
 
   RoutingSearchParameters parameters =
       BuildSearchParameters(first_solution_strategy, solution_limit);
-  handle->assignment = handle->model->SolveWithParameters(parameters);
+  handle->assignment = SolveInterruptibly(
+      handle->model.get(), enable_interrupt,
+      [&] { return handle->model->SolveWithParameters(parameters); });
   return handle->assignment == nullptr ? 0 : 1;
 }
 
@@ -389,13 +429,20 @@ EMSCRIPTEN_KEEPALIVE int64_t routing_get_number_of_rejects_in_first_solution(
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_solve_from_assignment_with_parameters(
-    int model_handle, int first_solution_strategy, int solution_limit) {
+    int model_handle, int first_solution_strategy, int solution_limit,
+    int enable_interrupt) {
+  const ResetRoutingInterruptOnExit reset_interrupt;
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr || handle->assignment == nullptr) return 0;
   RoutingSearchParameters parameters =
       BuildSearchParameters(first_solution_strategy, solution_limit);
-  handle->assignment = handle->model->SolveFromAssignmentWithParameters(
-      handle->assignment, parameters);
+  const Assignment* initial_assignment = handle->assignment;
+  handle->assignment = SolveInterruptibly(
+      handle->model.get(), enable_interrupt,
+      [&] {
+        return handle->model->SolveFromAssignmentWithParameters(
+            initial_assignment, parameters);
+      });
   return handle->assignment == nullptr ? 0 : 1;
 }
 

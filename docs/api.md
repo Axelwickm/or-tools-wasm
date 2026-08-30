@@ -5,7 +5,7 @@ The package is ESM only:
 
 ```ts
 import { CpSat } from 'or-tools-wasm/cp-sat';
-import { initRouting, RoutingIndexManager, RoutingModel } from 'or-tools-wasm/routing';
+import { RoutingIndexManager, RoutingModel } from 'or-tools-wasm/routing';
 ```
 
 Most solver runtimes are loaded lazily. Browser solves use the package worker
@@ -465,47 +465,45 @@ Import:
 import {
   Assignment,
   BoundCost,
-  DefaultRoutingModelParameters,
-  initRouting,
+  defaultRoutingModelParameters,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
   RoutingModel,
   RoutingSearchStatus,
-  DefaultRoutingSearchParameters,
+  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
 } from 'or-tools-wasm/routing';
 ```
 
-Initialize the routing runtime before constructing routing objects when using
-the direct runtime path. In browser worker-bridge mode this is a no-op, but
-awaiting it keeps the same code portable across runtimes:
+Routing models are constructed synchronously. The WebAssembly runtime is loaded
+lazily when a solve starts:
 
 ```ts
-await initRouting();
-
 const manager = new RoutingIndexManager(distanceMatrix.length, 1, 0);
 const routing = new RoutingModel(manager);
-const transit = routing.RegisterTransitCallback((from, to) => {
-  return distanceMatrix[manager.IndexToNode(from)][manager.IndexToNode(to)];
+const transit = routing.registerTransitCallback((from, to) => {
+  return distanceMatrix[manager.indexToNode(from)][manager.indexToNode(to)];
 });
-routing.SetArcCostEvaluatorOfAllVehicles(transit);
+routing.setArcCostEvaluatorOfAllVehicles(transit);
 
-const params = DefaultRoutingSearchParameters();
+const params = defaultRoutingSearchParameters();
 params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-const assignment = await routing.SolveWithParameters(params);
+const assignment = await routing.solveWithParameters(params, {
+  executor: 'worker',
+});
 ```
 
 The Routing API is a high-level wrapper around the compiled OR-Tools Routing
-runtime. It keeps Python-style method names for parity with upstream examples
-and tests.
+runtime. Public methods use camelCase while preserving the corresponding Python
+Routing concepts.
 
-### Initialization
-
-`initRouting(): Promise<void>`
-
-Loads the routing WebAssembly runtime for direct solves. Construction of
-`RoutingIndexManager` or `RoutingModel` before this resolves will throw on
-direct runtime paths.
+`solve()`, `solveWithParameters()`, and
+`solveFromAssignmentWithParameters()` accept execution options containing
+`executor`, `signal`, and `onEvent`. Use the worker executor for cancellation;
+it interrupts the native Routing search and remains reusable afterward. Direct
+execution cannot stop native work already in progress. `onEvent` reports the
+shared job lifecycle; OR-Tools Routing does not expose native solution-progress
+callbacks through this bridge.
 
 ### `RoutingIndexManager`
 
@@ -518,22 +516,16 @@ new RoutingIndexManager(numLocations, numVehicles, starts, ends)
 
 Methods:
 
-- `indexToNode(index): Promise<number>`
-- `nodeToIndex(node): Promise<number>`
-- `indexToNodeSync(index): number`
-- `nodeToIndexSync(node): number`
-- `IndexToNode(index): number`
-- `NodeToIndex(node): number`
-- `GetNumberOfNodes(): number`
-- `GetNumberOfVehicles(): number`
-- `GetNumberOfIndices(): number`
-- `GetStartIndex(vehicle): number`
-- `GetEndIndex(vehicle): number`
-- `delete(): void`
+- `indexToNode(index): number`
+- `nodeToIndex(node): number`
+- `getNumberOfNodes(): number`
+- `getNumberOfVehicles(): number`
+- `getNumberOfIndices(): number`
+- `getStartIndex(vehicle): number`
+- `getEndIndex(vehicle): number`
 
 Properties:
 
-- `ready: Promise<void>`
 - `numLocations: number`
 - `numVehicles: number`
 - `starts: number[]`
@@ -550,53 +542,51 @@ const routing = new RoutingModel(manager, parameters?);
 
 Callbacks and costs:
 
-- `RegisterTransitCallback((fromIndex, toIndex) => number): number`
-- `RegisterTransitMatrix(matrix: number[][]): number`
-- `RegisterUnaryTransitCallback((fromIndex) => number): number`
-- `RegisterUnaryTransitVector(values: number[]): number`
-- `SetArcCostEvaluatorOfAllVehicles(evaluatorIndex): void`
-- `GetArcCostForVehicle(fromIndex, toIndex, vehicle): number`
+- `registerTransitCallback((fromIndex, toIndex) => number): number`
+- `registerTransitMatrix(matrix: number[][]): number`
+- `registerUnaryTransitCallback((fromIndex) => number): number`
+- `registerUnaryTransitVector(values: number[]): number`
+- `setArcCostEvaluatorOfAllVehicles(evaluatorIndex): void`
+- `getArcCostForVehicle(fromIndex, toIndex, vehicle): number`
 
 Dimensions:
 
-- `AddDimension(transitIndex, slackMax, capacity, fixStartCumulToZero, name): boolean`
-- `AddDimensionWithVehicleCapacity(transitIndex, slackMax, capacities, fixStartCumulToZero, name): boolean`
-- `AddDimensionWithVehicleTransits(transitIndices, slackMax, capacity, fixStartCumulToZero, name): boolean`
-- `AddConstantDimension(value, capacity, fixStartCumulToZero, name): [number, boolean]`
-- `AddVectorDimension(values, capacity, fixStartCumulToZero, name): [number, boolean]`
-- `AddMatrixDimension(matrix, capacity, fixStartCumulToZero, name): [number, boolean]`
-- `GetDimensionOrDie(name): RoutingDimension`
+- `addDimension(transitIndex, slackMax, capacity, fixStartCumulToZero, name): boolean`
+- `addDimensionWithVehicleCapacity(transitIndex, slackMax, capacities, fixStartCumulToZero, name): boolean`
+- `addDimensionWithVehicleTransits(transitIndices, slackMax, capacity, fixStartCumulToZero, name): boolean`
+- `addConstantDimension(value, capacity, fixStartCumulToZero, name): [number, boolean]`
+- `addVectorDimension(values, capacity, fixStartCumulToZero, name): [number, boolean]`
+- `addMatrixDimension(matrix, capacity, fixStartCumulToZero, name): [number, boolean]`
+- `getDimensionOrDie(name): RoutingDimension`
 
 Search and assignments:
 
-- `Solve(): Promise<Assignment | null>`
-- `SolveWithParameters(parameters): Promise<Assignment | null>`
-- `solveWithParametersSync(parameters): Assignment | null`
-- `SolveFromAssignmentWithParameters(assignment, parameters): Promise<Assignment | null>`
-- `ReadAssignmentFromRoutes(routes, ignoreInactiveIndices): Assignment`
-- `CloseModelWithParameters(parameters): void`
+- `solve(options?): Promise<Assignment | null>`
+- `solveWithParameters(parameters, options?): Promise<Assignment | null>`
+- `solveFromAssignmentWithParameters(assignment, parameters, options?): Promise<Assignment | null>`
+- `readAssignmentFromRoutes(routes, ignoreInactiveIndices): Assignment`
+- `closeModelWithParameters(parameters): void`
 - `status(): RoutingSearchStatus`
 
 Route structure and model helpers:
 
-- `Start(vehicle): number`
-- `End(vehicle): number`
-- `IsEnd(index): boolean`
-- `NextVar(index): number`
-- `VehicleVar(index): RoutingVehicleVar`
+- `start(vehicle): number`
+- `end(vehicle): number`
+- `isEnd(index): boolean`
+- `nextVar(index): number`
+- `vehicleVar(index): RoutingVehicleVar`
 - `vehicles(): number`
-- `AddDisjunction(indices, penalty?): number`
-- `AddPickupAndDelivery(pickup, delivery): void`
-- `AddAtSolutionCallback(callback): void`
-- `GetAutomaticFirstSolutionStrategy(): FirstSolutionStrategy`
-- `GetNumberOfDecisionsInFirstSolution(parameters): number`
-- `GetNumberOfRejectsInFirstSolution(parameters): number`
-- `CostVar(): { Max(): number }`
-- `solver(): { Parameters(): { trace_propagation: boolean }; LocalSearchProfile(): string; Add(...): void }`
-- `delete(): void`
+- `addDisjunction(indices, penalty?): number`
+- `addPickupAndDelivery(pickup, delivery): void`
+- `addAtSolutionCallback(callback): void`
+- `getAutomaticFirstSolutionStrategy(): FirstSolutionStrategy`
+- `getNumberOfDecisionsInFirstSolution(parameters): number`
+- `getNumberOfRejectsInFirstSolution(parameters): number`
+- `costVar(): { max(): number }`
+- `solver(): { parameters(): { tracePropagation: boolean }; localSearchProfile(): string; add(...): void }`
 
-`NextVar(index)` returns an opaque next-variable handle represented by the
-index. Pass that value to `assignment.Value(...)`. `VehicleVar(index)` returns
+`nextVar(index)` returns an opaque next-variable handle represented by the
+index. Pass that value to `assignment.value(...)`. `vehicleVar(index)` returns
 an opaque vehicle-variable handle for solver constraints.
 
 Advanced assignment helpers are also exposed for parity with the current
@@ -611,45 +601,45 @@ used through `Assignment`.
 
 ### Routing Solver Constraints
 
-`routing.solver().Add(...)` accepts the routing constraint objects currently
+`routing.solver().add(...)` accepts the routing constraint objects currently
 needed for pickup-and-delivery parity. JavaScript does not support Python-style
 operator overloading, so constraints are explicit objects:
 
 ```ts
-routing.AddPickupAndDelivery(pickupIndex, deliveryIndex);
+routing.addPickupAndDelivery(pickupIndex, deliveryIndex);
 
-routing.solver().Add({
+routing.solver().add({
   type: 'routingVehicleEquality',
-  left: routing.VehicleVar(pickupIndex),
-  right: routing.VehicleVar(deliveryIndex),
+  left: routing.vehicleVar(pickupIndex),
+  right: routing.vehicleVar(deliveryIndex),
 });
 
-const distance = routing.GetDimensionOrDie('distance');
-routing.solver().Add({
+const distance = routing.getDimensionOrDie('distance');
+routing.solver().add({
   type: 'routingCumulLessOrEqual',
-  left: distance.CumulVar(pickupIndex),
-  right: distance.CumulVar(deliveryIndex),
+  left: distance.cumulVar(pickupIndex),
+  right: distance.cumulVar(deliveryIndex),
 });
 ```
 
 Supported solver constraint object shapes:
 
-- `{ type: 'routingVehicleEquality', left: routing.VehicleVar(...), right: routing.VehicleVar(...) }`
-- `{ type: 'routingCumulLessOrEqual', left: dimension.CumulVar(...), right: dimension.CumulVar(...) }`
+- `{ type: 'routingVehicleEquality', left: routing.vehicleVar(...), right: routing.vehicleVar(...) }`
+- `{ type: 'routingCumulLessOrEqual', left: dimension.cumulVar(...), right: dimension.cumulVar(...) }`
 
 Unknown constraint objects are ignored by the compatibility shim.
 
 ### `RoutingDimension`
 
-- `CumulVar(index): RoutingCumulVar`
-- `HasSoftSpanUpperBounds(): boolean`
-- `SetSoftSpanUpperBoundForVehicle(boundCost, vehicle): void`
-- `GetSoftSpanUpperBoundForVehicle(vehicle): BoundCost`
-- `HasQuadraticCostSoftSpanUpperBounds(): boolean`
-- `SetQuadraticCostSoftSpanUpperBoundForVehicle(boundCost, vehicle): void`
-- `GetQuadraticCostSoftSpanUpperBoundForVehicle(vehicle): BoundCost`
+- `cumulVar(index): RoutingCumulVar`
+- `hasSoftSpanUpperBounds(): boolean`
+- `setSoftSpanUpperBoundForVehicle(boundCost, vehicle): void`
+- `getSoftSpanUpperBoundForVehicle(vehicle): BoundCost`
+- `hasQuadraticCostSoftSpanUpperBounds(): boolean`
+- `setQuadraticCostSoftSpanUpperBoundForVehicle(boundCost, vehicle): void`
+- `getQuadraticCostSoftSpanUpperBoundForVehicle(vehicle): BoundCost`
 
-`CumulVar(index)` returns an opaque cumul-variable handle for assignment reads
+`cumulVar(index)` returns an opaque cumul-variable handle for assignment reads
 and solver constraints.
 
 ### `BoundCost`
@@ -665,34 +655,34 @@ Fields:
 
 ### `Assignment`
 
-- `ObjectiveValue(): number`
-- `Value(indexOrVar): number`
-- `Min(indexOrVar): number`
+- `objectiveValue(): number`
+- `value(indexOrVar): number`
+- `min(indexOrVar): number`
 
-For `NextVar(index)`, pass the returned value into `assignment.Value()` to get
-the next index. For dimensions, pass `dimension.CumulVar(index)`.
+For `nextVar(index)`, pass the returned value into `assignment.value()` to get
+the next index. For dimensions, pass `dimension.cumulVar(index)`.
 
 ### Routing Parameters And Enums
 
-- `DefaultRoutingSearchParameters(): RoutingSearchParameters`
-- `DefaultRoutingModelParameters(): RoutingModelParameters`
-- `FindErrorInRoutingSearchParameters(params): string`
+- `defaultRoutingSearchParameters(): RoutingSearchParameters`
+- `defaultRoutingModelParameters(): RoutingModelParameters`
+- `findErrorInRoutingSearchParameters(params): string`
 - `BOOL_FALSE`, `BOOL_TRUE`, `BOOL_UNSPECIFIED`
 
 `RoutingSearchParameters` currently exposes the subset used by the bridge:
 
 - `firstSolutionStrategy?: FirstSolutionStrategy`
-- `solution_limit?: number`
-- `local_search_operators?: Record<string, unknown>`
-- `local_search_metaheuristic?: LocalSearchMetaheuristic`
+- `solutionLimit?: number`
+- `localSearchOperators?: Record<string, unknown>`
+- `localSearchMetaheuristic?: LocalSearchMetaheuristic`
 
 `RoutingModelParameters` exposes:
 
-- `solver_parameters.CopyFrom(value): void`
-- `solver_parameters.trace_propagation: boolean`
-- `solver_parameters.profile_local_search: boolean`
+- `solverParameters.copyFrom(value): void`
+- `solverParameters.tracePropagation: boolean`
+- `solverParameters.profileLocalSearch: boolean`
 
-`FindErrorInRoutingSearchParameters(params)` returns an empty string when the
+`findErrorInRoutingSearchParameters(params)` returns an empty string when the
 supported parameter subset is valid.
 
 `FirstSolutionStrategy` contains:
@@ -1667,8 +1657,8 @@ Variables:
 - `variablesList(): MathOptVariable[]`
 - `variables(): MathOptVariable[]`
 - `getNumVariables(): number`
-- `getNextVariableId(): number`
-- `ensureNextVariableIdAtLeast(id): void`
+- `getnextVariableId(): number`
+- `ensurenextVariableIdAtLeast(id): void`
 - `hasVariable(id): boolean`
 - `getVariable(id, validate?): MathOptVariable | undefined`
 
@@ -1999,14 +1989,3 @@ For raw protobuf workflows, use the schema helpers:
 
 - `CpSat.getSchemas()`
 - `MPSolver.getLinearSolverSchemas()`
-
-## Memory Management
-
-Objects backed by native WebAssembly handles expose `delete()` when explicit
-cleanup is supported:
-
-- `RoutingIndexManager.delete()`
-- `RoutingModel.delete()`
-
-For long-running applications that create many native objects, call `delete()`
-when a model is no longer needed.

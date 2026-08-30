@@ -124,6 +124,7 @@ message RoutingBridgeRequest {
   repeated RoutingModelOperation operations = 8;
   repeated string dimension_names = 9;
   RoutingInitialAssignment initial_assignment = 10;
+  bool interruptible = 11;
 }
 
 message RoutingDimensionValues {
