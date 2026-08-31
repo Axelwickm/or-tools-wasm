@@ -19,7 +19,7 @@ import { runRcpspConcurrencyCase } from '../../cases/or-tools-wasm/rcpsp/concurr
 import { runRoutingConcurrencyCase } from '../../cases/or-tools-wasm/routing/concurrency.ts';
 import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
 import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
-import { runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
+import { runSolverRestartCase, runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
 import { runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -33,6 +33,16 @@ await runBunFixture(async () => {
     { solver: 'set-cover', run: () => runSetCoverConcurrencyCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator }) },
     { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi) },
   ]);
+  await runSolverRestartCase([
+    { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+    { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase({ MathOpt } as never, PdlpApi as never) },
+    { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+    { solver: 'routing', run: () => runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never) },
+    { solver: 'knapsack', run: () => runKnapsackConcurrencyCase({ KnapsackSolver, KnapsackSolverType }) },
+    { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase({ SimpleMaxFlow }) },
+    { solver: 'set-cover', run: () => runSetCoverConcurrencyCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator }) },
+    { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi) },
+  ], terminateCpSatRuntimeThreads);
 }, async () => {
   await Promise.all([
     terminateCpSatRuntimeThreads(),

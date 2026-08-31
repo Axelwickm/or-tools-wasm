@@ -182,16 +182,23 @@ export function createRuntimeLoader(adapter: RuntimeLoaderAdapter) {
   }
 
   async function terminateLoadedRuntimeThreads(): Promise<void> {
-    const modules = await Promise.allSettled(Object.values(modulePromises));
-    for (const moduleResult of modules) {
-      if (moduleResult.status !== 'fulfilled') continue;
-      const module = moduleResult.value as RuntimeWithPthreads;
-      try {
-        if (Object.prototype.hasOwnProperty.call(module, 'PThread')) {
-          module.PThread?.terminateAllThreads?.();
+    const loadedModules = Object.entries(modulePromises);
+    const modules = await Promise.allSettled(loadedModules.map(([, module]) => module));
+    try {
+      for (const moduleResult of modules) {
+        if (moduleResult.status !== 'fulfilled') continue;
+        const module = moduleResult.value as RuntimeWithPthreads;
+        try {
+          if (Object.prototype.hasOwnProperty.call(module, 'PThread')) {
+            module.PThread?.terminateAllThreads?.();
+          }
+        } catch (error) {
+          if (!String(error).includes('PThread')) throw error;
         }
-      } catch (error) {
-        if (!String(error).includes('PThread')) throw error;
+      }
+    } finally {
+      for (const [key] of loadedModules) {
+        delete modulePromises[key as RuntimeKey];
       }
     }
   }

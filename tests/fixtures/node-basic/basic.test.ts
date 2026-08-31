@@ -77,7 +77,7 @@ import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/
 import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
 import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
 import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
-import { runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
+import { runSolverPeakConcurrencyCase, runSolverRestartCase, runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
 import { runMpSolverConcurrencyCase } from '../../cases/or-tools-wasm/mp_solver/concurrency.ts';
 
 type NamedCaseResult = {
@@ -261,6 +261,32 @@ test('runs the shared PDLP cases in Node', async (t) => {
 
 test('reuses every solver runtime across repeated operations in Node', async () => {
   await runSolverReuseCase([
+    { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+    { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase({ MathOpt } as never, PdlpApi as never) },
+    { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+    { solver: 'routing', run: () => runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never) },
+    { solver: 'knapsack', run: () => runKnapsackConcurrencyCase({ KnapsackSolver, KnapsackSolverType }) },
+    { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase({ SimpleMaxFlow }) },
+    { solver: 'set-cover', run: () => runSetCoverConcurrencyCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator }) },
+    { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi) },
+  ]);
+});
+
+test('restarts every solver runtime after thread teardown in Node', async () => {
+  await runSolverRestartCase([
+    { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+    { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase({ MathOpt } as never, PdlpApi as never) },
+    { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+    { solver: 'routing', run: () => runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never) },
+    { solver: 'knapsack', run: () => runKnapsackConcurrencyCase({ KnapsackSolver, KnapsackSolverType }) },
+    { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase({ SimpleMaxFlow }) },
+    { solver: 'set-cover', run: () => runSetCoverConcurrencyCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator }) },
+    { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi) },
+  ], CpSatApi.terminateLoadedRuntimeThreads);
+});
+
+test('runs every solver runtime concurrently in Node', async () => {
+  await runSolverPeakConcurrencyCase([
     { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
     { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase({ MathOpt } as never, PdlpApi as never) },
     { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },

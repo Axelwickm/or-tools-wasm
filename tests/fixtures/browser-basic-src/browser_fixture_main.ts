@@ -34,7 +34,7 @@ import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
 import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
 import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
-import { runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
+import { runSolverPeakConcurrencyCase, runSolverRestartCase, runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
 import type { BrowserFixtureGroup } from '../../harness/browser_groups.ts';
 
 type PackageModule = Record<string, any>;
@@ -71,6 +71,7 @@ type RunResult = {
 type WorkerStats = {
   total: number;
   pthread: number;
+  activePthread: number;
   executorWorkers: Record<string, number>;
   activeExecutorWorkers: Record<string, number>;
   executorWorkerRequests: Record<string, number>;
@@ -191,7 +192,7 @@ function installWorkerSpy() {
     name?: string;
     executor?: string;
   }> = [];
-  const terminations: Array<{ id: number; executor?: string }> = [];
+  const terminations: Array<{ id: number; executor?: string; pthread: boolean }> = [];
   const executorRequests: string[] = [];
   let nextWorkerId = 1;
 
@@ -217,7 +218,7 @@ function installWorkerSpy() {
     }) as Worker['postMessage'];
     const originalTerminate = worker.terminate.bind(worker);
     worker.terminate = (() => {
-      terminations.push({ id, executor });
+      terminations.push({ id, executor, pthread: name?.startsWith('em-pthread-') === true });
       return originalTerminate();
     }) as Worker['terminate'];
     return worker;
@@ -244,6 +245,8 @@ function installWorkerSpy() {
       return {
         total: creations.length,
         pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
+        activePthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length
+          - terminations.filter((termination) => termination.pthread).length,
         executorWorkers,
         activeExecutorWorkers,
         executorWorkerRequests,
@@ -278,6 +281,21 @@ async function runSelectedGroup<T>(
   if (selectedGroup && selectedGroup !== group) return undefined;
   setStatus({ ok: false, phase });
   return run();
+}
+
+async function terminateRuntimeThreads(apis: BrowserFixtureApis): Promise<void> {
+  const terminators = new Set([
+    apis.CpSatApi.terminateLoadedRuntimeThreads,
+    apis.RoutingApiModule.terminateLoadedRuntimeThreads,
+    apis.MPSolverApi.terminateLoadedRuntimeThreads,
+    apis.KnapsackApi.terminateLoadedRuntimeThreads,
+    apis.NetworkFlowApi.terminateLoadedRuntimeThreads,
+    apis.SetCoverApi.terminateLoadedRuntimeThreads,
+    apis.RcpspApi.terminateLoadedRuntimeThreads,
+    apis.MathOptApi.terminateLoadedRuntimeThreads,
+    apis.PdlpApi.terminateLoadedRuntimeThreads,
+  ]);
+  await Promise.all([...terminators].map((terminate) => terminate()));
 }
 
 export async function runBrowserFixture(apis: BrowserFixtureApis) {
@@ -418,6 +436,39 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
       { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi as never) },
     ]))
     : undefined;
+  const solverRestartResult = selectedGroup === null
+    ? await runWithWorkerStats(workerSpy, () => runSolverRestartCase([
+      { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+      { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase(MathOptApi as never, PdlpApi as never) },
+      { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+      { solver: 'routing', run: () => runRoutingConcurrencyCase(RoutingApiModule as never) },
+      { solver: 'knapsack', run: () => runKnapsackConcurrencyCase(KnapsackApi as never) },
+      { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase(NetworkFlowApi as never) },
+      { solver: 'set-cover', run: () => runSetCoverConcurrencyCase(SetCoverApi as never) },
+      { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi as never) },
+    ], CpSatApi.terminateLoadedRuntimeThreads))
+    : undefined;
+  const solverPeakConcurrencyResult = selectedGroup === null
+    ? await runWithWorkerStats(workerSpy, () => runSolverPeakConcurrencyCase([
+      { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+      { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase(MathOptApi as never, PdlpApi as never) },
+      { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+      { solver: 'routing', run: () => runRoutingConcurrencyCase(RoutingApiModule as never) },
+      { solver: 'knapsack', run: () => runKnapsackConcurrencyCase(KnapsackApi as never) },
+      { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase(NetworkFlowApi as never) },
+      { solver: 'set-cover', run: () => runSetCoverConcurrencyCase(SetCoverApi as never) },
+      { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi as never) },
+    ]))
+    : undefined;
+  if (solverPeakConcurrencyResult && solverPeakConcurrencyResult.after.activePthread > 28) {
+    throw new Error(`Peak solver load left ${solverPeakConcurrencyResult.after.activePthread} pthreads; expected at most 28.`);
+  }
+  if (solverPeakConcurrencyResult) {
+    await terminateRuntimeThreads(apis);
+    if (workerSpy.snapshot().activePthread !== 0) {
+      throw new Error('Runtime teardown left active Emscripten pthreads after the peak solver load.');
+    }
+  }
   const mpSolverConcurrencyResult = await runSelectedGroup(
     selectedGroup,
     'mp-solver',
@@ -548,6 +599,12 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     solverReuseResult: solverReuseResult?.result,
     solverReuseStatsBefore: solverReuseResult?.before,
     solverReuseStatsAfter: solverReuseResult?.after,
+    solverRestartResult: solverRestartResult?.result,
+    solverRestartStatsBefore: solverRestartResult?.before,
+    solverRestartStatsAfter: solverRestartResult?.after,
+    solverPeakConcurrencyResult: solverPeakConcurrencyResult?.result,
+    solverPeakConcurrencyStatsBefore: solverPeakConcurrencyResult?.before,
+    solverPeakConcurrencyStatsAfter: solverPeakConcurrencyResult?.after,
     mpSolverConcurrencyResult,
     mpSolverWorkerLifecycleResult: mpSolverWorkerLifecycleResult?.result,
     routingConcurrencyResult,
