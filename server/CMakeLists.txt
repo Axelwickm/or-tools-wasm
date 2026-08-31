@@ -12,10 +12,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
 find_package(PkgConfig REQUIRED)
+find_package(OpenSSL REQUIRED)
 pkg_search_module(CPP_HTTPLIB IMPORTED_TARGET cpp-httplib httplib)
 if(TARGET PkgConfig::CPP_HTTPLIB)
   add_library(server_cpp_httplib INTERFACE)
-  target_link_libraries(server_cpp_httplib INTERFACE PkgConfig::CPP_HTTPLIB)
+  target_link_libraries(server_cpp_httplib INTERFACE
+    PkgConfig::CPP_HTTPLIB
+    OpenSSL::SSL
+    OpenSSL::Crypto)
 else()
   FetchContent_Declare(
     cpp_httplib
@@ -23,7 +27,10 @@ else()
     GIT_TAG v0.27.0)
   FetchContent_MakeAvailable(cpp_httplib)
   add_library(server_cpp_httplib INTERFACE)
-  target_link_libraries(server_cpp_httplib INTERFACE httplib::httplib)
+  target_link_libraries(server_cpp_httplib INTERFACE
+    httplib::httplib
+    OpenSSL::SSL
+    OpenSSL::Crypto)
 endif()
 
 set(BUILD_CXX ON CACHE BOOL "Build OR-Tools C++ library" FORCE)

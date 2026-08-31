@@ -11,6 +11,7 @@ RUN apt-get update \
     g++ \
     git \
     libcpp-httplib-dev \
+    libssl-dev \
     ninja-build \
     pkg-config \
   && rm -rf /var/lib/apt/lists/*
