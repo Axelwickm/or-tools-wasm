@@ -106,7 +106,10 @@ export type CpSatLike = {
     response: SolverResponse | null;
     bytes: Uint8Array;
   }>;
-  validate(model: Uint8Array): Promise<{ ok: boolean; message: string }>;
+  validate(
+    model: Uint8Array,
+    options?: { executor?: CpSatExecutorSelection; signal?: AbortSignal },
+  ): Promise<{ ok: boolean; message: string }>;
   modelStats(model: Uint8Array): Promise<string>;
   createModel(model: CpModelProto): Promise<Uint8Array>;
 };
@@ -118,6 +121,7 @@ export function withCpSatExecutor(
   return {
     ...CpSat,
     solve: (model, options = {}) => CpSat.solve(model, { ...options, executor }),
+    validate: (model, options = {}) => CpSat.validate(model, { ...options, executor }),
   };
 }
 

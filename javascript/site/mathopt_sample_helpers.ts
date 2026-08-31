@@ -7,7 +7,6 @@ export const executorSelector = document.getElementById('solver-executor') as HT
 export const workerCountInput = document.getElementById('worker-count') as HTMLInputElement | null;
 export const runButton = document.getElementById('run') as HTMLButtonElement | null;
 export const selectedMathOptExecutor = configureSolverExecutorSelector(
-  null,
   executorSelector,
 );
 

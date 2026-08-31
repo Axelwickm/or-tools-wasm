@@ -19,6 +19,7 @@ else
   fi
   build_parallel_level="$((host_cores > 1 ? host_cores - 1 : 1))"
 fi
+export CMAKE_BUILD_PARALLEL_LEVEL="${build_parallel_level}"
 
 scripts/ensure-emsdk.sh
 source ./emsdk/emsdk_env.sh
@@ -26,6 +27,7 @@ source ./emsdk/emsdk_env.sh
 if [[ "${ORTOOLS_WASM_RECONFIGURE:-0}" == "1" || ! -f build/CMakeCache.txt ]]; then
   cmake -S . -B build \
     -DCMAKE_TOOLCHAIN_FILE="${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
+    -DBUILD_SHARED_LIBS=OFF \
     ${CMAKE_ARGS:-}
 fi
 

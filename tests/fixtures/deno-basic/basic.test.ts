@@ -7,6 +7,7 @@ import {
   MPSolver,
   MPSolverParameters,
 } from 'or-tools-wasm/mp-solver';
+import * as MPSolverApi from 'or-tools-wasm/mp-solver';
 import {
   KnapsackSolver,
   KnapsackSolverType,
@@ -42,6 +43,7 @@ import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/s
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
+import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
 import { runCloudExecutorCase } from '../../cases/or-tools-wasm/cloud_executor.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
 import { runKnapsackConcurrencyCase } from '../../cases/or-tools-wasm/knapsack/concurrency.ts';
@@ -65,6 +67,9 @@ import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
 import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
 import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
+import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
+import { runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
+import { runMpSolverConcurrencyCase } from '../../cases/or-tools-wasm/mp_solver/concurrency.ts';
 
 type NamedCaseResult = {
   id?: string;
@@ -97,6 +102,23 @@ Deno.test('enforces the CP-SAT worker job lifecycle in Deno', async () => {
 
 Deno.test('enforces CP-SAT local solve concurrency in Deno', async () => {
   await runCpSatConcurrencyCase(CpSatApi as never);
+});
+
+Deno.test('reuses CP-SAT threads across repeated solves in Deno', async () => {
+  await runCpSatThreadReuseCase(CpSat as never);
+});
+
+Deno.test('reuses every solver runtime across repeated operations in Deno', async () => {
+  await runSolverReuseCase([
+    { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+    { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase({ MathOpt } as never, PdlpApi as never) },
+    { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+    { solver: 'routing', run: () => runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never) },
+    { solver: 'knapsack', run: () => runKnapsackConcurrencyCase({ KnapsackSolver, KnapsackSolverType }) },
+    { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase({ SimpleMaxFlow }) },
+    { solver: 'set-cover', run: () => runSetCoverConcurrencyCase(SetCoverApi) },
+    { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi) },
+  ]);
 });
 
 Deno.test('enforces the Routing worker job lifecycle in Deno', async () => {

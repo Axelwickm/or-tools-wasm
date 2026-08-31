@@ -47,7 +47,7 @@ export function appendStatus(element: HTMLElement | null, message: string): void
 let readMPSolverExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 export function configureMPSolverExecutor(selector: HTMLSelectElement | null): void {
-  readMPSolverExecutor = configureSolverExecutorSelector(null, selector);
+  readMPSolverExecutor = configureSolverExecutorSelector(selector);
 }
 
 export function currentMPSolverExecutor(): 'direct' | 'worker' | 'server' {

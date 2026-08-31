@@ -1,10 +1,10 @@
-FROM mcr.microsoft.com/playwright:v1.60.0-noble
+FROM mcr.microsoft.com/playwright:v1.62.1-noble
 
 WORKDIR /bench
 
 COPY benchmarking/package/or-tools-wasm-local.tgz /tmp/or-tools-wasm-local.tgz
 RUN npm init -y \
-  && npm install --no-audit --no-fund /tmp/or-tools-wasm-local.tgz playwright-core@1.60.0
+  && npm install --no-audit --no-fund /tmp/or-tools-wasm-local.tgz playwright-core@1.62.1
 
 COPY Version.txt ./Version.txt
 COPY benchmarking ./benchmarking

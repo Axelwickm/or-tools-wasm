@@ -4,9 +4,6 @@ export type ExecutorConfiguration =
   | { type: 'worker' }
   | { type: 'cloud' }
   | { type: 'server'; url: string };
-type ExecutorApi = {
-  setExecutor(configuration: ExecutorConfiguration): void;
-};
 
 const SERVER_ENDPOINT_STORAGE_KEY = 'ortools-wasm.server-endpoint';
 const DEFAULT_SERVER_PORT = '17827';
@@ -79,7 +76,6 @@ function createServerSettings(selector: HTMLSelectElement) {
 }
 
 export function configureSolverExecutorSelector(
-  api: ExecutorApi | null,
   selector: HTMLSelectElement | null,
 ): () => ExecutorConfiguration {
   let configuration: ExecutorConfiguration = { type: 'direct' };
@@ -104,14 +100,12 @@ export function configureSolverExecutorSelector(
     serverSettings.settings.hidden = mode !== 'server';
     if (mode !== 'server') {
       configuration = { type: mode };
-      api?.setExecutor(configuration);
       return;
     }
 
     const endpoint = readEndpoint();
     if (endpoint) {
       configuration = { type: 'server', url: endpoint };
-      api?.setExecutor(configuration);
     }
   };
 
@@ -128,7 +122,6 @@ export function configureSolverExecutorSelector(
     }
     if (selector.value === 'server') {
       configuration = { type: 'server', url: endpoint };
-      api?.setExecutor(configuration);
     }
   });
   return () => configuration;

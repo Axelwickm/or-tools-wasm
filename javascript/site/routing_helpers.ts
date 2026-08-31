@@ -17,7 +17,7 @@ export type RouteSummary = {
 let readRoutingExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 export function configureRoutingExecutor(selector: HTMLSelectElement | null): void {
-  readRoutingExecutor = configureSolverExecutorSelector(null, selector);
+  readRoutingExecutor = configureSolverExecutorSelector(selector);
 }
 
 export function currentRoutingExecutionOptions(): RoutingSolveOptions {

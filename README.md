@@ -8,18 +8,19 @@ as multithreaded WebAssembly.
 
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Native Server](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml)
-[![Vite 7 dev Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Chromium&nameFilter=Vite%207%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Vite 7 dev Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20dev%20Firefox&nameFilter=Vite%207%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Vite 7 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20static%20Chromium&nameFilter=Vite%207%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Vite 7 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%207%20static%20Firefox&nameFilter=Vite%207%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 8 dev Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%208%20dev%20Chromium&nameFilter=Vite%208%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 8 dev Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%208%20dev%20Firefox&nameFilter=Vite%208%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 8 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%208%20static%20Chromium&nameFilter=Vite%208%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Vite 8 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Vite%208%20static%20Firefox&nameFilter=Vite%208%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Webpack 5 dev Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20dev%20Chromium&nameFilter=Webpack%205%20%2F%20dev%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Webpack 5 dev Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20dev%20Firefox&nameFilter=Webpack%205%20%2F%20dev%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Webpack 5 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Chromium&nameFilter=Webpack%205%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Webpack 5 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Webpack%205%20static%20Firefox&nameFilter=Webpack%205%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Rollup 4 static Chromium](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Chromium&nameFilter=Rollup%204%20%2F%20static%20%2F%20chromium)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Rollup 4 static Firefox](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Rollup%204%20static%20Firefox&nameFilter=Rollup%204%20%2F%20static%20%2F%20firefox)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Node 26.5.0](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Node%2026.5.0&nameFilter=Node%2026.5.0%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
-[![Deno 2.9.3](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno%202.9.3&nameFilter=Deno%202.9.3%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Node 24](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Node%2024&nameFilter=Node%2024%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Node 26.8.1](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Node%2026.8.1&nameFilter=Node%2026.8.1%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
+[![Deno 2.9.5](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno%202.9.5&nameFilter=Deno%202.9.5%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Bun 1.3.14](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Bun%201.3.14&nameFilter=Bun%201.3.14%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 
 [Try online in your browser](https://axelwickman.com/or-tools-wasm?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=try_online)
@@ -89,7 +90,7 @@ model.addLinearConstraint(desks.times(3).plus(tables.times(4)), 0, 12);
 model.maximize(desks.times(20).plus(tables.times(30)));
 
 const solver = new CpSolver();
-const status = await solver.solve(model, { numSearchWorkers: 1 });
+const status = await solver.solve(model, { numWorkers: 1 });
 
 console.log(solver.statusName(status));
 console.log({
@@ -103,9 +104,7 @@ Force CP-SAT to solve through its worker bridge when you want to keep solver
 work off the main thread:
 
 ```ts
-import { CpSat, CpModel, CpSolver } from 'or-tools-wasm/cp-sat';
-
-CpSat.setExecutor({ type: 'worker' });
+import { CpModel, CpSolver } from 'or-tools-wasm/cp-sat';
 
 const model = new CpModel();
 const x = model.newIntVar(0, 10, 'x');
@@ -114,7 +113,7 @@ model.add(x.ge(3));
 model.minimize(x);
 
 const solver = new CpSolver();
-await solver.solve(model, { numWorkers: 1 });
+await solver.solve(model, { numWorkers: 1, executor: 'worker' });
 
 console.log(solver.value(x));
 ```

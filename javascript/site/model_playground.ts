@@ -166,7 +166,7 @@ async function validateModel() {
   try {
     const modelBytes = await buildModelBytes();
     setStatus('Validating model...');
-    const validation = await CpSat.validate(modelBytes);
+    const validation = await CpSat.validate(modelBytes, { executor: selectedExecutor() });
     setResult(validation);
     setStatus(validation.ok ? 'Model is valid.' : 'Model is invalid.');
   } catch (error) {
@@ -190,6 +190,7 @@ async function solveModel() {
     setStatus('Solving...');
     const result = await CpSat.solve(modelBytes, {
       ...params,
+      executor: selectedExecutor(),
       eventMask: selectedEventMask(),
       onEvent: appendEvent,
       signal: controller.signal,
@@ -205,7 +206,7 @@ async function solveModel() {
   }
 }
 
-configureSolverExecutorSelector(CpSat, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
 loadSampleButton?.addEventListener('click', loadSample);
 validateButton?.addEventListener('click', () => {

@@ -174,4 +174,4 @@ sizeInput?.addEventListener('change', () => {
   resetView();
 });
 resetView();
-readNetworkFlowExecutor = configureSolverExecutorSelector(null, executorSelector);
+readNetworkFlowExecutor = configureSolverExecutorSelector(executorSelector);

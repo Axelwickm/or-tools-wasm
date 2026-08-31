@@ -8,11 +8,11 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "vite": "^7.2.4"
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
   },
   "dependencies": {
     "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-0.9.1.tgz",
-    "protobufjs": "^7.5.4"
+    "protobufjs": "^8.8.0"
   }
 }

@@ -331,4 +331,4 @@ coverageLegend?.addEventListener('pointerout', (event) => {
 
 renderMap();
 renderSolution();
-readSetCoverExecutor = configureSolverExecutorSelector(null, executorSelector);
+readSetCoverExecutor = configureSolverExecutorSelector(executorSelector);

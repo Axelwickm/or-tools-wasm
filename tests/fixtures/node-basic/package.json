@@ -9,7 +9,7 @@
     "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-0.9.1.tgz"
   },
   "devDependencies": {
-    "@types/node": "^20.14.15",
-    "typescript": "^5.9.3"
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2"
   }
 }

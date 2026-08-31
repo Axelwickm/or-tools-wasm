@@ -154,28 +154,27 @@
     "test:fixtures": "npm run test:fixtures:full"
   },
   "files": [
-    "build/javascript/lib/*.d.ts",
+    "build/javascript/lib/**/*.d.ts",
     "build/javascript/wasm",
     "build/javascript/browser",
     "build/javascript/node",
     "build/javascript/node-wasm"
   ],
   "dependencies": {
-    "@bufbuild/protobuf": "^2.12.0",
+    "@bufbuild/protobuf": "^2.14.0",
     "long": "^5.3.2",
-    "protobufjs": "^7.5.4"
+    "protobufjs": "^8.8.0"
   },
   "devDependencies": {
-    "@bufbuild/buf": "^1.70.0",
-    "@bufbuild/protoc-gen-es": "^2.12.0",
-    "@playwright/test": "^1.60.0",
-    "@types/node": "^20.14.15",
+    "@bufbuild/buf": "^1.72.0",
+    "@bufbuild/protoc-gen-es": "^2.14.0",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.4.0",
+    "@typescript/typescript6": "^6.0.2",
     "esbuild": "^0.27.7",
-    "typescript": "^5.9.3",
-    "vite": "^7.2.4",
-    "vite-plugin-dts": "^4.5.4",
-    "vite-plugin-top-level-await": "^1.6.0",
-    "vite-plugin-wasm": "^3.5.0"
+    "typescript": "^7.0.2",
+    "unplugin-dts": "^1.0.3",
+    "vite": "^8.2.2"
   },
   "keywords": [
     "or-tools",

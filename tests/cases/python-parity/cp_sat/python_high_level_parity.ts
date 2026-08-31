@@ -50,7 +50,7 @@ type HighLevelApi = {
   weightedSum(values: Iterable<unknown>, coeffs: Iterable<number>): any;
   rebuild_from_linear_expression_proto: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
   rebuildFromLinearExpressionProto?: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
-  setExecutor(configuration:
+  setFixtureExecutor(configuration:
     | { type: 'auto' | 'direct' | 'worker' }
     | { type: 'server'; url: string | URL; authToken?: string; statusIntervalMs?: number }
   ): void;
@@ -353,14 +353,14 @@ async function withCpSatExecutorMode<T>(
 ): Promise<T> {
   if (mode === 'server') {
     await assertServerExecutorIsRunning();
-    api.setExecutor(serverExecutorConfiguration());
+    api.setFixtureExecutor(serverExecutorConfiguration());
   } else {
-    api.setExecutor({ type: mode });
+    api.setFixtureExecutor({ type: mode });
   }
   try {
     return await run();
   } finally {
-    api.setExecutor({ type: 'auto' });
+    api.setFixtureExecutor({ type: 'auto' });
   }
 }
 

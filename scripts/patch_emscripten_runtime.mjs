@@ -80,6 +80,10 @@ for (const nodeRuntimePath of nodeRuntimePaths) {
 
 const webRuntimeReplacements = [
   [
+    'var ENVIRONMENT_IS_WEB=!!globalThis.window;var ENVIRONMENT_IS_WORKER=!!globalThis.WorkerGlobalScope;var ENVIRONMENT_IS_NODE=globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";var ENVIRONMENT_IS_SHELL=!ENVIRONMENT_IS_WEB&&!ENVIRONMENT_IS_NODE&&!ENVIRONMENT_IS_WORKER;var ENVIRONMENT_IS_PTHREAD=ENVIRONMENT_IS_WORKER&&globalThis.name?.startsWith("em-pthread");',
+    'var ORTOOLS_WASM_WEB_HOST=typeof Deno!=="undefined"||typeof Bun!=="undefined";var ORTOOLS_WASM_PTHREAD_URL=typeof import.meta.url==="string"&&import.meta.url.includes("?em-pthread=");var ORTOOLS_WASM_PTHREAD_MARKER=globalThis.__ORTOOLS_WASM_PTHREAD===true;if(ORTOOLS_WASM_WEB_HOST&&!globalThis.window&&!ORTOOLS_WASM_PTHREAD_URL&&!ORTOOLS_WASM_PTHREAD_MARKER)globalThis.window=globalThis;var ENVIRONMENT_IS_WEB=!!globalThis.window;var ENVIRONMENT_IS_WORKER=!!globalThis.WorkerGlobalScope||ORTOOLS_WASM_PTHREAD_URL||ORTOOLS_WASM_PTHREAD_MARKER;var ENVIRONMENT_IS_NODE=!ORTOOLS_WASM_WEB_HOST&&globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";var ENVIRONMENT_IS_SHELL=!ENVIRONMENT_IS_WEB&&!ENVIRONMENT_IS_NODE&&!ENVIRONMENT_IS_WORKER;var ENVIRONMENT_IS_PTHREAD=ENVIRONMENT_IS_WORKER&&(ORTOOLS_WASM_PTHREAD_URL||ORTOOLS_WASM_PTHREAD_MARKER||globalThis.name?.startsWith("em-pthread"));',
+  ],
+  [
     'var currentNodeVersion=typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
     'var currentNodeVersion=globalThis.__ORTOOLS_WASM_PTHREAD!==true&&typeof Deno==="undefined"&&typeof Bun==="undefined"&&typeof process!=="undefined"&&process.versions?.node?humanReadableVersionToPacked(process.versions.node):TARGET_NOT_SUPPORTED;',
   ],
@@ -115,6 +119,10 @@ const webRuntimeReplacements = [
     'var isPthread=globalThis.self?.name?.startsWith("em-pthread")||import.meta.url.includes("?em-pthread=");isPthread&&cpSatModule();',
     'var isPthread=globalThis.self?.name?.startsWith("em-pthread")||import.meta.url.includes("?em-pthread=")||globalThis.__ORTOOLS_WASM_PTHREAD===true;isPthread&&cpSatModule();',
   ],
+  [
+    'var isPthread=globalThis.name?.startsWith("em-pthread");isPthread&&cpSatModule();',
+    'var isPthread=globalThis.name?.startsWith("em-pthread")||import.meta.url.includes("?em-pthread=")||globalThis.__ORTOOLS_WASM_PTHREAD===true;isPthread&&cpSatModule();',
+  ],
 ];
 
 for (const runtimeName of runtimeNames) {
@@ -149,6 +157,10 @@ for (const webRuntimePath of webRuntimePaths) {
   runtime = patchJspiAsyncCtors(runtime);
   runtime = patchJspiInvokeTableEntries(runtime);
 
+  if (!runtime.includes('var ORTOOLS_WASM_WEB_HOST=')) {
+    throw new Error(`Unsupported Emscripten environment detection in ${webRuntimePath}`);
+  }
+
   if (runtime !== original) {
     await writeFile(webRuntimePath, runtime);
     console.log(`Patched ${path.basename(webRuntimePath)}: deno-bun-web-worker-runtime`);
@@ -172,6 +184,10 @@ function patchJspiAsyncCtors(runtime) {
 
 function patchJspiInvokeTableEntries(runtime) {
   if (!runtime.includes('WebAssembly.promising')) return runtime;
+  // Emscripten 6 instruments invoke_* imports itself with WebAssembly.Suspending.
+  // Turning those imports into async functions as well creates a second JSPI
+  // boundary and causes Deno to throw "trying to suspend JS frames".
+  if (runtime.includes('new WebAssembly.Suspending(original)')) return runtime;
   if (runtime.includes('var wasmTablePromisingMirror=[];')) return runtime;
 
   const tableEntryHelper =

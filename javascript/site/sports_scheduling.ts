@@ -49,7 +49,7 @@ if (workerInput) {
   workerInput.min = '1';
   workerInput.value = String(maxWorkerCount);
 }
-configureSolverExecutorSelector(CpSat, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
 function append(text: string) {
   if (statusEl) {
@@ -448,7 +448,7 @@ async function runSportsScheduling() {
       return;
     }
 
-    const validation = await CpSat.validate(model);
+    const validation = await CpSat.validate(model, { executor: selectedExecutor() });
     if (!validation.ok) {
       append(`Model invalid: ${validation.message}`);
       showScheduleMessage('Model invalid.');
@@ -467,7 +467,7 @@ async function runSportsScheduling() {
 
     append('Solving…');
     try {
-      const result = await CpSat.solve(model, params);
+      const result = await CpSat.solve(model, { ...params, executor: selectedExecutor() });
       const response = result.response;
       if (!response || !statusEl) {
         append('Solver returned no response.');

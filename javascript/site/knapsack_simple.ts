@@ -254,4 +254,4 @@ removeResourceButton?.addEventListener('click', removeResource);
 
 renderMatrix();
 renderSolution();
-readKnapsackExecutor = configureSolverExecutorSelector(null, executorSelector);
+readKnapsackExecutor = configureSolverExecutorSelector(executorSelector);

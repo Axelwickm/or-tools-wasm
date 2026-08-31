@@ -2,11 +2,9 @@ import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
-import topLevelAwait from 'vite-plugin-top-level-await';
-import dts from 'vite-plugin-dts';
+import dts from 'unplugin-dts/vite';
 
-const rootDir = path.resolve(__dirname, '..');
-const packageDir = __dirname;
+const packageDir = import.meta.dirname;
 const libRoot = path.resolve(packageDir, 'lib');
 const wasmBuildDir = path.resolve(packageDir, 'build/javascript/wasm');
 const outDir = path.resolve(packageDir, 'build/javascript/lib');
@@ -107,7 +105,7 @@ const emitWasmSourceMapsPlugin = (): Plugin => ({
 });
 
 export default defineConfig({
-  root: rootDir,
+  root: packageDir,
   base: './',
   assetsInclude: ['**/*.d.ts'],
   resolve: {
@@ -118,19 +116,16 @@ export default defineConfig({
     }
   },
   plugins: [
-    topLevelAwait(),
     patchEmscriptenWasmPlugin(),
     emitWasmSourceMapsPlugin(),
     dts({
       tsconfigPath: path.resolve(packageDir, 'tsconfig.json'),
-      rollupTypes: true,
       entryRoot: libRoot,
     }),
   ],
   worker: {
     format: 'es',
     plugins: () => [
-      topLevelAwait(),
       patchEmscriptenWasmPlugin(),
     ],
     rollupOptions: {

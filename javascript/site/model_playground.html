@@ -38,14 +38,14 @@ const params: SatParameters = {
   numWorkers: workers,
 };
 
-CpSat.setExecutor({ type: 'worker' }); // Or direct/server.
 const model = await CpSat.createModel(modelJson);
-const validation = await CpSat.validate(model);
+const validation = await CpSat.validate(model, { executor: 'worker' });
 if (!validation.ok) throw new Error(validation.message);
 
 const controller = new AbortController();
 const result = await CpSat.solve(model, {
   ...params,
+  executor: 'worker',
   eventMask: { solution: true, bestBound: true, log: true },
   onEvent: (event) => console.log(event),
   signal: controller.signal,

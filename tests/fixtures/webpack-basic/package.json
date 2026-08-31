@@ -9,12 +9,12 @@
   },
   "dependencies": {
     "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-local.tgz",
-    "protobufjs": "^7.5.4"
+    "protobufjs": "^8.8.0"
   },
   "devDependencies": {
+    "esbuild-loader": "^4.5.0",
     "html-webpack-plugin": "^5.6.5",
-    "ts-loader": "^9.5.4",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "webpack": "^5.104.1",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.2"

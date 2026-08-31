@@ -320,6 +320,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "--bind"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8,PThread"
+    "-sINCOMING_MODULE_JS_API=['locateFile','wasmBinary','mainScriptUrlOrBlob','noExitRuntime']"
     "-sNODEJS_CATCH_REJECTION=0"
     "-sNODEJS_CATCH_EXIT=0"
     "--no-entry"
@@ -401,6 +402,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     list(JOIN JSPI_EXPORTS "','" JSPI_EXPORTS_ARGUMENT)
     set(${OUTPUT_VARIABLE}
       "-sJSPI=2"
+      "-sASYNCIFY_IGNORE_INDIRECT=1"
       "-sJSPI_EXPORTS=['${JSPI_EXPORTS_ARGUMENT}']"
       PARENT_SCOPE)
   endfunction()

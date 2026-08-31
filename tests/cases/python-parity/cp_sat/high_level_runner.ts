@@ -53,7 +53,7 @@ export function cpSatHighLevelApiFromPackage(api: HighLevelCpSatPackage) {
     object_is_a_false_literal: api.object_is_a_false_literal,
     object_is_a_true_literal: api.object_is_a_true_literal,
     rebuild_from_linear_expression_proto: api.rebuild_from_linear_expression_proto,
-    setExecutor: (configuration: CpSatExecutorConfiguration) => {
+    setFixtureExecutor: (configuration: CpSatExecutorConfiguration) => {
       executor = configuration;
     },
     sum: api.sum,

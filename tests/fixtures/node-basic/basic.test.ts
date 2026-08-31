@@ -6,6 +6,7 @@ import {
   MPSolver,
   MPSolverParameters,
 } from 'or-tools-wasm/mp-solver';
+import * as MPSolverApi from 'or-tools-wasm/mp-solver';
 import {
   KnapsackSolver,
   KnapsackSolverType,
@@ -52,6 +53,7 @@ import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parit
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
+import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
 import { runKnapsackCases } from '../../cases/python-parity/knapsack/index.ts';
 import { runKnapsackConcurrencyCase } from '../../cases/or-tools-wasm/knapsack/concurrency.ts';
 import { runKnapsackEventHandlerCase } from '../../cases/or-tools-wasm/knapsack/event_handler.ts';
@@ -74,6 +76,9 @@ import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
 import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
 import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
+import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
+import { runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
+import { runMpSolverConcurrencyCase } from '../../cases/or-tools-wasm/mp_solver/concurrency.ts';
 
 type NamedCaseResult = {
   id?: string;
@@ -116,6 +121,10 @@ test('enforces the CP-SAT worker job lifecycle in Node', async () => {
 
 test('enforces CP-SAT local solve concurrency in Node', async () => {
   await runCpSatConcurrencyCase(CpSatApi as never);
+});
+
+test('reuses CP-SAT threads across repeated solves in Node', async () => {
+  await runCpSatThreadReuseCase(CpSat as never);
 });
 
 test('runs the shared Routing cases in Node', async (t) => {
@@ -248,4 +257,17 @@ test('runs the shared MathOpt cases in Node', async (t) => {
 test('runs the shared PDLP cases in Node', async (t) => {
   const pdlpResults = await runPdlpCases(PdlpApi);
   await assertCaseResults(t, 'node PDLP', pdlpResults);
+});
+
+test('reuses every solver runtime across repeated operations in Node', async () => {
+  await runSolverReuseCase([
+    { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+    { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase({ MathOpt } as never, PdlpApi as never) },
+    { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+    { solver: 'routing', run: () => runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never) },
+    { solver: 'knapsack', run: () => runKnapsackConcurrencyCase({ KnapsackSolver, KnapsackSolverType }) },
+    { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase({ SimpleMaxFlow }) },
+    { solver: 'set-cover', run: () => runSetCoverConcurrencyCase({ SetCoverModel, SetCoverInvariant, GreedySolutionGenerator }) },
+    { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi) },
+  ]);
 });

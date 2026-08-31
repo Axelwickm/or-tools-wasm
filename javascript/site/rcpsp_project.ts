@@ -215,7 +215,7 @@ async function solve() {
   }
 }
 
-const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
 activitiesEl?.addEventListener('pointerover', (event) => {
   const target = event.target;

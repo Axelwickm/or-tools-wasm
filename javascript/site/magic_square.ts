@@ -14,7 +14,7 @@ const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelec
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
 const maxWorkerCount = getMaxWorkerCount();
-const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
 let activeSolve: AbortController | null = null;
 

@@ -217,14 +217,13 @@ function buildSportsScheduleModel(numTeams: number): CpModelInput {
   };
 }
 
-CpSat.setExecutor({ type: 'worker' });
 const numTeams = 4;
 const model = await CpSat.createModel(buildSportsScheduleModel(numTeams));
-const validation = await CpSat.validate(model);
+const validation = await CpSat.validate(model, { executor: 'worker' });
 if (!validation.ok) throw new Error(validation.message);
 
 const params: SatParameters = { numWorkers: 4, logSearchProgress: true };
-const result = await CpSat.solve(model, params);
+const result = await CpSat.solve(model, { ...params, executor: 'worker' });
 console.log(result.response?.objectiveValue, result.response?.solution);</code></pre>
 			</details>
 		</div>

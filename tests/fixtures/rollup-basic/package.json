@@ -13,6 +13,6 @@
     "esbuild": "^0.27.7",
     "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-local.tgz",
     "rollup": "^4.53.3",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   }
 }

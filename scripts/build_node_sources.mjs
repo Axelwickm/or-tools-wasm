@@ -21,13 +21,13 @@ const publicEntryNames = [
 ];
 const solverBuilds = [
   { directory: 'cp_sat', publicEntries: ['cp-sat', 'rcpsp'], label: 'CP-SAT', preserveGlobalMessaging: true },
-  { directory: 'knapsack', publicEntries: ['knapsack'], label: 'Knapsack' },
-  { directory: 'mathopt', publicEntries: ['mathopt'], label: 'MathOpt' },
-  { directory: 'mp_solver', publicEntries: ['mp-solver'], label: 'MP Solver' },
-  { directory: 'network_flow', publicEntries: ['network-flow'], label: 'Network Flow' },
-  { directory: 'pdlp', publicEntries: ['pdlp'], label: 'PDLP' },
-  { directory: 'routing', publicEntries: ['routing'], label: 'Routing' },
-  { directory: 'set_cover', publicEntries: ['set-cover'], label: 'Set Cover' },
+  { directory: 'knapsack', publicEntries: ['knapsack'], label: 'Knapsack', preserveGlobalMessaging: true },
+  { directory: 'mathopt', publicEntries: ['mathopt'], label: 'MathOpt', preserveGlobalMessaging: true },
+  { directory: 'mp_solver', publicEntries: ['mp-solver'], label: 'MP Solver', preserveGlobalMessaging: true },
+  { directory: 'network_flow', publicEntries: ['network-flow'], label: 'Network Flow', preserveGlobalMessaging: true },
+  { directory: 'pdlp', publicEntries: ['pdlp'], label: 'PDLP', preserveGlobalMessaging: true },
+  { directory: 'routing', publicEntries: ['routing'], label: 'Routing', preserveGlobalMessaging: true },
+  { directory: 'set_cover', publicEntries: ['set-cover'], label: 'Set Cover', preserveGlobalMessaging: true },
 ];
 
 function externalSharedRuntimePlugin(name, sharedImportPrefix) {

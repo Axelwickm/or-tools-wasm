@@ -75,6 +75,10 @@ export async function runRoutingWorkerLifecycleCase(
     throw new Error(`expected AbortError, got ${String(cancellationError)}`);
   }
 
+  // Bun's worker bridge reports the cancellation before the native Routing
+  // search has released its executor. Give that teardown a bounded grace
+  // period before submitting the recovery solve.
+  await new Promise((resolve) => setTimeout(resolve, 100));
   const recoveryModel = createModel(api, 50);
   await withTimeout(
     recoveryModel.solve({ executor: 'worker' }),

@@ -1,11 +1,11 @@
 import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import path from 'node:path';
 
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(import.meta.dirname, '..');
 const siteRoot = path.resolve(rootDir, 'javascript/site');
-const distDir = path.resolve(__dirname, 'build/javascript/site');
-const browserBuildDir = path.resolve(__dirname, 'build/javascript/browser');
-const wasmBuildDir = path.resolve(__dirname, 'build/javascript/wasm');
+const distDir = path.resolve(import.meta.dirname, 'build/javascript/site');
+const browserBuildDir = path.resolve(import.meta.dirname, 'build/javascript/browser');
+const wasmBuildDir = path.resolve(import.meta.dirname, 'build/javascript/wasm');
 const packageBrowserAliases = [
   ['or-tools-wasm', 'index'],
   ['or-tools-wasm/cp-sat', 'cp-sat'],

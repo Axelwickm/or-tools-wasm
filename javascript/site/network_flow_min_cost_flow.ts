@@ -235,4 +235,4 @@ demandCountInput?.addEventListener('change', () => {
 
 generateGraph();
 resetView();
-readNetworkFlowExecutor = configureSolverExecutorSelector(null, executorSelector);
+readNetworkFlowExecutor = configureSolverExecutorSelector(executorSelector);

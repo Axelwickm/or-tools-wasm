@@ -5,6 +5,7 @@ import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolv
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
+import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
 import { runSolverConcurrencyCase } from '../../cases/or-tools-wasm/solver_concurrency.ts';
 import { runMpSolverConcurrencyCase } from '../../cases/or-tools-wasm/mp_solver/concurrency.ts';
 import { runMpSolverWorkerLifecycleCase } from '../../cases/or-tools-wasm/mp_solver/worker_lifecycle.ts';
@@ -33,6 +34,7 @@ import { runSetCoverCases } from '../../cases/python-parity/set_cover/index.ts';
 import { runSetCoverConcurrencyCase } from '../../cases/or-tools-wasm/set_cover/concurrency.ts';
 import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover/event_handler.ts';
 import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
+import { runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
 import type { BrowserFixtureGroup } from '../../harness/browser_groups.ts';
 
 type PackageModule = Record<string, any>;
@@ -392,12 +394,30 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     'cp-sat-concurrency',
     () => runCpSatConcurrencyCase(CpSatApi as never),
   );
+  const cpSatThreadReuseResult = await runSelectedGroup(
+    selectedGroup,
+    'cp-sat',
+    'cp-sat-thread-reuse',
+    () => runWithWorkerStats(workerSpy, () => runCpSatThreadReuseCase(typedCpSat as never)),
+  );
   const solverConcurrencyResult = await runSelectedGroup(
     selectedGroup,
     'mathopt',
     'mathopt-pdlp-concurrency',
     () => runSolverConcurrencyCase(MathOptApi as never, PdlpApi as never),
   );
+  const solverReuseResult = selectedGroup === null
+    ? await runWithWorkerStats(workerSpy, () => runSolverReuseCase([
+      { solver: 'cp-sat', run: () => runCpSatConcurrencyCase(CpSatApi as never) },
+      { solver: 'mathopt-pdlp', run: () => runSolverConcurrencyCase(MathOptApi as never, PdlpApi as never) },
+      { solver: 'mp-solver', run: () => runMpSolverConcurrencyCase(MPSolverApi as never) },
+      { solver: 'routing', run: () => runRoutingConcurrencyCase(RoutingApiModule as never) },
+      { solver: 'knapsack', run: () => runKnapsackConcurrencyCase(KnapsackApi as never) },
+      { solver: 'network-flow', run: () => runNetworkFlowConcurrencyCase(NetworkFlowApi as never) },
+      { solver: 'set-cover', run: () => runSetCoverConcurrencyCase(SetCoverApi as never) },
+      { solver: 'rcpsp', run: () => runRcpspConcurrencyCase(RcpspApi as never) },
+    ]))
+    : undefined;
   const mpSolverConcurrencyResult = await runSelectedGroup(
     selectedGroup,
     'mp-solver',
@@ -522,6 +542,12 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     ok: true,
     cloudExecutorResult,
     cpSatConcurrencyResult,
+    cpSatThreadReuseResult: cpSatThreadReuseResult?.result,
+    cpSatThreadReuseStatsBefore: cpSatThreadReuseResult?.before,
+    cpSatThreadReuseStatsAfter: cpSatThreadReuseResult?.after,
+    solverReuseResult: solverReuseResult?.result,
+    solverReuseStatsBefore: solverReuseResult?.before,
+    solverReuseStatsAfter: solverReuseResult?.after,
     mpSolverConcurrencyResult,
     mpSolverWorkerLifecycleResult: mpSolverWorkerLifecycleResult?.result,
     routingConcurrencyResult,

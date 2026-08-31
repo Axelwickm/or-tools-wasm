@@ -24,7 +24,7 @@ let cancelled = false;
 let givens = new Set<number>();
 let activeInterrupter: InstanceType<typeof MathOpt.SolveInterrupter> | null = null;
 const maxWorkerCount = getMaxWorkerCount();
-const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
 type SudokuBackend = 'CP_SAT' | 'GSCIP' | 'GLPK';
 

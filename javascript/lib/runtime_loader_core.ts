@@ -164,6 +164,7 @@ export function createRuntimeLoader(adapter: RuntimeLoaderAdapter) {
       const createModule = await adapter.loadFactory(asset.jsUrl);
       const moduleOverrides: Record<string, unknown> = {
         locateFile: asset.locateFile,
+        noExitRuntime: true,
       };
       if (asset.wasmBinary) {
         moduleOverrides.wasmBinary = asset.wasmBinary;

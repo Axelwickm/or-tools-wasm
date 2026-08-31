@@ -435,14 +435,6 @@ Returns embedded `.proto` schemas. CP-SAT always returns `cp_model` and
 `sat_parameters`; MPSolver-related schemas may be present when fetched through
 the worker path.
 
-`CpSat.setWorkerBridgeEnabled(enabled: boolean): void`
-
-Alias for the shared package worker bridge control.
-
-`CpSat.isWorkerBridgeEnabled(): boolean`
-
-Alias for the shared package worker bridge state.
-
 ### CP-SAT Types And Enums
 
 The package exports generated CP-SAT protobuf types and enums, including:
@@ -1908,7 +1900,7 @@ the same per-call options object.
 
 `solveLog` contains `terminationReason` and `iterationCount`.
 
-## Worker Bridge
+## Executor Selection
 
 The CP-SAT, MathOpt, Routing, MPSolver, Knapsack, Network Flow, Set
 Cover, RCPSP, and PDLP paths can use the shared worker bridge. Worker bridge
@@ -1917,29 +1909,18 @@ Knapsack, Set Cover, and Network Flow are single-threaded but can still run
 through the worker bridge for UI responsiveness, while RCPSP uses CP-SAT and
 can also accept CP-SAT thread settings. CP-SAT, SAT, SCIP/GSCIP, CBC, and other
 threaded-capable paths can also accept solver thread settings.
-Prefer the shared package controls:
+Choose execution per operation:
 
 ```ts
-import { isWorkerBridgeEnabled, setWorkerBridgeEnabled } from 'or-tools-wasm/cp-sat';
+import { CpSat } from 'or-tools-wasm/cp-sat';
 
-setWorkerBridgeEnabled(true);
-isWorkerBridgeEnabled();
+const result = await CpSat.solve(model, { executor: 'worker' });
 ```
 
-Solver-specific aliases are also exposed for existing call sites:
-
-```ts
-CpSat.setWorkerBridgeEnabled(true);
-MathOpt.setWorkerBridgeEnabled(true);
-MathOpt.isWorkerBridgeEnabled();
-MPSolver.setWorkerBridgeEnabled(true);
-Pdlp.setWorkerBridgeEnabled(true);
-RoutingModel.setWorkerBridgeEnabled(true);
-```
-
-The worker bridge defaults on in browser main-thread builds and defaults off in
-non-browser runtimes. Non-browser callers normally use direct runtime paths
-unless they explicitly enable the bridge.
+Pass `executor: 'direct'`, `executor: 'worker'`, a server/cloud configuration,
+or `executor: 'auto'` in the operation's options object. `auto` selects worker
+execution on browser main threads when workers are available and direct
+execution elsewhere. There is no global executor or worker-bridge setting.
 
 ## Generated Protobuf Types
 

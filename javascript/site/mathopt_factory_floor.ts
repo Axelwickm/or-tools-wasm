@@ -491,7 +491,7 @@ let lastError = '';
 let movementPlanStatus = 'Idle';
 
 const maxWorkerCount = getMaxWorkerCount();
-const selectedExecutor = configureSolverExecutorSelector(null, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 if (workerThreadsInput) {
   const initialThreads = Math.min(4, maxWorkerCount);
   workerThreadsInput.max = String(maxWorkerCount);

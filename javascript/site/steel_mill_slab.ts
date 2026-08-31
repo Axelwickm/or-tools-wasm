@@ -312,7 +312,7 @@ const setReadyIndicator = (text: string) => {
   }
 };
 
-configureSolverExecutorSelector(CpSat, executorSelector);
+const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
 if (workersInput) {
   workersInput.max = String(maxWorkerCount);
@@ -1100,7 +1100,7 @@ const runExperiment = async () => {
       return;
     }
 
-    const validation = await CpSat.validate(modelInstance);
+    const validation = await CpSat.validate(modelInstance, { executor: selectedExecutor() });
     if (!validation.ok) {
       appendStatus(`Model invalid: ${validation.message}`);
       return;
@@ -1108,7 +1108,7 @@ const runExperiment = async () => {
 
     appendStatus('Solving…');
     try {
-      const result = await CpSat.solve(modelInstance, params);
+      const result = await CpSat.solve(modelInstance, { ...params, executor: selectedExecutor() });
       const response = result.response;
       if (!response) {
         appendStatus('Solver returned no response.');

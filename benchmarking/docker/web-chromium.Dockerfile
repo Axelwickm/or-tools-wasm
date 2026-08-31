@@ -1,4 +1,4 @@
-FROM node:26.5.0-bookworm-slim
+FROM node:26.8.1-trixie-slim
 
 WORKDIR /bench
 
@@ -11,7 +11,7 @@ RUN apt-get update \
 
 COPY benchmarking/package/or-tools-wasm-local.tgz /tmp/or-tools-wasm-local.tgz
 RUN npm init -y \
-  && npm install --no-audit --no-fund /tmp/or-tools-wasm-local.tgz playwright-core@1.60.0
+  && npm install --no-audit --no-fund /tmp/or-tools-wasm-local.tgz playwright-core@1.62.1
 
 COPY Version.txt ./Version.txt
 COPY benchmarking ./benchmarking
