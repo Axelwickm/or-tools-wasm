@@ -6,7 +6,7 @@
  * Generator: scripts/generate_sat_parameters_types.mjs
  */
 
-export type ProtoInt64 = number | string | { low: number; high: number; unsigned?: boolean };
+export type ProtoInt64 = bigint | number | string | { low: number; high: number; unsigned?: boolean };
 
 /**
  * The order in which the variables (resp. affine expression) above should be

@@ -13,7 +13,7 @@ type RoutingIndexManagerLike = {
 };
 
 type RoutingAssignmentLike = {
-  objectiveValue(): number;
+  objectiveValue(): bigint;
   value(index: number): number;
 };
 
@@ -31,7 +31,7 @@ type RoutingModelLike = {
   start(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
   status(): number;
 };
 
@@ -48,8 +48,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 function assertNumber(value: unknown, expected: number, message: string) {
-  assert(typeof value === 'number', `${message}: expected a numeric value`);
-  assert(value === expected, `${message}: expected ${expected}, got ${value}`);
+  assert(value === expected || value === BigInt(expected), `${message}: expected ${expected}, got ${String(value)}`);
 }
 
 function extractRoute(

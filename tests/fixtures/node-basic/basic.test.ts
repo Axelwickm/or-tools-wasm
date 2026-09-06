@@ -51,6 +51,7 @@ import { test, type TestContext } from 'node:test';
 import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
+import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
@@ -104,6 +105,11 @@ test('runs the shared high-level CP-SAT Python parity cases in Node', async (t) 
 
   const results = await runCpSatHighLevelParityCasesForPackage(CpSatApi);
   await assertCaseResults(t, 'node high-level CP-SAT', results);
+});
+
+test('runs the first-party high-level CP-SAT contract cases in Node', async (t) => {
+  const results = await runCpSatHighLevelContractCases(CpSatApi as never);
+  await assertCaseResults(t, 'node high-level CP-SAT contract', results);
 });
 
 test('runs the shared proto CP-SAT cases in Node', async (t) => {
@@ -201,6 +207,31 @@ test('cancels and recovers the Network Flow worker in Node', async () => {
 
 test('isolates Network Flow event-handler errors in Node', async () => {
   await runNetworkFlowEventHandlerCase({ SimpleMaxFlow });
+});
+
+test('preserves exact int64 values across direct and worker WASM boundaries', async () => {
+  const exact = 9_007_199_254_740_993n;
+
+  for (const executor of ['direct', 'worker'] as const) {
+    const knapsack = new KnapsackSolver(
+      KnapsackSolverType.KNAPSACK_BRUTE_FORCE_SOLVER,
+      `exact-${executor}`,
+    );
+    knapsack.init([exact], [[1]], [1]);
+    assert.equal(await knapsack.solve({ executor }), exact, `Knapsack ${executor}`);
+
+    const flow = new SimpleMaxFlow();
+    flow.addArcWithCapacity(0, 1, exact);
+    assert.equal(await flow.solve(0, 1, { executor }), SimpleMaxFlowStatus.OPTIMAL);
+    assert.equal(flow.optimalFlow(), exact, `Network Flow ${executor}`);
+
+    const manager = new RoutingIndexManager(2, 1, 0);
+    const routing = new RoutingModel(manager);
+    const transit = routing.registerTransitMatrix([[0n, exact], [0n, 0n]]);
+    routing.setArcCostEvaluatorOfAllVehicles(transit);
+    const assignment = await routing.solve({ executor });
+    assert.equal(assignment?.objectiveValue(), exact, `Routing ${executor}`);
+  }
 });
 
 test('runs the shared Set Cover cases in Node', async (t) => {

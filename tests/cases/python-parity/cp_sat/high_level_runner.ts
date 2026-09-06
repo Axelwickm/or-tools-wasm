@@ -5,22 +5,12 @@ export { cpSatHighLevelParityCases, runCpSatHighLevelParityCases } from './index
 
 type HighLevelCpSatPackage = {
   CpModel: unknown;
-  ArithmeticError: unknown;
-  BoundedLinearExpression: unknown;
   CpSolver: unknown;
   CpSolverSolutionCallback: unknown;
   Domain: unknown;
-  FlatFloatExpr: unknown;
-  FlatIntExpr: unknown;
   LinearExpr: unknown;
-  NotImplementedError: unknown;
   DecisionStrategyProto_DomainReductionStrategy: unknown;
   DecisionStrategyProto_VariableSelectionStrategy: unknown;
-  RuntimeError: unknown;
-  ValueError: unknown;
-  object_is_a_false_literal: unknown;
-  object_is_a_true_literal: unknown;
-  rebuild_from_linear_expression_proto: unknown;
   sum: unknown;
   weightedSum: unknown;
 };
@@ -37,22 +27,12 @@ export function cpSatHighLevelApiFromPackage(api: HighLevelCpSatPackage) {
   }
   const highLevelApi = {
     CpModel: api.CpModel,
-    ArithmeticError: api.ArithmeticError,
-    BoundedLinearExpression: api.BoundedLinearExpression,
     CpSolver: FixtureCpSolver,
     CpSolverSolutionCallback: api.CpSolverSolutionCallback,
     Domain: api.Domain,
-    FlatFloatExpr: api.FlatFloatExpr,
-    FlatIntExpr: api.FlatIntExpr,
     LinearExpr: api.LinearExpr,
-    NotImplementedError: api.NotImplementedError,
     DecisionStrategyProto_DomainReductionStrategy: api.DecisionStrategyProto_DomainReductionStrategy,
     DecisionStrategyProto_VariableSelectionStrategy: api.DecisionStrategyProto_VariableSelectionStrategy,
-    RuntimeError: api.RuntimeError,
-    ValueError: api.ValueError,
-    object_is_a_false_literal: api.object_is_a_false_literal,
-    object_is_a_true_literal: api.object_is_a_true_literal,
-    rebuild_from_linear_expression_proto: api.rebuild_from_linear_expression_proto,
     setFixtureExecutor: (configuration: CpSatExecutorConfiguration) => {
       executor = configuration;
     },

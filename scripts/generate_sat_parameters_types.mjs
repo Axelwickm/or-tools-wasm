@@ -450,7 +450,7 @@ function generateTs(ast, source) {
   lines.push(' * Generator: scripts/generate_sat_parameters_types.mjs');
   lines.push(' */');
   lines.push('');
-  lines.push('export type ProtoInt64 = number | string | { low: number; high: number; unsigned?: boolean };');
+  lines.push('export type ProtoInt64 = bigint | number | string | { low: number; high: number; unsigned?: boolean };');
   lines.push('');
 
   const enumNamesInOrder = ast.enums.map((e) => e.name);

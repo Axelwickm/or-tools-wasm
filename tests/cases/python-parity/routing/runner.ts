@@ -33,7 +33,7 @@ type RoutingIndexManagerLike = {
 };
 
 type RoutingAssignmentLike = {
-  objectiveValue(): number;
+  objectiveValue(): bigint;
   value(index: unknown): number;
   min(index: unknown): number;
 };
@@ -53,7 +53,7 @@ type RoutingModelLike = {
   getNumberOfRejectsInFirstSolution(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): number;
   getAutomaticFirstSolutionStrategy(): number;
   addAtSolutionCallback(callback: (() => void) | { __call__(): void }): void;
-  costVar(): { max(): number };
+  costVar(): { max(): bigint };
   addDimension(transitIndex: number, slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
   addDimensionWithVehicleCapacity(transitIndex: number, slackMax: number, capacities: number[], fixStartCumulToZero: boolean, name: string): boolean;
   addDimensionWithVehicleTransits(transitIndices: number[], slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
@@ -65,17 +65,17 @@ type RoutingModelLike = {
   getDimensionOrDie(name: string): {
     cumulVar(index: number): unknown;
     hasSoftSpanUpperBounds(): boolean;
-    setSoftSpanUpperBoundForVehicle(boundCost: { bound: number; cost: number }, vehicle: number): void;
-    getSoftSpanUpperBoundForVehicle(vehicle: number): { bound: number; cost: number };
+    setSoftSpanUpperBoundForVehicle(boundCost: { bound: bigint; cost: bigint }, vehicle: number): void;
+    getSoftSpanUpperBoundForVehicle(vehicle: number): { bound: bigint; cost: bigint };
     hasQuadraticCostSoftSpanUpperBounds(): boolean;
-    setQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: { bound: number; cost: number }, vehicle: number): void;
-    getQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): { bound: number; cost: number };
+    setQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: { bound: bigint; cost: bigint }, vehicle: number): void;
+    getQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): { bound: bigint; cost: bigint };
   };
   start(vehicle: number): number;
   end(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
   status(): number;
   vehicles(): number;
   solver(): {
@@ -104,7 +104,7 @@ export type RoutingApi = {
   LocalSearchMetaheuristic: { GUIDED_LOCAL_SEARCH: number };
   BOOL_FALSE: number;
   BOOL_UNSPECIFIED: number;
-  BoundCost: new (bound?: number, cost?: number) => { bound: number; cost: number };
+  BoundCost: new (bound?: number, cost?: number) => { bound: bigint; cost: bigint };
   RoutingIndexManager: new (
     numLocations: number,
     numVehicles: number,

@@ -1,6 +1,6 @@
 import type { SharedCaseMetadata } from './shared_case.ts';
 
-export type ProtoInt64 = number | string | { low: number; high: number; unsigned?: boolean };
+export type ProtoInt64 = bigint | number | string | { low: number; high: number; unsigned?: boolean };
 
 export type CpModelProto = Record<string, unknown>;
 

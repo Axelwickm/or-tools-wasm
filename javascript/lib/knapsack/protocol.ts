@@ -12,13 +12,13 @@ export type KnapsackOperation = {
   name: string;
   useReduction: boolean;
   timeLimitSeconds: number;
-  profits: number[];
-  weights: number[][];
-  capacities: number[];
+  profits: bigint[];
+  weights: bigint[][];
+  capacities: bigint[];
 };
 
 export type KnapsackResult = {
-  profit: number;
+  profit: bigint;
   optimal: boolean;
   contains: boolean[];
 };

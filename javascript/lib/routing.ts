@@ -16,6 +16,8 @@ export {
 } from './routing/api.js';
 export { CloudExecutorUnavailableError } from './cloud_executor.js';
 export type { RoutingEvent, RoutingModelParameters, RoutingSearchParameters, RoutingSolveOptions } from './routing/api.js';
+export type { IntValue } from './int64.js';
+export { asNumber } from './int64.js';
 export type { SolverJobEvent } from './solver_executor.js';
 export type {
   AutoExecutorConfiguration,

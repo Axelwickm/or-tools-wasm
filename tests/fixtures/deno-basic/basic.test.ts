@@ -40,6 +40,7 @@ import { executorFixtureModes } from '../../harness/shared_case.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
 import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
+import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
@@ -165,6 +166,9 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
 
   const highLevelResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
   await assertCaseSteps(t, 'deno high-level CP-SAT', highLevelResults);
+
+  const highLevelContractResults = await runCpSatHighLevelContractCases(CpSatApi as never);
+  await assertCaseSteps(t, 'deno high-level CP-SAT contract', highLevelContractResults);
 
   const results = await runCpSatCases(CpSat as never);
   for (const result of results) {

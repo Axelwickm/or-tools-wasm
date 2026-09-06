@@ -11,38 +11,38 @@ message NetworkFlowBridgeRequest {
 }
 
 message MaxFlowRequest {
-  repeated double tails = 1;
-  repeated double heads = 2;
-  repeated double capacities = 3;
-  double source = 4;
-  double sink = 5;
+  repeated int32 tails = 1;
+  repeated int32 heads = 2;
+  repeated int64 capacities = 3;
+  int32 source = 4;
+  int32 sink = 5;
 }
 
 message MinCostFlowRequest {
-  repeated double tails = 1;
-  repeated double heads = 2;
-  repeated double capacities = 3;
-  repeated double unit_costs = 4;
-  repeated double supplies = 5;
+  repeated int32 tails = 1;
+  repeated int32 heads = 2;
+  repeated int64 capacities = 3;
+  repeated int64 unit_costs = 4;
+  repeated int64 supplies = 5;
   bool solve_max_flow_with_min_cost = 6;
 }
 
 message LinearSumAssignmentRequest {
-  repeated double left_nodes = 1;
-  repeated double right_nodes = 2;
-  repeated double costs = 3;
+  repeated int32 left_nodes = 1;
+  repeated int32 right_nodes = 2;
+  repeated int64 costs = 3;
 }
 
 message NetworkFlowBridgeResponse {
   int32 status = 1;
-  double optimal_flow = 2;
-  double optimal_cost = 3;
-  double maximum_flow = 4;
+  int64 optimal_flow = 2;
+  int64 optimal_cost = 3;
+  int64 maximum_flow = 4;
   int32 num_nodes = 5;
   int32 num_arcs = 6;
-  repeated double flows = 7;
-  repeated double source_side_min_cut = 8;
-  repeated double sink_side_min_cut = 9;
-  repeated double right_mates = 10;
-  repeated double assignment_costs = 11;
+  repeated int64 flows = 7;
+  repeated int32 source_side_min_cut = 8;
+  repeated int32 sink_side_min_cut = 9;
+  repeated int32 right_mates = 10;
+  repeated int64 assignment_costs = 11;
 }

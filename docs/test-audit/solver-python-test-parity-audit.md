@@ -76,7 +76,7 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
   - ✅ 🔎 CpModelTest.test_add_false
   - ✅ 🔎 CpModelTest.test_sum
   - ⚪ 🔎 CpModelTest.test_sum_parsing - current partial parity case covers public high-level sum flattening, integer/float offset behavior, affine/constant/SumArray expression repr, strings, and invalid operands; remaining upstream assertions check Python NumPy scalar handling and internal IntAffine/FloatAffine class identity/fields
-  - ⚪ 🔎 CpModelTest.test_weighted_sum_parsing - current partial parity case covers public high-level `weighted_sum` flattening and constant expression repr; remaining upstream assertions distinguish integer-valued float coefficients and Python NumPy scalar handling, which JS numbers cannot represent
+  - ⚪ 🔎 CpModelTest.test_weighted_sum_parsing - current partial parity case covers public high-level `weightedSum` flattening and constant expression repr; remaining upstream assertions distinguish integer-valued float coefficients and Python NumPy scalar handling, which JS numbers cannot represent
   - ✅ 🔎 CpModelTest.test_sum_with_api
   - ✅ 🔎 CpModelTest.test_weighted_sum
   - ✅ 🔎 CpModelTest.test_all_different
@@ -103,10 +103,10 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
   - ✅ 🔎 CpModelTest.test_min_equality_generator
   - ✅ 🔎 CpModelTest.test_min_equality_args
   - ✅ 🔎 CpModelTest.test_min_equality_with_constant
-  - ✅ 🔎 CpModelTest.test_abs
+  - ⚪ 🔎 CpModelTest.test_abs - current partial parity case covers canonical `addAbsEquality()` proto behavior; Python's `abs()` operator hook is intentionally outside the TypeScript API
   - ✅ 🔎 CpModelTest.test_issue4568
-  - ✅ 🔎 CpModelTest.test_division
-  - ✅ 🔎 CpModelTest.testModulo
+  - ⚪ 🔎 CpModelTest.test_division - current partial parity case covers canonical `addDivisionEquality()` proto behavior; Python's division operator hook is intentionally outside the TypeScript API
+  - ⚪ 🔎 CpModelTest.testModulo - current partial parity case covers canonical `addModuloEquality()` proto behavior; Python's modulo operator hook is intentionally outside the TypeScript API
   - ✅ 🔎 CpModelTest.test_multiplication_equality
   - ✅ 🔎 CpModelTest.test_multiplication_equality_generator
   - ✅ 🔎 CpModelTest.test_implication
@@ -119,29 +119,29 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
   - ✅ 🔎 CpModelTest.test_bool_x_or
   - ✅ 🔎 CpModelTest.test_map_domain
   - ✅ 🔎 CpModelTest.test_interval
-  - ✅ 🔎 CpModelTest.test_rebuild_from_linear_expression_proto
+  - ⚪ 🔎 CpModelTest.test_rebuild_from_linear_expression_proto - outside the TypeScript contract: this directly tests Python's internal proto-to-expression reconstruction helper; public interval expression reconstruction is covered by `CpModelTest.test_interval`
   - ✅ 🔎 CpModelTest.test_absent_interval
   - ✅ 🔎 CpModelTest.test_optional_interval
   - ✅ 🔎 CpModelTest.test_no_overlap
   - ✅ 🔎 CpModelTest.test_no_overlap2d
   - ✅ 🔎 CpModelTest.test_cumulative
-  - ✅ 🔎 CpModelTest.test_get_or_make_index_from_constant
+  - ⚪ 🔎 CpModelTest.test_get_or_make_index_from_constant - outside the TypeScript contract: this directly tests Python's internal constant-index cache; public constant creation and deduplication behavior is exercised through canonical model constraints
   - ✅ 🔎 CpModelTest.test_str
   - ✅ 🔎 CpModelTest.test_repr
-  - ✅ 🔎 CpModelTest.test_integer_expression_errors
+  - ⚪ 🔎 CpModelTest.test_integer_expression_errors - current partial parity case covers canonical multiplication/type and integer-bound validation with JavaScript `RangeError`; Python-only `ArithmeticError` and division, modulo, power, shift, and bitwise hooks are intentionally outside the TypeScript API
   - ✅ 🔎 CpModelTest.test_model_errors
-  - ✅ 🔎 CpModelTest.test_solver_errors
+  - ⚪ 🔎 CpModelTest.test_solver_errors - current partial parity case covers canonical pre-solve result errors with JavaScript `Error` and invalid operands with `TypeError`; unlike Python's `response_proto`, the TypeScript `response` property is `null` before solve
   - ✅ 🔎 CpModelTest.test_has_objective_minimize
   - ✅ 🔎 CpModelTest.test_has_objective_maximize
   - ✅ 🔎 CpModelTest.test_search_for_all_solutions
   - ✅ 🔎 CpModelTest.test_solve_with_solution_callback
-  - ✅ 🔎 CpModelTest.test_solve_with_float_value_in_callback
+  - ⚪ 🔎 CpModelTest.test_solve_with_float_value_in_callback - intentionally outside the TypeScript contract: this only exercises Python's separate `float_value()` alias; canonical callback `value()` returns `bigint` for integer expressions and `number` for floating-point expressions
   - ✅ 🔎 CpModelTest.test_best_bound_callback
   - ✅ 🔎 CpModelTest.test_value
-  - ✅ 🔎 CpModelTest.test_float_value
+  - ⚪ 🔎 CpModelTest.test_float_value - intentionally outside the TypeScript contract: this only exercises Python's separate `float_value()` alias; canonical `value()` covers both integer and floating-point expressions
   - ✅ 🔎 CpModelTest.test_boolean_value
   - ✅ 🔎 CpModelTest.test_unsupported_operators
-  - ⚪ 🔎 CpModelTest.test_is_literal_true_false - current partial parity case covers JS/Python boolean literal constants and bitwise-not integer literal behavior; remaining upstream assertions check Python NumPy boolean scalars, which have no native JS equivalent
+  - ⚪ 🔎 CpModelTest.test_is_literal_true_false - outside the TypeScript contract: this tests Python-internal literal classification helpers and NumPy/bitwise representations; public Boolean literals and negation are covered through canonical model and solve cases
   - ✅ 🔎 CpModelTest.test_solve_minimize_with_solution_callback
   - ✅ 🔎 CpModelTest.test_solution_value
   - ✅ 🔎 CpModelTest.test_solution_hinting
@@ -152,7 +152,7 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
   - ✅ 🔎 CpModelTest.test_model_and_response_stats
   - ✅ 🔎 CpModelTest.test_validate_model
   - ✅ 🔎 CpModelTest.test_validate_model_with_overflow
-  - ⚪ 🔎 CpModelTest.test_copy_model - current partial parity case covers high-level clone, proto-index accessors, wrapper `is_boolean`, and cloned `model_proto` identity; remaining upstream assertions check Python copy.copy/deepcopy object graph behavior
+  - ⚪ 🔎 CpModelTest.test_copy_model - current partial parity case covers high-level clone independence, canonical proto-index accessors, `isBoolean()`, detached `modelProto` snapshots, and standard JavaScript `RangeError`/`TypeError`; remaining upstream assertions check Python copy.copy/deepcopy object graph behavior
   - ✅ 🔎 CpModelTest.test_custom_log
   - ✅ 🔎 CpModelTest.test_log_to_response
   - ✅ 🔎 CpModelTest.test_issue2762
@@ -185,7 +185,18 @@ Shared fixture case IDs are the stable link between this audit and the runtime s
   - ✅ 🔎 CpModelTest.test_simplification9
   - ✅ 🔎 CpModelTest.test_simplification10
   - ✅ 🔎 CpModelTest.test_issue4759
-  - ✅ 🔎 CpModelTest.test_pre_pep8
+  - ⚪ 🔎 CpModelTest.test_pre_pep8 - intentionally outside the TypeScript contract: this upstream test only verifies deprecated Python PascalCase aliases such as `NewIntVar`, `AddBoolOr`, and `Maximize`; or-tools-wasm exposes only the canonical camelCase TypeScript API
+
+### First-party CP-SAT high-level contracts
+
+These cases cover public TypeScript behavior that has no direct upstream
+`cp_model_test.py` parity case. They live outside the Python parity suite in
+`tests/cases/or-tools-wasm/cp_sat/high_level_contract.ts`:
+
+- `cp_sat.high_level.reservoir` - reservoir proto construction, active events, argument validation, and native solves; upstream Python exposes reservoir builders but has no corresponding `cp_model_test.py` case
+- `cp_sat.high_level.typescript_helpers` - `addEquality()`, public Boolean-variable classification, proto-index lookup, and detached model snapshots
+- `cp_sat.high_level.solver_results` - canonical response, timing, propagation, count, objective-bound, and log accessors before and after a successful solve
+- `cp_sat.high_level.expression_surface` - canonical expression proto normalization, Boolean literals, interval expression reconstruction, and native solving without exported Python-internal helper wrappers
 
 ## ortools/constraint_solver/python/pywraprouting_test.py
 - TestPyWrapRoutingIndexManager

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file knapsack.proto.
  */
 export const file_knapsack: GenFile = /*@__PURE__*/
-  fileDesc("Cg5rbmFwc2Fjay5wcm90bxIWb3J0b29sc193YXNtLmJyaWRnZS52MSLUAQoVS25hcHNhY2tCcmlkZ2VSZXF1ZXN0EhMKC3NvbHZlcl90eXBlGAEgASgFEgwKBG5hbWUYAiABKAkSFQoNdXNlX3JlZHVjdGlvbhgDIAEoCBIaChJ0aW1lX2xpbWl0X3NlY29uZHMYBCABKAESDwoHcHJvZml0cxgFIAMoARJACgd3ZWlnaHRzGAYgAygLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5LbmFwc2Fja1dlaWdodERpbWVuc2lvbhISCgpjYXBhY2l0aWVzGAcgAygBIikKF0tuYXBzYWNrV2VpZ2h0RGltZW5zaW9uEg4KBnZhbHVlcxgBIAMoASJLChZLbmFwc2Fja0JyaWRnZVJlc3BvbnNlEg4KBnByb2ZpdBgBIAEoARIPCgdvcHRpbWFsGAIgASgIEhAKCGNvbnRhaW5zGAMgAygIYgZwcm90bzM");
+  fileDesc("Cg5rbmFwc2Fjay5wcm90bxIWb3J0b29sc193YXNtLmJyaWRnZS52MSLUAQoVS25hcHNhY2tCcmlkZ2VSZXF1ZXN0EhMKC3NvbHZlcl90eXBlGAEgASgFEgwKBG5hbWUYAiABKAkSFQoNdXNlX3JlZHVjdGlvbhgDIAEoCBIaChJ0aW1lX2xpbWl0X3NlY29uZHMYBCABKAESDwoHcHJvZml0cxgFIAMoAxJACgd3ZWlnaHRzGAYgAygLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5LbmFwc2Fja1dlaWdodERpbWVuc2lvbhISCgpjYXBhY2l0aWVzGAcgAygDIikKF0tuYXBzYWNrV2VpZ2h0RGltZW5zaW9uEg4KBnZhbHVlcxgBIAMoAyJLChZLbmFwc2Fja0JyaWRnZVJlc3BvbnNlEg4KBnByb2ZpdBgBIAEoAxIPCgdvcHRpbWFsGAIgASgIEhAKCGNvbnRhaW5zGAMgAygIYgZwcm90bzM");
 
 /**
  * Knapsack solver payloads carried by the generic job.proto envelope.
@@ -39,9 +39,9 @@ export type KnapsackBridgeRequest = Message<"ortools_wasm.bridge.v1.KnapsackBrid
   timeLimitSeconds: number;
 
   /**
-   * @generated from field: repeated double profits = 5;
+   * @generated from field: repeated int64 profits = 5;
    */
-  profits: number[];
+  profits: bigint[];
 
   /**
    * @generated from field: repeated ortools_wasm.bridge.v1.KnapsackWeightDimension weights = 6;
@@ -49,9 +49,9 @@ export type KnapsackBridgeRequest = Message<"ortools_wasm.bridge.v1.KnapsackBrid
   weights: KnapsackWeightDimension[];
 
   /**
-   * @generated from field: repeated double capacities = 7;
+   * @generated from field: repeated int64 capacities = 7;
    */
-  capacities: number[];
+  capacities: bigint[];
 };
 
 /**
@@ -81,9 +81,9 @@ export type KnapsackBridgeRequestJson = {
   timeLimitSeconds?: number | "NaN" | "Infinity" | "-Infinity";
 
   /**
-   * @generated from field: repeated double profits = 5;
+   * @generated from field: repeated int64 profits = 5;
    */
-  profits?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  profits?: string[];
 
   /**
    * @generated from field: repeated ortools_wasm.bridge.v1.KnapsackWeightDimension weights = 6;
@@ -91,9 +91,9 @@ export type KnapsackBridgeRequestJson = {
   weights?: KnapsackWeightDimensionJson[];
 
   /**
-   * @generated from field: repeated double capacities = 7;
+   * @generated from field: repeated int64 capacities = 7;
    */
-  capacities?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  capacities?: string[];
 };
 
 export type KnapsackBridgeRequestValid = KnapsackBridgeRequest;
@@ -110,9 +110,9 @@ export const KnapsackBridgeRequestSchema: GenMessage<KnapsackBridgeRequest, {jso
  */
 export type KnapsackWeightDimension = Message<"ortools_wasm.bridge.v1.KnapsackWeightDimension"> & {
   /**
-   * @generated from field: repeated double values = 1;
+   * @generated from field: repeated int64 values = 1;
    */
-  values: number[];
+  values: bigint[];
 };
 
 /**
@@ -120,9 +120,9 @@ export type KnapsackWeightDimension = Message<"ortools_wasm.bridge.v1.KnapsackWe
  */
 export type KnapsackWeightDimensionJson = {
   /**
-   * @generated from field: repeated double values = 1;
+   * @generated from field: repeated int64 values = 1;
    */
-  values?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  values?: string[];
 };
 
 export type KnapsackWeightDimensionValid = KnapsackWeightDimension;
@@ -139,9 +139,9 @@ export const KnapsackWeightDimensionSchema: GenMessage<KnapsackWeightDimension, 
  */
 export type KnapsackBridgeResponse = Message<"ortools_wasm.bridge.v1.KnapsackBridgeResponse"> & {
   /**
-   * @generated from field: double profit = 1;
+   * @generated from field: int64 profit = 1;
    */
-  profit: number;
+  profit: bigint;
 
   /**
    * @generated from field: bool optimal = 2;
@@ -159,9 +159,9 @@ export type KnapsackBridgeResponse = Message<"ortools_wasm.bridge.v1.KnapsackBri
  */
 export type KnapsackBridgeResponseJson = {
   /**
-   * @generated from field: double profit = 1;
+   * @generated from field: int64 profit = 1;
    */
-  profit?: number | "NaN" | "Infinity" | "-Infinity";
+  profit?: string;
 
   /**
    * @generated from field: bool optimal = 2;

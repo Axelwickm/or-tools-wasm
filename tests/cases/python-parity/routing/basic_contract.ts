@@ -29,12 +29,12 @@ type RoutingModelLike = {
   end(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
   status(): number;
 };
 
 type RoutingAssignmentLike = {
-  objectiveValue(): number;
+  objectiveValue(): bigint;
   value(index: number): number;
 };
 
@@ -57,8 +57,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 function assertNumber(value: unknown, expected: number, message: string) {
-  assert(typeof value === 'number', `${message}: expected a numeric value`);
-  assert(value === expected, `${message}: expected ${expected}, got ${value}`);
+  assert(value === expected || value === BigInt(expected), `${message}: expected ${expected}, got ${String(value)}`);
 }
 
 function assertArrayEquals(actual: number[], expected: number[], message: string) {
@@ -78,12 +77,12 @@ function inspectRoute(
     start(vehicle: number): number;
     isEnd(index: number): boolean;
     nextVar(index: number): number;
-    getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+    getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
   },
   assignment: { value(index: number): number },
 ) {
   const route: number[] = [];
-  let routeDistance = 0;
+  let routeDistance = 0n;
   let index = routing.start(0);
   while (!routing.isEnd(index)) {
     const nextIndex = assignment.value(routing.nextVar(index));

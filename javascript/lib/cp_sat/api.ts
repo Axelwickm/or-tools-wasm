@@ -24,7 +24,7 @@ import type {
   SolverJobEvent,
   SolverResourceRequest,
 } from '../solver_executor.js';
-import { decodeProtobufWithExactLongs } from '../protobufjs_helpers.js';
+import { decodeProtobufWithExactLongs, encodeProtobufBigInts } from '../protobufjs_helpers.js';
 import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
 import * as protobufModule from 'protobufjs';
@@ -170,11 +170,12 @@ function encodeSatParameters(
   if (unknownParameter) {
     throw new Error(`CpSat.solve: unknown solver parameter "${unknownParameter}".`);
   }
-  const validationError = parametersType.verify(params);
+  const protobufParams = encodeProtobufBigInts(params) as Record<string, unknown>;
+  const validationError = parametersType.verify(protobufParams);
   if (validationError) {
     throw new Error(`CpSat.solve: ${validationError}`);
   }
-  const message = parametersType.create(params);
+  const message = parametersType.create(protobufParams);
   return parametersType.encode(message).finish();
 }
 
@@ -234,7 +235,7 @@ function normalizeCpModelForProtobuf(model: CpModelProto) {
 
 async function createModel(model: CpModelProto): Promise<Uint8Array> {
   const { modelType: type } = getProtobufContext();
-  const protobufModel = normalizeCpModelForProtobuf(model);
+  const protobufModel = encodeProtobufBigInts(normalizeCpModelForProtobuf(model)) as Record<string, unknown>;
   const validationError = type.verify(protobufModel);
   if (validationError) {
     throw new Error(`CpSat.createModel: ${validationError}`);

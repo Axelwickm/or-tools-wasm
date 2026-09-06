@@ -15,11 +15,18 @@ import type {
   CpSatSolverParameters,
 } from './api.js';
 import type { ExecutorSelection } from '../executor_configuration.js';
+import {
+  INT64_MAX as INT64_MAX_BIGINT,
+  INT64_MIN as INT64_MIN_BIGINT,
+  toInt64,
+  type IntValue,
+} from '../int64.js';
 
-const INT64_MIN: ProtoInt64 = { low: 0, high: -2147483648 };
-const INT64_MAX: ProtoInt64 = { low: -1, high: 2147483647 };
-
-export type LinearExprLike = number | IntVar | NotBoolVar | LinearExpr;
+const INT64_MIN: ProtoInt64 = INT64_MIN_BIGINT;
+const INT64_MAX: ProtoInt64 = INT64_MAX_BIGINT;
+export type { IntValue } from '../int64.js';
+export type NumericValue = number | bigint;
+export type LinearExprLike = IntValue | IntVar | NotBoolVar | LinearExpr;
 export type LiteralLike = number | boolean | BoolVar | NotBoolVar;
 export type CpSolverSolveOptions = CpSatSolverParameters & {
   executor?: ExecutorSelection;
@@ -35,70 +42,31 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-export class ValueError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ValueError';
-  }
-}
-
-export class RuntimeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RuntimeError';
-  }
-}
-
-export class ArithmeticError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ArithmeticError';
-  }
-}
-
-export class NotImplementedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'NotImplementedError';
-  }
-}
-
-function valueError(condition: unknown, message: string): asserts condition {
+function rangeError(condition: unknown, message: string): asserts condition {
   if (!condition) {
-    throw new ValueError(message);
+    throw new RangeError(message);
   }
 }
 
-function runtimeError(condition: unknown, message: string): asserts condition {
+function stateError(condition: unknown, message: string): asserts condition {
   if (!condition) {
-    throw new RuntimeError(message);
+    throw new Error(message);
   }
 }
 
-function asInt64(value: number): ProtoInt64 {
-  assert(Number.isInteger(value), `expected integer value, got ${value}`);
-  return value;
-}
-
-function normalizeInt64(value: ProtoInt64): ProtoInt64 {
-  if (typeof value === 'number') {
-    return asInt64(value);
-  }
-  return value;
-}
-
-function int64ObjectToBigInt(value: { low: number; high: number; unsigned?: boolean }) {
-  return BigInt(value.high) * 0x100000000n + BigInt(value.low >>> 0);
+function asInt64(value: IntValue): ProtoInt64 {
+  const exact = toInt64(value);
+  return exact >= BigInt(Number.MIN_SAFE_INTEGER) && exact <= BigInt(Number.MAX_SAFE_INTEGER)
+    ? Number(exact)
+    : exact;
 }
 
 function protoInt64ToBigInt(value: ProtoInt64) {
-  if (typeof value === 'number') {
-    return BigInt(value);
-  }
-  if (typeof value === 'string') {
-    return BigInt(value);
-  }
-  return int64ObjectToBigInt(value);
+  if (typeof value === 'number' || typeof value === 'bigint') return toInt64(value);
+  const exact = typeof value === 'string'
+    ? BigInt(value)
+    : BigInt(value.high) * 0x1_0000_0000n + BigInt(value.low >>> 0);
+  return toInt64(exact);
 }
 
 function protoInt64ToString(value: ProtoInt64) {
@@ -113,60 +81,32 @@ function compareProtoInt64(left: ProtoInt64, right: ProtoInt64) {
   return 0;
 }
 
-function bigintToProtoInt64(value: bigint): ProtoInt64 {
-  if (value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER)) {
-    return Number(value);
-  }
-  return {
-    low: Number(BigInt.asIntN(32, value)),
-    high: Number(BigInt.asIntN(32, value >> 32n)),
-  };
-}
-
 function isInt64Min(value: ProtoInt64) {
-  return (
-    value === '-9223372036854775808' ||
-    (typeof value === 'object' && value.low === 0 && value.high === -2147483648)
-  );
+  return protoInt64ToBigInt(value) === INT64_MIN_BIGINT;
 }
 
 function isInt64Max(value: ProtoInt64) {
-  return (
-    value === '9223372036854775807' ||
-    (typeof value === 'object' && value.low === -1 && value.high === 2147483647)
-  );
+  return protoInt64ToBigInt(value) === INT64_MAX_BIGINT;
 }
 
-function isProtoInt64Object(value: unknown): value is { low: number; high: number; unsigned?: boolean } {
-  return typeof value === 'object'
-    && value !== null
-    && 'low' in value
-    && 'high' in value
-    && typeof (value as { low: unknown }).low === 'number'
-    && typeof (value as { high: unknown }).high === 'number';
+function isProtoInt64Constant(value: unknown): value is IntValue {
+  return typeof value === 'number' || typeof value === 'bigint';
 }
 
-function isProtoInt64String(value: unknown): value is string {
-  return typeof value === 'string' && /^-?\d+$/.test(value);
+function adjustedProtoInt64ToBigInt(value: ProtoInt64, offset: NumericValue) {
+  rangeError(isExactInteger(offset), 'integer bounds require an integer expression offset');
+  return protoInt64ToBigInt(value) - offset;
 }
 
-function isProtoInt64Constant(value: unknown): value is ProtoInt64 {
-  return typeof value === 'number' || isProtoInt64String(value) || isProtoInt64Object(value);
-}
-
-function adjustedProtoInt64ToBigInt(value: ProtoInt64, offset: number) {
-  return protoInt64ToBigInt(value) - BigInt(offset);
-}
-
-function adjustedProtoInt64ToString(value: ProtoInt64, offset: number) {
-  if (Number.isInteger(offset)) {
+function adjustedProtoInt64ToString(value: ProtoInt64, offset: NumericValue) {
+  if (isExactInteger(offset)) {
     return adjustedProtoInt64ToBigInt(value, offset).toString();
   }
   return String(protoInt64ToNumber(value) - offset);
 }
 
-function compareAdjustedProtoInt64(left: ProtoInt64, right: ProtoInt64, offset: number) {
-  if (!Number.isInteger(offset)) {
+function compareAdjustedProtoInt64(left: ProtoInt64, right: ProtoInt64, offset: NumericValue) {
+  if (!isExactInteger(offset)) {
     const leftValue = protoInt64ToNumber(left) - offset;
     const rightValue = protoInt64ToNumber(right) - offset;
     if (leftValue < rightValue) return -1;
@@ -180,64 +120,113 @@ function compareAdjustedProtoInt64(left: ProtoInt64, right: ProtoInt64, offset: 
   return 0;
 }
 
-function adjustDomainEndpoint(value: ProtoInt64, offset: number): ProtoInt64 {
+function adjustDomainEndpoint(value: ProtoInt64, offset: NumericValue): ProtoInt64 {
   if (isInt64Min(value) || isInt64Max(value)) {
     return value;
   }
-  if (typeof value === 'number') {
-    return asInt64(value - offset);
-  }
-  if (typeof value === 'string') {
-    return bigintToProtoInt64(BigInt(value) - BigInt(offset));
-  }
-  return bigintToProtoInt64(int64ObjectToBigInt(value) - BigInt(offset));
+  rangeError(isExactInteger(offset), 'integer constraints require an integer expression offset');
+  return asInt64(protoInt64ToBigInt(value) - offset);
 }
 
 function protoInt64ToNumber(value: ProtoInt64 | undefined) {
   if (value === undefined) return 0;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') return Number(value);
-  return value.high * 0x100000000 + (value.low >>> 0);
+  const exact = protoInt64ToBigInt(value);
+  rangeError(
+    exact >= BigInt(Number.MIN_SAFE_INTEGER) && exact <= BigInt(Number.MAX_SAFE_INTEGER),
+    `integer cannot be represented exactly as a JavaScript number: ${exact}`,
+  );
+  return Number(exact);
 }
 
 function cloneProto<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
-export type LinearExpressionProtoLike = {
-  vars?: number[];
-  coeffs?: ProtoInt64[];
-  offset?: ProtoInt64;
-};
+const liveModelProtos = new WeakMap<CpModel, CpModelProto>();
+
+function liveModelProto(model: CpModel) {
+  const proto = liveModelProtos.get(model);
+  assert(proto, 'CpModel has no internal proto');
+  return proto;
+}
 
 type LinearExprDisplayNode =
-  | { kind: 'const'; value: number }
+  | { kind: 'const'; value: NumericValue }
   | { kind: 'var'; index: number }
   | { kind: 'not'; index: number }
   | { kind: 'sum'; values: LinearExprDisplayNode[] }
-  | { kind: 'mul'; coeff: number; value: LinearExprDisplayNode }
-  | { kind: 'weighted'; values: LinearExprDisplayNode[]; coeffs: number[] };
+  | { kind: 'mul'; coeff: NumericValue; value: LinearExprDisplayNode }
+  | { kind: 'weighted'; values: LinearExprDisplayNode[]; coeffs: NumericValue[] };
 
-export function rebuildFromLinearExpressionProto(
-  proto: LinearExpressionProtoLike,
-  _modelProto: unknown,
-): number | LinearExpr {
-  const vars = proto.vars ?? [];
-  const coeffs = proto.coeffs ?? [];
-  valueError(vars.length === coeffs.length, 'linear expression proto vars and coeffs must have the same length');
-  if (vars.length === 0) {
-    return protoInt64ToNumber(proto.offset);
-  }
-
-  const terms = new Map<number, number>();
-  for (let index = 0; index < vars.length; index += 1) {
-    terms.set(vars[index], Number(protoInt64ToNumber(coeffs[index])));
-  }
-  return new LinearExpr(null, terms, protoInt64ToNumber(proto.offset));
+function normalizeNumeric(value: NumericValue): NumericValue {
+  if (typeof value === 'bigint') return toInt64(value);
+  if (!Number.isFinite(value)) throw new TypeError(`expected finite numeric value, got ${value}`);
+  return Number.isInteger(value) ? toInt64(value) : value;
 }
 
-export function rebuild_from_linear_expression_proto(proto: LinearExpressionProtoLike, modelProto: unknown): number | LinearExpr {
-  return rebuildFromLinearExpressionProto(proto, modelProto);
+function isExactInteger(value: NumericValue): value is bigint {
+  return typeof value === 'bigint';
+}
+
+function numericIsZero(value: NumericValue) {
+  return value === 0 || value === 0n;
+}
+
+function numericIsOne(value: NumericValue) {
+  return value === 1 || value === 1n;
+}
+
+function numericIsNegativeOne(value: NumericValue) {
+  return value === -1 || value === -1n;
+}
+
+function numericAdd(left: NumericValue, right: NumericValue): NumericValue {
+  if (isExactInteger(left) && isExactInteger(right)) return left + right;
+  if (isExactInteger(left) || isExactInteger(right)) {
+    const integer = isExactInteger(left) ? left : right as bigint;
+    const floating = isExactInteger(left) ? right as number : left as number;
+    rangeError(
+      integer >= BigInt(Number.MIN_SAFE_INTEGER) && integer <= BigInt(Number.MAX_SAFE_INTEGER),
+      'cannot combine an out-of-safe-range integer with a floating-point value',
+    );
+    return Number(integer) + floating;
+  }
+  return left + right;
+}
+
+function numericMultiply(left: NumericValue, right: NumericValue): NumericValue {
+  if (isExactInteger(left) && isExactInteger(right)) return left * right;
+  if (isExactInteger(left) || isExactInteger(right)) {
+    const integer = isExactInteger(left) ? left : right as bigint;
+    const floating = isExactInteger(left) ? right as number : left as number;
+    rangeError(
+      integer >= BigInt(Number.MIN_SAFE_INTEGER) && integer <= BigInt(Number.MAX_SAFE_INTEGER),
+      'cannot combine an out-of-safe-range integer with a floating-point value',
+    );
+    return Number(integer) * floating;
+  }
+  return left * right;
+}
+
+function numericNegate(value: NumericValue): NumericValue {
+  return typeof value === 'bigint' ? -value : -value;
+}
+
+function numericAbs(value: NumericValue): NumericValue {
+  return typeof value === 'bigint' ? (value < 0n ? -value : value) : Math.abs(value);
+}
+
+function numericIsNegative(value: NumericValue) {
+  return typeof value === 'bigint' ? value < 0n : value < 0;
+}
+
+function numericToNumber(value: NumericValue) {
+  if (typeof value === 'number') return value;
+  rangeError(
+    value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER),
+    `integer cannot be represented exactly as a JavaScript number: ${value}`,
+  );
+  return Number(value);
 }
 
 function evaluateLinearExpression(response: CpSolverResponse, expression: LinearExprLike) {
@@ -245,8 +234,8 @@ function evaluateLinearExpression(response: CpSolverResponse, expression: Linear
   let value = expr.offset;
   for (const [index, coeff] of expr.terms) {
     const variableValue = response.solution?.[index];
-    assert(typeof variableValue === 'number', `missing numeric solution value for variable ${index}`);
-    value += coeff * variableValue;
+    assert(typeof variableValue === 'bigint', `missing exact integer solution value for variable ${index}`);
+    value = numericAdd(value, numericMultiply(coeff, variableValue));
   }
   return value;
 }
@@ -260,8 +249,8 @@ function evaluateBooleanLiteral(response: CpSolverResponse, literal: LiteralLike
   }
   const index = literal instanceof NotBoolVar ? literal.variable.index : literal.index;
   const value = response.solution?.[index];
-  assert(typeof value === 'number', `missing numeric solution value for literal ${index}`);
-  const truth = value !== 0;
+  assert(typeof value === 'bigint', `missing exact integer solution value for literal ${index}`);
+  const truth = value !== 0n;
   return literal instanceof NotBoolVar ? !truth : truth;
 }
 
@@ -279,48 +268,15 @@ function literalIndex(literal: LiteralLike) {
   return literal.index;
 }
 
-export function objectIsATrueLiteral(literal: unknown) {
-  if (literal instanceof IntVar) {
-    const domain = literal.model.proto().variables?.[literal.index]?.domain ?? [];
-    return domain.length === 2 && protoInt64ToNumber(domain[0]) === 1 && protoInt64ToNumber(domain[1]) === 1;
-  }
-  if (literal instanceof NotBoolVar) {
-    const domain = literal.variable.model.proto().variables?.[literal.variable.index]?.domain ?? [];
-    return domain.length === 2 && protoInt64ToNumber(domain[0]) === 0 && protoInt64ToNumber(domain[1]) === 0;
-  }
-  if (typeof literal === 'boolean') {
-    return literal;
-  }
-  if (typeof literal === 'number' && Number.isInteger(literal)) {
-    return literal === 1 || literal === ~0;
-  }
-  return false;
-}
-
-export function object_is_a_true_literal(literal: unknown) {
-  return objectIsATrueLiteral(literal);
-}
-
-export function objectIsAFalseLiteral(literal: unknown) {
-  if (literal instanceof IntVar) {
-    const domain = literal.model.proto().variables?.[literal.index]?.domain ?? [];
-    return domain.length === 2 && protoInt64ToNumber(domain[0]) === 0 && protoInt64ToNumber(domain[1]) === 0;
-  }
-  if (literal instanceof NotBoolVar) {
-    const domain = literal.variable.model.proto().variables?.[literal.variable.index]?.domain ?? [];
-    return domain.length === 2 && protoInt64ToNumber(domain[0]) === 1 && protoInt64ToNumber(domain[1]) === 1;
-  }
-  if (typeof literal === 'boolean') {
-    return !literal;
-  }
-  if (typeof literal === 'number' && Number.isInteger(literal)) {
-    return literal === 0 || literal === ~1;
-  }
-  return false;
-}
-
-export function object_is_a_false_literal(literal: unknown) {
-  return objectIsAFalseLiteral(literal);
+function literalReferences(model: CpModel, literals: Iterable<LiteralLike>) {
+  return Array.from(literals, (literal) => {
+    const index = literalIndex(literal);
+    if (index === true) return model.newConstant(1).index;
+    if (index === false) return model.newConstant(0).index;
+    assert(literal instanceof BoolVar || literal instanceof NotBoolVar, 'literal must be a Boolean variable or its negation');
+    requireSameModel(model, literal.model, 'literal');
+    return index;
+  });
 }
 
 function requireSameModel(model: CpModel, owner: CpModel, what: string) {
@@ -329,9 +285,9 @@ function requireSameModel(model: CpModel, owner: CpModel, what: string) {
   }
 }
 
-function mergeTerms(terms: Map<number, number>, index: number, coeff: number) {
-  const next = (terms.get(index) ?? 0) + coeff;
-  if (next === 0) {
+function mergeTerms(terms: Map<number, NumericValue>, index: number, coeff: NumericValue) {
+  const next = numericAdd(terms.get(index) ?? 0n, coeff);
+  if (numericIsZero(next)) {
     terms.delete(index);
   } else {
     terms.set(index, next);
@@ -339,7 +295,7 @@ function mergeTerms(terms: Map<number, number>, index: number, coeff: number) {
 }
 
 function variableDisplayName(model: CpModel | null, index: number) {
-  return model?.proto().variables?.[index]?.name || `var${index}`;
+  return model === null ? `var${index}` : liveModelProto(model).variables?.[index]?.name || `var${index}`;
 }
 
 function renderLinearExprDisplay(node: LinearExprDisplayNode, model: CpModel | null): string {
@@ -352,10 +308,10 @@ function renderLinearExprDisplay(node: LinearExprDisplayNode, model: CpModel | n
       return `not(${variableDisplayName(model, node.index)})`;
     case 'mul': {
       const value = renderLinearExprDisplay(node.value, model);
-      if (node.coeff === 1) {
+      if (numericIsOne(node.coeff)) {
         return value;
       }
-      if (node.coeff === -1) {
+      if (numericIsNegativeOne(node.coeff)) {
         return `(-${value})`;
       }
       return `(${node.coeff} * ${value})`;
@@ -370,7 +326,7 @@ function renderLinearExprDisplay(node: LinearExprDisplayNode, model: CpModel | n
 function renderLinearExprDisplayRepr(node: LinearExprDisplayNode, model: CpModel | null): string {
   switch (node.kind) {
     case 'const':
-      return Number.isInteger(node.value) ? `IntConstant(${node.value})` : `FloatConstant(${node.value})`;
+      return isExactInteger(node.value) ? `IntConstant(${node.value})` : `FloatConstant(${node.value})`;
     case 'var': {
       const variable = model?.getIntVarFromProtoIndex(node.index);
       return variable?.repr() ?? `var${node.index}`;
@@ -379,30 +335,30 @@ function renderLinearExprDisplayRepr(node: LinearExprDisplayNode, model: CpModel
       return `NotBooleanVariable(var_index=${node.index})`;
     case 'mul': {
       const valueRepr = renderLinearExprDisplayRepr(node.value, model);
-      const affineName = Number.isInteger(node.coeff) ? 'IntAffine' : 'FloatAffine';
+      const affineName = isExactInteger(node.coeff) ? 'IntAffine' : 'FloatAffine';
       return `${affineName}(expr=${valueRepr}, coeff=${node.coeff}, offset=0)`;
     }
     case 'sum': {
       const values: string[] = [];
-      let integerOffset = 0;
+      let integerOffset = 0n;
       let floatOffset = 0;
       let hasFloatOffset = false;
       for (const value of node.values) {
         if (value.kind === 'const') {
-          if (Number.isInteger(value.value) && !hasFloatOffset) {
+          if (isExactInteger(value.value) && !hasFloatOffset) {
             integerOffset += value.value;
           } else {
             hasFloatOffset = true;
-            floatOffset += value.value;
+            floatOffset += numericToNumber(value.value);
           }
         } else {
           values.push(renderLinearExprDisplayRepr(value, model));
         }
       }
       if (hasFloatOffset) {
-        return `SumArray(${values.join(', ')}, float_offset=${floatOffset + integerOffset})`;
+        return `SumArray(${values.join(', ')}, float_offset=${floatOffset + Number(integerOffset)})`;
       }
-      if (integerOffset !== 0) {
+      if (integerOffset !== 0n) {
         return `SumArray(${values.join(', ')}, int_offset=${integerOffset})`;
       }
       return `SumArray(${values.join(', ')})`;
@@ -416,15 +372,15 @@ function renderLinearExprDisplayRepr(node: LinearExprDisplayNode, model: CpModel
 
 function formatDisplaySum(values: LinearExprDisplayNode[], model: CpModel | null) {
   const nonConstantValues: LinearExprDisplayNode[] = [];
-  let constant = 0;
+  let constant: NumericValue = 0n;
   for (const value of values) {
     if (value.kind === 'const') {
-      constant += value.value;
+      constant = numericAdd(constant, value.value);
     } else {
       nonConstantValues.push(value);
     }
   }
-  if (constant !== 0 || nonConstantValues.length === 0) {
+  if (!numericIsZero(constant) || nonConstantValues.length === 0) {
     nonConstantValues.push({ kind: 'const', value: constant });
   }
   if (nonConstantValues.length === 0) {
@@ -433,8 +389,8 @@ function formatDisplaySum(values: LinearExprDisplayNode[], model: CpModel | null
   const [first, ...rest] = nonConstantValues;
   let text = renderLinearExprDisplay(first, model);
   for (const value of rest) {
-    if (value.kind === 'const' && value.value < 0) {
-      text += ` - ${Math.abs(value.value)}`;
+    if (value.kind === 'const' && numericIsNegative(value.value)) {
+      text += ` - ${numericAbs(value.value)}`;
     } else {
       text += ` + ${renderLinearExprDisplay(value, model)}`;
     }
@@ -442,25 +398,25 @@ function formatDisplaySum(values: LinearExprDisplayNode[], model: CpModel | null
   return nonConstantValues.length > 1 ? `(${text})` : text;
 }
 
-function formatWeightedDisplaySum(values: LinearExprDisplayNode[], coeffs: number[], model: CpModel | null) {
+function formatWeightedDisplaySum(values: LinearExprDisplayNode[], coeffs: NumericValue[], model: CpModel | null) {
   const pieces: Array<{ sign: 1 | -1; text: string }> = [];
   for (let index = 0; index < values.length; index += 1) {
     const coeff = coeffs[index];
-    if (coeff === 0) {
+    if (numericIsZero(coeff)) {
       continue;
     }
     const value = values[index];
     if (value.kind === 'const') {
-      const scaled = value.value * coeff;
-      if (scaled !== 0) {
-        pieces.push({ sign: scaled < 0 ? -1 : 1, text: String(Math.abs(scaled)) });
+      const scaled = numericMultiply(value.value, coeff);
+      if (!numericIsZero(scaled)) {
+        pieces.push({ sign: numericIsNegative(scaled) ? -1 : 1, text: String(numericAbs(scaled)) });
       }
       continue;
     }
-    const sign = coeff < 0 ? -1 : 1;
-    const absCoeff = Math.abs(coeff);
+    const sign = numericIsNegative(coeff) ? -1 : 1;
+    const absCoeff = numericAbs(coeff);
     const valueText = renderLinearExprDisplay(value, model);
-    pieces.push({ sign, text: absCoeff === 1 ? valueText : `${absCoeff} * ${valueText}` });
+    pieces.push({ sign, text: numericIsOne(absCoeff) ? valueText : `${absCoeff} * ${valueText}` });
   }
   if (pieces.length === 0) {
     return '0';
@@ -482,14 +438,14 @@ function appendDisplaySumValues(values: LinearExprDisplayNode[], node: LinearExp
 }
 
 function unsupportedNativeOperatorCoercion(): never {
-  throw new NotImplementedError('native JavaScript operators are not supported for CP-SAT expressions; use the explicit high-level API methods');
+  throw new TypeError('native JavaScript operators are not supported for CP-SAT expressions; use the explicit high-level API methods');
 }
 
 function expressionList(first: Iterable<LinearExprLike> | LinearExprLike, rest: LinearExprLike[]) {
   if (rest.length > 0) {
     return [first as LinearExprLike, ...rest];
   }
-  if (typeof first === 'number' || first instanceof IntVar || first instanceof NotBoolVar || first instanceof LinearExpr) {
+  if (typeof first === 'number' || typeof first === 'bigint' || first instanceof IntVar || first instanceof NotBoolVar || first instanceof LinearExpr) {
     return [first];
   }
   return Array.from(first);
@@ -499,7 +455,7 @@ function iterableValues(first: Iterable<LinearExprLike> | LinearExprLike, rest: 
   if (rest.length > 0) {
     return [first, ...rest] as LinearExprLike[];
   }
-  if (typeof first === 'number' || first instanceof IntVar || first instanceof NotBoolVar || first instanceof LinearExpr) {
+  if (typeof first === 'number' || typeof first === 'bigint' || first instanceof IntVar || first instanceof NotBoolVar || first instanceof LinearExpr) {
     return [first];
   }
   return Array.from(first);
@@ -517,14 +473,14 @@ function literalList(first: Iterable<LiteralLike> | LiteralLike, rest: LiteralLi
 
 export class LinearExpr {
   readonly model: CpModel | null;
-  readonly terms: ReadonlyMap<number, number>;
-  readonly offset: number;
+  readonly terms: ReadonlyMap<number, NumericValue>;
+  readonly offset: NumericValue;
   private readonly display: LinearExprDisplayNode | null;
 
   constructor(
     model: CpModel | null,
-    terms: ReadonlyMap<number, number> = new Map(),
-    offset = 0,
+    terms: ReadonlyMap<number, NumericValue> = new Map(),
+    offset: NumericValue = 0n,
     display: LinearExprDisplayNode | null = null,
   ) {
     this.model = model;
@@ -533,44 +489,29 @@ export class LinearExpr {
     this.display = display;
   }
 
-  static constant(value: number) {
-    return new LinearExpr(null, new Map(), value, { kind: 'const', value });
+  static constant(value: IntValue) {
+    const normalized = normalizeNumeric(value);
+    return new LinearExpr(null, new Map(), normalized, { kind: 'const', value: normalized });
   }
 
   static sum(values: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
     return sum(values, ...rest);
   }
 
-  static Sum(values: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
-    return LinearExpr.sum(values, ...rest);
-  }
-
-  static weightedSum(values: Iterable<LinearExprLike>, coeffs: Iterable<number>) {
+  static weightedSum(values: Iterable<LinearExprLike>, coeffs: Iterable<NumericValue>) {
     return weightedSum(values, coeffs);
   }
 
-  static weighted_sum(values: Iterable<LinearExprLike>, coeffs: Iterable<number>) {
-    return LinearExpr.weightedSum(values, coeffs);
-  }
-
-  static WeightedSum(values: Iterable<LinearExprLike>, coeffs: Iterable<number>) {
-    return LinearExpr.weightedSum(values, coeffs);
-  }
-
-  static term(variable: IntVar | NotBoolVar, coeff: number) {
+  static term(variable: IntVar | NotBoolVar, coeff: NumericValue) {
     return term(variable, coeff);
   }
 
-  static Term(variable: IntVar | NotBoolVar, coeff: number) {
-    return LinearExpr.term(variable, coeff);
-  }
-
-  static affine(expression: LinearExprLike, coeff: number, offset: number) {
+  static affine(expression: LinearExprLike, coeff: NumericValue, offset: IntValue) {
     return LinearExpr.from(expression).times(coeff).plus(offset);
   }
 
   static from(value: LinearExprLike): LinearExpr {
-    if (typeof value === 'number') {
+    if (typeof value === 'number' || typeof value === 'bigint') {
       return LinearExpr.constant(value);
     }
     if (value instanceof LinearExpr) {
@@ -585,8 +526,9 @@ export class LinearExpr {
     return value.expr();
   }
 
-  plus(value: LinearExprLike, coeff = 1) {
-    const other = coeff === 1 ? LinearExpr.from(value) : LinearExpr.from(value).times(coeff);
+  plus(value: LinearExprLike, coeff: NumericValue = 1n) {
+    const normalizedCoeff = normalizeNumeric(coeff);
+    const other = numericIsOne(normalizedCoeff) ? LinearExpr.from(value) : LinearExpr.from(value).times(normalizedCoeff);
     const model = this.model ?? other.model;
     if (this.model && other.model) {
       requireSameModel(this.model, other.model, 'linear expression');
@@ -598,28 +540,26 @@ export class LinearExpr {
     const displayValues: LinearExprDisplayNode[] = [];
     appendDisplaySumValues(displayValues, this.displayNodeForRendering());
     appendDisplaySumValues(displayValues, other.displayNodeForRendering());
-    return new LinearExpr(model, terms, this.offset + other.offset, { kind: 'sum', values: displayValues });
+    return new LinearExpr(model, terms, numericAdd(this.offset, other.offset), { kind: 'sum', values: displayValues });
   }
 
   minus(value: LinearExprLike) {
-    return this.plus(value, -1);
+    return this.plus(value, -1n);
   }
 
-  times(coeff: number) {
-    if (typeof coeff !== 'number' || !Number.isFinite(coeff)) {
-      throw new TypeError(`expected finite numeric coefficient, got ${coeff}`);
-    }
-    const terms = new Map<number, number>();
+  times(coeff: NumericValue) {
+    const normalizedCoeff = normalizeNumeric(coeff);
+    const terms = new Map<number, NumericValue>();
     for (const [index, termCoeff] of this.terms) {
-      mergeTerms(terms, index, termCoeff * coeff);
+      mergeTerms(terms, index, numericMultiply(termCoeff, normalizedCoeff));
     }
-    let displayCoeff = coeff;
+    let displayCoeff = normalizedCoeff;
     let displayValue = this.displayNodeForRendering();
     if (displayValue.kind === 'mul') {
-      displayCoeff *= displayValue.coeff;
+      displayCoeff = numericMultiply(displayCoeff, displayValue.coeff);
       displayValue = displayValue.value;
     }
-    return new LinearExpr(this.model, terms, this.offset * coeff, {
+    return new LinearExpr(this.model, terms, numericMultiply(this.offset, normalizedCoeff), {
       kind: 'mul',
       coeff: displayCoeff,
       value: displayValue,
@@ -627,69 +567,7 @@ export class LinearExpr {
   }
 
   neg() {
-    return this.times(-1);
-  }
-
-  abs(): never {
-    throw new NotImplementedError(
-      'calling abs() on a linear expression is not supported, please use CpModel.add_abs_equality',
-    );
-  }
-
-  __abs__(): never {
-    return this.abs();
-  }
-
-  div(_value: LinearExprLike): never {
-    throw new NotImplementedError(
-      'calling // on a linear expression is not supported, please use CpModel.add_division_equality',
-    );
-  }
-
-  __div__(value: LinearExprLike): never {
-    return this.div(value);
-  }
-
-  truediv(_value: LinearExprLike): never {
-    return this.div(_value);
-  }
-
-  __truediv__(value: LinearExprLike): never {
-    return this.truediv(value);
-  }
-
-  mod(_value: LinearExprLike): never {
-    throw new NotImplementedError(
-      'calling %% on a linear expression is not supported, please use CpModel.add_modulo_equality',
-    );
-  }
-
-  __mod__(value: LinearExprLike): never {
-    return this.mod(value);
-  }
-
-  __pow__(_value: LinearExprLike): never {
-    throw new NotImplementedError('calling ** on a linear expression is not supported');
-  }
-
-  __lshift__(_value: LinearExprLike): never {
-    throw new NotImplementedError('calling << on a linear expression is not supported');
-  }
-
-  __rshift__(_value: LinearExprLike): never {
-    throw new NotImplementedError('calling >> on a linear expression is not supported');
-  }
-
-  __and__(_value: LinearExprLike): never {
-    throw new NotImplementedError('calling & on a linear expression is not supported');
-  }
-
-  __or__(_value: LinearExprLike): never {
-    throw new NotImplementedError('calling | on a linear expression is not supported');
-  }
-
-  __xor__(_value: LinearExprLike): never {
-    throw new NotImplementedError('calling ^ on a linear expression is not supported');
+    return this.times(-1n);
   }
 
   eq(value: LinearExprLike) {
@@ -698,10 +576,10 @@ export class LinearExpr {
 
   ne(value: LinearExprLike) {
     if (isProtoInt64Constant(value) && isInt64Min(value)) {
-      return new BoundedLinearExpr(this, bigintToProtoInt64(-9223372036854775807n), INT64_MAX);
+      return new BoundedLinearExpr(this, asInt64(-9223372036854775807n), INT64_MAX);
     }
     if (isProtoInt64Constant(value) && isInt64Max(value)) {
-      return new BoundedLinearExpr(this, INT64_MIN, bigintToProtoInt64(9223372036854775806n));
+      return new BoundedLinearExpr(this, INT64_MIN, asInt64(9223372036854775806n));
     }
     return new BoundedLinearExpr(this.minus(value), INT64_MIN, -1, [INT64_MIN, -1, 1, INT64_MAX]);
   }
@@ -715,7 +593,7 @@ export class LinearExpr {
 
   lt(value: LinearExprLike) {
     if (isProtoInt64Constant(value) && isInt64Min(value)) {
-      throw new ArithmeticError('integer expressions cannot be less than INT_MIN');
+      throw new RangeError('integer expressions cannot be less than INT_MIN');
     }
     return new BoundedLinearExpr(this.minus(value), INT64_MIN, -1);
   }
@@ -729,7 +607,7 @@ export class LinearExpr {
 
   gt(value: LinearExprLike) {
     if (isProtoInt64Constant(value) && isInt64Max(value)) {
-      throw new ArithmeticError('integer expressions cannot be greater than INT_MAX');
+      throw new RangeError('integer expressions cannot be greater than INT_MAX');
     }
     return new BoundedLinearExpr(this.minus(value), 1, INT64_MAX);
   }
@@ -739,10 +617,12 @@ export class LinearExpr {
     const coeffs: ProtoInt64[] = [];
     for (const [index, coeff] of this.terms) {
       vars.push(index);
+      rangeError(isExactInteger(coeff), 'integer constraints require integer coefficients');
       coeffs.push(asInt64(coeff));
     }
     const proto: LinearExpressionProto = { vars, coeffs };
-    if (this.offset !== 0) {
+    if (!numericIsZero(this.offset)) {
+      rangeError(isExactInteger(this.offset), 'integer constraints require an integer offset');
       proto.offset = asInt64(this.offset);
     }
     return proto;
@@ -752,20 +632,20 @@ export class LinearExpr {
     if (this.display) {
       return renderLinearExprDisplay(this.display, this.model);
     }
-    if (this.terms.size === 1 && this.offset !== 0) {
+    if (this.terms.size === 1 && !numericIsZero(this.offset)) {
       const [[index, coeff]] = Array.from(this.terms);
       const variable = this.model?.getIntVarFromProtoIndex(index);
-      if (variable instanceof BoolVar && coeff === -this.offset) {
+      if (variable instanceof BoolVar && coeff === numericNegate(this.offset)) {
         return `(${this.offset} * not(${variable}))`;
       }
     }
     const pieces: string[] = [];
     let singleTermNeedsParens = false;
     for (const [index, coeff] of this.terms) {
-      const name = this.model?.proto().variables?.[index]?.name || `var${index}`;
-      if (coeff === 1) {
+      const name = this.model === null ? `var${index}` : liveModelProto(this.model).variables?.[index]?.name || `var${index}`;
+      if (numericIsOne(coeff)) {
         pieces.push(name);
-      } else if (coeff === -1) {
+      } else if (numericIsNegativeOne(coeff)) {
         pieces.push(`-${name}`);
         singleTermNeedsParens = true;
       } else {
@@ -773,7 +653,7 @@ export class LinearExpr {
         singleTermNeedsParens = true;
       }
     }
-    if (this.offset !== 0 || pieces.length === 0) {
+    if (!numericIsZero(this.offset) || pieces.length === 0) {
       pieces.push(String(this.offset));
       singleTermNeedsParens = false;
     }
@@ -803,40 +683,36 @@ export class LinearExpr {
     }
     const values = Array.from(this.terms, ([index, coeff]) => {
       const variable: LinearExprDisplayNode = { kind: 'var', index };
-      return coeff === 1 ? variable : { kind: 'mul', coeff, value: variable } as LinearExprDisplayNode;
+      return numericIsOne(coeff) ? variable : { kind: 'mul', coeff, value: variable } as LinearExprDisplayNode;
     });
-    if (this.offset !== 0) {
+    if (!numericIsZero(this.offset)) {
       values.push({ kind: 'const', value: this.offset });
     }
     return values.length === 1 ? values[0] : { kind: 'sum', values };
   }
 
   hasFloatingPointTerms() {
-    return this.offset !== 0 && !Number.isInteger(this.offset)
-      || Array.from(this.terms.values()).some((coeff) => !Number.isInteger(coeff));
+    return !isExactInteger(this.offset)
+      || Array.from(this.terms.values()).some((coeff) => !isExactInteger(coeff));
   }
 
   isInteger() {
     return !this.hasFloatingPointTerms();
   }
 
-  is_integer() {
-    return this.isInteger();
-  }
-
   repr() {
     if (this.terms.size === 0) {
-      return Number.isInteger(this.offset) ? `IntConstant(${this.offset})` : `FloatConstant(${this.offset})`;
+      return isExactInteger(this.offset) ? `IntConstant(${this.offset})` : `FloatConstant(${this.offset})`;
     }
     if (this.terms.size === 1) {
       const [[index, coeff]] = Array.from(this.terms);
-      if (coeff === 1 && this.offset === 0) {
+      if (numericIsOne(coeff) && numericIsZero(this.offset)) {
         const variable = this.model?.getIntVarFromProtoIndex(index);
         return variable?.repr() ?? String(this);
       }
       const variable = this.model?.getIntVarFromProtoIndex(index);
       const variableRepr = variable?.repr() ?? `var${index}`;
-      if (Number.isInteger(coeff) && Number.isInteger(this.offset)) {
+      if (isExactInteger(coeff) && isExactInteger(this.offset)) {
         return `IntAffine(expr=${variableRepr}, coeff=${coeff}, offset=${this.offset})`;
       }
       return `FloatAffine(expr=${variableRepr}, coeff=${coeff}, offset=${this.offset})`;
@@ -849,10 +725,10 @@ export class LinearExpr {
       return variable?.repr() ?? `var${index}`;
     });
     const coeffs = Array.from(this.terms.values());
-    if (this.offset === 0 && coeffs.every((coeff) => coeff === 1)) {
+    if (numericIsZero(this.offset) && coeffs.every(numericIsOne)) {
       return `SumArray(${variables.join(', ')})`;
     }
-    if (coeffs.every((coeff) => Number.isInteger(coeff)) && Number.isInteger(this.offset)) {
+    if (coeffs.every(isExactInteger) && isExactInteger(this.offset)) {
       return `IntWeightedSum([${variables.join(', ')}], [${coeffs.join(', ')}], ${this.offset})`;
     }
     return `FloatWeightedSum([${variables.join(', ')}], [${coeffs.join(', ')}], ${this.offset})`;
@@ -861,8 +737,8 @@ export class LinearExpr {
   toFloatObjective(maximize = false) {
     return {
       vars: Array.from(this.terms.keys()),
-      coeffs: Array.from(this.terms.values()),
-      offset: this.offset,
+      coeffs: Array.from(this.terms.values(), numericToNumber),
+      offset: numericToNumber(this.offset),
       maximize,
     };
   }
@@ -889,7 +765,7 @@ export class BoundedLinearExpr {
         && protoInt64ToNumber(this.domain[2]) === 1
         && isInt64Max(this.domain[3])
       ) {
-        return `${expressionText} != ${-this.expression.offset}`;
+        return `${expressionText} != ${numericNegate(this.expression.offset)}`;
       }
       const [firstLower, firstUpper, secondLower, secondUpper] = this.domain.map((value) =>
         adjustedProtoInt64ToString(value, this.expression.offset),
@@ -924,20 +800,6 @@ export class BoundedLinearExpr {
   }
 }
 
-export class BoundedLinearExpression extends BoundedLinearExpr {
-  constructor(expression: unknown, domain: unknown) {
-    const linear = LinearExpr.from(expression as LinearExprLike);
-    valueError(domain instanceof Domain, 'domain must be a Domain');
-    const flatDomain = domain.flatIntervals;
-    valueError(flatDomain.length >= 2 && flatDomain.length % 2 === 0, 'domain must contain complete intervals');
-    if (flatDomain.length === 2) {
-      super(linear, flatDomain[0], flatDomain[1]);
-    } else {
-      super(linear, flatDomain[0], flatDomain[flatDomain.length - 1], flatDomain);
-    }
-  }
-}
-
 export class IntVar {
   constructor(
     readonly model: CpModel,
@@ -946,111 +808,40 @@ export class IntVar {
   ) {}
 
   get name() {
-    return this.model.proto().variables?.[this.index]?.name ?? '';
+    return liveModelProto(this.model).variables?.[this.index]?.name ?? '';
   }
 
-  get model_proto() {
-    return this.model.proto();
+  get modelProto() {
+    return this.model.modelProto;
   }
 
   expr() {
-    return new LinearExpr(this.model, new Map([[this.index, 1]]), 0, { kind: 'var', index: this.index });
+    return new LinearExpr(this.model, new Map([[this.index, 1n]]), 0n, { kind: 'var', index: this.index });
   }
 
-  plus(value: LinearExprLike, coeff = 1) {
+  plus(value: LinearExprLike, coeff: NumericValue = 1n) {
     return this.expr().plus(value, coeff);
-  }
-
-  __add__(value: LinearExprLike) {
-    return this.plus(value);
   }
 
   minus(value: LinearExprLike) {
     return this.expr().minus(value);
   }
 
-  times(coeff: number) {
+  times(coeff: NumericValue) {
     return this.expr().times(coeff);
-  }
-
-  __mul__(coeff: number) {
-    return this.times(coeff);
   }
 
   neg() {
     return this.expr().neg();
   }
 
-  abs(): never {
-    return this.expr().abs();
-  }
-
-  __abs__(): never {
-    return this.abs();
-  }
-
-  div(value: LinearExprLike): never {
-    return this.expr().div(value);
-  }
-
-  __div__(value: LinearExprLike): never {
-    return this.div(value);
-  }
-
-  truediv(value: LinearExprLike): never {
-    return this.expr().truediv(value);
-  }
-
-  __truediv__(value: LinearExprLike): never {
-    return this.truediv(value);
-  }
-
-  mod(value: LinearExprLike): never {
-    return this.expr().mod(value);
-  }
-
-  __mod__(value: LinearExprLike): never {
-    return this.mod(value);
-  }
-
-  __pow__(value: LinearExprLike): never {
-    return this.expr().__pow__(value);
-  }
-
-  __lshift__(value: LinearExprLike): never {
-    return this.expr().__lshift__(value);
-  }
-
-  __rshift__(value: LinearExprLike): never {
-    return this.expr().__rshift__(value);
-  }
-
-  __and__(value: LinearExprLike): never {
-    return this.expr().__and__(value);
-  }
-
-  __or__(value: LinearExprLike): never {
-    return this.expr().__or__(value);
-  }
-
-  __xor__(value: LinearExprLike): never {
-    return this.expr().__xor__(value);
-  }
-
   isInteger() {
     return true;
   }
 
-  is_integer() {
-    return true;
-  }
-
   isBoolean() {
-    return this.model.isBooleanIndex(this.index);
-  }
-
-  get is_boolean() {
-    return this.isBoolean();
+    const domain = liveModelProto(this.model).variables?.[this.index]?.domain ?? [];
+    return isBooleanDomain(domain);
   }
 
   negated() {
@@ -1061,7 +852,7 @@ export class IntVar {
   }
 
   toString() {
-    const variable = this.model.proto().variables?.[this.index];
+    const variable = liveModelProto(this.model).variables?.[this.index];
     if (variable?.name) {
       return variable.name;
     }
@@ -1081,7 +872,7 @@ export class IntVar {
 
   debugString() {
     const name = String(this);
-    const domain = this.model.proto().variables?.[this.index]?.domain ?? [];
+    const domain = liveModelProto(this.model).variables?.[this.index]?.domain ?? [];
     return `${name}(${formatDomain(domain)})`;
   }
 
@@ -1105,10 +896,6 @@ export class IntVar {
     return this.expr().lt(value);
   }
 
-  __lt__(value: LinearExprLike) {
-    return this.lt(value);
-  }
-
   ge(value: LinearExprLike) {
     return this.expr().ge(value);
   }
@@ -1117,9 +904,6 @@ export class IntVar {
     return this.expr().gt(value);
   }
 
-  __gt__(value: LinearExprLike) {
-    return this.gt(value);
-  }
 }
 
 export class BoolVar extends IntVar {
@@ -1147,8 +931,8 @@ export class NotBoolVar {
     this.name = variable.name ? `not(${variable.name})` : '';
   }
 
-  get model_proto() {
-    return this.model.proto();
+  get modelProto() {
+    return this.model.modelProto;
   }
 
   not() {
@@ -1159,96 +943,28 @@ export class NotBoolVar {
     return this.variable;
   }
 
-  plus(value: LinearExprLike, coeff = 1) {
+  plus(value: LinearExprLike, coeff: NumericValue = 1n) {
     return this.expr().plus(value, coeff);
-  }
-
-  __add__(value: LinearExprLike) {
-    return this.plus(value);
   }
 
   minus(value: LinearExprLike) {
     return this.expr().minus(value);
   }
 
-  times(coeff: number) {
+  times(coeff: NumericValue) {
     return this.expr().times(coeff);
-  }
-
-  __mul__(coeff: number) {
-    return this.times(coeff);
   }
 
   neg() {
     return this.expr().neg();
   }
 
-  abs(): never {
-    return this.expr().abs();
-  }
-
-  __abs__(): never {
-    return this.abs();
-  }
-
-  div(value: LinearExprLike): never {
-    return this.expr().div(value);
-  }
-
-  __div__(value: LinearExprLike): never {
-    return this.div(value);
-  }
-
-  truediv(value: LinearExprLike): never {
-    return this.expr().truediv(value);
-  }
-
-  __truediv__(value: LinearExprLike): never {
-    return this.truediv(value);
-  }
-
-  mod(value: LinearExprLike): never {
-    return this.expr().mod(value);
-  }
-
-  __mod__(value: LinearExprLike): never {
-    return this.mod(value);
-  }
-
-  __pow__(value: LinearExprLike): never {
-    return this.expr().__pow__(value);
-  }
-
-  __lshift__(value: LinearExprLike): never {
-    return this.expr().__lshift__(value);
-  }
-
-  __rshift__(value: LinearExprLike): never {
-    return this.expr().__rshift__(value);
-  }
-
-  __and__(value: LinearExprLike): never {
-    return this.expr().__and__(value);
-  }
-
-  __or__(value: LinearExprLike): never {
-    return this.expr().__or__(value);
-  }
-
-  __xor__(value: LinearExprLike): never {
-    return this.expr().__xor__(value);
-  }
-
   isInteger() {
     return true;
   }
 
-  is_integer() {
-    return true;
-  }
-
   expr() {
-    return new LinearExpr(this.model, new Map([[this.variable.index, -1]]), 1, {
+    return new LinearExpr(this.model, new Map([[this.variable.index, -1n]]), 1n, {
       kind: 'not',
       index: this.variable.index,
     });
@@ -1270,118 +986,6 @@ export class NotBoolVar {
   }
 }
 
-export class FlatIntExpr {
-  readonly vars: IntVar[];
-  readonly coeffs: number[];
-  readonly offset: number;
-
-  constructor(expression: unknown) {
-    if (expression instanceof FlatIntExpr || expression instanceof FlatFloatExpr) {
-      valueError(expression.coeffs.every((coeff) => Number.isInteger(coeff)) && Number.isInteger(expression.offset), 'expression is not integer');
-      this.vars = [...expression.vars];
-      this.coeffs = [...expression.coeffs];
-      this.offset = expression.offset;
-      return;
-    }
-    const linear = LinearExpr.from(expression as LinearExprLike);
-    valueError(linear.isInteger(), 'expression is not integer');
-    const vars: IntVar[] = [];
-    const coeffs: number[] = [];
-    for (const [index, coeff] of linear.terms) {
-      assert(linear.model, `missing model for variable ${index}`);
-      vars.push(linear.model.getIntVarFromProtoIndex(index));
-      coeffs.push(coeff);
-    }
-    this.vars = vars;
-    this.coeffs = coeffs;
-    this.offset = linear.offset;
-  }
-
-  expr() {
-    const model = this.vars[0]?.model ?? null;
-    const terms = new Map<number, number>();
-    for (let index = 0; index < this.vars.length; index += 1) {
-      terms.set(this.vars[index].index, this.coeffs[index]);
-    }
-    return new LinearExpr(model, terms, this.offset);
-  }
-
-  plus(value: LinearExprLike) {
-    return this.expr().plus(value);
-  }
-
-  minus(value: LinearExprLike) {
-    return this.expr().minus(value);
-  }
-
-  times(coeff: number) {
-    return this.expr().times(coeff);
-  }
-
-  toString() {
-    return formatFlatExpression(this.vars, this.coeffs, this.offset);
-  }
-
-  repr() {
-    return `FlatIntExpr([${this.vars.map((variable) => variable.repr()).join(', ')}], [${this.coeffs.join(', ')}], ${this.offset})`;
-  }
-}
-
-export class FlatFloatExpr {
-  readonly vars: IntVar[];
-  readonly coeffs: number[];
-  readonly offset: number;
-
-  constructor(expression: unknown) {
-    if (expression instanceof FlatIntExpr || expression instanceof FlatFloatExpr) {
-      this.vars = [...expression.vars];
-      this.coeffs = expression.coeffs.map((coeff) => Number(coeff));
-      this.offset = Number(expression.offset);
-      return;
-    }
-    const linear = LinearExpr.from(expression as LinearExprLike);
-    const vars: IntVar[] = [];
-    const coeffs: number[] = [];
-    for (const [index, coeff] of linear.terms) {
-      assert(linear.model, `missing model for variable ${index}`);
-      vars.push(linear.model.getIntVarFromProtoIndex(index));
-      coeffs.push(Number(coeff));
-    }
-    this.vars = vars;
-    this.coeffs = coeffs;
-    this.offset = Number(linear.offset);
-  }
-
-  expr() {
-    const model = this.vars[0]?.model ?? null;
-    const terms = new Map<number, number>();
-    for (let index = 0; index < this.vars.length; index += 1) {
-      terms.set(this.vars[index].index, this.coeffs[index]);
-    }
-    return new LinearExpr(model, terms, this.offset);
-  }
-
-  plus(value: LinearExprLike) {
-    return this.expr().plus(value);
-  }
-
-  minus(value: LinearExprLike) {
-    return this.expr().minus(value);
-  }
-
-  times(coeff: number) {
-    return this.expr().times(coeff);
-  }
-
-  toString() {
-    return formatFlatExpression(this.vars, this.coeffs, this.offset);
-  }
-
-  repr() {
-    return `FlatFloatExpr([${this.vars.map((variable) => variable.repr()).join(', ')}], [${this.coeffs.join(', ')}], ${this.offset})`;
-  }
-}
-
 export class IntervalVar {
   constructor(
     readonly model: CpModel,
@@ -1393,8 +997,8 @@ export class IntervalVar {
     private readonly isPresent?: LiteralLike,
   ) {}
 
-  get model_proto() {
-    return this.model.proto();
+  get modelProto() {
+    return this.model.modelProto;
   }
 
   startExpr() {
@@ -1437,38 +1041,34 @@ export class Constraint {
   ) {}
 
   get name() {
-    return this.model.proto().constraints?.[this.index]?.name ?? '';
+    return liveModelProto(this.model).constraints?.[this.index]?.name ?? '';
   }
 
   withName(name: string) {
-    const constraint = this.model.proto().constraints?.[this.index];
+    const constraint = liveModelProto(this.model).constraints?.[this.index];
     assert(constraint, 'constraint no longer exists in model');
     constraint.name = name;
     return this;
   }
 
-  with_name(name: string) {
-    return this.withName(name);
-  }
-
   onlyEnforceIf(literals: LiteralLike | Iterable<LiteralLike>, ...rest: LiteralLike[]) {
     const values = literalList(literals, rest);
-    const constraint = this.model.proto().constraints?.[this.index];
+    const constraint = liveModelProto(this.model).constraints?.[this.index];
     assert(constraint, 'constraint no longer exists in model');
     constraint.enforcementLiteral = [
       ...(constraint.enforcementLiteral ?? []),
-      ...this.model.literalReferences(values),
+      ...literalReferences(this.model, values),
     ];
     return this;
   }
 }
 
 function simplifyLinearSum(values: LinearExprLike[]) {
-  let constant = 0;
+  let constant: NumericValue = 0n;
   const nonConstantValues: LinearExprLike[] = [];
   for (const value of values) {
-    if (typeof value === 'number') {
-      constant += value;
+    if (typeof value === 'number' || typeof value === 'bigint') {
+      constant = numericAdd(constant, normalizeNumeric(value));
     } else {
       nonConstantValues.push(value);
     }
@@ -1476,7 +1076,7 @@ function simplifyLinearSum(values: LinearExprLike[]) {
   if (nonConstantValues.length === 0) {
     return LinearExpr.constant(constant);
   }
-  if (constant === 0 && nonConstantValues.length === 1) {
+  if (numericIsZero(constant) && nonConstantValues.length === 1) {
     return nonConstantValues[0];
   }
   return null;
@@ -1484,25 +1084,24 @@ function simplifyLinearSum(values: LinearExprLike[]) {
 
 function combineLinearExpressions(
   values: Iterable<LinearExprLike>,
-  scaleByIndex?: (index: number) => number,
+  scaleByIndex?: (index: number) => NumericValue,
   display?: LinearExprDisplayNode | null,
 ) {
   let model: CpModel | null = null;
-  const terms = new Map<number, number>();
-  let offset = 0;
+  const terms = new Map<number, NumericValue>();
+  let offset: NumericValue = 0n;
   let index = 0;
   for (const value of values) {
-    const scale = scaleByIndex?.(index) ?? 1;
-    assert(Number.isFinite(scale), `expected finite coefficient, got ${scale}`);
+    const scale = normalizeNumeric(scaleByIndex?.(index) ?? 1n);
     const expression = LinearExpr.from(value);
     if (model && expression.model) {
       requireSameModel(model, expression.model, 'linear expression');
     }
     model ??= expression.model;
     for (const [termIndex, termCoeff] of expression.terms) {
-      mergeTerms(terms, termIndex, termCoeff * scale);
+      mergeTerms(terms, termIndex, numericMultiply(termCoeff, scale));
     }
-    offset += expression.offset * scale;
+    offset = numericAdd(offset, numericMultiply(expression.offset, scale));
     index += 1;
   }
   return new LinearExpr(model, terms, offset, display ?? null);
@@ -1518,10 +1117,10 @@ export function sum(values: Iterable<LinearExprLike> | LinearExprLike, ...rest: 
   return combineLinearExpressions(valueList, undefined, { kind: 'sum', values: displayValues });
 }
 
-export function weightedSum(values: Iterable<LinearExprLike>, coeffs: Iterable<number>): LinearExprLike {
+export function weightedSum(values: Iterable<LinearExprLike>, coeffs: Iterable<NumericValue>): LinearExprLike {
   const valueList = Array.from(values);
   const coeffList = Array.from(coeffs);
-  valueError(valueList.length === coeffList.length, 'weightedSum requires the same number of expressions and coefficients');
+  rangeError(valueList.length === coeffList.length, 'weightedSum requires the same number of expressions and coefficients');
   const displayValues = valueList.map((value) => LinearExpr.from(value).displayNodeForRendering());
   const result = combineLinearExpressions(valueList, (index) => coeffList[index], {
     kind: 'weighted',
@@ -1535,34 +1134,8 @@ export function weightedSum(values: Iterable<LinearExprLike>, coeffs: Iterable<n
   return result;
 }
 
-export function term(variable: IntVar | NotBoolVar, coeff: number) {
+export function term(variable: IntVar | NotBoolVar, coeff: NumericValue) {
   return variable.times(coeff);
-}
-
-function formatFlatExpression(vars: IntVar[], coeffs: number[], offset: number) {
-  const pieces: string[] = [];
-  for (let index = 0; index < vars.length; index += 1) {
-    const coeff = coeffs[index];
-    const variable = String(vars[index]);
-    if (coeff === 1) {
-      pieces.push(variable);
-    } else if (coeff === -1) {
-      pieces.push(`-${variable}`);
-    } else {
-      pieces.push(`${coeff} * ${variable}`);
-    }
-  }
-  if (offset !== 0 || pieces.length === 0) {
-    pieces.push(String(offset));
-  }
-  const [first, ...rest] = pieces;
-  const value = rest.reduce((text, piece) => {
-    if (piece.startsWith('-')) {
-      return `${text} - ${piece.slice(1)}`;
-    }
-    return `${text} + ${piece}`;
-  }, first);
-  return pieces.length > 1 ? `(${value})` : value;
 }
 
 function formatDomain(domain: ProtoInt64[]) {
@@ -1587,84 +1160,68 @@ function isBooleanDomain(domain: ProtoInt64[]) {
 export class Domain {
   readonly flatIntervals: ProtoInt64[];
 
-  constructor(lower: unknown, upper?: unknown);
-  constructor(flatIntervals: Iterable<unknown>);
-  constructor(lowerOrIntervals: unknown, upper?: unknown) {
+  constructor(lower: IntValue, upper?: IntValue);
+  constructor(flatIntervals: Iterable<IntValue>);
+  constructor(lowerOrIntervals: IntValue | Iterable<IntValue>, upper?: IntValue) {
     if (upper !== undefined) {
-      this.flatIntervals = [normalizeInt64(lowerOrIntervals as ProtoInt64), normalizeInt64(upper as ProtoInt64)];
+      this.flatIntervals = [asInt64(lowerOrIntervals as IntValue), asInt64(upper)];
       return;
     }
     if (
       typeof lowerOrIntervals === 'number'
-      || typeof lowerOrIntervals === 'string'
-      || isProtoInt64Object(lowerOrIntervals)
+      || typeof lowerOrIntervals === 'bigint'
     ) {
-      const value = normalizeInt64(lowerOrIntervals as ProtoInt64);
+      const value = asInt64(lowerOrIntervals);
       this.flatIntervals = [value, value];
       return;
     }
-    this.flatIntervals = Array.from(lowerOrIntervals as Iterable<ProtoInt64>, normalizeInt64);
+    this.flatIntervals = Array.from(lowerOrIntervals, asInt64);
   }
 
-  static fromFlatIntervals(intervals: Iterable<ProtoInt64>) {
-    return new Domain(Array.from(intervals, normalizeInt64));
+  static fromFlatIntervals(intervals: Iterable<IntValue>) {
+    return new Domain(Array.from(intervals, (value) => toInt64(value)));
   }
 
-  static from_flat_intervals(intervals: Iterable<ProtoInt64>) {
-    return Domain.fromFlatIntervals(intervals);
-  }
-
-  static fromIntervals(intervals: Iterable<Iterable<ProtoInt64>>) {
+  static fromIntervals(intervals: Iterable<Iterable<IntValue>>) {
     const flatIntervals: ProtoInt64[] = [];
     for (const interval of intervals) {
-      const values = Array.from(interval, normalizeInt64);
-      valueError(values.length === 1 || values.length === 2, 'domain intervals must contain one or two bounds');
+      const values = Array.from(interval, asInt64);
+      rangeError(values.length === 1 || values.length === 2, 'domain intervals must contain one or two bounds');
       flatIntervals.push(values[0], values[1] ?? values[0]);
     }
-    return new Domain(flatIntervals);
+    return new Domain(flatIntervals.map(protoInt64ToBigInt));
   }
 
-  static from_intervals(intervals: Iterable<Iterable<ProtoInt64>>) {
-    return Domain.fromIntervals(intervals);
-  }
-
-  static fromValues(values: Iterable<number>) {
-    const sortedValues = Array.from(new Set(values)).sort((left, right) => left - right);
+  static fromValues(values: Iterable<IntValue>) {
+    const exactValues = Array.from(values, (value) => toInt64(value));
+    const sortedValues = Array.from(new Set(exactValues)).sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
     const flatIntervals: ProtoInt64[] = [];
     for (const value of sortedValues) {
-      valueError(Number.isInteger(value), `domain value must be an integer, got ${value}`);
       const lastUpper = flatIntervals[flatIntervals.length - 1];
-      if (typeof lastUpper === 'number' && lastUpper + 1 === value) {
-        flatIntervals[flatIntervals.length - 1] = value;
+      if (lastUpper !== undefined && protoInt64ToBigInt(lastUpper) + 1n === value) {
+        flatIntervals[flatIntervals.length - 1] = asInt64(value);
       } else {
-        flatIntervals.push(value, value);
+        const protoValue = asInt64(value);
+        flatIntervals.push(protoValue, protoValue);
       }
     }
-    return new Domain(flatIntervals);
+    return new Domain(flatIntervals.map(protoInt64ToBigInt));
   }
 
-  static from_values(values: Iterable<number>) {
-    return Domain.fromValues(values);
-  }
 }
 
 export class CpModel {
   private readonly model: CpModelProto;
-  private readonly boolVariableIndexes = new Set<number>();
-  private readonly constantIndexes = new Map<number, number>();
+  private readonly constantIndexes = new Map<bigint, number>();
   private readonly intVariables = new Map<number, IntVar>();
-  private trueConstant: BoolVar | null = null;
-  private falseConstant: BoolVar | null = null;
 
   constructor(model?: CpModelProto) {
     this.model = model === undefined ? { variables: [], constraints: [] } : cloneProto(model);
+    liveModelProtos.set(this, this.model);
     for (const [index, variable] of (this.model.variables ?? []).entries()) {
       const domain = variable.domain ?? [];
-      if (isBooleanDomain(domain)) {
-        this.boolVariableIndexes.add(index);
-      }
       if (domain.length === 2 && compareProtoInt64(domain[0], domain[1]) === 0) {
-        this.constantIndexes.set(protoInt64ToNumber(domain[0]), index);
+        this.constantIndexes.set(protoInt64ToBigInt(domain[0]), index);
       }
     }
   }
@@ -1677,12 +1234,8 @@ export class CpModel {
     this.model.name = name;
   }
 
-  proto() {
-    return this.model;
-  }
-
-  Proto() {
-    return this.proto();
+  get modelProto() {
+    return cloneProto(this.model);
   }
 
   clone() {
@@ -1699,86 +1252,43 @@ export class CpModel {
     }
   }
 
-  remove_all_names() {
-    this.removeAllNames();
-  }
-
-  newIntVar(lb: ProtoInt64, ub: ProtoInt64, name = '') {
+  newIntVar(lb: IntValue, ub: IntValue, name = '') {
     const index = this.model.variables?.length ?? 0;
-    const domain = [normalizeInt64(lb), normalizeInt64(ub)];
-    this.model.variables?.push(compareProtoInt64(lb, ub) <= 0 ? { name, domain } : { name });
-    if (isBooleanDomain(domain)) {
-      this.boolVariableIndexes.add(index);
-    }
+    const domain = [asInt64(lb), asInt64(ub)];
+    this.model.variables?.push(compareProtoInt64(domain[0], domain[1]) <= 0 ? { name, domain } : { name });
     const variable = new IntVar(this, index, name);
     this.intVariables.set(index, variable);
     return variable;
-  }
-
-  new_int_var(lb: ProtoInt64, ub: ProtoInt64, name = '') {
-    return this.newIntVar(lb, ub, name);
-  }
-
-  NewIntVar(lb: ProtoInt64, ub: ProtoInt64, name = '') {
-    return this.newIntVar(lb, ub, name);
   }
 
   newIntVarFromDomain(domain: Domain, name = '') {
     const index = this.model.variables?.length ?? 0;
     const flatDomain = [...domain.flatIntervals];
     this.model.variables?.push({ name, domain: flatDomain });
-    if (isBooleanDomain(flatDomain)) {
-      this.boolVariableIndexes.add(index);
-    }
     const variable = new IntVar(this, index, name);
     this.intVariables.set(index, variable);
     return variable;
   }
 
-  new_int_var_from_domain(domain: Domain, name = '') {
-    return this.newIntVarFromDomain(domain, name);
-  }
-
-  NewIntVarFromDomain(domain: Domain, name = '') {
-    return this.newIntVarFromDomain(domain, name);
-  }
-
   newBoolVar(name = '') {
     const index = this.model.variables?.length ?? 0;
     this.model.variables?.push({ name, domain: [0, 1] });
-    this.boolVariableIndexes.add(index);
     const variable = new BoolVar(this, index, name);
     this.intVariables.set(index, variable);
     return variable;
   }
 
-  new_bool_var(name = '') {
-    return this.newBoolVar(name);
-  }
-
-  NewBoolVar(name = '') {
-    return this.newBoolVar(name);
-  }
-
-  newConstant(value: number, name = '') {
+  newConstant(value: IntValue, name = '') {
     if (name) {
       return this.newIntVar(value, value, name);
     }
-    return this.getIntVarFromProtoIndex(this.getOrMakeIndexFromConstant(value));
-  }
-
-  new_constant(value: number, name = '') {
-    return this.newConstant(value, name);
-  }
-
-  NewConstant(value: number, name = '') {
-    return this.newConstant(value, name);
+    return this.getIntVarFromProtoIndex(this.constantIndex(value));
   }
 
   getIntVarFromProtoIndex(index: number) {
-    valueError(Number.isInteger(index), `variable index must be an integer, got ${index}`);
+    rangeError(Number.isInteger(index), `variable index must be an integer, got ${index}`);
     const variables = this.model.variables ?? [];
-    valueError(index >= 0 && index < variables.length, `getIntVarFromProtoIndex: out of bound index ${index}`);
+    rangeError(index >= 0 && index < variables.length, `getIntVarFromProtoIndex: out of bound index ${index}`);
     const existing = this.intVariables.get(index);
     if (existing !== undefined) {
       return existing;
@@ -1786,10 +1296,6 @@ export class CpModel {
     const variable = new IntVar(this, index, variables[index]?.name ?? '');
     this.intVariables.set(index, variable);
     return variable;
-  }
-
-  get_int_var_from_proto_index(index: number) {
-    return this.getIntVarFromProtoIndex(index);
   }
 
   getBoolVarFromProtoIndex(index: number) {
@@ -1805,16 +1311,14 @@ export class CpModel {
     return boolVariable;
   }
 
-  get_bool_var_from_proto_index(index: number) {
-    return this.getBoolVarFromProtoIndex(index);
-  }
-
   getIntervalVarFromProtoIndex(index: number) {
-    valueError(Number.isInteger(index), `interval index must be an integer, got ${index}`);
+    rangeError(Number.isInteger(index), `interval index must be an integer, got ${index}`);
     const constraints = this.model.constraints ?? [];
-    valueError(index >= 0 && index < constraints.length, `getIntervalVarFromProtoIndex: out of bound index ${index}`);
+    rangeError(index >= 0 && index < constraints.length, `getIntervalVarFromProtoIndex: out of bound index ${index}`);
     const constraint = constraints[index];
-    valueError(constraint?.interval !== undefined, `getIntervalVarFromProtoIndex: index ${index} is not an interval`);
+    if (constraint?.interval === undefined) {
+      throw new TypeError(`getIntervalVarFromProtoIndex: index ${index} is not an interval`);
+    }
     const interval = constraint.interval;
     return new IntervalVar(
       this,
@@ -1827,66 +1331,18 @@ export class CpModel {
     );
   }
 
-  get_interval_var_from_proto_index(index: number) {
-    return this.getIntervalVarFromProtoIndex(index);
-  }
-
-  getOrMakeIndexFromConstant(value: number) {
-    valueError(Number.isInteger(value), `constant index requires an integer, got ${value}`);
-    const existingIndex = this.constantIndexes.get(value);
+  private constantIndex(value: IntValue) {
+    const exact = toInt64(value);
+    const existingIndex = this.constantIndexes.get(exact);
     if (existingIndex !== undefined) {
       return existingIndex;
     }
     const index = this.model.variables?.length ?? 0;
-    const domain: ProtoInt64[] = [value, value];
+    const protoValue = asInt64(exact);
+    const domain: ProtoInt64[] = [protoValue, protoValue];
     this.model.variables?.push({ domain });
-    if (isBooleanDomain(domain)) {
-      this.boolVariableIndexes.add(index);
-    }
-    this.constantIndexes.set(value, index);
+    this.constantIndexes.set(exact, index);
     return index;
-  }
-
-  get_or_make_index_from_constant(value: number) {
-    return this.getOrMakeIndexFromConstant(value);
-  }
-
-  getOrMakeVariableIndex(variable: unknown) {
-    return this.get_or_make_variable_index(variable);
-  }
-
-  isBooleanValue(value: unknown) {
-    return value === true || value === false;
-  }
-
-  is_boolean_value(value: unknown) {
-    return this.isBooleanValue(value);
-  }
-
-  isBooleanIndex(index: number) {
-    return this.boolVariableIndexes.has(index);
-  }
-
-  get_or_make_variable_index(variable: unknown) {
-    if (typeof variable === 'number') {
-      valueError(Number.isInteger(variable), `variable index requires an integer, got ${variable}`);
-      return this.getOrMakeIndexFromConstant(variable);
-    }
-    if (variable instanceof IntVar) {
-      requireSameModel(this, variable.model, 'variable');
-      return variable.index;
-    }
-    if (variable instanceof NotBoolVar) {
-      requireSameModel(this, variable.model, 'variable');
-      return variable.index;
-    }
-    if (variable === true) {
-      return this.constantBoolIndex(true);
-    }
-    if (variable === false) {
-      return this.constantBoolIndex(false);
-    }
-    throw new TypeError('expected a variable-like object');
   }
 
   add(bound: BoundedLinearExpr | boolean) {
@@ -1896,25 +1352,28 @@ export class CpModel {
     if (bound === false) {
       return this.addBoolOr([]);
     }
-    return this.addLinearConstraint(bound.expression, bound.lowerBound, bound.upperBound, bound.domain);
+    return this.addLinearConstraint(
+      bound.expression,
+      protoInt64ToBigInt(bound.lowerBound),
+      protoInt64ToBigInt(bound.upperBound),
+      bound.domain,
+    );
   }
 
-  Add(bound: BoundedLinearExpr | boolean) {
-    return this.add(bound);
-  }
-
-  addLinearConstraint(expression: LinearExprLike, lb: ProtoInt64, ub: ProtoInt64, domain?: ProtoInt64[]) {
+  addLinearConstraint(expression: LinearExprLike, lb: IntValue, ub: IntValue, domain?: ProtoInt64[]) {
     const expr = LinearExpr.from(expression);
     this.checkExpressionModel(expr);
+    rangeError(expr.isInteger(), 'linear constraints require integer expressions');
+    const normalizedLb = asInt64(lb);
+    const normalizedUb = asInt64(ub);
     if (expr.terms.size === 0 && domain === undefined) {
-      const numericLb = protoInt64ToNumber(lb);
-      const numericUb = protoInt64ToNumber(ub);
-      return expr.offset >= numericLb && expr.offset <= numericUb
+      const exactOffset = expr.offset as bigint;
+      return exactOffset >= protoInt64ToBigInt(normalizedLb) && exactOffset <= protoInt64ToBigInt(normalizedUb)
         ? this.pushConstraint({ boolAnd: { literals: [] } })
         : this.pushConstraint({ boolOr: { literals: [] } });
     }
     const proto = expr.toProto();
-    const adjustedDomain = (domain ?? [lb, ub]).map((value) => adjustDomainEndpoint(value, expr.offset));
+    const adjustedDomain = (domain ?? [normalizedLb, normalizedUb]).map((value) => adjustDomainEndpoint(value, expr.offset));
     return this.pushConstraint({
       linear: {
         vars: proto.vars,
@@ -1922,14 +1381,6 @@ export class CpModel {
         domain: adjustedDomain,
       },
     });
-  }
-
-  add_linear_constraint(expression: LinearExprLike, lb: number, ub: number) {
-    return this.addLinearConstraint(expression, lb, ub);
-  }
-
-  AddLinearConstraint(expression: LinearExprLike, lb: ProtoInt64, ub: ProtoInt64) {
-    return this.addLinearConstraint(expression, lb, ub);
   }
 
   addEquality(left: LinearExprLike, right: LinearExprLike) {
@@ -1942,17 +1393,13 @@ export class CpModel {
     });
   }
 
-  AddAllDifferent(expressions: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
-    return this.addAllDifferent(expressions, ...rest);
-  }
-
-  addElement(index: LinearExprLike, expressions: Iterable<LinearExprLike | number>, target: LinearExprLike) {
+  addElement(index: LinearExprLike, expressions: Iterable<LinearExprLike>, target: LinearExprLike) {
     const exprs = Array.from(expressions);
-    valueError(exprs.length > 0, 'addElement requires at least one expression');
-    if (typeof index === 'number') {
-      valueError(Number.isInteger(index), `element index must be an integer, got ${index}`);
-      valueError(index >= 0 && index < exprs.length, `element index ${index} is out of range`);
-      return this.add(LinearExpr.from(target).eq(exprs[index]));
+    rangeError(exprs.length > 0, 'addElement requires at least one expression');
+    if (typeof index === 'number' || typeof index === 'bigint') {
+      const exactIndex = toInt64(index, 'element index');
+      rangeError(exactIndex >= 0n && exactIndex < BigInt(exprs.length), `element index ${index} is out of range`);
+      return this.add(LinearExpr.from(target).eq(exprs[Number(exactIndex)]));
     }
     return this.pushConstraint({
       element: {
@@ -1963,12 +1410,12 @@ export class CpModel {
     });
   }
 
-  addAllowedAssignments(expressions: Iterable<LinearExprLike>, tuples: Iterable<Iterable<number>>) {
+  addAllowedAssignments(expressions: Iterable<LinearExprLike>, tuples: Iterable<Iterable<IntValue>>) {
     const exprs = this.expressionProtos(expressions);
-    valueError(exprs.length > 0, 'addAllowedAssignments requires at least one expression');
+    rangeError(exprs.length > 0, 'addAllowedAssignments requires at least one expression');
     const values = Array.from(tuples, (tupleValue) => Array.from(tupleValue));
     for (const tupleValue of values) {
-      valueError(tupleValue.length === exprs.length, 'tuple arity does not match expression count');
+      rangeError(tupleValue.length === exprs.length, 'tuple arity does not match expression count');
     }
     return this.pushConstraint({
       table: {
@@ -1978,7 +1425,7 @@ export class CpModel {
     });
   }
 
-  addForbiddenAssignments(expressions: Iterable<LinearExprLike>, tuples: Iterable<Iterable<number>>) {
+  addForbiddenAssignments(expressions: Iterable<LinearExprLike>, tuples: Iterable<Iterable<IntValue>>) {
     const constraint = this.addAllowedAssignments(expressions, tuples);
     const proto = this.model.constraints?.[constraint.index];
     assert(proto?.table, 'table constraint was not created');
@@ -1986,18 +1433,18 @@ export class CpModel {
     return constraint;
   }
 
-  addAutomaton(expressions: Iterable<LinearExprLike>, startingState: number, finalStates: Iterable<number>, transitions: Iterable<[number, number, number]>) {
+  addAutomaton(expressions: Iterable<LinearExprLike>, startingState: IntValue, finalStates: Iterable<IntValue>, transitions: Iterable<[IntValue, IntValue, IntValue]>) {
     const exprs = this.expressionProtos(expressions);
     const finalStateValues = Array.from(finalStates, asInt64);
     const transitionValues = Array.from(transitions);
-    valueError(exprs.length > 0, 'addAutomaton requires at least one expression');
-    valueError(finalStateValues.length > 0, 'addAutomaton requires at least one final state');
-    valueError(transitionValues.length > 0, 'addAutomaton requires at least one transition');
+    rangeError(exprs.length > 0, 'addAutomaton requires at least one expression');
+    rangeError(finalStateValues.length > 0, 'addAutomaton requires at least one final state');
+    rangeError(transitionValues.length > 0, 'addAutomaton requires at least one transition');
     const tails: ProtoInt64[] = [];
     const labels: ProtoInt64[] = [];
     const heads: ProtoInt64[] = [];
     for (const transition of transitionValues) {
-      valueError(transition.length === 3, 'automaton transitions must contain tail, label, and head');
+      rangeError(transition.length === 3, 'automaton transitions must contain tail, label, and head');
       const [tail, label, head] = transition;
       tails.push(asInt64(tail));
       labels.push(asInt64(label));
@@ -2017,12 +1464,12 @@ export class CpModel {
 
   addCircuit(arcs: Iterable<[number, number, LiteralLike]>) {
     const arcValues = Array.from(arcs);
-    valueError(arcValues.length > 0, 'addCircuit requires at least one arc');
+    rangeError(arcValues.length > 0, 'addCircuit requires at least one arc');
     const tails: number[] = [];
     const heads: number[] = [];
     const literals: number[] = [];
     for (const [tail, head, literal] of arcValues) {
-      const [literalRef] = this.literalReferences([literal]);
+      const [literalRef] = literalReferences(this, [literal]);
       tails.push(tail);
       heads.push(head);
       literals.push(literalRef);
@@ -2032,12 +1479,12 @@ export class CpModel {
 
   addMultipleCircuit(arcs: Iterable<[number, number, LiteralLike]>) {
     const arcValues = Array.from(arcs);
-    valueError(arcValues.length > 0, 'addMultipleCircuit requires at least one arc');
+    rangeError(arcValues.length > 0, 'addMultipleCircuit requires at least one arc');
     const tails: number[] = [];
     const heads: number[] = [];
     const literals: number[] = [];
     for (const [tail, head, literal] of arcValues) {
-      const [literalRef] = this.literalReferences([literal]);
+      const [literalRef] = literalReferences(this, [literal]);
       tails.push(tail);
       heads.push(head);
       literals.push(literalRef);
@@ -2063,10 +1510,6 @@ export class CpModel {
     });
   }
 
-  add_max_equality(target: LinearExprLike, expressions: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
-    return this.addMaxEquality(target, expressions, ...rest);
-  }
-
   addMinEquality(target: LinearExprLike, expressions: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
     const values = expressionList(expressions, rest);
     return this.pushConstraint({
@@ -2077,17 +1520,9 @@ export class CpModel {
     });
   }
 
-  add_min_equality(target: LinearExprLike, expressions: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
-    return this.addMinEquality(target, expressions, ...rest);
-  }
-
   addAbsEquality(target: LinearExprLike, expression: LinearExprLike) {
     const expr = LinearExpr.from(expression);
     return this.addMaxEquality(target, [expr, expr.neg()]);
-  }
-
-  add_abs_equality(target: LinearExprLike, expression: LinearExprLike) {
-    return this.addAbsEquality(target, expression);
   }
 
   addDivisionEquality(target: LinearExprLike, numerator: LinearExprLike, denominator: LinearExprLike) {
@@ -2099,10 +1534,6 @@ export class CpModel {
     });
   }
 
-  add_division_equality(target: LinearExprLike, numerator: LinearExprLike, denominator: LinearExprLike) {
-    return this.addDivisionEquality(target, numerator, denominator);
-  }
-
   addModuloEquality(target: LinearExprLike, expression: LinearExprLike, modulo: LinearExprLike) {
     return this.pushConstraint({
       intMod: {
@@ -2110,10 +1541,6 @@ export class CpModel {
         exprs: [this.expressionProto(expression), this.expressionProto(modulo)],
       },
     });
-  }
-
-  add_modulo_equality(target: LinearExprLike, expression: LinearExprLike, modulo: LinearExprLike) {
-    return this.addModuloEquality(target, expression, modulo);
   }
 
   addMultiplicationEquality(target: LinearExprLike, expressions: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
@@ -2125,86 +1552,43 @@ export class CpModel {
     });
   }
 
-  add_multiplication_equality(target: LinearExprLike, expressions: Iterable<LinearExprLike> | LinearExprLike, ...rest: LinearExprLike[]) {
-    return this.addMultiplicationEquality(target, expressions, ...rest);
-  }
-
   addImplication(left: LiteralLike, right: LiteralLike) {
     return this.pushConstraint({
-      enforcementLiteral: this.literalReferences([left]),
-      boolAnd: { literals: this.literalReferences([right]) },
+      enforcementLiteral: literalReferences(this, [left]),
+      boolAnd: { literals: literalReferences(this, [right]) },
     });
   }
 
-  add_implication(left: LiteralLike, right: LiteralLike) {
-    return this.addImplication(left, right);
-  }
-
   addBoolOr(literals: Iterable<LiteralLike> | LiteralLike, ...rest: LiteralLike[]) {
-    return this.pushConstraint({ boolOr: { literals: this.literalReferences(literalList(literals, rest)) } });
-  }
-
-  add_bool_or(literals: Iterable<LiteralLike> | LiteralLike, ...rest: LiteralLike[]) {
-    return this.addBoolOr(literals, ...rest);
-  }
-
-  AddBoolOr(literals: Iterable<LiteralLike> | LiteralLike, ...rest: LiteralLike[]) {
-    return this.addBoolOr(literals, ...rest);
+    return this.pushConstraint({ boolOr: { literals: literalReferences(this, literalList(literals, rest)) } });
   }
 
   addAtLeastOne(literals: Iterable<LiteralLike> | LiteralLike, ...rest: LiteralLike[]) {
     return this.addBoolOr(literals, ...rest);
   }
 
-  add_at_least_one(literals: Iterable<LiteralLike> | LiteralLike, ...rest: LiteralLike[]) {
-    return this.addAtLeastOne(literals, ...rest);
-  }
-
   addBoolAnd(literals: Iterable<LiteralLike>) {
-    return this.pushConstraint({ boolAnd: { literals: this.literalReferences(literals) } });
-  }
-
-  add_bool_and(literals: Iterable<LiteralLike>) {
-    return this.addBoolAnd(literals);
-  }
-
-  AddBoolAnd(literals: Iterable<LiteralLike>) {
-    return this.addBoolAnd(literals);
+    return this.pushConstraint({ boolAnd: { literals: literalReferences(this, literals) } });
   }
 
   addBoolXor(literals: Iterable<LiteralLike>) {
-    return this.pushConstraint({ boolXor: { literals: this.literalReferences(literals) } });
-  }
-
-  add_bool_xor(literals: Iterable<LiteralLike>) {
-    return this.addBoolXor(literals);
-  }
-
-  AddBoolXOr(literals: Iterable<LiteralLike>) {
-    return this.addBoolXor(literals);
+    return this.pushConstraint({ boolXor: { literals: literalReferences(this, literals) } });
   }
 
   addAtMostOne(literals: Iterable<LiteralLike>) {
-    return this.pushConstraint({ atMostOne: { literals: this.literalReferences(literals) } });
-  }
-
-  add_at_most_one(literals: Iterable<LiteralLike>) {
-    return this.addAtMostOne(literals);
+    return this.pushConstraint({ atMostOne: { literals: literalReferences(this, literals) } });
   }
 
   addExactlyOne(literals: Iterable<LiteralLike>) {
-    return this.pushConstraint({ exactlyOne: { literals: this.literalReferences(literals) } });
+    return this.pushConstraint({ exactlyOne: { literals: literalReferences(this, literals) } });
   }
 
-  add_exactly_one(literals: Iterable<LiteralLike>) {
-    return this.addExactlyOne(literals);
-  }
-
-  addMapDomain(variable: IntVar, booleanVariables: Iterable<BoolVar>, offset = 0) {
+  addMapDomain(variable: IntVar, booleanVariables: Iterable<BoolVar>, offset: IntValue = 0n) {
     requireSameModel(this, variable.model, 'map domain variable');
+    const exactOffset = toInt64(offset);
     for (const [index, literal] of Array.from(booleanVariables).entries()) {
       requireSameModel(this, literal.model, 'map domain literal');
-      const value = offset + index;
+      const value = exactOffset + BigInt(index);
       this.pushConstraint({
         enforcementLiteral: [literal.index],
         linear: {
@@ -2218,38 +1602,22 @@ export class CpModel {
         linear: {
           vars: [variable.index],
           coeffs: [1],
-          domain: [INT64_MIN, asInt64(value - 1), asInt64(value + 1), INT64_MAX],
+          domain: [INT64_MIN, asInt64(value - 1n), asInt64(value + 1n), INT64_MAX],
         },
       });
     }
-  }
-
-  add_map_domain(variable: IntVar, booleanVariables: Iterable<BoolVar>, offset = 0) {
-    return this.addMapDomain(variable, booleanVariables, offset);
   }
 
   newIntervalVar(start: LinearExprLike, size: LinearExprLike, end: LinearExprLike, name = '') {
     return this.pushInterval({ start, size, end, name });
   }
 
-  new_interval_var(start: LinearExprLike, size: LinearExprLike, end: LinearExprLike, name = '') {
-    return this.newIntervalVar(start, size, end, name);
-  }
-
-  newFixedSizeIntervalVar(start: LinearExprLike, size: number, name = '') {
+  newFixedSizeIntervalVar(start: LinearExprLike, size: IntValue, name = '') {
     return this.pushInterval({ start, size, end: LinearExpr.from(start).plus(size), name });
   }
 
-  new_fixed_size_interval_var(start: LinearExprLike, size: number, name = '') {
-    return this.newFixedSizeIntervalVar(start, size, name);
-  }
-
-  newOptionalFixedSizeIntervalVar(start: LinearExprLike, size: number, isPresent: LiteralLike, name = '') {
+  newOptionalFixedSizeIntervalVar(start: LinearExprLike, size: IntValue, isPresent: LiteralLike, name = '') {
     return this.newOptionalIntervalVar(start, size, LinearExpr.from(start).plus(size), isPresent, name);
-  }
-
-  new_optional_fixed_size_interval_var(start: LinearExprLike, size: number, isPresent: LiteralLike, name = '') {
-    return this.newOptionalFixedSizeIntervalVar(start, size, isPresent, name);
   }
 
   newOptionalIntervalVar(start: LinearExprLike, size: LinearExprLike, end: LinearExprLike, isPresent: LiteralLike, name = '') {
@@ -2262,20 +1630,8 @@ export class CpModel {
     return this.pushInterval({ start, size, end, isPresent, name });
   }
 
-  new_optional_interval_var(start: LinearExprLike, size: LinearExprLike, end: LinearExprLike, isPresent: LiteralLike, name = '') {
-    return this.newOptionalIntervalVar(start, size, end, isPresent, name);
-  }
-
   addNoOverlap(intervals: Iterable<IntervalVar>) {
     return this.pushConstraint({ noOverlap: { intervals: this.intervalIndexes(intervals) } });
-  }
-
-  add_no_overlap(intervals: Iterable<IntervalVar>) {
-    return this.addNoOverlap(intervals);
-  }
-
-  AddNoOverlap(intervals: Iterable<IntervalVar>) {
-    return this.addNoOverlap(intervals);
   }
 
   addNoOverlap2D(xIntervals: Iterable<IntervalVar>, yIntervals: Iterable<IntervalVar>) {
@@ -2285,14 +1641,6 @@ export class CpModel {
         yIntervals: this.intervalIndexes(yIntervals),
       },
     });
-  }
-
-  add_no_overlap_2d(xIntervals: Iterable<IntervalVar>, yIntervals: Iterable<IntervalVar>) {
-    return this.addNoOverlap2D(xIntervals, yIntervals);
-  }
-
-  AddNoOverlap2D(xIntervals: Iterable<IntervalVar>, yIntervals: Iterable<IntervalVar>) {
-    return this.addNoOverlap2D(xIntervals, yIntervals);
   }
 
   addCumulative(intervals: Iterable<IntervalVar>, demands: Iterable<LinearExprLike>, capacity: LinearExprLike) {
@@ -2305,18 +1653,27 @@ export class CpModel {
     });
   }
 
-  add_cumulative(intervals: Iterable<IntervalVar>, demands: Iterable<LinearExprLike>, capacity: LinearExprLike) {
-    return this.addCumulative(intervals, demands, capacity);
-  }
-
-  addReservoirConstraint(times: Iterable<LinearExprLike>, levelChanges: Iterable<LinearExprLike>, minLevel: number, maxLevel: number, activeLiterals?: Iterable<LiteralLike>) {
+  addReservoirConstraint(times: Iterable<LinearExprLike>, levelChanges: Iterable<LinearExprLike>, minLevel: IntValue, maxLevel: IntValue, activeLiterals?: Iterable<LiteralLike>) {
+    const exactMinLevel = toInt64(minLevel);
+    const exactMaxLevel = toInt64(maxLevel);
+    rangeError(exactMaxLevel >= exactMinLevel, 'reservoir max level must be greater than or equal to min level');
+    rangeError(exactMaxLevel >= 0n, 'reservoir max level must be nonnegative');
+    rangeError(exactMinLevel <= 0n, 'reservoir min level must be nonpositive');
+    const timeValues = Array.from(times);
+    const levelChangeValues = Array.from(levelChanges);
+    const activeLiteralValues = activeLiterals === undefined ? undefined : Array.from(activeLiterals);
+    rangeError(timeValues.length === levelChangeValues.length, 'reservoir times and level changes must have the same length');
+    rangeError(
+      activeLiteralValues === undefined || activeLiteralValues.length === timeValues.length,
+      'reservoir active literals and times must have the same length',
+    );
     return this.pushConstraint({
       reservoir: {
-        timeExprs: this.expressionProtos(times),
-        levelChanges: this.expressionProtos(levelChanges),
-        minLevel: asInt64(minLevel),
-        maxLevel: asInt64(maxLevel),
-        activeLiterals: activeLiterals ? this.literalReferences(activeLiterals) : undefined,
+        timeExprs: this.expressionProtos(timeValues),
+        levelChanges: this.expressionProtos(levelChangeValues),
+        minLevel: asInt64(exactMinLevel),
+        maxLevel: asInt64(exactMaxLevel),
+        activeLiterals: activeLiteralValues === undefined ? undefined : literalReferences(this, activeLiteralValues),
       },
     });
   }
@@ -2334,10 +1691,10 @@ export class CpModel {
     });
   }
 
-  addHint(variable: IntVar | NotBoolVar, value: number | boolean) {
-    const hintedValue = typeof value === 'boolean' ? (value ? 1 : 0) : value;
+  addHint(variable: IntVar | NotBoolVar, value: IntValue | boolean) {
+    const hintedValue = typeof value === 'boolean' ? (value ? 1n : 0n) : toInt64(value);
     const hintVariable = variable instanceof NotBoolVar ? variable.variable : variable;
-    const hintValue = variable instanceof NotBoolVar ? 1 - hintedValue : hintedValue;
+    const hintValue = variable instanceof NotBoolVar ? 1n - hintedValue : hintedValue;
     requireSameModel(this, hintVariable.model, 'hint variable');
     this.model.solutionHint ??= { vars: [], values: [] };
     this.model.solutionHint.vars?.push(hintVariable.index);
@@ -2374,12 +1731,8 @@ export class CpModel {
     this.model.objective = {
       vars: proto.vars,
       coeffs: proto.coeffs,
-      offset: typeof proto.offset === 'number' ? proto.offset : undefined,
+      offset: proto.offset === undefined ? undefined : numericToNumber(protoInt64ToBigInt(proto.offset)),
     };
-  }
-
-  Minimize(expression: LinearExprLike) {
-    return this.minimize(expression);
   }
 
   maximize(expression: LinearExprLike) {
@@ -2397,13 +1750,9 @@ export class CpModel {
     this.model.objective = {
       vars: proto.vars,
       coeffs: proto.coeffs,
-      offset: typeof proto.offset === 'number' ? proto.offset : undefined,
+      offset: proto.offset === undefined ? undefined : numericToNumber(protoInt64ToBigInt(proto.offset)),
       scalingFactor: -1,
     };
-  }
-
-  Maximize(expression: LinearExprLike) {
-    return this.maximize(expression);
   }
 
   hasObjective() {
@@ -2419,7 +1768,7 @@ export class CpModel {
   }
 
   async validate() {
-    const modelBytes = await CpSat.createModel(this.proto());
+    const modelBytes = await CpSat.createModel(this.model);
     const validation = await CpSat.validate(modelBytes);
     return validation.ok ? '' : validation.message;
   }
@@ -2434,7 +1783,7 @@ export class CpModel {
       },
     };
     if (input.isPresent !== undefined) {
-      constraint.enforcementLiteral = this.literalReferences([input.isPresent]);
+      constraint.enforcementLiteral = literalReferences(this, [input.isPresent]);
     }
     const index = this.model.constraints?.length ?? 0;
     this.model.constraints?.push(constraint);
@@ -2461,15 +1810,15 @@ export class CpModel {
 
   private expressionFromProto(proto: LinearExpressionProto | undefined): LinearExprLike {
     if (proto === undefined) {
-      return 0;
+      return 0n;
     }
-    const terms = new Map<number, number>();
+    const terms = new Map<number, NumericValue>();
     const vars = proto.vars ?? [];
     const coeffs = proto.coeffs ?? [];
     for (let index = 0; index < vars.length; index += 1) {
-      mergeTerms(terms, vars[index], protoInt64ToNumber(coeffs[index]));
+      mergeTerms(terms, vars[index], protoInt64ToBigInt(coeffs[index]));
     }
-    return new LinearExpr(this, terms, protoInt64ToNumber(proto.offset));
+    return new LinearExpr(this, terms, protoInt64ToBigInt(proto.offset ?? 0));
   }
 
   private literalFromProtoIndex(index: number): LiteralLike {
@@ -2506,31 +1855,10 @@ export class CpModel {
     }
     const expr = LinearExpr.from(expression);
     this.checkExpressionModel(expr);
-    return Array.from(expr.terms.keys()).some((index) => this.boolVariableIndexes.has(index));
-  }
-
-  literalReferences(literals: Iterable<LiteralLike>) {
-    return Array.from(literals, (literal) => {
-      const index = literalIndex(literal);
-      if (index === true) {
-        return this.constantBoolIndex(true);
-      }
-      if (index === false) {
-        return this.constantBoolIndex(false);
-      }
-      assert(literal instanceof BoolVar || literal instanceof NotBoolVar, 'literal must be a Boolean variable or its negation');
-      requireSameModel(this, literal.model, 'literal');
-      return index;
+    return Array.from(expr.terms.keys()).some((index) => {
+      const domain = this.model.variables?.[index]?.domain ?? [];
+      return isBooleanDomain(domain);
     });
-  }
-
-  private constantBoolIndex(value: boolean) {
-    if (value) {
-      this.trueConstant ??= this.getBoolVarFromProtoIndex(this.getOrMakeIndexFromConstant(1));
-      return this.trueConstant.index;
-    }
-    this.falseConstant ??= this.getBoolVarFromProtoIndex(this.getOrMakeIndexFromConstant(0));
-    return this.falseConstant.index;
   }
 }
 
@@ -2539,11 +1867,9 @@ export class CpSolverSolutionCallback {
 
   onSolutionCallback() {}
 
-  value(expression: LinearExprLike) {
-    return evaluateLinearExpression(this.requireCurrentResponse(), expression);
-  }
-
-  floatValue(expression: LinearExprLike) {
+  value(expression: IntVar | NotBoolVar): bigint;
+  value(expression: LinearExprLike): NumericValue;
+  value(expression: LinearExprLike): NumericValue {
     return evaluateLinearExpression(this.requireCurrentResponse(), expression);
   }
 
@@ -2553,13 +1879,13 @@ export class CpSolverSolutionCallback {
 
   get objectiveValue() {
     const response = this.requireCurrentResponse();
-    runtimeError(typeof response.objectiveValue === 'number', 'missing objective value');
+    stateError(typeof response.objectiveValue === 'number', 'missing objective value');
     return response.objectiveValue;
   }
 
   get bestObjectiveBound() {
     const response = this.requireCurrentResponse();
-    runtimeError(typeof response.bestObjectiveBound === 'number', 'missing best objective bound');
+    stateError(typeof response.bestObjectiveBound === 'number', 'missing best objective bound');
     return response.bestObjectiveBound;
   }
 
@@ -2578,7 +1904,7 @@ export class CpSolverSolutionCallback {
 
   private requireCurrentResponse() {
     if (!this.currentResponse) {
-      throw new RuntimeError('solve() has not started or the callback is not currently running');
+      throw new Error('solve() has not started or the callback is not currently running');
     }
     return this.currentResponse;
   }
@@ -2593,7 +1919,7 @@ export class CpSolver {
 
   async solve(model: CpModel, options: CpSolverSolveOptions = {}) {
     if (this.solving) {
-      throw new RuntimeError('CpSolver.solve() is already in progress.');
+      throw new Error('CpSolver.solve() is already in progress.');
     }
     this.solving = true;
     try {
@@ -2613,7 +1939,7 @@ export class CpSolver {
       ...solverParameters
     } = options;
     const mergedParams = { ...this.parameters, ...solverParameters };
-    const modelBytes = await CpSat.createModel(model.proto());
+    const modelBytes = await CpSat.createModel(liveModelProto(model));
     const hasInternalEvents = Boolean(solutionCallback || this.bestBoundCallback || this.logCallback);
     let eventMask = requestedEventMask;
     if (hasInternalEvents && (eventMask || !onEvent)) {
@@ -2645,79 +1971,46 @@ export class CpSolver {
     return result.response?.status;
   }
 
-  response() {
+  get response() {
     return this.lastResponse;
   }
 
   responseStats() {
-    return JSON.stringify(this.requireResponse());
+    return JSON.stringify(
+      this.requireResponse(),
+      (_key, value) => typeof value === 'bigint' ? value.toString() : value,
+    );
   }
 
-  get best_objective_bound() {
-    return this.bestObjectiveBound();
-  }
-
-  get deterministic_time() {
+  get deterministicTime() {
     const response = this.requireResponse();
-    runtimeError(typeof response.deterministicTime === 'number', 'missing deterministic time');
+    stateError(typeof response.deterministicTime === 'number', 'missing deterministic time');
     return response.deterministicTime;
   }
 
-  get num_binary_propagations() {
+  get numBinaryPropagations() {
     return protoInt64ToNumber(this.requireResponse().numBinaryPropagations);
   }
 
-  get num_integer_propagations() {
+  get numIntegerPropagations() {
     return protoInt64ToNumber(this.requireResponse().numIntegerPropagations);
   }
 
-  get user_time() {
+  get userTime() {
     const response = this.requireResponse();
-    runtimeError(typeof response.userTime === 'number', 'missing user time');
+    stateError(typeof response.userTime === 'number', 'missing user time');
     return response.userTime;
   }
 
-  get response_proto() {
-    return this.requireResponse();
-  }
-
-  get solve_log() {
+  get solveLog() {
     return this.requireResponse().solveLog;
   }
 
-  get num_booleans() {
-    return this.numBooleans;
-  }
-
-  get num_conflicts() {
-    return this.numConflicts;
-  }
-
-  get num_branches() {
-    return this.numBranches;
-  }
-
-  get num_integers() {
+  get numIntegers() {
     return protoInt64ToNumber(this.requireResponse().numIntegers);
   }
 
-  get wall_time() {
-    return this.wallTime;
-  }
-
-  get objective_value() {
-    return this.objectiveValue();
-  }
-
-  set best_bound_callback(callback: ((bound: number) => void) | null) {
-    this.bestBoundCallback = callback;
-  }
-
-  set log_callback(callback: ((message: string) => void) | null) {
-    this.logCallback = callback;
-  }
-
-  solutionInfo() {
+  get solutionInfo() {
     return this.requireResponse().solutionInfo ?? '';
   }
 
@@ -2737,27 +2030,25 @@ export class CpSolver {
     return this.requireResponse().wallTime ?? 0;
   }
 
-  value(expression: LinearExprLike) {
+  value(expression: IntVar | NotBoolVar): bigint;
+  value(expression: LinearExprLike): NumericValue;
+  value(expression: LinearExprLike): NumericValue {
     return evaluateLinearExpression(this.requireResponse(), expression);
-  }
-
-  floatValue(expression: LinearExprLike) {
-    return this.value(expression);
   }
 
   booleanValue(literal: LiteralLike) {
     return evaluateBooleanLiteral(this.requireResponse(), literal);
   }
 
-  objectiveValue() {
+  get objectiveValue() {
     const response = this.requireResponse();
-    runtimeError(typeof response.objectiveValue === 'number', 'missing objective value');
+    stateError(typeof response.objectiveValue === 'number', 'missing objective value');
     return response.objectiveValue;
   }
 
-  bestObjectiveBound() {
+  get bestObjectiveBound() {
     const response = this.requireResponse();
-    runtimeError(typeof response.bestObjectiveBound === 'number', 'missing best objective bound');
+    stateError(typeof response.bestObjectiveBound === 'number', 'missing best objective bound');
     return response.bestObjectiveBound;
   }
 
@@ -2769,15 +2060,7 @@ export class CpSolver {
   }
 
   private requireResponse() {
-    runtimeError(this.lastResponse !== null, 'solve() has not completed with a solver response');
+    stateError(this.lastResponse !== null, 'solve() has not completed with a solver response');
     return this.lastResponse;
-  }
-
-  get best_bound_callback() {
-    return this.bestBoundCallback;
-  }
-
-  get log_callback() {
-    return this.logCallback;
   }
 }

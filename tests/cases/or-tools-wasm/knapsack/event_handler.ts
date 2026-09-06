@@ -4,7 +4,7 @@ type KnapsackEventHandlerApi = {
     solve(options: {
       executor: 'direct' | 'worker';
       onEvent?: (event: unknown) => void;
-    }): Promise<number>;
+    }): Promise<bigint>;
   };
   KnapsackSolverType: {
     KNAPSACK_BRUTE_FORCE_SOLVER: 0;
@@ -46,7 +46,7 @@ async function assertCallbackRecovery(
     throw new Error(`${executor}: expected the original callback error, got ${String(thrown)}`);
   }
   const profit = await solver.solve({ executor });
-  if (profit !== 15) {
+  if (profit !== 15n) {
     throw new Error(`${executor}: expected recovery profit 15, got ${profit}`);
   }
 }

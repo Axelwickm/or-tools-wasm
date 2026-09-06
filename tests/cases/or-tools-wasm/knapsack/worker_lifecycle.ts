@@ -1,7 +1,7 @@
 type KnapsackWorkerApi = {
   KnapsackSolver: new (solverType: 0, name: string) => {
     init(profits: number[], weights: number[][], capacities: number[]): void;
-    solve(options: { executor: 'worker'; signal?: AbortSignal }): Promise<number>;
+    solve(options: { executor: 'worker'; signal?: AbortSignal }): Promise<bigint>;
   };
   KnapsackSolverType: {
     KNAPSACK_BRUTE_FORCE_SOLVER: 0;

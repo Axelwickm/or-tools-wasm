@@ -60,7 +60,7 @@ export async function runCpSatConcurrencyCase(
   const highLevelSolve = solver.solve(model, { executor: 'direct' });
   await expectError(
     solver.solve(model, { executor: 'direct' }),
-    'RuntimeError',
+    'Error',
     'concurrent solve on one CpSolver',
   );
   await highLevelSolve;

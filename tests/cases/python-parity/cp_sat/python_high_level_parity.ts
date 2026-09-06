@@ -18,38 +18,11 @@ type HighLevelApi = {
   LinearExpr: {
     sum(values: Iterable<unknown> | unknown, ...rest: unknown[]): any;
     weightedSum(values: Iterable<unknown>, coeffs: Iterable<number>): any;
-    weighted_sum(values: Iterable<unknown>, coeffs: Iterable<number>): any;
-    WeightedSum(values: Iterable<unknown>, coeffs: Iterable<number>): any;
     affine(expression: unknown, coeff: number, offset: number): any;
     term(variable: unknown, coeff: number): any;
   };
-  BoundedLinearExpression: new (expression: unknown, domain: unknown) => unknown;
-  FlatIntExpr: new (expression: unknown) => {
-    vars: IntVarLike[];
-    coeffs: number[];
-    offset: number;
-    plus(value: unknown): LinearExprLike;
-    minus(value: unknown): LinearExprLike;
-    repr(): string;
-  };
-  FlatFloatExpr: new (expression: unknown) => {
-    vars: IntVarLike[];
-    coeffs: number[];
-    offset: number;
-    plus(value: unknown): LinearExprLike;
-    minus(value: unknown): LinearExprLike;
-    repr(): string;
-  };
-  ValueError: new (message: string) => Error;
-  RuntimeError: new (message: string) => Error;
-  ArithmeticError: new (message: string) => Error;
-  NotImplementedError: new (message: string) => Error;
-  object_is_a_true_literal(literal: unknown): boolean;
-  object_is_a_false_literal(literal: unknown): boolean;
   sum(values: Iterable<unknown> | unknown, ...rest: unknown[]): any;
   weightedSum(values: Iterable<unknown>, coeffs: Iterable<number>): any;
-  rebuild_from_linear_expression_proto: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
-  rebuildFromLinearExpressionProto?: (proto: LinearExpressionProtoLike, modelProto: unknown) => LinearExprLike | number;
   setFixtureExecutor(configuration:
     | { type: 'auto' | 'direct' | 'worker' }
     | { type: 'server'; url: string | URL; authToken?: string; statusIntervalMs?: number }
@@ -63,28 +36,14 @@ type HighLevelApi = {
   };
 };
 
-type LinearExpressionProtoLike = {
-  vars?: number[];
-  coeffs?: any[];
-  offset?: any;
-};
-
 type CpModelLike = {
   name: string;
   newIntVar(lb: unknown, ub: unknown, name?: string): IntVarLike;
-  new_int_var(lb: unknown, ub: unknown, name?: string): IntVarLike;
-  NewIntVar(lb: unknown, ub: unknown, name?: string): IntVarLike;
   newIntVarFromDomain(domain: unknown, name?: string): IntVarLike;
-  NewIntVarFromDomain(domain: unknown, name?: string): IntVarLike;
   newBoolVar(name?: string): BoolVarLike;
-  new_bool_var(name?: string): BoolVarLike;
-  NewBoolVar(name?: string): BoolVarLike;
   newConstant(value: number, name?: string): IntVarLike;
-  NewConstant(value: number, name?: string): IntVarLike;
   add(bound: unknown): unknown;
-  Add(bound: unknown): unknown;
   addAllDifferent(expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
-  AddAllDifferent(expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
   addElement(index: unknown, expressions: Iterable<unknown>, target: unknown): unknown;
   addCircuit(arcs: Iterable<readonly [number, number, unknown]>): unknown;
   addMultipleCircuit(arcs: Iterable<readonly [number, number, unknown]>): unknown;
@@ -93,114 +52,70 @@ type CpModelLike = {
   addAutomaton(expressions: Iterable<unknown>, startingState: number, finalStates: Iterable<number>, transitions: Iterable<readonly [number, number, number]>): unknown;
   addInverse(direct: Iterable<IntVarLike>, inverse: Iterable<IntVarLike>): unknown;
   addMaxEquality(target: unknown, expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
-  add_max_equality(target: unknown, expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
   addMinEquality(target: unknown, expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
-  add_min_equality(target: unknown, expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
   addAbsEquality(target: unknown, expression: unknown): unknown;
-  add_abs_equality(target: unknown, expression: unknown): unknown;
   addDivisionEquality(target: unknown, numerator: unknown, denominator: unknown): unknown;
-  add_division_equality(target: unknown, numerator: unknown, denominator: unknown): unknown;
-  add_modulo_equality(target: unknown, expression: unknown, modulo: unknown): unknown;
+  addModuloEquality(target: unknown, expression: unknown, modulo: unknown): unknown;
   addMultiplicationEquality(target: unknown, expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
-  add_multiplication_equality(target: unknown, expressions: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
   addImplication(left: unknown, right: unknown): unknown;
-  add_implication(left: unknown, right: unknown): unknown;
   addBoolOr(literals: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
-  add_bool_or(literals: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
-  AddBoolOr(literals: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
   addAtLeastOne(literals: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
-  add_at_least_one(literals: Iterable<unknown> | unknown, ...rest: unknown[]): unknown;
   addAtMostOne(literals: Iterable<unknown>): unknown;
-  add_at_most_one(literals: Iterable<unknown>): unknown;
   addExactlyOne(literals: Iterable<unknown>): unknown;
-  add_exactly_one(literals: Iterable<unknown>): unknown;
   addBoolAnd(literals: Iterable<unknown>): unknown;
-  add_bool_and(literals: Iterable<unknown>): unknown;
-  AddBoolAnd(literals: Iterable<unknown>): unknown;
   addBoolXor(literals: Iterable<unknown>): unknown;
-  add_bool_xor(literals: Iterable<unknown>): unknown;
-  AddBoolXOr(literals: Iterable<unknown>): unknown;
   addMapDomain(variable: IntVarLike, booleanVariables: Iterable<BoolVarLike>, offset?: number): unknown;
-  add_map_domain(variable: IntVarLike, booleanVariables: Iterable<BoolVarLike>, offset?: number): unknown;
   newIntervalVar(start: unknown, size: unknown, end: unknown, name?: string): IntervalVarLike;
-  new_interval_var(start: unknown, size: unknown, end: unknown, name?: string): IntervalVarLike;
   newFixedSizeIntervalVar(start: unknown, size: number, name?: string): IntervalVarLike;
-  new_fixed_size_interval_var(start: unknown, size: number, name?: string): IntervalVarLike;
   newOptionalIntervalVar(start: unknown, size: unknown, end: unknown, isPresent: unknown, name?: string): IntervalVarLike;
-  new_optional_interval_var(start: unknown, size: unknown, end: unknown, isPresent: unknown, name?: string): IntervalVarLike;
   newOptionalFixedSizeIntervalVar(start: unknown, size: number, isPresent: unknown, name?: string): IntervalVarLike;
-  new_optional_fixed_size_interval_var(start: unknown, size: number, isPresent: unknown, name?: string): IntervalVarLike;
   addNoOverlap(intervals: Iterable<IntervalVarLike>): ConstraintLike;
-  add_no_overlap(intervals: Iterable<IntervalVarLike>): ConstraintLike;
-  AddNoOverlap(intervals: Iterable<IntervalVarLike>): ConstraintLike;
   addNoOverlap2D(xIntervals: Iterable<IntervalVarLike>, yIntervals: Iterable<IntervalVarLike>): ConstraintLike;
-  add_no_overlap_2d(xIntervals: Iterable<IntervalVarLike>, yIntervals: Iterable<IntervalVarLike>): ConstraintLike;
-  AddNoOverlap2D(xIntervals: Iterable<IntervalVarLike>, yIntervals: Iterable<IntervalVarLike>): ConstraintLike;
   addCumulative(intervals: Iterable<IntervalVarLike>, demands: Iterable<unknown>, capacity: unknown): ConstraintLike;
-  add_cumulative(intervals: Iterable<IntervalVarLike>, demands: Iterable<unknown>, capacity: unknown): ConstraintLike;
   addLinearConstraint(expression: unknown, lb: number, ub: number): unknown;
   addHint(variable: unknown, value: number | boolean): unknown;
-  get_or_make_index_from_constant(value: number): number;
-  get_int_var_from_proto_index(index: number): IntVarLike;
-  get_bool_var_from_proto_index(index: number): BoolVarLike;
-  get_interval_var_from_proto_index(index: number): IntervalVarLike;
-  get_or_make_variable_index(variable: unknown): number;
-  is_boolean_value(value: unknown): boolean;
-  isBooleanValue(value: unknown): boolean;
+  getIntVarFromProtoIndex(index: number): IntVarLike;
+  getBoolVarFromProtoIndex(index: number): BoolVarLike;
+  getIntervalVarFromProtoIndex(index: number): IntervalVarLike;
   addAssumption(literal: unknown): unknown;
   addAssumptions(literals: Iterable<unknown>): unknown;
   clearAssumptions(): void;
   addDecisionStrategy(expressions: Iterable<unknown>, variableSelectionStrategy: unknown, domainReductionStrategy: unknown): unknown;
-  getOrMakeVariableIndex(variable: unknown): number;
   minimize(expression: unknown): unknown;
-  Minimize(expression: unknown): unknown;
   maximize(expression: unknown): unknown;
-  Maximize(expression: unknown): unknown;
   hasObjective(): boolean;
   modelStats(): string;
   validate(): Promise<string>;
-  remove_all_names(): void;
-  proto(): Record<string, unknown>;
-  Proto(): Record<string, unknown>;
+  removeAllNames(): void;
+  readonly modelProto: Record<string, unknown>;
   clone(): CpModelLike;
 };
 
 type CpSolverLike = {
   solve(model: CpModelLike, params?: Record<string, unknown>): Promise<unknown>;
   statusName(status?: unknown): string;
-  value(expression: unknown): number;
-  floatValue(expression: unknown): number;
+  value(expression: unknown): number | bigint;
   booleanValue(expression: unknown): boolean;
   responseStats(): string;
-  solutionInfo(): string;
+  readonly solutionInfo: string;
   readonly numBooleans: number;
   readonly numConflicts: number;
   readonly numBranches: number;
   readonly numBinaryPropagations: number;
   readonly numIntegerPropagations: number;
   readonly wallTime: number;
-  objectiveValue(): number;
-  readonly best_objective_bound: number;
-  readonly deterministic_time: number;
-  readonly num_binary_propagations: number;
-  readonly num_integer_propagations: number;
-  readonly num_booleans: number;
-  readonly num_conflicts: number;
-  readonly num_branches: number;
-  readonly user_time: number;
-  readonly wall_time: number;
-  readonly objective_value: number;
-  readonly response_proto: Record<string, unknown>;
-  readonly solve_log: string | undefined;
-  best_bound_callback: ((bound: number) => void) | null;
-  log_callback: ((message: string) => void) | null;
+  readonly objectiveValue: number;
+  readonly bestObjectiveBound: number;
+  readonly deterministicTime: number;
+  readonly userTime: number;
+  readonly response: Record<string, unknown> | null;
+  readonly solveLog: string | undefined;
   bestBoundCallback: ((bound: number) => void) | null;
   logCallback: ((message: string) => void) | null;
 };
 
 type CpSolverSolutionCallbackLike = {
-  value(expression: unknown): number;
-  floatValue(expression: unknown): number;
+  value(expression: unknown): number | bigint;
   booleanValue(literal: unknown): boolean;
   readonly objectiveValue: number;
 };
@@ -208,39 +123,20 @@ type CpSolverSolutionCallbackLike = {
 type IntVarLike = {
   index: number;
   readonly name: string;
-  readonly model_proto: unknown;
-  readonly is_boolean: boolean;
+  readonly modelProto: unknown;
+  isBoolean(): boolean;
   repr(): string;
   negated(): NotBoolVarLike;
   plus(value: unknown): LinearExprLike;
-  __add__(value: unknown): LinearExprLike;
   minus(value: unknown): LinearExprLike;
   times(coeff: number): LinearExprLike;
-  __mul__(coeff: number): LinearExprLike;
-  abs(): never;
-  __abs__(): never;
-  div(value: unknown): never;
-  __div__(value: unknown): never;
-  truediv(value: unknown): never;
-  __truediv__(value: unknown): never;
-  mod(value: unknown): never;
-  __mod__(value: unknown): never;
-  __pow__(value: unknown): never;
-  __lshift__(value: unknown): never;
-  __rshift__(value: unknown): never;
-  __and__(value: unknown): never;
-  __or__(value: unknown): never;
-  __xor__(value: unknown): never;
   isInteger?(): boolean;
-  is_integer?(): boolean;
   eq(value: unknown): unknown;
   ne(value: unknown): unknown;
   ge(value: unknown): unknown;
   gt(value: unknown): unknown;
-  __gt__(value: unknown): unknown;
   le(value: unknown): unknown;
   lt(value: unknown): unknown;
-  __lt__(value: unknown): unknown;
 };
 
 type BoolVarLike = IntVarLike & {
@@ -249,51 +145,20 @@ type BoolVarLike = IntVarLike & {
 
 type NotBoolVarLike = {
   index: number;
-  readonly model_proto: unknown;
+  readonly modelProto: unknown;
   repr(): string;
   negated(): IntVarLike;
   plus(value: unknown): LinearExprLike;
-  __add__(value: unknown): LinearExprLike;
   minus(value: unknown): LinearExprLike;
   times(coeff: number): LinearExprLike;
-  __mul__(coeff: number): LinearExprLike;
   neg(): LinearExprLike;
-  abs(): never;
-  __abs__(): never;
-  div(value: unknown): never;
-  __div__(value: unknown): never;
-  truediv(value: unknown): never;
-  __truediv__(value: unknown): never;
-  mod(value: unknown): never;
-  __mod__(value: unknown): never;
-  __pow__(value: unknown): never;
-  __lshift__(value: unknown): never;
-  __rshift__(value: unknown): never;
-  __and__(value: unknown): never;
-  __or__(value: unknown): never;
-  __xor__(value: unknown): never;
 };
 
 type LinearExprLike = {
   plus(value: unknown): LinearExprLike;
   minus(value: unknown): LinearExprLike;
   times(coeff: number): LinearExprLike;
-  abs(): never;
-  __abs__(): never;
-  div(value: unknown): never;
-  __div__(value: unknown): never;
-  truediv(value: unknown): never;
-  __truediv__(value: unknown): never;
-  mod(value: unknown): never;
-  __mod__(value: unknown): never;
-  __pow__(value: unknown): never;
-  __lshift__(value: unknown): never;
-  __rshift__(value: unknown): never;
-  __and__(value: unknown): never;
-  __or__(value: unknown): never;
-  __xor__(value: unknown): never;
   isInteger?(): boolean;
-  is_integer?(): boolean;
   repr?(): string;
   eq(value: unknown): unknown;
   ne(value: unknown): unknown;
@@ -305,7 +170,7 @@ type LinearExprLike = {
 
 type IntervalVarLike = {
   index: number;
-  readonly model_proto: unknown;
+  readonly modelProto: unknown;
   repr(): string;
   startExpr(): IntVarLike | LinearExprLike | number;
   sizeExpr(): IntVarLike | LinearExprLike | number;
@@ -316,7 +181,7 @@ type IntervalVarLike = {
 type ConstraintLike = {
   index: number;
   readonly name: string;
-  with_name(name: string): ConstraintLike;
+  withName(name: string): ConstraintLike;
   onlyEnforceIf(literals: unknown, ...rest: unknown[]): ConstraintLike;
 };
 
@@ -365,6 +230,12 @@ async function withCpSatExecutorMode<T>(
 }
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
+  if (typeof actual === 'bigint' && typeof expected === 'number' && Number.isSafeInteger(expected)) {
+    if (actual === BigInt(expected)) return;
+  }
+  if (typeof expected === 'bigint' && typeof actual === 'number' && Number.isSafeInteger(actual)) {
+    if (BigInt(actual) === expected) return;
+  }
   if (actual !== expected) {
     throw new Error(`${message}: expected ${expected}, got ${actual}`);
   }
@@ -390,7 +261,8 @@ function assertPresent<T>(value: T | undefined, message: string): T {
 
 const PY_INT_MIN = '-9223372036854775808';
 const PY_INT_MAX = '9223372036854775807';
-const PY_INT_MAX_PROTO = { low: -1, high: 2147483647 };
+const PY_INT_MIN_BIGINT = -9223372036854775808n;
+const PY_INT_MAX_BIGINT = 9223372036854775807n;
 
 function int64String(value: unknown) {
   if (typeof value === 'object' && value !== null && 'low' in value && 'high' in value) {
@@ -400,13 +272,13 @@ function int64String(value: unknown) {
   return String(value);
 }
 
-type FlatIntExprLike = {
+type NormalizedLinearExpr = {
   vars: IntVarLike[];
   coeffs: number[];
   offset: number;
 };
 
-function asFlatIntExpr(expression: number | LinearExprLike, variableByIndex: Map<number, IntVarLike>): FlatIntExprLike {
+function normalizeLinearExpr(expression: number | LinearExprLike, variableByIndex: Map<number, IntVarLike>): NormalizedLinearExpr {
   if (typeof expression === 'number') {
     return { vars: [], coeffs: [], offset: expression };
   }
@@ -433,7 +305,7 @@ function assertFlatExpr(
   message: string,
 ) {
   const variableByIndex = new Map(expectedTerms.map(([variable]) => [variable.index, variable]));
-  const flat = asFlatIntExpr(expression, variableByIndex);
+  const flat = normalizeLinearExpr(expression, variableByIndex);
   assertLength(flat.vars, expectedTerms.length, `${message} variable count`);
   for (let index = 0; index < expectedTerms.length; index += 1) {
     assertEqual(flat.vars[index].index, expectedTerms[index][0].index, `${message} variable ${index}`);
@@ -444,16 +316,16 @@ function assertFlatExpr(
 
 function flatExprSignature(expression: LinearExprLike, variables: IntVarLike[]) {
   const variableByIndex = new Map(variables.map((variable) => [variable.index, variable]));
-  const flat = asFlatIntExpr(expression, variableByIndex);
+  const flat = normalizeLinearExpr(expression, variableByIndex);
   return JSON.stringify({
     vars: flat.vars.map((variable) => variable.index),
     coeffs: flat.coeffs,
     offset: flat.offset,
-  });
+  }, (_key, value) => typeof value === 'bigint' ? value.toString() : value);
 }
 
 function expressionIsInteger(expression: unknown) {
-  return typeof expression === 'number' ? Number.isInteger(expression) : Boolean((expression as LinearExprLike).is_integer?.());
+  return typeof expression === 'number' ? Number.isInteger(expression) : Boolean((expression as LinearExprLike).isInteger?.());
 }
 
 function assertThrows(errorCtor: new (...args: never[]) => Error, fn: () => void, message: string) {
@@ -464,19 +336,6 @@ function assertThrows(errorCtor: new (...args: never[]) => Error, fn: () => void
       return;
     }
     throw new Error(`${message}: expected ${errorCtor.name}, got ${error instanceof Error ? error.name : typeof error}`);
-  }
-  throw new Error(`${message}: expected ${errorCtor.name}`);
-}
-
-function assertThrowsWithMessage(errorCtor: new (...args: never[]) => Error, expectedMessage: string, fn: () => void, message: string) {
-  try {
-    fn();
-  } catch (error) {
-    if (!(error instanceof errorCtor)) {
-      throw new Error(`${message}: expected ${errorCtor.name}, got ${error instanceof Error ? error.name : typeof error}`);
-    }
-    assertEqual(error.message, expectedMessage, `${message} message`);
-    return;
   }
   throw new Error(`${message}: expected ${errorCtor.name}`);
 }
@@ -494,11 +353,11 @@ async function assertRejects(errorCtor: new (...args: never[]) => Error, promise
 }
 
 function variables(model: CpModelLike) {
-  return model.proto().variables as unknown[] | undefined;
+  return model.modelProto.variables as unknown[] | undefined;
 }
 
 function constraints(model: CpModelLike) {
-  return model.proto().constraints as Array<Record<string, any>> | undefined;
+  return model.modelProto.constraints as Array<Record<string, any>> | undefined;
 }
 
 function newLinMaxVars(CpModel: HighLevelApi['CpModel']) {
@@ -542,7 +401,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_all_different matches upstream assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_all_different',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 4, `x${index}`));
       model.addAllDifferent(x);
@@ -555,7 +414,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_hash_int_var matches upstream same-index variable key behavior using the high-level CP-SAT API.
     name: 'CpModelTest.test_hash_int_var',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const varA = model.newIntVar(0, 2, 'a');
       const variables = new Set<IntVarLike>();
@@ -567,7 +426,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const accumulator = new Map<IntVarLike, number>();
       accumulator.set(varA, (accumulator.get(varA) ?? 0) + 1);
       assertEqual(accumulator.get(varA), 1, `${this.name} initial accumulator`);
-      const sameVarA = model.get_int_var_from_proto_index(varA.index);
+      const sameVarA = model.getIntVarFromProtoIndex(varA.index);
       accumulator.set(sameVarA, (accumulator.get(sameVarA) ?? 0) + 3);
       assertEqual(accumulator.get(varA), 4, `${this.name} same-index accumulator`);
     },
@@ -576,7 +435,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_all_different_gen matches upstream assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_all_different_gen',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       model.addAllDifferent((function* expressions() {
         for (let index = 0; index < 5; index += 1) {
@@ -665,9 +524,9 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const model = new CpModel();
-      const x = model.NewIntVar(0, 1, 'x');
-      const y = model.NewIntVar(0, 2, 'y');
-      const z = model.NewIntVar(0, 3, 'z');
+      const x = model.newIntVar(0, 1, 'x');
+      const y = model.newIntVar(0, 2, 'y');
+      const z = model.newIntVar(0, 3, 'z');
       const expr = x.minus(y).minus(z.times(2));
       assertEqual(String(expr), '(x + (-y) + (-2 * z))', `${this.name} expression string`);
     },
@@ -920,7 +779,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_linear matches upstream solve assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_linear',
     source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver, RuntimeError }) {
+    async run({ CpModel, CpSolver }) {
       const model = new CpModel();
       const x = model.newIntVar(-10, 10, 'x');
       const y = model.newIntVar(-10, 10, 'y');
@@ -937,7 +796,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_none_argument matches upstream solve and TypeError assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_none_argument',
     source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver, RuntimeError }) {
+    async run({ CpModel, CpSolver }) {
       const model = new CpModel();
       const x = model.newIntVar(-10, 10, 'x');
       const y = model.newIntVar(-10, 10, 'y');
@@ -947,7 +806,6 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
       assertThrows(TypeError, () => solver.value(null as never), `${this.name} value rejects null`);
-      assertThrows(TypeError, () => solver.floatValue(null as never), `${this.name} floatValue rejects null`);
       assertThrows(TypeError, () => solver.booleanValue(null as never), `${this.name} booleanValue rejects null`);
     },
   },
@@ -994,11 +852,11 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       model.name = 'test_model';
       const x = model.newIntVar(-10, 10, 'x');
       const y = model.newIntVar(-10, 10, 'y');
-      const ct = model.addLinearConstraint(x.plus(y.times(2)), 0, 10).with_name('test_constraint');
+      const ct = model.addLinearConstraint(x.plus(y.times(2)), 0, 10).withName('test_constraint');
       assertEqual(model.name, 'test_model', `${this.name} model name`);
       assertEqual(x.name, 'x', `${this.name} variable name`);
       assertEqual(ct.name, 'test_constraint', `${this.name} constraint name`);
-      model.remove_all_names();
+      model.removeAllNames();
       assertEqual(model.name, '', `${this.name} cleared model name`);
       assertEqual(x.name, '', `${this.name} cleared variable name`);
       assertEqual(ct.name, '', `${this.name} cleared constraint name`);
@@ -1020,7 +878,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(solver.value(x), 5, `${this.name} x value`);
       assertEqual(solver.value(x.times(3)), 15, `${this.name} x*3 value`);
       assertEqual(solver.value(x.plus(1)), 6, `${this.name} x+1 value`);
-      assertEqual(solver.objectiveValue(), -10, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, -10, `${this.name} objective value`);
     },
   },
   {
@@ -1038,7 +896,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
       assertEqual(solver.value(x), -4, `${this.name} x value`);
       assertEqual(solver.value(y), -9, `${this.name} y value`);
-      assertEqual(solver.objectiveValue(), 17, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 17, `${this.name} objective value`);
     },
   },
   {
@@ -1062,7 +920,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(solver.booleanValue(x), false, `${this.name} boolean_value(x)`);
       assertEqual(solver.booleanValue(x.negated()), true, `${this.name} boolean_value(x.negated())`);
       assertEqual(solver.value(y.times(-1)), -10, `${this.name} value(-y)`);
-      assertEqual(solver.objectiveValue(), 16.1, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 16.1, `${this.name} objective value`);
     },
   },
   {
@@ -1086,9 +944,9 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(solver.value(x1.times(2).plus(3)), 5, `${this.name} value(3 + 2 * x1)`);
       assertEqual(solver.value(x1.plus(x2).plus(x3)), 3, `${this.name} value(x1 + x2 + x3)`);
       assertEqual(solver.value(sum([x1, x2, x3, 0, -2])), 1, `${this.name} value(sum([x1, x2, x3, 0, -2]))`);
-      assertEqual(solver.value(weightedSum([x1, x2, x4, 3], [2, 2, 2, 1])), 7, `${this.name} value(weighted_sum([x1, x2, x4, 3], [2, 2, 2, 1])`);
+      assertEqual(solver.value(weightedSum([x1, x2, x4, 3], [2, 2, 2, 1])), 7, `${this.name} value(weightedSum([x1, x2, x4, 3], [2, 2, 2, 1])`);
       assertEqual(solver.value(x4.negated().times(5)), 5, `${this.name} value(5 * x4.negated())`);
-      assertEqual(solver.objectiveValue(), 8, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 8, `${this.name} objective value`);
     },
   },
   {
@@ -1103,7 +961,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const solver = new CpSolver();
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.objectiveValue(), 10, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 10, `${this.name} objective value`);
     },
   },
   {
@@ -1118,7 +976,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const solver = new CpSolver();
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.objectiveValue(), 5, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 5, `${this.name} objective value`);
     },
   },
   {
@@ -1162,7 +1020,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const solver = new CpSolver();
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.objectiveValue(), 1, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 1, `${this.name} objective value`);
       for (let index = 0; index < 100; index += 1) {
         assertEqual(solver.value(x[index]), index === 99 ? 1 : 0, `${this.name} x${index} value`);
       }
@@ -1171,59 +1029,43 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
   {
     name: 'CpModelTest.test_sum_parsing.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, LinearExpr, FlatIntExpr, FlatFloatExpr }) {
+    run({ CpModel, LinearExpr }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 2, `x${index}`));
 
       const s1 = LinearExpr.sum(x);
       assertEqual(expressionIsInteger(s1), true, `${this.name} s1 is integer`);
-      const flatS1 = new FlatIntExpr(s1);
-      assertLength(flatS1.vars, 5, `${this.name} s1 variable count`);
-      assertEqual(flatS1.offset, 0, `${this.name} s1 offset`);
+      assertFlatExpr(s1, x.map((variable) => [variable, 1] as const), 0, `${this.name} s1`);
 
       const s2 = LinearExpr.sum(x[0], x[2], x[4]);
       assertEqual(expressionIsInteger(s2), true, `${this.name} s2 is integer`);
-      const flatS2 = new FlatIntExpr(s2);
-      assertLength(flatS2.vars, 3, `${this.name} s2 variable count`);
-      assertEqual(flatS2.offset, 0, `${this.name} s2 offset`);
+      assertFlatExpr(s2, [[x[0], 1], [x[2], 1], [x[4], 1]], 0, `${this.name} s2`);
 
       const s3 = LinearExpr.sum(x[0], x[2], 2, x[4], -4);
       assertEqual(expressionIsInteger(s3), true, `${this.name} s3 is integer`);
-      const flatS3 = new FlatIntExpr(s3);
-      assertLength(flatS3.vars, 3, `${this.name} s3 variable count`);
-      assertEqual(flatS3.offset, -2, `${this.name} s3 offset`);
+      assertFlatExpr(s3, [[x[0], 1], [x[2], 1], [x[4], 1]], -2, `${this.name} s3`);
 
       const s4 = LinearExpr.sum(x[0], x[2], 2.5);
       assertEqual(expressionIsInteger(s4), false, `${this.name} s4 is not integer`);
-      const flatS4 = new FlatFloatExpr(s4);
-      assertLength(flatS4.vars, 2, `${this.name} s4 variable count`);
-      assertEqual(flatS4.offset, 2.5, `${this.name} s4 offset`);
+      assertFlatExpr(s4, [[x[0], 1], [x[2], 1]], 2.5, `${this.name} s4`);
 
       const s5 = LinearExpr.sum(x[0], x[2], 2, 1.5);
       assertEqual(expressionIsInteger(s5), false, `${this.name} s5 is not integer`);
-      const flatS5 = new FlatFloatExpr(s5);
-      assertLength(flatS5.vars, 2, `${this.name} s5 variable count`);
-      assertEqual(flatS5.offset, 3.5, `${this.name} s5 offset`);
+      assertFlatExpr(s5, [[x[0], 1], [x[2], 1]], 3.5, `${this.name} s5`);
       assertEqual(String(s5), '(x0 + x2 + 3.5)', `${this.name} s5 string`);
 
       const s5b = LinearExpr.sum(x[0], x[2], 2, -2.5);
       assertEqual(expressionIsInteger(s5b), false, `${this.name} s5b is not integer`);
       assertEqual(String(s5b), '(x0 + x2 - 0.5)', `${this.name} s5b string`);
-      const flatS5b = new FlatFloatExpr(s5b);
-      assertLength(flatS5b.vars, 2, `${this.name} s5b variable count`);
-      assertEqual(flatS5b.offset, -0.5, `${this.name} s5b offset`);
+      assertFlatExpr(s5b, [[x[0], 1], [x[2], 1]], -0.5, `${this.name} s5b`);
 
       const s6 = LinearExpr.sum(x[0], x[2], -1, -4);
       assertEqual(expressionIsInteger(s6), true, `${this.name} s6 is integer`);
-      const flatS6 = new FlatIntExpr(s6);
-      assertLength(flatS6.vars, 2, `${this.name} s6 variable count`);
-      assertEqual(flatS6.offset, -5, `${this.name} s6 offset`);
+      assertFlatExpr(s6, [[x[0], 1], [x[2], 1]], -5, `${this.name} s6`);
 
       const s7 = LinearExpr.sum(x[0], x[2], 2.0, 1.5);
       assertEqual(expressionIsInteger(s7), false, `${this.name} s7 is not integer`);
-      const flatS7 = new FlatFloatExpr(s7);
-      assertLength(flatS7.vars, 2, `${this.name} s7 variable count`);
-      assertEqual(flatS7.offset, 3.5, `${this.name} s7 offset`);
+      assertFlatExpr(s7, [[x[0], 1], [x[2], 1]], 3.5, `${this.name} s7`);
 
       const s8 = LinearExpr.sum(x[0], 3);
       assertEqual(expressionIsInteger(s8), true, `${this.name} s8 is integer`);
@@ -1252,12 +1094,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         'SumArray(x0(0..2), IntAffine(expr=x2(0..2), coeff=-1, offset=0), int_offset=-3)',
         `${this.name} s12 repr`,
       );
-      const flatS12 = new FlatIntExpr(s12);
-      assertEqual(String(flatS12), '(x0 - x2 - 3)', `${this.name} s12 flat string`);
-      assertEqual(flatS12.repr(), 'FlatIntExpr([x0(0..2), x2(0..2)], [1, -1], -3)', `${this.name} s12 flat repr`);
-      const flatFloatS12 = new FlatFloatExpr(s12);
-      assertEqual(String(flatFloatS12), '(x0 - x2 - 3)', `${this.name} s12 flat float string`);
-      assertEqual(flatFloatS12.repr(), 'FlatFloatExpr([x0(0..2), x2(0..2)], [1, -1], -3)', `${this.name} s12 flat float repr`);
+      assertFlatExpr(s12, [[x[0], 1], [x[2], -1]], -3, `${this.name} s12`);
 
       const s13 = LinearExpr.sum(2);
       assertEqual(String(s13), '2', `${this.name} s13 string`);
@@ -1269,7 +1106,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
 
       assertThrows(TypeError, () => LinearExpr.sum(x[0], x[2], 'foo' as never), `${this.name} rejects string operand`);
       assertThrows(TypeError, () => LinearExpr.sum(x[0], x[2], { dtype: 2 } as never), `${this.name} rejects fake dtype operand`);
-      assertThrows(TypeError, () => LinearExpr.sum(x[0], x[2], { is_integer: false } as never), `${this.name} rejects fake is_integer operand`);
+      assertThrows(TypeError, () => LinearExpr.sum(x[0], x[2], { isInteger: false } as never), `${this.name} rejects fake isInteger operand`);
     },
   },
   {
@@ -1292,17 +1129,17 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const solver = new CpSolver();
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.objectiveValue(), 1, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 1, `${this.name} objective value`);
       for (let index = 0; index < 100; index += 1) {
         assertEqual(solver.value(x[index]), index === 99 ? 1 : 0, `${this.name} x${index} value`);
       }
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_weighted_sum matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.test_weighted_sum matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.test_weighted_sum',
     source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver, LinearExpr, ValueError, weightedSum }) {
+    async run({ CpModel, CpSolver, LinearExpr, weightedSum }) {
       const model = new CpModel();
       const x = Array.from({ length: 100 }, (_, index) => model.newIntVar(0, 2, `x${index}`));
       const c = Array.from({ length: 100 }, () => 2);
@@ -1311,69 +1148,61 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const solver = new CpSolver();
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.objectiveValue(), 1, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 1, `${this.name} objective value`);
       for (let index = 0; index < 100; index += 1) {
         assertEqual(solver.value(x[index]), index === 99 ? 1 : 0, `${this.name} x${index} value`);
       }
-      assertThrows(ValueError, () => weightedSum([x[0]], [1, 2]), `${this.name} rejects length mismatch`);
-      assertThrows(ValueError, () => weightedSum([x[0]], [1.1, 2.2]), `${this.name} rejects float coefficient mismatch`);
-      assertThrows(ValueError, () => weightedSum([x[0], 3, 5], [1, 2]), `${this.name} rejects constant length mismatch`);
-      assertThrows(ValueError, () => weightedSum([x[0], 2.2, 3], [1.1, 2.2]), `${this.name} rejects float constant mismatch`);
-      assertThrows(ValueError, () => LinearExpr.WeightedSum([x[0]], [1, 2]), `${this.name} rejects alias length mismatch`);
-      assertThrows(ValueError, () => LinearExpr.WeightedSum([x[0]], [1.1, 2.2]), `${this.name} rejects alias float coefficient mismatch`);
+      assertThrows(RangeError, () => weightedSum([x[0]], [1, 2]), `${this.name} rejects length mismatch`);
+      assertThrows(RangeError, () => weightedSum([x[0]], [1.1, 2.2]), `${this.name} rejects float coefficient mismatch`);
+      assertThrows(RangeError, () => weightedSum([x[0], 3, 5], [1, 2]), `${this.name} rejects constant length mismatch`);
+      assertThrows(RangeError, () => weightedSum([x[0], 2.2, 3], [1.1, 2.2]), `${this.name} rejects float constant mismatch`);
+      assertThrows(RangeError, () => LinearExpr.weightedSum([x[0]], [1, 2]), `${this.name} static helper rejects length mismatch`);
+      assertThrows(RangeError, () => LinearExpr.weightedSum([x[0]], [1.1, 2.2]), `${this.name} static helper rejects float coefficient mismatch`);
     },
   },
   {
     name: 'CpModelTest.test_weighted_sum_parsing.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, LinearExpr, FlatIntExpr, FlatFloatExpr }) {
+    run({ CpModel, LinearExpr }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 2, `x${index}`));
       const c = [1, -2, 2, 3, 0];
       const floatC = [1, -1.0, 2, 3, 0.0];
 
-      const s1 = LinearExpr.weighted_sum(x, c);
+      const s1 = LinearExpr.weightedSum(x, c);
       assertEqual(expressionIsInteger(s1), true, `${this.name} s1 is integer`);
-      const flatS1 = new FlatIntExpr(s1);
-      assertLength(flatS1.vars, 4, `${this.name} s1 variable count`);
-      assertEqual(flatS1.offset, 0, `${this.name} s1 offset`);
+      const integerWeightedTerms = [[x[0], 1], [x[1], -2], [x[2], 2], [x[3], 3]] as Array<readonly [IntVarLike, number]>;
+      const floatWeightedTerms = [[x[0], 1], [x[1], -1], [x[2], 2], [x[3], 3]] as Array<readonly [IntVarLike, number]>;
+      assertFlatExpr(s1, integerWeightedTerms, 0, `${this.name} s1`);
 
-      const s2 = LinearExpr.weighted_sum(x, floatC);
-      const flatS2 = new FlatFloatExpr(s2);
-      assertLength(flatS2.vars, 4, `${this.name} s2 variable count`);
-      assertEqual(flatS2.offset, 0, `${this.name} s2 offset`);
+      const s2 = LinearExpr.weightedSum(x, floatC);
+      assertFlatExpr(s2, floatWeightedTerms, 0, `${this.name} s2`);
 
-      const s3 = LinearExpr.weighted_sum([...x, 2], [...c, -1]);
+      const s3 = LinearExpr.weightedSum([...x, 2], [...c, -1]);
       assertEqual(expressionIsInteger(s3), true, `${this.name} s3 is integer`);
-      const flatS3 = new FlatIntExpr(s3);
-      assertLength(flatS3.vars, 4, `${this.name} s3 variable count`);
-      assertEqual(flatS3.offset, -2, `${this.name} s3 offset`);
+      assertFlatExpr(s3, integerWeightedTerms, -2, `${this.name} s3`);
 
-      const s4 = LinearExpr.weighted_sum([...x, 2], [...floatC, -1.0]);
-      const flatS4 = new FlatFloatExpr(s4);
-      assertLength(flatS4.vars, 4, `${this.name} s4 variable count`);
-      assertEqual(flatS4.offset, -2, `${this.name} s4 offset`);
+      const s4 = LinearExpr.weightedSum([...x, 2], [...floatC, -1.0]);
+      assertFlatExpr(s4, floatWeightedTerms, -2, `${this.name} s4`);
 
-      const s5 = LinearExpr.weighted_sum([...x, 2], [...c, -1]);
+      const s5 = LinearExpr.weightedSum([...x, 2], [...c, -1]);
       assertEqual(expressionIsInteger(s5), true, `${this.name} s5 is integer`);
-      const flatS5 = new FlatIntExpr(s5);
-      assertLength(flatS5.vars, 4, `${this.name} s5 variable count`);
-      assertEqual(flatS5.offset, -2, `${this.name} s5 offset`);
+      assertFlatExpr(s5, integerWeightedTerms, -2, `${this.name} s5`);
 
-      const s6 = LinearExpr.weighted_sum([2], [1]);
+      const s6 = LinearExpr.weightedSum([2], [1]);
       assertEqual(s6.repr?.(), 'IntConstant(2)', `${this.name} s6 repr`);
-      assertEqual(new FlatIntExpr(s6).repr(), 'FlatIntExpr([], [], 2)', `${this.name} s6 flat repr`);
+      assertFlatExpr(s6, [], 2, `${this.name} s6`);
 
-      const s7 = LinearExpr.weighted_sum([2], [1.25]);
+      const s7 = LinearExpr.weightedSum([2], [1.25]);
       assertEqual(s7.repr?.(), 'FloatConstant(2.5)', `${this.name} s7 repr`);
-      assertEqual(new FlatFloatExpr(s7).repr(), 'FlatFloatExpr([], [], 2.5)', `${this.name} s7 flat repr`);
+      assertFlatExpr(s7, [], 2.5, `${this.name} s7`);
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_element matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.test_element matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.test_element',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 4, `x${index}`));
       model.addElement(x[0], [x[1], 2, 4, x[2]], x[4]);
@@ -1382,7 +1211,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertLength(constraints(model)?.[0]?.element?.exprs, 4, `${this.name} element expression count`);
       assertEqual(constraints(model)?.[0]?.element?.linearIndex?.vars?.[0], 0, `${this.name} index var`);
       assertEqual(constraints(model)?.[0]?.element?.linearTarget?.vars?.[0], 4, `${this.name} target var`);
-      assertThrows(ValueError, () => model.addElement(x[0], [], x[4]), `${this.name} rejects empty expressions`);
+      assertThrows(RangeError, () => model.addElement(x[0], [], x[4]), `${this.name} rejects empty expressions`);
     },
   },
   {
@@ -1426,10 +1255,10 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.testCircuit matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.testCircuit matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.testCircuit',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
       model.addCircuit(x.map((literal, index) => [index, index + 1, literal]));
@@ -1438,14 +1267,14 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertLength(constraints(model)?.[0]?.circuit?.heads, 5, `${this.name} head count`);
       assertLength(constraints(model)?.[0]?.circuit?.tails, 5, `${this.name} tail count`);
       assertLength(constraints(model)?.[0]?.circuit?.literals, 5, `${this.name} literal count`);
-      assertThrows(ValueError, () => model.addCircuit([]), `${this.name} rejects empty arcs`);
+      assertThrows(RangeError, () => model.addCircuit([]), `${this.name} rejects empty arcs`);
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_multiple_circuit matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.test_multiple_circuit matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.test_multiple_circuit',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
       model.addMultipleCircuit(x.map((literal, index) => [index, index + 1, literal]));
@@ -1454,14 +1283,14 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertLength(constraints(model)?.[0]?.routes?.heads, 5, `${this.name} head count`);
       assertLength(constraints(model)?.[0]?.routes?.tails, 5, `${this.name} tail count`);
       assertLength(constraints(model)?.[0]?.routes?.literals, 5, `${this.name} literal count`);
-      assertThrows(ValueError, () => model.addMultipleCircuit([]), `${this.name} rejects empty arcs`);
+      assertThrows(RangeError, () => model.addMultipleCircuit([]), `${this.name} rejects empty arcs`);
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_allowed_assignments matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.test_allowed_assignments matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.test_allowed_assignments',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 4, `x${index}`));
       model.addAllowedAssignments(x, [
@@ -1475,7 +1304,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertLength(constraints(model)?.[0]?.table?.values, 15, `${this.name} value count`);
       assertEqual(constraints(model)?.[0]?.table?.negated ?? false, false, `${this.name} negated flag`);
       assertThrows(
-        ValueError,
+        RangeError,
         () => model.addAllowedAssignments(x, [
           [0, 1, 2, 3, 4],
           [4, 3, 2, 1, 1],
@@ -1484,7 +1313,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         `${this.name} rejects wrong tuple arity`,
       );
       assertThrows(
-        ValueError,
+        RangeError,
         () => model.addAllowedAssignments([], [
           [0, 1, 2, 3, 4],
           [4, 3, 2, 1, 1],
@@ -1495,10 +1324,10 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_forbidden_assignments matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.test_forbidden_assignments matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.test_forbidden_assignments',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 4, `x${index}`));
       model.addForbiddenAssignments(x, [
@@ -1512,7 +1341,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertLength(constraints(model)?.[0]?.table?.values, 15, `${this.name} value count`);
       assertEqual(constraints(model)?.[0]?.table?.negated, true, `${this.name} negated flag`);
       assertThrows(
-        ValueError,
+        RangeError,
         () => model.addForbiddenAssignments(x, [
           [0, 1, 2, 3, 4],
           [4, 3, 2, 1, 1],
@@ -1521,7 +1350,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         `${this.name} rejects wrong tuple arity`,
       );
       assertThrows(
-        ValueError,
+        RangeError,
         () => model.addForbiddenAssignments([], [
           [0, 1, 2, 3, 4],
           [4, 3, 2, 1, 1],
@@ -1532,10 +1361,10 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_automaton matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.test_automaton matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.test_automaton',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 4, `x${index}`));
       model.addAutomaton(x, 0, [2, 3], [
@@ -1554,7 +1383,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertLength(automaton?.finalStates, 2, `${this.name} final state count`);
       assertEqual(automaton?.startingState, 0, `${this.name} starting state`);
       assertThrows(
-        ValueError,
+        RangeError,
         () => model.addAutomaton(x, 0, [2, 3], [
           [0, 0, 0],
           [0, 1, 1],
@@ -1564,7 +1393,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         `${this.name} rejects malformed transitions`,
       );
       assertThrows(
-        ValueError,
+        RangeError,
         () => model.addAutomaton([], 0, [2, 3], [
           [0, 0, 0],
           [0, 1, 1],
@@ -1573,7 +1402,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         `${this.name} rejects empty expressions`,
       );
       assertThrows(
-        ValueError,
+        RangeError,
         () => model.addAutomaton(x, 0, [], [
           [0, 0, 0],
           [0, 1, 1],
@@ -1581,7 +1410,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         ]),
         `${this.name} rejects empty final states`,
       );
-      assertThrows(ValueError, () => model.addAutomaton(x, 0, [2, 3], []), `${this.name} rejects empty transitions`);
+      assertThrows(RangeError, () => model.addAutomaton(x, 0, [2, 3], []), `${this.name} rejects empty transitions`);
     },
   },
   {
@@ -1605,7 +1434,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_max_equality(x, y);
+      model.addMaxEquality(x, y);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
       assertMaxEqualityProto(model, 5, 1, this.name);
     },
@@ -1616,7 +1445,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_max_equality(x, [y[0], y[2], y[1], y[3]]);
+      model.addMaxEquality(x, [y[0], y[2], y[1], y[3]]);
       assertMaxEqualityProto(model, 4, 1, this.name);
     },
   },
@@ -1626,7 +1455,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_max_equality(x, [y[0], y[2], y[1], y[3]]);
+      model.addMaxEquality(x, [y[0], y[2], y[1], y[3]]);
       assertMaxEqualityProto(model, 4, 1, this.name);
     },
   },
@@ -1636,7 +1465,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_max_equality(x, (function* expressions() {
+      model.addMaxEquality(x, (function* expressions() {
         yield* y;
       })());
       assertMaxEqualityProto(model, 5, 1, this.name);
@@ -1648,7 +1477,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_max_equality(x, y[2], y[4]);
+      model.addMaxEquality(x, y[2], y[4]);
       assertMaxEqualityProto(model, 2, 1, this.name);
     },
   },
@@ -1660,7 +1489,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const model = new CpModel();
       const x = model.newIntVar(0, 4, 'x');
       const y = model.newIntVar(0, 4, 'y');
-      model.add_max_equality(x, [y, 3]);
+      model.addMaxEquality(x, [y, 3]);
       const linMax = constraints(model)?.[0]?.linMax;
       assertLength(variables(model), 2, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
@@ -1679,7 +1508,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_min_equality(x, y);
+      model.addMinEquality(x, y);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
       assertMaxEqualityProto(model, 5, -1, this.name);
     },
@@ -1690,7 +1519,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_min_equality(x, [y[0], y[2], y[1], y[3]]);
+      model.addMinEquality(x, [y[0], y[2], y[1], y[3]]);
       assertMaxEqualityProto(model, 4, -1, this.name);
     },
   },
@@ -1700,7 +1529,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_min_equality(x, [y[0], y[2], y[1], y[3]]);
+      model.addMinEquality(x, [y[0], y[2], y[1], y[3]]);
       assertMaxEqualityProto(model, 4, -1, this.name);
     },
   },
@@ -1710,7 +1539,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_min_equality(x, (function* expressions() {
+      model.addMinEquality(x, (function* expressions() {
         yield* y;
       })());
       assertMaxEqualityProto(model, 5, -1, this.name);
@@ -1722,7 +1551,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const { model, x, y } = newLinMaxVars(CpModel);
-      model.add_min_equality(x, y[2], y[4]);
+      model.addMinEquality(x, y[2], y[4]);
       assertMaxEqualityProto(model, 2, -1, this.name);
     },
   },
@@ -1734,7 +1563,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const model = new CpModel();
       const x = model.newIntVar(0, 4, 'x');
       const y = model.newIntVar(0, 4, 'y');
-      model.add_min_equality(x, [y, 3]);
+      model.addMinEquality(x, [y, 3]);
       const linMax = constraints(model)?.[0]?.linMax;
       assertLength(variables(model), 2, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
@@ -1748,14 +1577,14 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_abs matches upstream proto assertions and unsupported-operation guidance using the high-level CP-SAT API.
-    name: 'CpModelTest.test_abs',
+    // TEMP: partial parity - covers addAbsEquality; Python's abs() operator hook is intentionally outside the TypeScript API.
+    name: 'CpModelTest.test_abs.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, NotImplementedError }) {
+    run({ CpModel }) {
       const model = new CpModel();
-      const x = model.new_int_var(0, 4, 'x');
-      const y = model.new_int_var(-5, 5, 'y');
-      model.add_abs_equality(x, y);
+      const x = model.newIntVar(0, 4, 'x');
+      const y = model.newIntVar(-5, 5, 'y');
+      model.addAbsEquality(x, y);
       const linMax = constraints(model)?.[0]?.linMax;
       assertLength(variables(model), 2, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
@@ -1764,23 +1593,17 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(linMax?.exprs?.[0]?.coeffs?.[0], 1, `${this.name} first expr coeff`);
       assertEqual(linMax?.exprs?.[1]?.vars?.[0], 1, `${this.name} second expr var`);
       assertEqual(linMax?.exprs?.[1]?.coeffs?.[0], -1, `${this.name} second expr coeff`);
-      assertThrowsWithMessage(
-        NotImplementedError,
-        'calling abs() on a linear expression is not supported, please use CpModel.add_abs_equality',
-        () => x.__abs__(),
-        `${this.name} unsupported abs`,
-      );
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_division matches upstream proto assertions and unsupported-operation guidance using the high-level CP-SAT API.
-    name: 'CpModelTest.test_division',
+    // TEMP: partial parity - covers addDivisionEquality; Python's division operator hook is intentionally outside the TypeScript API.
+    name: 'CpModelTest.test_division.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, NotImplementedError }) {
+    run({ CpModel }) {
       const model = new CpModel();
-      const x = model.new_int_var(0, 10, 'x');
-      const y = model.new_int_var(0, 50, 'y');
-      model.add_division_equality(x, y, 6);
+      const x = model.newIntVar(0, 10, 'x');
+      const y = model.newIntVar(0, 50, 'y');
+      model.addDivisionEquality(x, y, 6);
       const intDiv = constraints(model)?.[0]?.intDiv;
       assertLength(variables(model), 2, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
@@ -1789,12 +1612,6 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(intDiv?.exprs?.[0]?.coeffs?.[0], 1, `${this.name} numerator coeff`);
       assertLength(intDiv?.exprs?.[1]?.vars, 0, `${this.name} denominator var count`);
       assertEqual(intDiv?.exprs?.[1]?.offset, 6, `${this.name} denominator offset`);
-      assertThrowsWithMessage(
-        NotImplementedError,
-        'calling // on a linear expression is not supported, please use CpModel.add_division_equality',
-        () => x.__truediv__(3),
-        `${this.name} unsupported division`,
-      );
     },
   },
   {
@@ -1804,14 +1621,14 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     async run({ CpModel, CpSolver }) {
       const model = new CpModel();
       const target = 11;
-      const value = model.new_int_var(0, 10, '');
-      const defect = model.new_int_var(0, 2147483647, '');
-      model.add_abs_equality(defect, value.minus(target));
+      const value = model.newIntVar(0, 10, '');
+      const defect = model.newIntVar(0, 2147483647, '');
+      model.addAbsEquality(defect, value.minus(target));
       model.minimize(defect);
       const solver = new CpSolver();
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.objectiveValue(), 1, `${this.name} objective value`);
+      assertEqual(solver.objectiveValue, 1, `${this.name} objective value`);
     },
   },
   {
@@ -1822,7 +1639,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const model = new CpModel();
       const x = model.newIntVar(0, 4, 'x');
       const y = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 4, `y${index}`));
-      model.add_multiplication_equality(x, y);
+      model.addMultiplicationEquality(x, y);
       assertLength(variables(model), 6, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
       assertLength(constraints(model)?.[0]?.intProd?.exprs, 5, `${this.name} expression count`);
@@ -1837,7 +1654,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const model = new CpModel();
       const x = model.newIntVar(0, 4, 'x');
       const y = Array.from({ length: 5 }, (_, index) => model.newIntVar(0, 4, `y${index}`));
-      model.add_multiplication_equality(x, y[2], y[3]);
+      model.addMultiplicationEquality(x, y[2], y[3]);
       assertLength(variables(model), 6, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
       assertLength(constraints(model)?.[0]?.intProd?.exprs, 2, `${this.name} expression count`);
@@ -1845,14 +1662,14 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.testModulo matches upstream proto assertions and unsupported-operation guidance using the high-level CP-SAT API.
-    name: 'CpModelTest.testModulo',
+    // TEMP: partial parity - covers addModuloEquality; Python's modulo operator hook is intentionally outside the TypeScript API.
+    name: 'CpModelTest.testModulo.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, NotImplementedError }) {
+    run({ CpModel }) {
       const model = new CpModel();
-      const x = model.new_int_var(0, 10, 'x');
-      const y = model.new_int_var(0, 50, 'y');
-      model.add_modulo_equality(x, y, 6);
+      const x = model.newIntVar(0, 10, 'x');
+      const y = model.newIntVar(0, 50, 'y');
+      model.addModuloEquality(x, y, 6);
       const intMod = constraints(model)?.[0]?.intMod;
       assertLength(variables(model), 2, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
@@ -1861,12 +1678,6 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(intMod?.exprs?.[0]?.coeffs?.[0], 1, `${this.name} numerator coeff`);
       assertLength(intMod?.exprs?.[1]?.vars, 0, `${this.name} modulo var count`);
       assertEqual(intMod?.exprs?.[1]?.offset, 6, `${this.name} modulo offset`);
-      assertThrowsWithMessage(
-        NotImplementedError,
-        'calling %% on a linear expression is not supported, please use CpModel.add_modulo_equality',
-        () => x.__mod__(3),
-        `${this.name} unsupported modulo`,
-      );
     },
   },
   {
@@ -1877,7 +1688,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const model = new CpModel();
       const x = model.newBoolVar('x');
       const y = model.newBoolVar('y');
-      model.add_implication(x, y);
+      model.addImplication(x, y);
       assertLength(variables(model), 2, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
       assertLength(constraints(model)?.[0]?.boolAnd?.literals, 1, `${this.name} bool_and literal count`);
@@ -1893,15 +1704,15 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
-      model.add_bool_or(x);
+      model.addBoolOr(x);
       assertLength(variables(model), 5, `${this.name} initial variable count`);
       assertLength(constraints(model), 1, `${this.name} initial constraint count`);
       assertLength(constraints(model)?.[0]?.boolOr?.literals, 5, `${this.name} initial literal count`);
-      model.add_bool_or([x[0], x[1], false]);
+      model.addBoolOr([x[0], x[1], false]);
       assertLength(variables(model), 6, `${this.name} variable count after false literal`);
-      assertThrows(TypeError, () => model.add_bool_or([x[2], 2]), `${this.name} rejects numeric literal 2`);
+      assertThrows(TypeError, () => model.addBoolOr([x[2], 2]), `${this.name} rejects numeric literal 2`);
       const y = model.newIntVar(0, 4, 'y');
-      assertThrows(TypeError, () => model.add_bool_or([y, false]), `${this.name} rejects integer variable literal`);
+      assertThrows(TypeError, () => model.addBoolOr([y, false]), `${this.name} rejects integer variable literal`);
     },
   },
   {
@@ -1911,15 +1722,15 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
-      model.add_bool_or(x);
-      model.add_bool_or(true, x[0], x[2]);
-      model.add_bool_or(false, x[0]);
-      model.add_bool_or((function* literals() {
+      model.addBoolOr(x);
+      model.addBoolOr(true, x[0], x[2]);
+      model.addBoolOr(false, x[0]);
+      model.addBoolOr((function* literals() {
         for (const index of [0, 2, 3, 4]) {
           yield x[index];
         }
       })());
-      model.add_bool_or(x[3]);
+      model.addBoolOr(x[3]);
       assertLength(variables(model), 7, `${this.name} variable count`);
       assertLength(constraints(model), 5, `${this.name} constraint count`);
       assertLength(constraints(model)?.[0]?.boolOr?.literals, 5, `${this.name} first bool_or literal count`);
@@ -1936,15 +1747,15 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
-      model.add_at_least_one(x);
+      model.addAtLeastOne(x);
       assertLength(variables(model), 5, `${this.name} initial variable count`);
       assertLength(constraints(model), 1, `${this.name} initial constraint count`);
       assertLength(constraints(model)?.[0]?.boolOr?.literals, 5, `${this.name} initial literal count`);
-      model.add_at_least_one([x[0], x[1], false]);
+      model.addAtLeastOne([x[0], x[1], false]);
       assertLength(variables(model), 6, `${this.name} variable count after false literal`);
-      assertThrows(TypeError, () => model.add_at_least_one([x[2], 2]), `${this.name} rejects numeric literal 2`);
+      assertThrows(TypeError, () => model.addAtLeastOne([x[2], 2]), `${this.name} rejects numeric literal 2`);
       const y = model.newIntVar(0, 4, 'y');
-      assertThrows(TypeError, () => model.add_at_least_one([y, false]), `${this.name} rejects integer variable literal`);
+      assertThrows(TypeError, () => model.addAtLeastOne([y, false]), `${this.name} rejects integer variable literal`);
     },
   },
   {
@@ -1954,15 +1765,15 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
-      model.add_at_most_one(x);
+      model.addAtMostOne(x);
       assertLength(variables(model), 5, `${this.name} initial variable count`);
       assertLength(constraints(model), 1, `${this.name} initial constraint count`);
       assertLength(constraints(model)?.[0]?.atMostOne?.literals, 5, `${this.name} initial literal count`);
-      model.add_at_most_one([x[0], x[1], false]);
+      model.addAtMostOne([x[0], x[1], false]);
       assertLength(variables(model), 6, `${this.name} variable count after false literal`);
-      assertThrows(TypeError, () => model.add_at_most_one([x[2], 2]), `${this.name} rejects numeric literal 2`);
+      assertThrows(TypeError, () => model.addAtMostOne([x[2], 2]), `${this.name} rejects numeric literal 2`);
       const y = model.newIntVar(0, 4, 'y');
-      assertThrows(TypeError, () => model.add_at_most_one([y, false]), `${this.name} rejects integer variable literal`);
+      assertThrows(TypeError, () => model.addAtMostOne([y, false]), `${this.name} rejects integer variable literal`);
     },
   },
   {
@@ -1972,15 +1783,15 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
-      model.add_exactly_one(x);
+      model.addExactlyOne(x);
       assertLength(variables(model), 5, `${this.name} initial variable count`);
       assertLength(constraints(model), 1, `${this.name} initial constraint count`);
       assertLength(constraints(model)?.[0]?.exactlyOne?.literals, 5, `${this.name} initial literal count`);
-      model.add_exactly_one([x[0], x[1], false]);
+      model.addExactlyOne([x[0], x[1], false]);
       assertLength(variables(model), 6, `${this.name} variable count after false literal`);
-      assertThrows(TypeError, () => model.add_exactly_one([x[2], 2]), `${this.name} rejects numeric literal 2`);
+      assertThrows(TypeError, () => model.addExactlyOne([x[2], 2]), `${this.name} rejects numeric literal 2`);
       const y = model.newIntVar(0, 4, 'y');
-      assertThrows(TypeError, () => model.add_exactly_one([y, false]), `${this.name} rejects integer variable literal`);
+      assertThrows(TypeError, () => model.addExactlyOne([y, false]), `${this.name} rejects integer variable literal`);
     },
   },
   {
@@ -1990,11 +1801,11 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
-      model.add_bool_and(x);
+      model.addBoolAnd(x);
       assertLength(variables(model), 5, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
       assertLength(constraints(model)?.[0]?.boolAnd?.literals, 5, `${this.name} literal count`);
-      model.add_bool_and([x[1], x[2].negated(), true]);
+      model.addBoolAnd([x[1], x[2].negated(), true]);
       assertEqual(constraints(model)?.[1]?.boolAnd?.literals?.[0], 1, `${this.name} second constraint first literal`);
       assertEqual(constraints(model)?.[1]?.boolAnd?.literals?.[1], -3, `${this.name} second constraint second literal`);
       assertEqual(constraints(model)?.[1]?.boolAnd?.literals?.[2], 5, `${this.name} second constraint true literal`);
@@ -2007,7 +1818,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
-      model.add_bool_xor(x);
+      model.addBoolXor(x);
       assertLength(variables(model), 5, `${this.name} variable count`);
       assertLength(constraints(model), 1, `${this.name} constraint count`);
       assertLength(constraints(model)?.[0]?.boolXor?.literals, 5, `${this.name} literal count`);
@@ -2021,7 +1832,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const model = new CpModel();
       const x = Array.from({ length: 5 }, (_, index) => model.newBoolVar(`x${index}`));
       const y = model.newIntVar(0, 10, 'y');
-      model.add_map_domain(y, x, 2);
+      model.addMapDomain(y, x, 2);
       assertLength(variables(model), 6, `${this.name} variable count`);
       assertLength(constraints(model), 10, `${this.name} constraint count`);
     },
@@ -2032,18 +1843,18 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const model = new CpModel();
-      const x = model.new_int_var(0, 4, 'x');
-      const y = model.new_int_var(0, 3, 'y');
-      const i = model.new_interval_var(x, 3, y, 'i');
+      const x = model.newIntVar(0, 4, 'x');
+      const y = model.newIntVar(0, 3, 'y');
+      const i = model.newIntervalVar(x, 3, y, 'i');
       assertEqual(i.index, 0, `${this.name} interval index`);
       assertLength(i.presenceLiterals(), 0, `${this.name} presence literal count`);
-      const j = model.new_fixed_size_interval_var(x, 2, 'j');
+      const j = model.newFixedSizeIntervalVar(x, 2, 'j');
       assertEqual(j.index, 1, `${this.name} fixed interval index`);
       assertEqual((j.startExpr() as IntVarLike).index, x.index, `${this.name} fixed start expr index`);
       assertEqual(j.sizeExpr(), 2, `${this.name} fixed size expr`);
       assertEqual(String(j.endExpr()), '(x + 2)', `${this.name} fixed end expr`);
-      const b = model.new_bool_var('b');
-      const k = model.new_optional_fixed_size_interval_var(x, 2, b, 'k');
+      const b = model.newBoolVar('b');
+      const k = model.newOptionalFixedSizeIntervalVar(x, 2, b, 'k');
       assertEqual(k.index, 2, `${this.name} optional fixed interval index`);
       assertEqual((k.startExpr() as IntVarLike).index, x.index, `${this.name} optional fixed start expr index`);
       assertEqual(k.sizeExpr(), 2, `${this.name} optional fixed size expr`);
@@ -2052,61 +1863,12 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_rebuild_from_linear_expression_proto matches upstream assertions using the high-level CP-SAT API.
-    name: 'CpModelTest.test_rebuild_from_linear_expression_proto',
-    source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, rebuild_from_linear_expression_proto }) {
-      const model = new CpModel();
-      const x = model.new_int_var(0, 4, 'x');
-      const y = model.new_int_var(0, 1, 'y');
-      const z = model.new_int_var(0, 5, 'z');
-      const i = model.new_interval_var(x, y, z, 'i');
-      assertEqual(i.startExpr(), x, `${this.name} start expr`);
-      assertEqual(i.sizeExpr(), y, `${this.name} size expr`);
-      assertEqual(i.endExpr(), z, `${this.name} end expr`);
-      assertEqual((i.sizeExpr() as IntVarLike).negated().index, y.negated().index, `${this.name} negated size expr`);
-      assertThrows(TypeError, () => (i.startExpr() as IntVarLike).negated(), `${this.name} rejects start expr negated`);
-
-      const variableByIndex = new Map<number, IntVarLike>([
-        [x.index, x],
-        [y.index, y],
-      ]);
-      const proto = {
-        vars: [x.index, y.index],
-        coeffs: [1, 2],
-      };
-      const expr1 = rebuild_from_linear_expression_proto(proto, model.proto());
-      const canonicalExpr1 = asFlatIntExpr(expr1, variableByIndex);
-      assertEqual(canonicalExpr1.vars[0], x, `${this.name} first canonical variable`);
-      assertEqual(canonicalExpr1.vars[1], y, `${this.name} second canonical variable`);
-      assertEqual(canonicalExpr1.coeffs[0], 1, `${this.name} first canonical coefficient`);
-      assertEqual(canonicalExpr1.coeffs[1], 2, `${this.name} second canonical coefficient`);
-      assertEqual(canonicalExpr1.offset, 0, `${this.name} canonical offset`);
-      assertEqual(canonicalExpr1.vars[1].negated().index, y.negated().index, `${this.name} negated canonical var`);
-      assertThrows(TypeError, () => (canonicalExpr1.vars[0] as any).negated(), `${this.name} rejects canonical var negated`);
-
-      const expr2 = rebuild_from_linear_expression_proto(
-        {
-          ...proto,
-          offset: 2,
-        },
-        model.proto(),
-      );
-      const canonicalExpr2 = asFlatIntExpr(expr2, variableByIndex);
-      assertEqual(canonicalExpr2.vars[0], x, `${this.name} second pass first canonical variable`);
-      assertEqual(canonicalExpr2.vars[1], y, `${this.name} second pass second canonical variable`);
-      assertEqual(canonicalExpr2.coeffs[0], 1, `${this.name} second pass first canonical coefficient`);
-      assertEqual(canonicalExpr2.coeffs[1], 2, `${this.name} second pass second canonical coefficient`);
-      assertEqual(canonicalExpr2.offset, 2, `${this.name} second pass canonical offset`);
-    },
-  },
-  {
     // TEMP: parity - CpModelTest.test_absent_interval matches upstream assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_absent_interval',
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const model = new CpModel();
-      const i = model.new_optional_interval_var(1, 0, 1, false, '');
+      const i = model.newOptionalIntervalVar(1, 0, 1, false, '');
       assertEqual(i.index, 0, `${this.name} interval index`);
     },
   },
@@ -2116,13 +1878,13 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const model = new CpModel();
-      const b = model.new_bool_var('b');
-      const x = model.new_int_var(0, 4, 'x');
-      const y = model.new_int_var(0, 3, 'y');
-      const i = model.new_optional_interval_var(x, 3, y, b, 'i');
-      const j = model.new_optional_interval_var(x, y, 10, b, 'j');
-      const k = model.new_optional_interval_var(x, y.neg(), 10, b, 'k');
-      const l = model.new_optional_interval_var(x, 10, y.neg(), b.negated(), 'l');
+      const b = model.newBoolVar('b');
+      const x = model.newIntVar(0, 4, 'x');
+      const y = model.newIntVar(0, 3, 'y');
+      const i = model.newOptionalIntervalVar(x, 3, y, b, 'i');
+      const j = model.newOptionalIntervalVar(x, y, 10, b, 'j');
+      const k = model.newOptionalIntervalVar(x, y.neg(), 10, b, 'k');
+      const l = model.newOptionalIntervalVar(x, 10, y.neg(), b.negated(), 'l');
       assertEqual(i.index, 0, `${this.name} first interval index`);
       assertEqual(j.index, 1, `${this.name} second interval index`);
       assertEqual(k.index, 2, `${this.name} third interval index`);
@@ -2133,9 +1895,9 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual((iPresence[0] as BoolVarLike).index, b.index, `${this.name} first presence literal`);
       assertLength(lPresence, 1, `${this.name} negated presence literal count`);
       assertEqual((lPresence[0] as NotBoolVarLike).index, b.negated().index, `${this.name} negated presence literal`);
-      assertThrows(TypeError, () => model.new_optional_interval_var(1, 2, 3, x, 'x'), `${this.name} rejects integer presence literal`);
-      assertThrows(TypeError, () => model.new_optional_interval_var(b.plus(x), 2, 3, b, 'x'), `${this.name} rejects Boolean start expression`);
-      assertThrows(TypeError, () => model.new_optional_interval_var(1, 2, 3, b.plus(1), 'x'), `${this.name} rejects non-literal presence expression`);
+      assertThrows(TypeError, () => model.newOptionalIntervalVar(1, 2, 3, x, 'x'), `${this.name} rejects integer presence literal`);
+      assertThrows(TypeError, () => model.newOptionalIntervalVar(b.plus(x), 2, 3, b, 'x'), `${this.name} rejects Boolean start expression`);
+      assertThrows(TypeError, () => model.newOptionalIntervalVar(1, 2, 3, b.plus(1), 'x'), `${this.name} rejects non-literal presence expression`);
     },
   },
   {
@@ -2144,12 +1906,12 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const model = new CpModel();
-      const x = model.new_int_var(0, 4, 'x');
-      const y = model.new_int_var(0, 3, 'y');
-      const z = model.new_int_var(0, 3, 'y');
-      const i = model.new_interval_var(x, 3, y, 'i');
-      const j = model.new_interval_var(x, 5, z, 'j');
-      const ct = model.add_no_overlap([i, j]);
+      const x = model.newIntVar(0, 4, 'x');
+      const y = model.newIntVar(0, 3, 'y');
+      const z = model.newIntVar(0, 3, 'y');
+      const i = model.newIntervalVar(x, 3, y, 'i');
+      const j = model.newIntervalVar(x, 5, z, 'j');
+      const ct = model.addNoOverlap([i, j]);
       assertEqual(ct.index, 2, `${this.name} constraint index`);
       assertLength(constraints(model)?.[ct.index]?.noOverlap?.intervals, 2, `${this.name} interval count`);
       assertEqual(constraints(model)?.[ct.index]?.noOverlap?.intervals?.[0], 0, `${this.name} first interval`);
@@ -2162,12 +1924,12 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const model = new CpModel();
-      const x = model.new_int_var(0, 4, 'x');
-      const y = model.new_int_var(0, 3, 'y');
-      const z = model.new_int_var(0, 3, 'y');
-      const i = model.new_interval_var(x, 3, y, 'i');
-      const j = model.new_interval_var(x, 5, z, 'j');
-      const ct = model.add_no_overlap_2d([i, j], [j, i]);
+      const x = model.newIntVar(0, 4, 'x');
+      const y = model.newIntVar(0, 3, 'y');
+      const z = model.newIntVar(0, 3, 'y');
+      const i = model.newIntervalVar(x, 3, y, 'i');
+      const j = model.newIntervalVar(x, 5, z, 'j');
+      const ct = model.addNoOverlap2D([i, j], [j, i]);
       const noOverlap = constraints(model)?.[ct.index]?.noOverlap2d;
       assertEqual(ct.index, 2, `${this.name} constraint index`);
       assertLength(noOverlap?.xIntervals, 2, `${this.name} x interval count`);
@@ -2185,33 +1947,18 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     run({ CpModel }) {
       const model = new CpModel();
       const intervals = Array.from({ length: 10 }, (_, index) =>
-        model.new_interval_var(
-          model.new_int_var(0, 10, `s_${index}`),
+        model.newIntervalVar(
+          model.newIntVar(0, 10, `s_${index}`),
           5,
-          model.new_int_var(5, 15, `e_${index}`),
+          model.newIntVar(5, 15, `e_${index}`),
           `interval[${index}]`,
         ),
       );
       const demands = [1, 3, 5, 2, 4, 5, 3, 4, 2, 3];
-      const ct = model.add_cumulative(intervals, demands, 4);
+      const ct = model.addCumulative(intervals, demands, 4);
       assertEqual(ct.index, 10, `${this.name} constraint index`);
       assertLength(constraints(model)?.[ct.index]?.cumulative?.intervals, 10, `${this.name} interval count`);
-      assertThrows(TypeError, () => model.add_cumulative([intervals[0], 3 as never], [2, 3], 3), `${this.name} rejects non-interval`);
-    },
-  },
-  {
-    // TEMP: parity - CpModelTest.test_get_or_make_index_from_constant matches upstream assertions using the high-level CP-SAT API.
-    name: 'CpModelTest.test_get_or_make_index_from_constant',
-    source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel }) {
-      const model = new CpModel();
-      assertEqual(model.get_or_make_index_from_constant(3), 0, `${this.name} first constant index`);
-      assertEqual(model.get_or_make_index_from_constant(3), 0, `${this.name} repeated constant index`);
-      assertEqual(model.get_or_make_index_from_constant(5), 1, `${this.name} second constant index`);
-      const modelVariable = variables(model)?.[0] as { domain?: number[] } | undefined;
-      assertLength(modelVariable?.domain, 2, `${this.name} constant domain length`);
-      assertEqual(modelVariable?.domain?.[0], 3, `${this.name} constant domain lower`);
-      assertEqual(modelVariable?.domain?.[1], 3, `${this.name} constant domain upper`);
+      assertThrows(TypeError, () => model.addCumulative([intervals[0], 3 as never], [2, 3], 3), `${this.name} rejects non-interval`);
     },
   },
   {
@@ -2269,12 +2016,12 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_solve_with_solution_callback matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - CpModelTest.test_solve_with_solution_callback matches upstream behavior through the canonical TypeScript API.
     name: 'CpModelTest.test_solve_with_solution_callback',
     source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver, CpSolverSolutionCallback, RuntimeError }) {
+    async run({ CpModel, CpSolver, CpSolverSolutionCallback }) {
       class SolutionSum extends CpSolverSolutionCallback {
-        sum = 0;
+        sum = 0n;
         readonly vars: unknown[];
 
         constructor(vars: unknown[]) {
@@ -2284,7 +2031,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
 
         onSolutionCallback() {
           const callback = this as unknown as CpSolverSolutionCallbackLike;
-          this.sum = this.vars.reduce((total: number, variable) => total + callback.value(variable), 0);
+          this.sum = this.vars.reduce((total: bigint, variable) => total + BigInt(callback.value(variable)), 0n);
         }
       }
 
@@ -2294,42 +2041,16 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       model.addLinearConstraint(x.plus(y), 6, 6);
       const solver = new CpSolver();
       const solutionSum = new SolutionSum([x, y]);
-      assertThrows(RuntimeError, () => solutionSum.value(x), `${this.name} value before solve`);
+      assertThrows(Error, () => solutionSum.value(x), `${this.name} value before solve`);
       const status = await solver.solve(model, { solutionCallback: solutionSum });
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solutionSum.sum, 6, `${this.name} callback sum`);
+      assertEqual(solutionSum.sum, 6n, `${this.name} callback sum`);
     },
   },
-  {
-    // TEMP: parity - CpModelTest.test_solve_with_float_value_in_callback matches upstream assertions using the high-level CP-SAT API.
-    name: 'CpModelTest.test_solve_with_float_value_in_callback',
-    source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver, CpSolverSolutionCallback }) {
-      class SolutionFloatValue extends CpSolverSolutionCallback {
-        value = 0;
-        readonly expr: unknown;
-
-        constructor(expr: unknown) {
-          super();
-          this.expr = expr;
-        }
-
-        onSolutionCallback() {
-          this.value = (this as unknown as CpSolverSolutionCallbackLike).floatValue(this.expr);
-        }
-      }
-
-      const model = new CpModel();
-      const x = model.newIntVar(0, 5, 'x');
-      const y = model.newIntVar(0, 5, 'y');
-      model.addLinearConstraint(x.plus(y), 6, 6);
-      const solver = new CpSolver();
-      const solutionFloatValue = new SolutionFloatValue(x.plus(y).times(0.5));
-      const status = await solver.solve(model, { solutionCallback: solutionFloatValue });
-      assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solutionFloatValue.value, 3, `${this.name} callback float value`);
-    },
-  },
+  // Intentionally not ported: CpModelTest.test_solve_with_float_value_in_callback
+  // and CpModelTest.test_float_value only exercise Python's separate floatValue()
+  // alias. The canonical TypeScript value() returns bigint for integer expressions
+  // and number for floating-point expressions.
   {
     // TEMP: parity - CpModelTest.test_value matches upstream assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_value',
@@ -2348,22 +2069,6 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_float_value matches upstream assertions using the high-level CP-SAT API.
-    name: 'CpModelTest.test_float_value',
-    source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver }) {
-      const model = new CpModel();
-      const x = model.newIntVar(0, 10, 'x');
-      const y = model.newIntVar(0, 10, 'y');
-      model.add(x.plus(y.times(2)).eq(29));
-      const solver = new CpSolver();
-      const status = await solver.solve(model);
-      assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.floatValue(x.times(1.5).plus(0.25)), 13.75, `${this.name} float_value(x * 1.5 + 0.25)`);
-      assertEqual(solver.floatValue(2.25), 2.25, `${this.name} float_value(2.25)`);
-    },
-  },
-  {
     // TEMP: parity - CpModelTest.test_boolean_value matches upstream assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_boolean_value',
     source: 'ortools/sat/python/cp_model_test.py',
@@ -2379,9 +2084,9 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
       assertEqual(solver.booleanValue(x), true, `${this.name} boolean_value(x)`);
-      assertEqual(solver.value(x), 1 - solver.value(x.negated()), `${this.name} value(x)`);
-      assertEqual(solver.value(y), 1 - solver.value(y.negated()), `${this.name} value(y)`);
-      assertEqual(solver.value(z), 1 - solver.value(z.negated()), `${this.name} value(z)`);
+      assertEqual(solver.value(x), 1n - BigInt(solver.value(x.negated())), `${this.name} value(x)`);
+      assertEqual(solver.value(y), 1n - BigInt(solver.value(y.negated())), `${this.name} value(y)`);
+      assertEqual(solver.value(z), 1n - BigInt(solver.value(z.negated())), `${this.name} value(z)`);
       assertEqual(solver.booleanValue(y), false, `${this.name} boolean_value(y)`);
       assertEqual(solver.booleanValue(true), true, `${this.name} boolean_value(True)`);
       assertEqual(solver.booleanValue(false), false, `${this.name} boolean_value(False)`);
@@ -2393,18 +2098,18 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_unsupported_operators matches upstream native-operator rejection assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_unsupported_operators',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, NotImplementedError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = model.newIntVar(0, 10, 'x');
       const y = model.newIntVar(0, 10, 'y');
       const z = model.newIntVar(0, 10, 'z');
       assertThrows(
-        NotImplementedError,
+        TypeError,
         () => model.add((x as unknown as number) === Math.min(y as unknown as number, z as unknown as number)),
         `${this.name} rejects Math.min over variables`,
       );
       assertThrows(
-        NotImplementedError,
+        TypeError,
         () => {
           if ((x as unknown as number) > (y as unknown as number)) {
             throw new Error(`${this.name} native greater-than should not evaluate`);
@@ -2413,7 +2118,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         `${this.name} rejects native greater-than`,
       );
       assertThrows(
-        NotImplementedError,
+        TypeError,
         () => {
           if ((x as unknown as number) == 2) {
             throw new Error(`${this.name} native equality should not evaluate`);
@@ -2421,24 +2126,6 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         },
         `${this.name} rejects native equality`,
       );
-    },
-  },
-  {
-    name: 'CpModelTest.test_is_literal_true_false.partial',
-    source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, object_is_a_true_literal, object_is_a_false_literal }) {
-      const model = new CpModel();
-      const x = model.newConstant(0);
-      assertEqual(object_is_a_true_literal(x), false, `${this.name} constant zero is not true`);
-      assertEqual(object_is_a_false_literal(x), true, `${this.name} constant zero is false`);
-      assertEqual(object_is_a_true_literal(x.negated()), true, `${this.name} negated zero is true`);
-      assertEqual(object_is_a_false_literal(x.negated()), false, `${this.name} negated zero is not false`);
-      assertEqual(object_is_a_true_literal(true), true, `${this.name} true is true literal`);
-      assertEqual(object_is_a_false_literal(false), true, `${this.name} false is false literal`);
-      assertEqual(object_is_a_true_literal(false), false, `${this.name} false is not true literal`);
-      assertEqual(object_is_a_false_literal(true), false, `${this.name} true is not false literal`);
-      assertEqual(object_is_a_true_literal(~Number(true)), false, `${this.name} bitwise not true is not true literal`);
-      assertEqual(object_is_a_false_literal(~Number(false)), false, `${this.name} bitwise not false is not false literal`);
     },
   },
   {
@@ -2472,7 +2159,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     async run({ CpModel, CpSolver, CpSolverSolutionCallback, DecisionStrategyProto_VariableSelectionStrategy, DecisionStrategyProto_DomainReductionStrategy }) {
       class RecordSolution extends CpSolverSolutionCallback {
-        intVarValues: number[] = [];
+        intVarValues: Array<number | bigint> = [];
         boolVarValues: boolean[] = [];
         readonly intVars: unknown[];
         readonly boolVars: unknown[];
@@ -2513,7 +2200,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const solutionRecorder = new RecordSolution([3, x, x.times(-1).plus(1)], [1, false, b.negated()]);
       const status = await solver.solve(model, { solutionCallback: solutionRecorder });
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(JSON.stringify(solutionRecorder.intVarValues), JSON.stringify([3, 5, -4]), `${this.name} int var values`);
+      assertArrayEqual(solutionRecorder.intVarValues, [3n, 5n, -4n], `${this.name} int var values`);
       assertEqual(JSON.stringify(solutionRecorder.boolVarValues), JSON.stringify([true, false, true]), `${this.name} bool var values`);
     },
   },
@@ -2566,13 +2253,13 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const z = model.newBoolVar('z');
       model.addAssumption(x);
       model.addAssumptions([y.negated(), z]);
-      const assumptions = model.proto().assumptions as number[] | undefined;
+      const assumptions = model.modelProto.assumptions as number[] | undefined;
       assertLength(assumptions, 3, `${this.name} assumption count`);
       assertEqual(assumptions?.[0], x.index, `${this.name} first assumption`);
       assertEqual(assumptions?.[1], y.negated().index, `${this.name} second assumption`);
       assertEqual(assumptions?.[2], z.index, `${this.name} third assumption`);
       model.clearAssumptions();
-      assertLength(model.proto().assumptions as number[] | undefined, 0, `${this.name} assumptions after clear`);
+      assertLength(model.modelProto.assumptions as number[] | undefined, 0, `${this.name} assumptions after clear`);
     },
   },
   {
@@ -2589,8 +2276,8 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
         DecisionStrategyProto_VariableSelectionStrategy.CHOOSE_MIN_DOMAIN_SIZE,
         DecisionStrategyProto_DomainReductionStrategy.SELECT_MAX_VALUE,
       );
-      const strategy = (model.proto().searchStrategy as Array<Record<string, any>> | undefined)?.[0];
-      assertLength(model.proto().searchStrategy as unknown[] | undefined, 1, `${this.name} strategy count`);
+      const strategy = (model.modelProto.searchStrategy as Array<Record<string, any>> | undefined)?.[0];
+      assertLength(model.modelProto.searchStrategy as unknown[] | undefined, 1, `${this.name} strategy count`);
       assertLength(strategy?.exprs, 3, `${this.name} expr count`);
       assertEqual(strategy?.exprs?.[0]?.vars?.[0], y.index, `${this.name} first expr var`);
       assertEqual(strategy?.exprs?.[0]?.coeffs?.[0], 1, `${this.name} first expr coeff`);
@@ -2618,11 +2305,11 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       solver.parameters.numWorkers = 1;
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
-      assertEqual(solver.numBooleans, 0, `${this.name} num_booleans`);
-      assertEqual(solver.numConflicts, 0, `${this.name} num_conflicts`);
-      assertEqual(solver.numBranches, 0, `${this.name} num_branches`);
+      assertEqual(solver.numBooleans, 0, `${this.name} numBooleans`);
+      assertEqual(solver.numConflicts, 0, `${this.name} numConflicts`);
+      assertEqual(solver.numBranches, 0, `${this.name} numBranches`);
       if (solver.wallTime < 0) {
-        throw new Error(`${this.name} expected wall_time >= 0.0, got ${solver.wallTime}`);
+        throw new Error(`${this.name} expected wallTime >= 0.0, got ${solver.wallTime}`);
       }
     },
   },
@@ -2662,7 +2349,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
   {
     name: 'CpModelTest.test_copy_model.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ValueError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const b = model.newBoolVar('b');
       const x = model.newIntVar(0, 4, 'x');
@@ -2671,38 +2358,29 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const lin = model.add(x.plus(y).le(10)) as ConstraintLike;
 
       const newModel = model.clone();
-      const cloneB = newModel.get_bool_var_from_proto_index(b.index);
-      const cloneX = newModel.get_int_var_from_proto_index(x.index);
-      const cloneY = newModel.get_int_var_from_proto_index(y.index);
-      const cloneI = newModel.get_interval_var_from_proto_index(i.index);
+      const cloneB = newModel.getBoolVarFromProtoIndex(b.index);
+      const cloneX = newModel.getIntVarFromProtoIndex(x.index);
+      const cloneY = newModel.getIntVarFromProtoIndex(y.index);
+      const cloneI = newModel.getIntervalVarFromProtoIndex(i.index);
       assertEqual(cloneB.index, b.index, `${this.name} cloned bool index`);
       assertEqual(cloneX.index, x.index, `${this.name} cloned x index`);
       assertEqual(cloneY.index, y.index, `${this.name} cloned y index`);
       assertEqual(cloneI.index, i.index, `${this.name} cloned interval index`);
-      assertEqual(cloneB.is_boolean, b.is_boolean, `${this.name} cloned bool is_boolean`);
-      assertEqual(cloneX.is_boolean, x.is_boolean, `${this.name} cloned x is_boolean`);
-      assertEqual(cloneY.is_boolean, y.is_boolean, `${this.name} cloned y is_boolean`);
-      if (cloneB.model_proto === b.model_proto) {
-        throw new Error(`${this.name} expected clone bool model_proto to be distinct from original`);
-      }
-      if (cloneX.model_proto === x.model_proto) {
-        throw new Error(`${this.name} expected clone x model_proto to be distinct from original`);
-      }
-      if (cloneY.model_proto === y.model_proto) {
-        throw new Error(`${this.name} expected clone y model_proto to be distinct from original`);
-      }
-      if (cloneI.model_proto === i.model_proto) {
-        throw new Error(`${this.name} expected clone interval model_proto to be distinct from original`);
-      }
-      assertEqual(cloneB.model_proto, cloneX.model_proto, `${this.name} cloned bool/x share model_proto`);
-      assertEqual(cloneB.model_proto, cloneY.model_proto, `${this.name} cloned bool/y share model_proto`);
-      assertEqual(cloneB.model_proto, cloneI.model_proto, `${this.name} cloned bool/interval share model_proto`);
-      assertThrows(ValueError, () => newModel.get_bool_var_from_proto_index(-1), `${this.name} rejects negative bool index`);
-      assertThrows(ValueError, () => newModel.get_int_var_from_proto_index(-1), `${this.name} rejects negative int index`);
-      assertThrows(ValueError, () => newModel.get_interval_var_from_proto_index(-1), `${this.name} rejects negative interval index`);
-      assertThrows(TypeError, () => newModel.get_bool_var_from_proto_index(x.index), `${this.name} rejects integer as bool`);
-      assertThrows(ValueError, () => newModel.get_interval_var_from_proto_index(lin.index), `${this.name} rejects non-interval constraint`);
-      assertEqual((newModel.proto().constraints as any[])?.[cloneI.index]?.interval?.size?.offset, 12, `${this.name} interval size`);
+      assertEqual(cloneB.isBoolean(), b.isBoolean(), `${this.name} cloned bool isBoolean`);
+      assertEqual(cloneX.isBoolean(), x.isBoolean(), `${this.name} cloned x isBoolean`);
+      assertEqual(cloneY.isBoolean(), y.isBoolean(), `${this.name} cloned y isBoolean`);
+      newModel.name = 'clone';
+      assertEqual(model.name, '', `${this.name} original model name remains unchanged`);
+      assertEqual(cloneB.modelProto.name, 'clone', `${this.name} cloned bool references cloned model data`);
+      assertEqual(cloneX.modelProto.name, 'clone', `${this.name} cloned int references cloned model data`);
+      assertEqual(cloneY.modelProto.name, 'clone', `${this.name} cloned second int references cloned model data`);
+      assertEqual(cloneI.modelProto.name, 'clone', `${this.name} cloned interval references cloned model data`);
+      assertThrows(RangeError, () => newModel.getBoolVarFromProtoIndex(-1), `${this.name} rejects negative bool index`);
+      assertThrows(RangeError, () => newModel.getIntVarFromProtoIndex(-1), `${this.name} rejects negative int index`);
+      assertThrows(RangeError, () => newModel.getIntervalVarFromProtoIndex(-1), `${this.name} rejects negative interval index`);
+      assertThrows(TypeError, () => newModel.getBoolVarFromProtoIndex(x.index), `${this.name} rejects integer as bool`);
+      assertThrows(TypeError, () => newModel.getIntervalVarFromProtoIndex(lin.index), `${this.name} rejects non-interval constraint`);
+      assertEqual((newModel.modelProto.constraints as any[])?.[cloneI.index]?.interval?.size?.offset, 12, `${this.name} interval size`);
     },
   },
   {
@@ -2736,11 +2414,11 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_issue2762 matches upstream native boolean-or rejection using the high-level CP-SAT API.
     name: 'CpModelTest.test_issue2762',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, NotImplementedError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = [model.newBoolVar('a'), model.newBoolVar('b')];
       assertThrows(
-        NotImplementedError,
+        TypeError,
         () => model.add(((x[0] as unknown as number) != 0) || ((x[1] as unknown as number) != 0)),
         `${this.name} rejects native boolean-or over comparisons`,
       );
@@ -2758,7 +2436,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       solver.parameters.logSearchProgress = true;
       const status = await solver.solve(model);
       assertEqual(solver.statusName(status), 'MODEL_INVALID', `${this.name} status`);
-      assertEqual(solver.solutionInfo(), 'var #0 has no domain(): name: "x0"', `${this.name} solution_info`);
+      assertEqual(solver.solutionInfo, 'var #0 has no domain(): name: "x0"', `${this.name} solution_info`);
     },
   },
   {
@@ -2767,9 +2445,9 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     source: 'ortools/sat/python/cp_model_test.py',
     async run({ CpModel }) {
       const model = new CpModel();
-      const x = model.newIntVar(0, PY_INT_MAX_PROTO, 'x');
+      const x = model.newIntVar(0, PY_INT_MAX_BIGINT, 'x');
       const y = model.newIntVar(0, 10, 'y');
-      model.addLinearConstraint(x.plus(y), 6, PY_INT_MAX_PROTO as never);
+      model.addLinearConstraint(x.plus(y), 6, PY_INT_MAX_BIGINT);
       model.maximize(x.plus(y.times(2)));
       const validation = await model.validate();
       if (!validation) {
@@ -2784,15 +2462,14 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     async run({ CpModel }) {
       const model = new CpModel();
       assertThrows(TypeError, () => model.add('dummy' as never), `${this.name} rejects invalid add argument`);
-      assertThrows(TypeError, () => model.get_or_make_variable_index('dummy' as never), `${this.name} rejects invalid get_or_make_variable_index`);
       assertThrows(TypeError, () => model.minimize('dummy' as never), `${this.name} rejects invalid minimize argument`);
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_solver_errors matches upstream assertions using the high-level CP-SAT API.
-    name: 'CpModelTest.test_solver_errors',
+    // TEMP: partial parity - canonical response is null before solve rather than raising through Python's response_proto accessor.
+    name: 'CpModelTest.test_solver_errors.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver, RuntimeError }) {
+    async run({ CpModel, CpSolver }) {
       const model = new CpModel();
       const x = model.newIntVar(0, 1, 'x');
       const y = model.newIntVar(-10, 10, 'y');
@@ -2800,19 +2477,19 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       model.addLinearConstraint(x.plus(y.times(2)), 0, 10);
       model.minimize(y);
       const solver = new CpSolver();
-      assertThrows(RuntimeError, () => solver.value(x), `${this.name} value before solve`);
-      assertThrows(RuntimeError, () => solver.booleanValue(b), `${this.name} booleanValue before solve`);
-      assertThrows(RuntimeError, () => solver.best_objective_bound, `${this.name} best bound before solve`);
-      assertThrows(RuntimeError, () => solver.deterministic_time, `${this.name} deterministic time before solve`);
-      assertThrows(RuntimeError, () => solver.num_binary_propagations, `${this.name} num binary propagations before solve`);
-      assertThrows(RuntimeError, () => solver.num_booleans, `${this.name} num booleans before solve`);
-      assertThrows(RuntimeError, () => solver.num_branches, `${this.name} num branches before solve`);
-      assertThrows(RuntimeError, () => solver.num_conflicts, `${this.name} num conflicts before solve`);
-      assertThrows(RuntimeError, () => solver.num_integer_propagations, `${this.name} num integer propagations before solve`);
-      assertThrows(RuntimeError, () => solver.objective_value, `${this.name} objective value before solve`);
-      assertThrows(RuntimeError, () => solver.response_proto, `${this.name} response proto before solve`);
-      assertThrows(RuntimeError, () => solver.user_time, `${this.name} user time before solve`);
-      assertThrows(RuntimeError, () => solver.wall_time, `${this.name} wall time before solve`);
+      assertThrows(Error, () => solver.value(x), `${this.name} value before solve`);
+      assertThrows(Error, () => solver.booleanValue(b), `${this.name} booleanValue before solve`);
+      assertThrows(Error, () => solver.bestObjectiveBound, `${this.name} best bound before solve`);
+      assertThrows(Error, () => solver.deterministicTime, `${this.name} deterministic time before solve`);
+      assertThrows(Error, () => solver.numBinaryPropagations, `${this.name} num binary propagations before solve`);
+      assertThrows(Error, () => solver.numBooleans, `${this.name} num booleans before solve`);
+      assertThrows(Error, () => solver.numBranches, `${this.name} num branches before solve`);
+      assertThrows(Error, () => solver.numConflicts, `${this.name} num conflicts before solve`);
+      assertThrows(Error, () => solver.numIntegerPropagations, `${this.name} num integer propagations before solve`);
+      assertThrows(Error, () => solver.objectiveValue, `${this.name} objective value before solve`);
+      assertEqual(solver.response, null, `${this.name} response before solve`);
+      assertThrows(Error, () => solver.userTime, `${this.name} user time before solve`);
+      assertThrows(Error, () => solver.wallTime, `${this.name} wall time before solve`);
       await solver.solve(model);
       assertThrows(TypeError, () => solver.value('not_a_variable' as never), `${this.name} rejects invalid expression`);
       assertThrows(TypeError, () => model.addBoolOr([x, y]), `${this.name} rejects integer literal`);
@@ -2841,42 +2518,17 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       }
     },
   },
-  {
-    // TEMP: parity - CpModelTest.test_pre_pep8 matches upstream legacy alias assertions using the high-level CP-SAT API.
-    name: 'CpModelTest.test_pre_pep8',
-    source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, sum }) {
-      const model = new CpModel();
-      const x = Array.from({ length: 5 }, (_, index) => model.NewBoolVar(`x${index}`));
-      model.AddBoolOr(x);
-      model.Maximize(sum(x));
-      assertLength(variables(model), 5, `${this.name} variable count`);
-      assertLength(constraints(model), 1, `${this.name} constraint count`);
-      assertLength(constraints(model)?.[0]?.boolOr?.literals, 5, `${this.name} bool_or literal count`);
-      if (typeof model.Proto !== 'function') {
-        throw new Error(`${this.name} expected Proto alias`);
-      }
-      const modelCopy = model;
-      const modelDeepcopy = model.clone();
-      for (const [label, copiedModel] of [['copy', modelCopy], ['deepcopy', modelDeepcopy]] as const) {
-        if (
-          typeof copiedModel.AddBoolOr !== 'function'
-          || typeof copiedModel.AddBoolXOr !== 'function'
-          || typeof copiedModel.AddNoOverlap2D !== 'function'
-        ) {
-          throw new Error(`${this.name} expected ${label} model to keep pre-PEP8 aliases`);
-        }
-      }
-    },
-  },
+  // Intentionally not ported: CpModelTest.test_pre_pep8 only verifies
+  // deprecated Python PascalCase aliases such as NewIntVar, AddBoolOr, and
+  // Maximize. or-tools-wasm exposes only the canonical TypeScript camelCase API.
   {
     // TEMP: parity - CpModelTest.test_issue4434 matches upstream assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_issue4434',
     source: 'ortools/sat/python/cp_model_test.py',
     run({ CpModel }) {
       const model = new CpModel();
-      const i = model.NewIntVar(0, 10, 'i');
-      const j = model.NewIntVar(0, 10, 'j');
+      const i = model.newIntVar(0, 10, 'i');
+      const j = model.newIntVar(0, 10, 'j');
       const exprEq = i.plus(j).eq(5);
       const exprNe = i.plus(j).ne(5);
       const exprGe = i.plus(j).ge(5);
@@ -3088,9 +2740,9 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     // TEMP: parity - CpModelTest.test_str matches upstream string and flat-expression assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_str',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, Domain, LinearExpr, BoundedLinearExpression, FlatIntExpr, FlatFloatExpr }) {
+    run({ CpModel, LinearExpr }) {
       const model = new CpModel();
-      const x = model.new_int_var(0, 4, 'x');
+      const x = model.newIntVar(0, 4, 'x');
       assertEqual(String(x.eq(2)), 'x == 2', `${this.name} equality string`);
       assertEqual(String(x.ge(2)), 'x >= 2', `${this.name} greater-equal string`);
       assertEqual(String(x.le(2)), 'x <= 2', `${this.name} less-equal string`);
@@ -3100,39 +2752,25 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(String(x.times(3)), '(3 * x)', `${this.name} term string`);
       assertEqual(String(x.neg()), '(-x)', `${this.name} negated expression string`);
       assertEqual(String(x.plus(3)), '(x + 3)', `${this.name} plus offset string`);
-      assertEqual(String(x.le(PY_INT_MAX as never)), 'True (unbounded expr x)', `${this.name} upper int64 string`);
-      assertEqual(String(x.ne(PY_INT_MAX as never)), 'x <= 9223372036854775806', `${this.name} not int64 max string`);
-      assertEqual(String(x.ne(PY_INT_MIN as never)), 'x >= -9223372036854775807', `${this.name} not int64 min string`);
-      const y = model.new_int_var(0, 4, 'y');
+      assertEqual(String(x.le(PY_INT_MAX_BIGINT)), 'True (unbounded expr x)', `${this.name} upper int64 string`);
+      assertEqual(String(x.ne(PY_INT_MAX_BIGINT)), 'x <= 9223372036854775806', `${this.name} not int64 max string`);
+      assertEqual(String(x.ne(PY_INT_MIN_BIGINT)), 'x >= -9223372036854775807', `${this.name} not int64 min string`);
+      const y = model.newIntVar(0, 4, 'y');
       assertEqual(
-        String(LinearExpr.weighted_sum([x, y.plus(1), 2], [1, -2, 3])),
+        String(LinearExpr.weightedSum([x, y.plus(1), 2], [1, -2, 3])),
         '(x - 2 * (y + 1) + 6)',
         `${this.name} weighted sum string`,
       );
       assertEqual(String(x.ne(y)), '(x - y) != 0', `${this.name} var not-equal string`);
       assertEqual(String(LinearExpr.term(x, 3)), '(3 * x)', `${this.name} LinearExpr.term string`);
-      assertEqual(String(new BoundedLinearExpression(x, new Domain(0, 10))), '0 <= x <= 10', `${this.name} bounded expression string`);
       const e1 = LinearExpr.sum([x, y]).times(2);
-      const flatE1 = new FlatIntExpr(e1);
       assertEqual(String(e1), '(2 * (x + y))', `${this.name} sum scaling string`);
-      assertArrayEqual(flatE1.vars, [x, y], `${this.name} flat int vars`);
-      assertArrayEqual(flatE1.coeffs, [2, 2], `${this.name} flat int coeffs`);
-      assertEqual(flatE1.offset, 0, `${this.name} flat int offset`);
-      const repeatFlatE1 = new FlatIntExpr(flatE1.plus(3));
-      assertArrayEqual(repeatFlatE1.vars, [x, y], `${this.name} repeated flat int vars`);
-      assertArrayEqual(repeatFlatE1.coeffs, [2, 2], `${this.name} repeated flat int coeffs`);
-      assertEqual(repeatFlatE1.offset, 3, `${this.name} repeated flat int offset`);
-      const floatFlatE1 = new FlatFloatExpr(flatE1);
-      assertArrayEqual(floatFlatE1.vars, [x, y], `${this.name} flat float vars`);
-      assertArrayEqual(floatFlatE1.coeffs, [2, 2], `${this.name} flat float coeffs`);
-      assertEqual(floatFlatE1.offset, 0, `${this.name} flat float offset`);
-      const repeatFloatFlatE1 = new FlatFloatExpr(floatFlatE1.minus(2.5));
-      assertArrayEqual(repeatFloatFlatE1.vars, [x, y], `${this.name} repeated flat float vars`);
-      assertArrayEqual(repeatFloatFlatE1.coeffs, [2, 2], `${this.name} repeated flat float coeffs`);
-      assertEqual(repeatFloatFlatE1.offset, -2.5, `${this.name} repeated flat float offset`);
-      const b = model.new_bool_var('b');
+      assertFlatExpr(e1, [[x, 2], [y, 2]], 0, `${this.name} scaled sum`);
+      assertFlatExpr(e1.plus(3), [[x, 2], [y, 2]], 3, `${this.name} scaled sum plus integer`);
+      assertFlatExpr(e1.minus(2.5), [[x, 2], [y, 2]], -2.5, `${this.name} scaled sum minus float`);
+      const b = model.newBoolVar('b');
       assertEqual(String(LinearExpr.term(b.negated(), 3)), '(3 * not(b))', `${this.name} negated literal term string`);
-      const i = model.new_interval_var(x, 2, y, 'i');
+      const i = model.newIntervalVar(x, 2, y, 'i');
       assertEqual(String(i), 'i', `${this.name} interval string`);
     },
   },
@@ -3179,34 +2817,26 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_integer_expression_errors matches upstream error assertions using Python-compatible dunder operator aliases.
-    name: 'CpModelTest.test_integer_expression_errors',
+    // TEMP: partial parity - Python division/modulo/power/bitwise hooks have no TypeScript API equivalent.
+    name: 'CpModelTest.test_integer_expression_errors.partial',
     source: 'ortools/sat/python/cp_model_test.py',
-    run({ CpModel, ArithmeticError, NotImplementedError }) {
+    run({ CpModel }) {
       const model = new CpModel();
       const x = model.newIntVar(0, 1, 'x');
       const y = model.newIntVar(0, 3, 'y');
-      assertThrows(TypeError, () => x.__mul__(y as never), `${this.name} rejects variable multiplication`);
-      assertThrows(NotImplementedError, () => x.__div__(y), `${this.name} rejects div`);
-      assertThrows(NotImplementedError, () => x.__truediv__(y), `${this.name} rejects true div`);
-      assertThrows(NotImplementedError, () => x.__mod__(y), `${this.name} rejects mod`);
-      assertThrows(NotImplementedError, () => x.__pow__(y), `${this.name} rejects pow`);
-      assertThrows(NotImplementedError, () => x.__lshift__(y), `${this.name} rejects left shift`);
-      assertThrows(NotImplementedError, () => x.__rshift__(y), `${this.name} rejects right shift`);
-      assertThrows(NotImplementedError, () => x.__and__(y), `${this.name} rejects bitwise and`);
-      assertThrows(NotImplementedError, () => x.__or__(y), `${this.name} rejects bitwise or`);
-      assertThrows(NotImplementedError, () => x.__xor__(y), `${this.name} rejects bitwise xor`);
-      assertThrows(ArithmeticError, () => x.__lt__(PY_INT_MIN as never), `${this.name} rejects less than INT_MIN`);
-      assertThrows(ArithmeticError, () => x.__gt__(PY_INT_MAX as never), `${this.name} rejects greater than INT_MAX`);
-      assertThrows(TypeError, () => x.__add__('dummy' as never), `${this.name} rejects string addition`);
-      assertThrows(TypeError, () => x.__mul__('dummy' as never), `${this.name} rejects string multiplication`);
+      assertThrows(TypeError, () => x.times(y as never), `${this.name} rejects variable multiplication`);
+      // Python-only division, modulo, power, shift, and bitwise hooks have no TypeScript API equivalent.
+      assertThrows(RangeError, () => x.lt(PY_INT_MIN_BIGINT), `${this.name} rejects less than INT_MIN`);
+      assertThrows(RangeError, () => x.gt(PY_INT_MAX_BIGINT), `${this.name} rejects greater than INT_MAX`);
+      assertThrows(TypeError, () => x.plus('dummy' as never), `${this.name} rejects string addition`);
+      assertThrows(TypeError, () => x.times('dummy' as never), `${this.name} rejects string multiplication`);
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_raise_python_exception_in_callback matches upstream assertions using the high-level CP-SAT API.
+    // TEMP: parity - callback exceptions propagate through the canonical TypeScript API.
     name: 'CpModelTest.test_raise_python_exception_in_callback',
     source: 'ortools/sat/python/cp_model_test.py',
-    async run({ CpModel, CpSolver, CpSolverSolutionCallback, ValueError }) {
+    async run({ CpModel, CpSolver, CpSolverSolutionCallback }) {
       const model = new CpModel();
       const jobs = [
         [3, 3],
@@ -3236,38 +2866,38 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const demands = [];
 
       for (const [index, [duration, width]] of jobs.entries()) {
-        const start = model.new_int_var(0, horizon, `start_${index}`);
-        const end = model.new_int_var(0, horizon, `end_${index}`);
-        intervals.push(model.new_interval_var(start, duration, end, `interval_${index}`));
+        const start = model.newIntVar(0, horizon, `start_${index}`);
+        const end = model.newIntVar(0, horizon, `end_${index}`);
+        intervals.push(model.newIntervalVar(start, duration, end, `interval_${index}`));
         ends.push(end);
         demands.push(width);
 
-        const performedOnM0 = model.new_bool_var(`perform_${index}_on_m0`);
+        const performedOnM0 = model.newBoolVar(`perform_${index}_on_m0`);
         performed.push(performedOnM0);
-        const start0 = model.new_int_var(0, horizon, `start_${index}_on_m0`);
-        const end0 = model.new_int_var(0, horizon, `end_${index}_on_m0`);
-        intervals0.push(model.new_optional_interval_var(start0, duration, end0, performedOnM0, `interval_${index}_on_m0`));
+        const start0 = model.newIntVar(0, horizon, `start_${index}_on_m0`);
+        const end0 = model.newIntVar(0, horizon, `end_${index}_on_m0`);
+        intervals0.push(model.newOptionalIntervalVar(start0, duration, end0, performedOnM0, `interval_${index}_on_m0`));
 
-        const start1 = model.new_int_var(0, horizon, `start_${index}_on_m1`);
-        const end1 = model.new_int_var(0, horizon, `end_${index}_on_m1`);
-        intervals1.push(model.new_optional_interval_var(start1, duration, end1, performedOnM0.negated(), `interval_${index}_on_m1`));
+        const start1 = model.newIntVar(0, horizon, `start_${index}_on_m1`);
+        const end1 = model.newIntVar(0, horizon, `end_${index}_on_m1`);
+        intervals1.push(model.newOptionalIntervalVar(start1, duration, end1, performedOnM0.negated(), `interval_${index}_on_m1`));
 
         model.add(start0.eq(start)).onlyEnforceIf(performedOnM0);
         model.add(start1.eq(start)).onlyEnforceIf(performedOnM0.negated());
       }
 
-      model.add_cumulative(intervals, demands, maxWidth);
-      model.add_no_overlap(intervals0);
-      model.add_no_overlap(intervals1);
-      const makespan = model.new_int_var(0, horizon, 'makespan');
-      model.add_max_equality(makespan, ends);
+      model.addCumulative(intervals, demands, maxWidth);
+      model.addNoOverlap(intervals0);
+      model.addNoOverlap(intervals1);
+      const makespan = model.newIntVar(0, horizon, 'makespan');
+      model.addMaxEquality(makespan, ends);
       model.minimize(makespan);
       model.add(performed[0].eq(0));
 
       const message = 'this is my test message';
       class RaiseException extends CpSolverSolutionCallback {
         onSolutionCallback() {
-          throw new ValueError(message);
+          throw new Error(message);
         }
       }
 
@@ -3275,7 +2905,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       solver.parameters.logSearchProgress = true;
       solver.parameters.numWorkers = 1;
       await assertRejects(
-        ValueError,
+        Error,
         solver.solve(model, { solutionCallback: new RaiseException() }),
         `${this.name} callback exception`,
       );
@@ -3301,7 +2931,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       );
       const solver = new CpSolver();
       let bestBound = 0;
-      solver.best_bound_callback = (bound: number) => {
+      solver.bestBoundCallback = (bound: number) => {
         bestBound = bound;
       };
       solver.parameters.numWorkers = 1;
@@ -3329,8 +2959,8 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(solver.statusName(status), 'OPTIMAL', `${this.name} status`);
       assertEqual(solver.value(x), 10, `${this.name} value(x)`);
       assertEqual(solver.value(y), -5, `${this.name} value(y)`);
-      if (!solver.solve_log || !solver.solve_log.includes('Starting CP-SAT solver')) {
-        throw new Error(`${this.name} expected solve_log to include solver startup`);
+      if (!solver.solveLog || !solver.solveLog.includes('Starting CP-SAT solver')) {
+        throw new Error(`${this.name} expected solveLog to include solver startup`);
       }
     },
   },

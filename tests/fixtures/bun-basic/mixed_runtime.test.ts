@@ -30,7 +30,7 @@ async function runCpSatSmoke() {
     numWorkers: 1,
   });
   assert(String(status) === 'OPTIMAL', `CP-SAT expected OPTIMAL, got ${status}`);
-  assert(solver.value(x) === 3, `CP-SAT expected x=3, got ${solver.value(x)}`);
+  assert(solver.value(x) === 3n, `CP-SAT expected x=3, got ${solver.value(x)}`);
 }
 
 async function runMPSolverSmoke() {

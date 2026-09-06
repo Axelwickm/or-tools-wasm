@@ -13,7 +13,7 @@ export type MaxFlowOperation = {
   type: 'maxFlow';
   tails: number[];
   heads: number[];
-  capacities: number[];
+  capacities: bigint[];
   source: number;
   sink: number;
 };
@@ -22,9 +22,9 @@ export type MinCostFlowOperation = {
   type: 'minCostFlow';
   tails: number[];
   heads: number[];
-  capacities: number[];
-  unitCosts: number[];
-  supplies: number[];
+  capacities: bigint[];
+  unitCosts: bigint[];
+  supplies: bigint[];
   solveMaxFlowWithMinCost: boolean;
 };
 
@@ -32,7 +32,7 @@ export type LinearSumAssignmentOperation = {
   type: 'linearSumAssignment';
   leftNodes: number[];
   rightNodes: number[];
-  costs: number[];
+  costs: bigint[];
 };
 
 export type NetworkFlowOperation =
@@ -42,16 +42,16 @@ export type NetworkFlowOperation =
 
 export type NetworkFlowResult = {
   status: number;
-  optimalFlow: number;
-  optimalCost: number;
-  maximumFlow: number;
+  optimalFlow: bigint;
+  optimalCost: bigint;
+  maximumFlow: bigint;
   numNodes: number;
   numArcs: number;
-  flows: number[];
+  flows: bigint[];
   sourceSideMinCut: number[];
   sinkSideMinCut: number[];
   rightMates: number[];
-  assignmentCosts: number[];
+  assignmentCosts: bigint[];
 };
 
 export type NetworkFlowExecutor = SolverExecutor<NetworkFlowOperation, NetworkFlowResult, never>;

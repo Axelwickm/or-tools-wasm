@@ -10,6 +10,7 @@ import {
 } from '../solver_executor.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
+import { toIndex } from '../int64.js';
 import type {
   MathOptExecutor,
   MathOptJob,
@@ -153,7 +154,7 @@ export class DirectMathOptExecutor implements MathOptExecutor {
             'number',
             ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
             [
-              Number(operation.handle),
+              toIndex(operation.handle, 'MathOpt incremental solver handle'),
               requestPointer,
               operation.request.length,
               updatePointer,
@@ -175,7 +176,7 @@ export class DirectMathOptExecutor implements MathOptExecutor {
           'mathopt_incremental_delete',
           undefined,
           ['number'],
-          [Number(operation.handle)],
+          [toIndex(operation.handle, 'MathOpt incremental solver handle')],
           { async: true },
         );
         return new Uint8Array();

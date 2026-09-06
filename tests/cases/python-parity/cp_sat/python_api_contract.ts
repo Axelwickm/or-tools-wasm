@@ -1,4 +1,4 @@
-import type { CpSatCase, CpSatLike, CpSatSolveParams, SolverResponse } from '../../../harness/cpsat_types.ts';
+import type { CpSatCase, CpSatLike, CpSatSolveParams, ProtoInt64, SolverResponse } from '../../../harness/cpsat_types.ts';
 
 const DecisionStrategyProto_VariableSelectionStrategy = {
   CHOOSE_MIN_DOMAIN_SIZE: 3,
@@ -40,6 +40,7 @@ function assertNumber(value: unknown, expected: number, message: string) {
 }
 
 function int64ToBigInt(value: unknown, message: string) {
+  if (typeof value === 'bigint') return value;
   if (typeof value === 'number') {
     assert(Number.isSafeInteger(value), `${message}: received an unsafe rounded number`);
     return BigInt(value);
@@ -59,26 +60,25 @@ function int64ToBigInt(value: unknown, message: string) {
 
 type CpSatLinearExpr = {
   vars?: number[];
-  coeffs?: number[];
-  offset?: number;
+  coeffs?: ProtoInt64[];
+  offset?: ProtoInt64;
 };
 
 function cpSolverValue(response: SolverResponse, expression: number | CpSatLinearExpr, caseName: string) {
   if (typeof expression === 'number') {
-    return expression;
+    return BigInt(expression);
   }
 
   const vars = expression.vars ?? [];
   const coeffs = expression.coeffs ?? [];
   assert(vars.length === coeffs.length, `${caseName} expected expression vars and coeffs to match`);
 
-  let value = expression.offset ?? 0;
+  let value = int64ToBigInt(expression.offset ?? 0, `${caseName} expression offset`);
   for (let i = 0; i < vars.length; i += 1) {
     const varIndex = vars[i];
-    const coeff = coeffs[i];
+    const coeff = int64ToBigInt(coeffs[i], `${caseName} coefficient ${i}`);
     const variableValue = response.solution?.[varIndex];
-    assert(typeof variableValue === 'number', `${caseName} expected variable ${varIndex} to have a numeric solution value`);
-    value += coeff * variableValue;
+    value += coeff * int64ToBigInt(variableValue, `${caseName} variable ${varIndex}`);
   }
   return value;
 }
@@ -429,7 +429,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [, targetValue] = response.solution;
-      assert(targetValue === 7, `${this.name} expected target = 7`);
+      assert(targetValue === 7n, `${this.name} expected target = 7`);
       return response.status;
     },
   },
@@ -459,7 +459,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [, yValue] = response.solution;
-      assert(yValue === 1, `${this.name} expected y = 1`);
+      assert(yValue === 1n, `${this.name} expected y = 1`);
       return response.status;
     },
   },
@@ -490,7 +490,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [, yValue] = response.solution;
-      assert(yValue === 1, `${this.name} expected y = 1`);
+      assert(yValue === 1n, `${this.name} expected y = 1`);
       return response.status;
     },
   },
@@ -552,9 +552,9 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 6, `${this.name} expected 6 solution values`);
       const [, , , g0Value, g1Value, g2Value] = response.solution;
-      assert(g0Value === 1, `${this.name} expected g0 = 1`);
-      assert(g1Value === 2, `${this.name} expected g1 = 2`);
-      assert(g2Value === 0, `${this.name} expected g2 = 0`);
+      assert(g0Value === 1n, `${this.name} expected g0 = 1`);
+      assert(g1Value === 2n, `${this.name} expected g1 = 2`);
+      assert(g2Value === 0n, `${this.name} expected g2 = 0`);
       return response.status;
     },
   },
@@ -630,7 +630,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [, yValue] = response.solution;
-      assert(yValue === 1, `${this.name} expected y = 1`);
+      assert(yValue === 1n, `${this.name} expected y = 1`);
       return response.status;
     },
   },
@@ -650,7 +650,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [, , x2Value] = response.solution;
-      assert(x2Value === 1, `${this.name} expected x2 = 1`);
+      assert(x2Value === 1n, `${this.name} expected x2 = 1`);
       return response.status;
     },
   },
@@ -670,8 +670,8 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [, x1Value, x2Value] = response.solution;
-      assert(x1Value === 0, `${this.name} expected x1 = 0`);
-      assert(x2Value === 0, `${this.name} expected x2 = 0`);
+      assert(x1Value === 0n, `${this.name} expected x1 = 0`);
+      assert(x2Value === 0n, `${this.name} expected x2 = 0`);
       return response.status;
     },
   },
@@ -691,11 +691,11 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [x0Value, x1Value, x2Value] = response.solution;
-      assert(typeof x0Value === 'number', `${this.name} expected x0 to be numeric`);
-      assert(typeof x1Value === 'number', `${this.name} expected x1 to be numeric`);
-      assert(typeof x2Value === 'number', `${this.name} expected x2 to be numeric`);
+      assert(typeof x0Value === 'bigint', `${this.name} expected x0 to be an exact integer`);
+      assert(typeof x1Value === 'bigint', `${this.name} expected x1 to be an exact integer`);
+      assert(typeof x2Value === 'bigint', `${this.name} expected x2 to be an exact integer`);
       const total = x0Value + x1Value + x2Value;
-      assert(total === 1, `${this.name} expected exactly one true literal`);
+      assert(total === 1n, `${this.name} expected exactly one true literal`);
       return response.status;
     },
   },
@@ -714,8 +714,8 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [x0Value, x1Value] = response.solution;
-      assert(x0Value === 1, `${this.name} expected x0 = 1`);
-      assert(x1Value === 1, `${this.name} expected x1 = 1`);
+      assert(x0Value === 1n, `${this.name} expected x0 = 1`);
+      assert(x1Value === 1n, `${this.name} expected x1 = 1`);
       return response.status;
     },
   },
@@ -735,7 +735,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [, , x2Value] = response.solution;
-      assert(x2Value === 0, `${this.name} expected x2 = 0`);
+      assert(x2Value === 0n, `${this.name} expected x2 = 0`);
       return response.status;
     },
   },
@@ -762,7 +762,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [xValue] = response.solution;
-      assert(xValue === 5, `${this.name} expected x = 5`);
+      assert(xValue === 5n, `${this.name} expected x = 5`);
       return response.status;
     },
   },
@@ -789,7 +789,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [xValue] = response.solution;
-      assert(xValue === 2, `${this.name} expected x = 2`);
+      assert(xValue === 2n, `${this.name} expected x = 2`);
       return response.status;
     },
   },
@@ -815,7 +815,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [xValue] = response.solution;
-      assert(xValue === 3, `${this.name} expected x = 3`);
+      assert(xValue === 3n, `${this.name} expected x = 3`);
       return response.status;
     },
   },
@@ -841,7 +841,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [xValue] = response.solution;
-      assert(xValue === 2, `${this.name} expected x = 2`);
+      assert(xValue === 2n, `${this.name} expected x = 2`);
       return response.status;
     },
   },
@@ -868,7 +868,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [xValue] = response.solution;
-      assert(xValue === 12, `${this.name} expected x = 12`);
+      assert(xValue === 12n, `${this.name} expected x = 12`);
       return response.status;
     },
   },
@@ -978,9 +978,9 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [xValue, yValue, zValue] = response.solution;
-      assert(xValue === 1, `${this.name} expected x = true`);
-      assert(yValue === 0, `${this.name} expected y = false`);
-      assert(zValue === 1, `${this.name} expected z = true`);
+      assert(xValue === 1n, `${this.name} expected x = true`);
+      assert(yValue === 0n, `${this.name} expected y = false`);
+      assert(zValue === 1n, `${this.name} expected z = true`);
       return response.status;
     },
   },
@@ -1040,8 +1040,8 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 3, `${this.name} expected 3 solution values`);
       const [xValue, yValue] = response.solution;
-      assert(xValue === 1, `${this.name} expected x = true`);
-      assert(yValue === 0, `${this.name} expected y = false`);
+      assert(xValue === 1n, `${this.name} expected x = true`);
+      assert(yValue === 0n, `${this.name} expected y = false`);
       return response.status;
     },
   },
@@ -1066,8 +1066,8 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [xValue, yValue] = response.solution;
-      assert(xValue === 2, `${this.name} expected x = 2`);
-      assert(yValue === 4, `${this.name} expected y = 4`);
+      assert(xValue === 2n, `${this.name} expected x = 2`);
+      assert(yValue === 4n, `${this.name} expected y = 4`);
       return response.status;
     },
   },
@@ -1079,9 +1079,9 @@ export const pythonApiContractCases: CpSatCase[] = [
       const response = await solveModel(CpSat, this, params);
       assertStatus(response, 'OPTIMAL', this.name);
       assert(typeof response.wallTime === 'number' && response.wallTime >= 0, `${this.name} expected wallTime`);
-      assert(response.numBooleans === 0, `${this.name} expected numBooleans = 0`);
-      assert(response.numConflicts === 0, `${this.name} expected numConflicts = 0`);
-      assert(response.numBranches === 0, `${this.name} expected numBranches = 0`);
+      assert(response.numBooleans === 0n, `${this.name} expected numBooleans = 0`);
+      assert(response.numConflicts === 0n, `${this.name} expected numConflicts = 0`);
+      assert(response.numBranches === 0n, `${this.name} expected numBranches = 0`);
       return response.status;
     },
   },
@@ -1145,8 +1145,8 @@ export const pythonApiContractCases: CpSatCase[] = [
       assertStatus(response, 'OPTIMAL', this.name);
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const [xValue, yValue] = response.solution;
-      assert(xValue === 10, `${this.name} expected x = 10`);
-      assert(yValue === -5, `${this.name} expected y = -5`);
+      assert(xValue === 10n, `${this.name} expected x = 10`);
+      assert(yValue === -5n, `${this.name} expected y = -5`);
       assert(typeof response.solveLog === 'string', `${this.name} expected solveLog`);
       assert(response.solveLog.includes('Starting CP-SAT solver'), `${this.name} expected solveLog to contain startup line`);
       assert(logLines.some((line) => line.includes('Starting CP-SAT solver')), `${this.name} expected log callback`);
@@ -1166,7 +1166,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
       const caseName = this.name;
-      const seen: number[] = [];
+      const seen: bigint[] = [];
       const result = await CpSat.solve(
         modelBytes,
         {
@@ -1176,7 +1176,7 @@ export const pythonApiContractCases: CpSatCase[] = [
             if (event.type !== 'solution') return;
             assert(event.response.solution?.length === 2, `${caseName} expected 2 solution values`);
             const [xValue] = event.response.solution;
-            assert(typeof xValue === 'number', `${caseName} expected x to be numeric`);
+            assert(typeof xValue === 'bigint', `${caseName} expected x to be an exact integer`);
             seen.push(xValue);
           },
         },
@@ -1297,9 +1297,9 @@ export const pythonApiContractCases: CpSatCase[] = [
       assert(response.solution?.length === 2, `${this.name} expected 2 solution values`);
       const x = { vars: [0], coeffs: [1] };
       const y = { vars: [1], coeffs: [1] };
-      assertNumber(cpSolverValue(response, x, this.name), 9, `${this.name} solver.value(x)`);
-      assertNumber(cpSolverValue(response, y, this.name), 10, `${this.name} solver.value(y)`);
-      assertNumber(cpSolverValue(response, 2, this.name), 2, `${this.name} solver.value(2)`);
+      assert(cpSolverValue(response, x, this.name) === 9n, `${this.name} solver.value(x)`);
+      assert(cpSolverValue(response, y, this.name) === 10n, `${this.name} solver.value(y)`);
+      assert(cpSolverValue(response, 2, this.name) === 2n, `${this.name} solver.value(2)`);
       return response.status;
     },
   },

@@ -19,18 +19,29 @@ function isProtobufLong(value: unknown): value is ProtobufLong {
 }
 
 function exactLongValue(value: ProtobufLong) {
-  const bigint = value.unsigned
+  return value.unsigned
     ? (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0)
     : BigInt(value.high) * 0x100000000n + BigInt(value.low >>> 0);
-  if (bigint >= BigInt(Number.MIN_SAFE_INTEGER) &&
-      bigint <= BigInt(Number.MAX_SAFE_INTEGER)) {
-    return Number(bigint);
-  }
+}
+
+function bigintAsLong(value: bigint): ProtobufLong {
   return {
-    low: value.low,
-    high: value.high,
-    unsigned: value.unsigned,
+    low: Number(BigInt.asIntN(32, value)),
+    high: Number(BigInt.asIntN(32, value >> 32n)),
+    unsigned: false,
   };
+}
+
+export function encodeProtobufBigInts(value: unknown): unknown {
+  if (typeof value === 'bigint') return bigintAsLong(value);
+  if (value instanceof Uint8Array) return value;
+  if (Array.isArray(value)) return value.map(encodeProtobufBigInts);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, encodeProtobufBigInts(entry)]),
+    );
+  }
+  return value;
 }
 
 function preserveExactProtobufLongs(value: unknown): unknown {

@@ -14,6 +14,9 @@ import {
   type NetworkFlowResult,
 } from './protocol.js';
 import type { SolverJobEvent } from '../solver_executor.js';
+import { toIndex, toInt64, type IntValue } from '../int64.js';
+
+const INT32_MAX = 2_147_483_647;
 
 export type NetworkFlowEvent = SolverJobEvent;
 export type NetworkFlowSolveOptions = {
@@ -52,7 +55,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): N
   }
 }
 
-function assertEqualLengths(name: string, ...values: number[][]) {
+function assertEqualLengths(name: string, ...values: ArrayLike<unknown>[]) {
   const expected = values[0]?.length ?? 0;
   for (const value of values) {
     if (value.length !== expected) {
@@ -61,13 +64,12 @@ function assertEqualLengths(name: string, ...values: number[][]) {
   }
 }
 
-function toNumberArray(values: ArrayLike<number>, name: string): number[] {
-  return Array.from(values, (value, index) => {
-    if (!Number.isFinite(value) || !Number.isInteger(value)) {
-      throw new Error(`${name}[${index}] must be a finite integer.`);
-    }
-    return value;
-  });
+function toIndexArray(values: ArrayLike<number>, name: string): number[] {
+  return Array.from(values, (value, index) => toIndex(value, `${name}[${index}]`, INT32_MAX));
+}
+
+function toInt64Array(values: ArrayLike<IntValue>, name: string): bigint[] {
+  return Array.from(values, (value, index) => toInt64(value, `${name}[${index}]`));
 }
 
 function assertIndex(index: number, length: number, label: string) {
@@ -148,36 +150,36 @@ export enum SimpleLinearSumAssignmentStatus {
 export class SimpleMaxFlow {
   private tails: number[] = [];
   private heads: number[] = [];
-  private capacities: number[] = [];
+  private capacities: bigint[] = [];
   private result: NetworkFlowResult | null = null;
   private solving = false;
 
-  addArcWithCapacity(tail: number, head: number, capacity: number): number {
+  addArcWithCapacity(tail: number, head: number, capacity: IntValue): number {
     const arc = this.tails.length;
-    this.tails.push(...toNumberArray([tail], 'tail'));
-    this.heads.push(...toNumberArray([head], 'head'));
-    this.capacities.push(...toNumberArray([capacity], 'capacity'));
+    this.tails.push(...toIndexArray([tail], 'tail'));
+    this.heads.push(...toIndexArray([head], 'head'));
+    this.capacities.push(...toInt64Array([capacity], 'capacity'));
     this.result = null;
     return arc;
   }
 
-  addArcsWithCapacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>): number[] {
-    const tailValues = toNumberArray(tails, 'tails');
-    const headValues = toNumberArray(heads, 'heads');
-    const capacityValues = toNumberArray(capacities, 'capacities');
+  addArcsWithCapacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<IntValue>): number[] {
+    const tailValues = toIndexArray(tails, 'tails');
+    const headValues = toIndexArray(heads, 'heads');
+    const capacityValues = toInt64Array(capacities, 'capacities');
     assertEqualLengths('SimpleMaxFlow.addArcsWithCapacity', tailValues, headValues, capacityValues);
     return tailValues.map((tail, index) => this.addArcWithCapacity(tail, headValues[index], capacityValues[index]));
   }
 
-  setArcCapacity(arc: number, capacity: number): void {
+  setArcCapacity(arc: number, capacity: IntValue): void {
     assertIndex(arc, this.capacities.length, 'arc');
-    this.capacities[arc] = toNumberArray([capacity], 'capacity')[0];
+    this.capacities[arc] = toInt64Array([capacity], 'capacity')[0];
     this.result = null;
   }
 
-  setArcsCapacity(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
-    const arcValues = toNumberArray(arcs, 'arcs');
-    const capacityValues = toNumberArray(capacities, 'capacities');
+  setArcsCapacity(arcs: ArrayLike<number>, capacities: ArrayLike<IntValue>): void {
+    const arcValues = toIndexArray(arcs, 'arcs');
+    const capacityValues = toInt64Array(capacities, 'capacities');
     assertEqualLengths('SimpleMaxFlow.setArcsCapacity', arcValues, capacityValues);
     for (const [index, arc] of arcValues.entries()) this.setArcCapacity(arc, capacityValues[index]);
   }
@@ -200,7 +202,7 @@ export class SimpleMaxFlow {
     return this.heads[arc];
   }
 
-  capacity(arc: number): number {
+  capacity(arc: number): bigint {
     assertIndex(arc, this.capacities.length, 'arc');
     return this.capacities[arc];
   }
@@ -214,8 +216,8 @@ export class SimpleMaxFlow {
         tails: this.tails,
         heads: this.heads,
         capacities: this.capacities,
-        source,
-        sink,
+        source: toIndex(source, 'source', INT32_MAX),
+        sink: toIndex(sink, 'sink', INT32_MAX),
       }, options);
       this.result = result;
       return result.status;
@@ -224,17 +226,17 @@ export class SimpleMaxFlow {
     }
   }
 
-  optimalFlow(): number {
-    return this.result?.optimalFlow ?? 0;
+  optimalFlow(): bigint {
+    return this.result?.optimalFlow ?? 0n;
   }
 
-  flow(arc: number): number {
+  flow(arc: number): bigint {
     assertIndex(arc, this.capacities.length, 'arc');
-    return this.result?.flows?.[arc] ?? 0;
+    return this.result?.flows?.[arc] ?? 0n;
   }
 
-  flows(arcs: ArrayLike<number>): number[] {
-    return toNumberArray(arcs, 'arcs').map((arc) => this.flow(arc));
+  flows(arcs: ArrayLike<number>): bigint[] {
+    return toIndexArray(arcs, 'arcs').map((arc) => this.flow(arc));
   }
 
   getSourceSideMinCut(): number[] {
@@ -249,18 +251,18 @@ export class SimpleMaxFlow {
 export class SimpleMinCostFlow {
   private tails: number[] = [];
   private heads: number[] = [];
-  private capacities: number[] = [];
-  private unitCosts: number[] = [];
-  private nodeSupplies: number[] = [];
+  private capacities: bigint[] = [];
+  private unitCosts: bigint[] = [];
+  private nodeSupplies: bigint[] = [];
   private result: NetworkFlowResult | null = null;
   private solving = false;
 
-  addArcWithCapacityAndUnitCost(tail: number, head: number, capacity: number, unitCost: number): number {
+  addArcWithCapacityAndUnitCost(tail: number, head: number, capacity: IntValue, unitCost: IntValue): number {
     const arc = this.tails.length;
-    this.tails.push(...toNumberArray([tail], 'tail'));
-    this.heads.push(...toNumberArray([head], 'head'));
-    this.capacities.push(...toNumberArray([capacity], 'capacity'));
-    this.unitCosts.push(...toNumberArray([unitCost], 'unitCost'));
+    this.tails.push(...toIndexArray([tail], 'tail'));
+    this.heads.push(...toIndexArray([head], 'head'));
+    this.capacities.push(...toInt64Array([capacity], 'capacity'));
+    this.unitCosts.push(...toInt64Array([unitCost], 'unitCost'));
     this.result = null;
     return arc;
   }
@@ -268,41 +270,41 @@ export class SimpleMinCostFlow {
   addArcsWithCapacityAndUnitCost(
     tails: ArrayLike<number>,
     heads: ArrayLike<number>,
-    capacities: ArrayLike<number>,
-    unitCosts: ArrayLike<number>,
+    capacities: ArrayLike<IntValue>,
+    unitCosts: ArrayLike<IntValue>,
   ): number[] {
-    const tailValues = toNumberArray(tails, 'tails');
-    const headValues = toNumberArray(heads, 'heads');
-    const capacityValues = toNumberArray(capacities, 'capacities');
-    const unitCostValues = toNumberArray(unitCosts, 'unitCosts');
+    const tailValues = toIndexArray(tails, 'tails');
+    const headValues = toIndexArray(heads, 'heads');
+    const capacityValues = toInt64Array(capacities, 'capacities');
+    const unitCostValues = toInt64Array(unitCosts, 'unitCosts');
     assertEqualLengths('SimpleMinCostFlow.addArcsWithCapacityAndUnitCost', tailValues, headValues, capacityValues, unitCostValues);
     return tailValues.map((tail, index) =>
       this.addArcWithCapacityAndUnitCost(tail, headValues[index], capacityValues[index], unitCostValues[index]));
   }
 
-  setArcCapacity(arc: number, capacity: number): void {
+  setArcCapacity(arc: number, capacity: IntValue): void {
     assertIndex(arc, this.capacities.length, 'arc');
-    this.capacities[arc] = toNumberArray([capacity], 'capacity')[0];
+    this.capacities[arc] = toInt64Array([capacity], 'capacity')[0];
     this.result = null;
   }
 
-  setArcCapacities(arcs: ArrayLike<number>, capacities: ArrayLike<number>): void {
-    const arcValues = toNumberArray(arcs, 'arcs');
-    const capacityValues = toNumberArray(capacities, 'capacities');
+  setArcCapacities(arcs: ArrayLike<number>, capacities: ArrayLike<IntValue>): void {
+    const arcValues = toIndexArray(arcs, 'arcs');
+    const capacityValues = toInt64Array(capacities, 'capacities');
     assertEqualLengths('SimpleMinCostFlow.setArcCapacities', arcValues, capacityValues);
     for (const [index, arc] of arcValues.entries()) this.setArcCapacity(arc, capacityValues[index]);
   }
 
-  setNodeSupply(node: number, supply: number): void {
-    const nodeValue = toNumberArray([node], 'node')[0];
-    while (this.nodeSupplies.length <= nodeValue) this.nodeSupplies.push(0);
-    this.nodeSupplies[nodeValue] = toNumberArray([supply], 'supply')[0];
+  setNodeSupply(node: number, supply: IntValue): void {
+    const nodeValue = toIndexArray([node], 'node')[0];
+    while (this.nodeSupplies.length <= nodeValue) this.nodeSupplies.push(0n);
+    this.nodeSupplies[nodeValue] = toInt64Array([supply], 'supply')[0];
     this.result = null;
   }
 
-  setNodesSupplies(nodes: ArrayLike<number>, supplies: ArrayLike<number>): void {
-    const nodeValues = toNumberArray(nodes, 'nodes');
-    const supplyValues = toNumberArray(supplies, 'supplies');
+  setNodesSupplies(nodes: ArrayLike<number>, supplies: ArrayLike<IntValue>): void {
+    const nodeValues = toIndexArray(nodes, 'nodes');
+    const supplyValues = toInt64Array(supplies, 'supplies');
     assertEqualLengths('SimpleMinCostFlow.setNodesSupplies', nodeValues, supplyValues);
     for (const [index, node] of nodeValues.entries()) this.setNodeSupply(node, supplyValues[index]);
   }
@@ -328,17 +330,17 @@ export class SimpleMinCostFlow {
     return this.heads[arc];
   }
 
-  capacity(arc: number): number {
+  capacity(arc: number): bigint {
     assertIndex(arc, this.capacities.length, 'arc');
     return this.capacities[arc];
   }
 
-  supply(node: number): number {
+  supply(node: number): bigint {
     assertIndex(node, this.numNodes(), 'node');
-    return this.nodeSupplies[node] ?? 0;
+    return this.nodeSupplies[node] ?? 0n;
   }
 
-  unitCost(arc: number): number {
+  unitCost(arc: number): bigint {
     assertIndex(arc, this.unitCosts.length, 'arc');
     return this.unitCosts[arc];
   }
@@ -374,44 +376,44 @@ export class SimpleMinCostFlow {
     }
   }
 
-  optimalCost(): number {
-    return this.result?.optimalCost ?? 0;
+  optimalCost(): bigint {
+    return this.result?.optimalCost ?? 0n;
   }
 
-  maximumFlow(): number {
-    return this.result?.maximumFlow ?? 0;
+  maximumFlow(): bigint {
+    return this.result?.maximumFlow ?? 0n;
   }
 
-  flow(arc: number): number {
+  flow(arc: number): bigint {
     assertIndex(arc, this.capacities.length, 'arc');
-    return this.result?.flows?.[arc] ?? 0;
+    return this.result?.flows?.[arc] ?? 0n;
   }
 
-  flows(arcs: ArrayLike<number>): number[] {
-    return toNumberArray(arcs, 'arcs').map((arc) => this.flow(arc));
+  flows(arcs: ArrayLike<number>): bigint[] {
+    return toIndexArray(arcs, 'arcs').map((arc) => this.flow(arc));
   }
 }
 
 export class SimpleLinearSumAssignment {
   private leftNodes: number[] = [];
   private rightNodes: number[] = [];
-  private costs: number[] = [];
+  private costs: bigint[] = [];
   private result: NetworkFlowResult | null = null;
   private solving = false;
 
-  addArcWithCost(leftNode: number, rightNode: number, cost: number): number {
+  addArcWithCost(leftNode: number, rightNode: number, cost: IntValue): number {
     const arc = this.leftNodes.length;
-    this.leftNodes.push(...toNumberArray([leftNode], 'leftNode'));
-    this.rightNodes.push(...toNumberArray([rightNode], 'rightNode'));
-    this.costs.push(...toNumberArray([cost], 'cost'));
+    this.leftNodes.push(...toIndexArray([leftNode], 'leftNode'));
+    this.rightNodes.push(...toIndexArray([rightNode], 'rightNode'));
+    this.costs.push(...toInt64Array([cost], 'cost'));
     this.result = null;
     return arc;
   }
 
-  addArcsWithCost(leftNodes: ArrayLike<number>, rightNodes: ArrayLike<number>, costs: ArrayLike<number>): number[] {
-    const leftValues = toNumberArray(leftNodes, 'leftNodes');
-    const rightValues = toNumberArray(rightNodes, 'rightNodes');
-    const costValues = toNumberArray(costs, 'costs');
+  addArcsWithCost(leftNodes: ArrayLike<number>, rightNodes: ArrayLike<number>, costs: ArrayLike<IntValue>): number[] {
+    const leftValues = toIndexArray(leftNodes, 'leftNodes');
+    const rightValues = toIndexArray(rightNodes, 'rightNodes');
+    const costValues = toInt64Array(costs, 'costs');
     assertEqualLengths('SimpleLinearSumAssignment.addArcsWithCost', leftValues, rightValues, costValues);
     return leftValues.map((leftNode, index) => this.addArcWithCost(leftNode, rightValues[index], costValues[index]));
   }
@@ -434,7 +436,7 @@ export class SimpleLinearSumAssignment {
     return this.rightNodes[arc];
   }
 
-  cost(arc: number): number {
+  cost(arc: number): bigint {
     assertIndex(arc, this.costs.length, 'arc');
     return this.costs[arc];
   }
@@ -456,8 +458,8 @@ export class SimpleLinearSumAssignment {
     }
   }
 
-  optimalCost(): number {
-    return this.result?.optimalCost ?? 0;
+  optimalCost(): bigint {
+    return this.result?.optimalCost ?? 0n;
   }
 
   rightMate(leftNode: number): number {
@@ -465,8 +467,8 @@ export class SimpleLinearSumAssignment {
     return this.result?.rightMates?.[leftNode] ?? -1;
   }
 
-  assignmentCost(leftNode: number): number {
+  assignmentCost(leftNode: number): bigint {
     assertIndex(leftNode, this.numNodes(), 'leftNode');
-    return this.result?.assignmentCosts?.[leftNode] ?? 0;
+    return this.result?.assignmentCosts?.[leftNode] ?? 0n;
   }
 }

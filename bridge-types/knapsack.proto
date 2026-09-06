@@ -8,17 +8,17 @@ message KnapsackBridgeRequest {
   string name = 2;
   bool use_reduction = 3;
   double time_limit_seconds = 4;
-  repeated double profits = 5;
+  repeated int64 profits = 5;
   repeated KnapsackWeightDimension weights = 6;
-  repeated double capacities = 7;
+  repeated int64 capacities = 7;
 }
 
 message KnapsackWeightDimension {
-  repeated double values = 1;
+  repeated int64 values = 1;
 }
 
 message KnapsackBridgeResponse {
-  double profit = 1;
+  int64 profit = 1;
   bool optimal = 2;
   repeated bool contains = 3;
 }

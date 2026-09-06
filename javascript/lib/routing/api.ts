@@ -11,8 +11,11 @@ import {
   type RoutingModelOperation,
   type RoutingSolveResult,
 } from './protocol.js';
+import { toIndex, toInt64, type IntValue } from '../int64.js';
 
-type RoutingTransitCallback = (fromIndex: number, toIndex: number) => number;
+const INT32_MAX = 2_147_483_647;
+
+type RoutingTransitCallback = (fromIndex: number, toIndex: number) => IntValue;
 
 async function createRoutingWorker(): Promise<SolverWorkerLike> {
   return new Worker(
@@ -47,10 +50,6 @@ export type RoutingSolveOptions = {
   onEvent?: (event: RoutingEvent) => void | Promise<void>;
   signal?: AbortSignal;
 };
-
-function toInt64(value: number): bigint {
-  return globalThis.BigInt(value);
-}
 
 export enum FirstSolutionStrategy {
   UNSET = 0,
@@ -129,10 +128,13 @@ export function findErrorInRoutingSearchParameters(params: RoutingSearchParamete
 }
 
 export class BoundCost {
-  constructor(
-    public bound = 0,
-    public cost = 0,
-  ) {}
+  readonly bound: bigint;
+  readonly cost: bigint;
+
+  constructor(bound: IntValue = 0n, cost: IntValue = 0n) {
+    this.bound = toInt64(bound, 'Routing span bound');
+    this.cost = toInt64(cost, 'Routing span cost');
+  }
 }
 
 type RoutingCumulVar = {
@@ -212,8 +214,8 @@ export class RoutingIndexManager {
     depotOrStarts: number | number[],
     maybeEnds?: number[],
   ) {
-    this.numLocations = numLocations;
-    this.numVehicles = numVehicles;
+    this.numLocations = toIndex(numLocations, 'Routing number of locations', INT32_MAX);
+    this.numVehicles = toIndex(numVehicles, 'Routing number of vehicles', INT32_MAX);
     if (Array.isArray(depotOrStarts)) {
       if (!Array.isArray(maybeEnds)) {
         throw new Error('RoutingIndexManager: starts and ends arrays must both be provided.');
@@ -221,11 +223,12 @@ export class RoutingIndexManager {
       if (depotOrStarts.length !== numVehicles || maybeEnds.length !== numVehicles) {
         throw new Error('RoutingIndexManager: starts and ends arrays must match numVehicles.');
       }
-      this.starts = [...depotOrStarts];
-      this.ends = [...maybeEnds];
+      this.starts = depotOrStarts.map((value, index) => toIndex(value, `Routing start[${index}]`, INT32_MAX));
+      this.ends = maybeEnds.map((value, index) => toIndex(value, `Routing end[${index}]`, INT32_MAX));
     } else {
-      this.starts = Array.from({ length: numVehicles }, () => depotOrStarts);
-      this.ends = Array.from({ length: numVehicles }, () => depotOrStarts);
+      const depot = toIndex(depotOrStarts, 'Routing depot', INT32_MAX);
+      this.starts = Array.from({ length: this.numVehicles }, () => depot);
+      this.ends = Array.from({ length: this.numVehicles }, () => depot);
     }
     this.createSyntheticIndexMapping();
   }
@@ -312,12 +315,13 @@ export class RoutingDimension {
   }
 
   setSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
-    this.state.softSpanUpperBounds.set(vehicle, new BoundCost(boundCost.bound, boundCost.cost));
-    this.recordSoftSpanUpperBound(boundCost, vehicle);
+    const vehicleIndex = toIndex(vehicle, 'Routing vehicle', INT32_MAX);
+    this.state.softSpanUpperBounds.set(vehicleIndex, new BoundCost(boundCost.bound, boundCost.cost));
+    this.recordSoftSpanUpperBound(boundCost, vehicleIndex);
   }
 
   getSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
-    return this.state.softSpanUpperBounds.get(vehicle) ?? new BoundCost(0, 0);
+    return this.state.softSpanUpperBounds.get(toIndex(vehicle, 'Routing vehicle', INT32_MAX)) ?? new BoundCost(0, 0);
   }
 
   hasQuadraticCostSoftSpanUpperBounds(): boolean {
@@ -325,12 +329,13 @@ export class RoutingDimension {
   }
 
   setQuadraticCostSoftSpanUpperBoundForVehicle(boundCost: BoundCost, vehicle: number): void {
-    this.state.quadraticCostSoftSpanUpperBounds.set(vehicle, new BoundCost(boundCost.bound, boundCost.cost));
-    this.recordQuadraticCostSoftSpanUpperBound(boundCost, vehicle);
+    const vehicleIndex = toIndex(vehicle, 'Routing vehicle', INT32_MAX);
+    this.state.quadraticCostSoftSpanUpperBounds.set(vehicleIndex, new BoundCost(boundCost.bound, boundCost.cost));
+    this.recordQuadraticCostSoftSpanUpperBound(boundCost, vehicleIndex);
   }
 
   getQuadraticCostSoftSpanUpperBoundForVehicle(vehicle: number): BoundCost {
-    return this.state.quadraticCostSoftSpanUpperBounds.get(vehicle) ?? new BoundCost(0, 0);
+    return this.state.quadraticCostSoftSpanUpperBounds.get(toIndex(vehicle, 'Routing vehicle', INT32_MAX)) ?? new BoundCost(0, 0);
   }
 }
 
@@ -353,21 +358,25 @@ export class Assignment {
     assignmentStates.set(this, { routing, result, routes, ignoreInactiveIndices });
   }
 
-  objectiveValue(): number {
+  objectiveValue(): bigint {
     return this.result?.objectiveValue ?? this.routing.assignmentObjectiveValue();
   }
 
-  value(indexOrVar: number | RoutingCumulVar): number {
+  value(indexOrVar: number): number;
+  value(indexOrVar: RoutingCumulVar): bigint;
+  value(indexOrVar: number | RoutingCumulVar): number | bigint {
     if (typeof indexOrVar === 'object') {
       return this.result
-        ? this.result.dimensionCumulValues[indexOrVar.dimensionName]?.[indexOrVar.index] ?? 0
+        ? this.result.dimensionCumulValues[indexOrVar.dimensionName]?.[indexOrVar.index] ?? 0n
         : this.routing.dimensionCumulValue(indexOrVar.dimensionName, indexOrVar.index);
     }
     return this.result?.nextValues[indexOrVar] ?? this.routing.nextValue(indexOrVar);
   }
 
-  min(indexOrVar: number | RoutingCumulVar): number {
-    return this.value(indexOrVar);
+  min(indexOrVar: number): number;
+  min(indexOrVar: RoutingCumulVar): bigint;
+  min(indexOrVar: number | RoutingCumulVar): number | bigint {
+    return typeof indexOrVar === 'object' ? this.value(indexOrVar) : this.value(indexOrVar);
   }
 }
 
@@ -414,7 +423,7 @@ export class RoutingModel {
   private readonly operations: RoutingModelOperation[] = [];
   private readonly dimensions = new Map<string, RoutingDimensionState>();
   private readonly atSolutionCallbacks: Array<() => void> = [];
-  private lastObjectiveValue = 0;
+  private lastObjectiveValue = 0n;
   private lastStatus: RoutingSearchStatus | null = null;
   private readonly parameters?: RoutingModelParameters;
 
@@ -444,8 +453,8 @@ export class RoutingModel {
       numVehicles: this.manager.numVehicles,
       starts: this.manager.starts,
       ends: this.manager.ends,
-      firstSolutionStrategy: parameters.firstSolutionStrategy ?? 0,
-      solutionLimit: parameters.solutionLimit ?? 0,
+      firstSolutionStrategy: toIndex(parameters.firstSolutionStrategy ?? 0, 'Routing first solution strategy', INT32_MAX),
+      solutionLimit: toIndex(parameters.solutionLimit ?? 0, 'Routing solution limit', INT32_MAX),
       transitMatrix: this.buildTransitMatrix(),
       transitMatrixDimension: dimension,
       operations: this.operations,
@@ -514,7 +523,7 @@ export class RoutingModel {
       : this.manager.ends.some((_, vehicle) => this.manager.getEndIndex(vehicle) === index);
   }
 
-  registerTransitMatrix(matrix: number[][]): number {
+  registerTransitMatrix(matrix: IntValue[][]): number {
     return this.registerTransitCallback((fromIndex, toIndex) => {
       const fromNode = this.manager.indexToNode(fromIndex);
       const toNode = this.manager.indexToNode(toIndex);
@@ -522,11 +531,11 @@ export class RoutingModel {
     });
   }
 
-  registerUnaryTransitCallback(callback: (fromIndex: number) => number): number {
+  registerUnaryTransitCallback(callback: (fromIndex: number) => IntValue): number {
     return this.registerTransitCallback((fromIndex) => callback(fromIndex));
   }
 
-  registerUnaryTransitVector(values: number[]): number {
+  registerUnaryTransitVector(values: IntValue[]): number {
     return this.registerUnaryTransitCallback((fromIndex) => {
       return values[this.manager.indexToNode(fromIndex)];
     });
@@ -534,8 +543,8 @@ export class RoutingModel {
 
   addDimension(
     transitIndex: number,
-    slackMax: number,
-    capacity: number,
+    slackMax: IntValue,
+    capacity: IntValue,
     fixStartCumulToZero: boolean,
     name: string,
   ): boolean {
@@ -543,8 +552,8 @@ export class RoutingModel {
     this.operations.push({
       type: 'addDimension',
       transitMatrix: this.buildTransitMatrixForEvaluator(transitIndex),
-      slackMax,
-      capacity,
+      slackMax: toInt64(slackMax),
+      capacity: toInt64(capacity),
       fixStartCumulToZero,
       name,
     });
@@ -553,8 +562,8 @@ export class RoutingModel {
 
   addDimensionWithVehicleCapacity(
     transitIndex: number,
-    slackMax: number,
-    capacities: number[],
+    slackMax: IntValue,
+    capacities: IntValue[],
     fixStartCumulToZero: boolean,
     name: string,
   ): boolean {
@@ -562,8 +571,8 @@ export class RoutingModel {
     this.operations.push({
       type: 'addDimensionWithVehicleCapacity',
       transitMatrix: this.buildTransitMatrixForEvaluator(transitIndex),
-      slackMax,
-      capacities,
+      slackMax: toInt64(slackMax),
+      capacities: capacities.map((value) => toInt64(value)),
       fixStartCumulToZero,
       name,
     });
@@ -572,8 +581,8 @@ export class RoutingModel {
 
   addDimensionWithVehicleTransits(
     transitIndices: number[],
-    slackMax: number,
-    capacity: number,
+    slackMax: IntValue,
+    capacity: IntValue,
     fixStartCumulToZero: boolean,
     name: string,
   ): boolean {
@@ -582,8 +591,8 @@ export class RoutingModel {
     this.operations.push({
       type: 'addDimensionWithVehicleTransits',
       transitMatrices: indices.map((index) => this.buildTransitMatrixForEvaluator(index)),
-      slackMax,
-      capacity,
+      slackMax: toInt64(slackMax),
+      capacity: toInt64(capacity),
       fixStartCumulToZero,
       name,
     });
@@ -591,25 +600,25 @@ export class RoutingModel {
   }
 
   addConstantDimension(
-    value: number,
-    capacity: number,
+    value: IntValue,
+    capacity: IntValue,
     fixStartCumulToZero: boolean,
     name: string,
   ): [number, boolean] {
     if (!this.addDimensionState(name)) return [-1, false];
-    this.operations.push({ type: 'addConstantDimension', value, capacity, fixStartCumulToZero, name });
+    this.operations.push({ type: 'addConstantDimension', value: toInt64(value), capacity: toInt64(capacity), fixStartCumulToZero, name });
     return [this.nextEvaluatorIndex++, true];
   }
 
-  addVectorDimension(values: number[], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
+  addVectorDimension(values: IntValue[], capacity: IntValue, fixStartCumulToZero: boolean, name: string): [number, boolean] {
     if (!this.addDimensionState(name)) return [-1, false];
-    this.operations.push({ type: 'addVectorDimension', values, capacity, fixStartCumulToZero, name });
+    this.operations.push({ type: 'addVectorDimension', values: values.map((item) => toInt64(item)), capacity: toInt64(capacity), fixStartCumulToZero, name });
     return [this.nextEvaluatorIndex++, true];
   }
 
-  addMatrixDimension(matrix: number[][], capacity: number, fixStartCumulToZero: boolean, name: string): [number, boolean] {
+  addMatrixDimension(matrix: IntValue[][], capacity: IntValue, fixStartCumulToZero: boolean, name: string): [number, boolean] {
     if (!this.addDimensionState(name)) return [-1, false];
-    this.operations.push({ type: 'addMatrixDimension', matrix, capacity, fixStartCumulToZero, name });
+    this.operations.push({ type: 'addMatrixDimension', matrix: matrix.map((row) => row.map((item) => toInt64(item))), capacity: toInt64(capacity), fixStartCumulToZero, name });
     return [this.nextEvaluatorIndex++, true];
   }
 
@@ -638,8 +647,8 @@ export class RoutingModel {
     );
   }
 
-  addDisjunction(indices: number[], penalty?: number): number {
-    this.operations.push({ type: 'addDisjunction', indices, penalty });
+  addDisjunction(indices: number[], penalty?: IntValue): number {
+    this.operations.push({ type: 'addDisjunction', indices, penalty: penalty === undefined ? undefined : toInt64(penalty) });
     return this.operations.length - 1;
   }
 
@@ -697,7 +706,7 @@ export class RoutingModel {
     this.atSolutionCallbacks.push(typeof callback === 'function' ? callback : () => callback.__call__());
   }
 
-  costVar(): { max: () => number } {
+  costVar(): { max: () => bigint } {
     return { max: () => this.lastObjectiveValue };
   }
 
@@ -748,14 +757,14 @@ export class RoutingModel {
     }
   }
 
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number {
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint {
     void vehicle;
     const dimension = this.manager.getNumberOfIndices();
     const matrix = this.buildTransitMatrix();
-    return Number(matrix[fromIndex * dimension + toIndex]);
+    return matrix[fromIndex * dimension + toIndex];
   }
 
-  assignmentObjectiveValue(): number {
+  assignmentObjectiveValue(): bigint {
     return this.lastObjectiveValue;
   }
 
@@ -763,8 +772,8 @@ export class RoutingModel {
     return this.lastResult?.nextValues[index] ?? index;
   }
 
-  dimensionCumulValue(dimensionName: string, index: number): number {
-    return this.lastResult?.dimensionCumulValues[dimensionName]?.[index] ?? 0;
+  dimensionCumulValue(dimensionName: string, index: number): bigint {
+    return this.lastResult?.dimensionCumulValues[dimensionName]?.[index] ?? 0n;
   }
 
   private addDimensionState(name: string): boolean {
@@ -818,9 +827,9 @@ export class RoutingModel {
     const ends = Array.from({ length: this.manager.numVehicles }, (_, vehicle) => this.manager.getEndIndex(vehicle));
     const matrix = this.buildTransitMatrix();
     const assigned = new Set<number>();
-    let objectiveValue = 0;
+    let objectiveValue = 0n;
 
-    const arcCost = (from: number, to: number) => Number(matrix[from * dimension + to]);
+    const arcCost = (from: number, to: number) => matrix[from * dimension + to];
     const checkIndex = (index: number, label: string) => {
       if (!Number.isInteger(index) || index < 0 || index >= dimension) {
         throw new Error(`RoutingModel.readAssignmentFromRoutes: ${label} index ${index} is out of range.`);

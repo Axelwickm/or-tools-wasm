@@ -274,9 +274,9 @@ EMSCRIPTEN_KEEPALIVE const char* get_optional_boolean_schema() {
 
 EMSCRIPTEN_KEEPALIVE uint8_t* knapsack_solve_serialized(
     int solver_type, const char* name, int use_reduction,
-    double time_limit_seconds, const double* profits_data, int num_items,
-    const double* weights_data, int num_dimensions,
-    const double* capacities_data, size_t* out_len) {
+    double time_limit_seconds, const int64_t* profits_data, int num_items,
+    const int64_t* weights_data, int num_dimensions,
+    const int64_t* capacities_data, size_t* out_len) {
   if (name == nullptr || profits_data == nullptr || weights_data == nullptr ||
       capacities_data == nullptr || num_items < 0 || num_dimensions < 0) {
     return CopyStringToBuffer(
@@ -284,24 +284,18 @@ EMSCRIPTEN_KEEPALIVE uint8_t* knapsack_solve_serialized(
         "dimensions.\"}", out_len);
   }
 
-  std::vector<int64_t> profits(num_items);
-  for (int i = 0; i < num_items; ++i) {
-    profits[i] = NumberToInt64(profits_data[i]);
-  }
+  std::vector<int64_t> profits(profits_data, profits_data + num_items);
 
   std::vector<std::vector<int64_t>> weights(num_dimensions,
                                             std::vector<int64_t>(num_items));
   for (int dimension = 0; dimension < num_dimensions; ++dimension) {
     for (int item = 0; item < num_items; ++item) {
-      weights[dimension][item] =
-          NumberToInt64(weights_data[dimension * num_items + item]);
+      weights[dimension][item] = weights_data[dimension * num_items + item];
     }
   }
 
-  std::vector<int64_t> capacities(num_dimensions);
-  for (int dimension = 0; dimension < num_dimensions; ++dimension) {
-    capacities[dimension] = NumberToInt64(capacities_data[dimension]);
-  }
+  std::vector<int64_t> capacities(capacities_data,
+                                  capacities_data + num_dimensions);
 
   try {
     KnapsackSolver solver(static_cast<KnapsackSolver::SolverType>(solver_type),
@@ -314,7 +308,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* knapsack_solve_serialized(
     const int64_t profit = solver.Solve();
 
     std::ostringstream out;
-    out << "{\"ok\":true,\"profit\":" << profit << ",\"optimal\":"
+    out << "{\"ok\":true,\"profit\":\"" << profit << "\",\"optimal\":"
         << (solver.IsSolutionOptimal() ? "true" : "false") << ",\"name\":\""
         << JsonEscape(solver.GetName()) << "\",\"contains\":[";
     for (int item = 0; item < num_items; ++item) {

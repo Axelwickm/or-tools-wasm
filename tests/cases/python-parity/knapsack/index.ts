@@ -27,7 +27,7 @@ type KnapsackSolverLike = {
   solve(options?: {
     executor?: 'direct' | 'worker' | ReturnType<typeof serverExecutorConfiguration>;
     onEvent?: (event: { type: string; status?: { state: number } }) => void;
-  }): Promise<number>;
+  }): Promise<bigint>;
   bestSolutionContains(itemId: number): boolean;
   isSolutionOptimal(): boolean;
   setUseReduction(useReduction: boolean): void;
@@ -92,7 +92,7 @@ async function solveKnapsackProblemUsingSpecificSolver(
   const resultWhenReduction = await realSolve(api, profits, weights, capacities, solverType, true);
   const resultWhenNoReduction = await realSolve(api, profits, weights, capacities, solverType, false);
   if (resultWhenReduction.profit !== resultWhenNoReduction.profit) {
-    return { profit: -1, selectedItems: [], optimal: false };
+    return { profit: -1n, selectedItems: [], optimal: false };
   }
   return resultWhenReduction;
 }
@@ -108,7 +108,7 @@ async function solveKnapsackProblem(
   const maxNumberOfItemsFor64ItemsSolver = 64;
   const maxCapacityForDynamicProgrammingSolver = 1000000;
   const numberOfItems = profits.length;
-  const invalidSolution = -1;
+  const invalidSolution = -1n;
 
   const genericResult = await solveKnapsackProblemUsingSpecificSolver(
     api,
@@ -187,10 +187,10 @@ async function runKnapsackProblemCase(
   expectedProfit: number,
 ): Promise<{ profit: number; selectedItems: number[]; optimal: boolean }> {
   const result = await solveKnapsackProblem(api, profits, weights, capacities);
-  assert(result.profit === expectedProfit, `${name} (${mode}): expected profit ${expectedProfit}, got ${result.profit}`);
+  assert(result.profit === BigInt(expectedProfit), `${name} (${mode}): expected profit ${expectedProfit}, got ${result.profit}`);
   assert(result.optimal, `${name} (${mode}): expected proven optimal solution`);
   return {
-    profit: result.profit,
+    profit: Number(result.profit),
     selectedItems: result.selectedItems,
     optimal: result.optimal,
   };

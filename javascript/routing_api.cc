@@ -132,7 +132,20 @@ EM_JS(int64_t, CallRoutingTransitCallback,
   if (typeof callback !== 'function') {
     throw new Error(`Routing transit callback ${callback_id} is not registered.`);
   }
-  return BigInt(callback(Number(from_index), Number(to_index)));
+  const from = Number(from_index);
+  const to = Number(to_index);
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) {
+    throw new RangeError('Routing callback index exceeds JavaScript safe integer range.');
+  }
+  const value = callback(from, to);
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+    throw new RangeError('Routing callback result must be a safe integer or bigint.');
+  }
+  const exact = BigInt(value);
+  if (BigInt.asIntN(64, exact) !== exact) {
+    throw new RangeError('Routing callback result is outside signed int64 range.');
+  }
+  return exact;
 });
 
 }  // namespace

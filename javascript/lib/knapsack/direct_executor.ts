@@ -83,7 +83,7 @@ export class DirectKnapsackExecutor implements KnapsackExecutor {
         this.solver, requestId, SolverJobState.SUCCEEDED, createdAt,
       ));
       return {
-        profit: result.profit ?? 0,
+        profit: result.profit ?? 0n,
         optimal: result.optimal === true,
         contains: result.contains ?? [],
       };

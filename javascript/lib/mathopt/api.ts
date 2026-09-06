@@ -22,6 +22,7 @@ import {
   type MathOptOperation,
 } from './protocol.js';
 import * as protobufModule from 'protobufjs';
+import { toIndex } from '../int64.js';
 
 type WireValue = Uint8Array;
 type ProtobufType = import('protobufjs').Type;
@@ -2185,8 +2186,8 @@ export class MathOptIncrementalSolver {
       throw new Error(status.strings.get(2)?.[0] ?? 'MathOpt incremental solver creation failed.');
     }
     const handleText = response.strings.get(2)?.[0];
-    const handle = handleText === undefined ? 0 : Number(handleText);
-    if (!Number.isInteger(handle) || handle <= 0) {
+    const handle = handleText === undefined ? 0 : toIndex(BigInt(handleText), 'MathOpt incremental solver handle');
+    if (handle <= 0) {
       throw new Error('MathOpt incremental solver creation returned no solver handle.');
     }
     this.handle = handle;
@@ -3023,7 +3024,7 @@ function decodeSparseBasisStatusVector(
   const ids = sparse.packedVarints.get(1) ?? [];
   const values = sparse.packedVarints.get(2) ?? [];
   ids.forEach((id, index) => {
-    const numericId = Number(id);
+    const numericId = toIndex(id, 'MathOpt variable id');
     const statusNumber = Number(values[index] ?? 0n);
     const status = basisStatusNames[statusNumber] ?? `BASIS_STATUS_${statusNumber}`;
     byId[numericId] = status;
@@ -3043,7 +3044,7 @@ function decodeSparseDoubleVector(
   const ids = sparse.packedVarints.get(1) ?? [];
   const values = sparse.packedDoubles.get(2) ?? [];
   ids.forEach((id, index) => {
-    const numericId = Number(id);
+    const numericId = toIndex(id, 'MathOpt constraint id');
     const value = values[index] ?? 0;
     byId[numericId] = value;
     byName[nameForId(numericId)] = value;
@@ -3073,8 +3074,8 @@ function readMessage(bytes: Uint8Array): DecodedMessage {
   while (offset < bytes.length) {
     const key = readVarint(bytes, offset);
     offset = key.offset;
-    const field = Number(key.value >> 3n);
-    const wire = Number(key.value & 7n);
+    const field = toIndex(key.value >> 3n, 'protobuf field number', 536_870_911);
+    const wire = toIndex(key.value & 7n, 'protobuf wire type', 7);
     if (wire === 0) {
       const value = readVarint(bytes, offset);
       offset = value.offset;
@@ -3086,7 +3087,7 @@ function readMessage(bytes: Uint8Array): DecodedMessage {
     } else if (wire === 2) {
       const length = readVarint(bytes, offset);
       offset = length.offset;
-      const end = offset + Number(length.value);
+      const end = offset + toIndex(length.value, 'protobuf field length', bytes.length - offset);
       const payload = bytes.slice(offset, end);
       offset = end;
       pushMap(decoded.messages, field, payload);

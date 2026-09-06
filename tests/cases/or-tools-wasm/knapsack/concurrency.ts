@@ -1,7 +1,7 @@
 type KnapsackConcurrencyApi = {
   KnapsackSolver: new (solverType: 0, name: string) => {
     init(profits: number[], weights: number[][], capacities: number[]): void;
-    solve(options: { executor: 'direct' | 'worker' }): Promise<number>;
+    solve(options: { executor: 'direct' | 'worker' }): Promise<bigint>;
   };
   KnapsackSolverType: {
     KNAPSACK_BRUTE_FORCE_SOLVER: 0;

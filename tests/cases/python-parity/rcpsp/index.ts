@@ -23,7 +23,7 @@ export type RcpspCaseResult = {
 type RcpspEventLike =
   | { type: 'status'; status: { state: number } }
   | { type: 'failure'; failure: { message: string } }
-  | { type: 'solution'; makespan: number; tasks: Array<{ name: string; start: number; end: number }> }
+  | { type: 'solution'; makespan: bigint; tasks: Array<{ name: string; start: bigint; end: bigint }> }
   | { type: 'bestBound'; bound: number }
   | { type: 'log'; message: string };
 
@@ -40,7 +40,7 @@ type RcpspParserLike = {
 
 type RcpspProblemLike = {
   exportModelAsProto(): RcpspProblemProtoLike;
-  toCpSatModel(): { proto(): { constraints?: unknown[] } };
+  toCpSatModel(): { readonly modelProto: { constraints?: unknown[] } };
   solve(options?: {
     numWorkers?: number;
     maxTimeInSeconds?: number;
@@ -52,9 +52,9 @@ type RcpspProblemLike = {
     eventMask?: { solution?: boolean; bestBound?: boolean; log?: boolean };
     signal?: AbortSignal;
   }): Promise<{
-    makespan: number | null;
+    makespan: bigint | null;
     statusName: string;
-    tasks: Array<{ name: string; start: number; end: number; demands: number[]; successors: number[] }>;
+    tasks: Array<{ name: string; start: bigint; end: bigint; demands: number[]; successors: number[] }>;
   }>;
 };
 
@@ -195,7 +195,7 @@ async function runCpSatBackedSchedule(api: RcpspApi, mode: ExecutorFixtureMode):
   const proto = problem.exportModelAsProto();
   assert(proto.resources?.length === 1, `RCPSP CP-SAT sample (${mode}) resources length`);
   assert(proto.tasks?.length === 7, `RCPSP CP-SAT sample (${mode}) source/tasks/sink length`);
-  assert((problem.toCpSatModel().proto().constraints ?? []).length > 0, `RCPSP CP-SAT sample (${mode}) generated constraints`);
+  assert((problem.toCpSatModel().modelProto.constraints ?? []).length > 0, `RCPSP CP-SAT sample (${mode}) generated constraints`);
   const events: RcpspEventLike[] = [];
   const result = await problem.solve({
     numWorkers: 1,
@@ -207,18 +207,18 @@ async function runCpSatBackedSchedule(api: RcpspApi, mode: ExecutorFixtureMode):
     },
   });
   assert(result.statusName === 'OPTIMAL' || result.statusName === 'FEASIBLE', `RCPSP CP-SAT sample (${mode}) status ${result.statusName}`);
-  assert(result.makespan === 8, `RCPSP CP-SAT sample (${mode}) expected makespan 8, got ${result.makespan}`);
+  assert(result.makespan === 8n, `RCPSP CP-SAT sample (${mode}) expected makespan 8, got ${result.makespan}`);
   const byName = new Map(result.tasks.map((task) => [task.name, task]));
-  assert(byName.get('site')?.start === 0, `RCPSP CP-SAT sample (${mode}) site start`);
-  assert(byName.get('frame')?.start === 3, `RCPSP CP-SAT sample (${mode}) frame start`);
-  assert(byName.get('inspect')?.end === 8, `RCPSP CP-SAT sample (${mode}) inspect end`);
+  assert(byName.get('site')?.start === 0n, `RCPSP CP-SAT sample (${mode}) site start`);
+  assert(byName.get('frame')?.start === 3n, `RCPSP CP-SAT sample (${mode}) frame start`);
+  assert(byName.get('inspect')?.end === 8n, `RCPSP CP-SAT sample (${mode}) inspect end`);
   const states = events.flatMap((event) => event.type === 'status' ? [event.status.state] : []);
   assert(states.includes(solverJobStates.RUNNING), `RCPSP CP-SAT sample (${mode}) missing RUNNING status`);
   assert(states.includes(solverJobStates.SUCCEEDED), `RCPSP CP-SAT sample (${mode}) missing SUCCEEDED status`);
   const solution = events.find((event) => event.type === 'solution');
   assert(solution?.type === 'solution', `RCPSP CP-SAT sample (${mode}) missing semantic solution event`);
-  assert(solution.makespan === 8, `RCPSP CP-SAT sample (${mode}) event makespan`);
-  assert(solution.tasks.some((task) => task.name === 'inspect' && task.end === 8), `RCPSP CP-SAT sample (${mode}) event schedule`);
+  assert(solution.makespan === 8n, `RCPSP CP-SAT sample (${mode}) event makespan`);
+  assert(solution.tasks.some((task) => task.name === 'inspect' && task.end === 8n), `RCPSP CP-SAT sample (${mode}) event schedule`);
   const controller = new AbortController();
   controller.abort();
   let cancellation: unknown = null;
@@ -232,7 +232,7 @@ async function runCpSatBackedSchedule(api: RcpspApi, mode: ExecutorFixtureMode):
     cancellation = error;
   }
   assert(cancellation instanceof Error && cancellation.name === 'AbortError', `RCPSP CP-SAT sample (${mode}) AbortSignal cancellation`);
-  return { makespan: result.makespan, statusName: result.statusName };
+  return { makespan: result.makespan === null ? null : Number(result.makespan), statusName: result.statusName };
 }
 
 type RcpspCase = SharedCase<RcpspApi, { makespan: number | null; statusName?: string }, ExecutorFixtureMode>;

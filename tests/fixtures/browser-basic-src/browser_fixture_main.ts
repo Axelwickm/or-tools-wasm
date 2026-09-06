@@ -3,6 +3,7 @@ import { cpSatCases } from '../../cases/python-parity/cp_sat/cases.ts';
 import { runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
+import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
@@ -332,6 +333,9 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
   const highLevelCpSat = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat-high-level', () =>
     runWithWorkerStats(workerSpy, () => runCpSatHighLevelParityCasesForPackage(CpSatApi as never))
   );
+  const highLevelCpSatContract = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat-high-level-contract', () =>
+    runWithWorkerStats(workerSpy, () => runCpSatHighLevelContractCases(CpSatApi as never))
+  );
   const cpSat = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat', () =>
     runWithWorkerStats(workerSpy, () =>
       runCpSatCases(typedCpSat as never, {
@@ -633,6 +637,7 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     cpSatWorkerStatsBefore: cpSat?.before,
     cpSatWorkerStatsAfter: cpSat?.after,
     highLevelCpSatResults: highLevelCpSat?.result,
+    highLevelCpSatContractResults: highLevelCpSatContract?.result,
     highLevelCpSatWorkerStatsBefore: highLevelCpSat?.before,
     highLevelCpSatWorkerStatsAfter: highLevelCpSat?.after,
     routingResults: routing?.result,

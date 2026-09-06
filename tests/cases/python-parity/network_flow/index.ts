@@ -32,11 +32,11 @@ type SimpleMaxFlowLike = {
   numArcs(): number;
   tail(arc: number): number;
   head(arc: number): number;
-  capacity(arc: number): number;
+  capacity(arc: number): bigint;
   solve(source: number, sink: number, options?: SolveOptions): Promise<number>;
-  optimalFlow(): number;
-  flow(arc: number): number;
-  flows(arcs: ArrayLike<number>): number[];
+  optimalFlow(): bigint;
+  flow(arc: number): bigint;
+  flows(arcs: ArrayLike<number>): bigint[];
   getSourceSideMinCut(): number[];
   getSinkSideMinCut(): number[];
 };
@@ -48,14 +48,14 @@ type SimpleMinCostFlowLike = {
   numArcs(): number;
   tail(arc: number): number;
   head(arc: number): number;
-  capacity(arc: number): number;
-  unitCost(arc: number): number;
-  supply(node: number): number;
+  capacity(arc: number): bigint;
+  unitCost(arc: number): bigint;
+  supply(node: number): bigint;
   solve(options?: SolveOptions): Promise<number>;
-  optimalCost(): number;
-  maximumFlow(): number;
-  flow(arc: number): number;
-  flows(arcs: ArrayLike<number>): number[];
+  optimalCost(): bigint;
+  maximumFlow(): bigint;
+  flow(arc: number): bigint;
+  flows(arcs: ArrayLike<number>): bigint[];
 };
 
 type SimpleLinearSumAssignmentLike = {
@@ -64,11 +64,11 @@ type SimpleLinearSumAssignmentLike = {
   numArcs(): number;
   leftNode(arc: number): number;
   rightNode(arc: number): number;
-  cost(arc: number): number;
+  cost(arc: number): bigint;
   solve(options?: SolveOptions): Promise<number>;
-  optimalCost(): number;
+  optimalCost(): bigint;
   rightMate(leftNode: number): number;
-  assignmentCost(leftNode: number): number;
+  assignmentCost(leftNode: number): bigint;
 };
 
 export type NetworkFlowApi = {
@@ -92,8 +92,11 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-function assertNumber(actual: number, expected: number, message: string) {
-  assert(actual === expected, `${message}: expected ${expected}, got ${actual}`);
+function assertNumber(actual: number | bigint, expected: number | bigint, message: string) {
+  const equal = typeof actual === typeof expected
+    ? actual === expected
+    : BigInt(actual) === BigInt(expected);
+  assert(equal, `${message}: expected ${expected}, got ${actual}`);
 }
 
 function lifecycleStates() {
@@ -140,14 +143,14 @@ async function runMaxFlowSample(api: NetworkFlowApi, mode: ExecutorFixtureMode):
   assertNumber(flows[0] + flows[1] + flows[2], 60, `SimpleMaxFlow (${mode}) source outflow`);
   assertNumber(flows[4] + flows[6] + flows[8], 60, `SimpleMaxFlow (${mode}) sink inflow`);
   for (const [arc, flow] of flows.entries()) {
-    assert(flow >= 0 && flow <= capacities[arc], `SimpleMaxFlow (${mode}) arc ${arc} flow within capacity`);
+    assert(flow >= 0n && flow <= BigInt(capacities[arc]), `SimpleMaxFlow (${mode}) arc ${arc} flow within capacity`);
     assertNumber(maxFlow.flow(arc), flow, `SimpleMaxFlow (${mode}) flow accessor ${arc}`);
   }
   const sourceSide = maxFlow.getSourceSideMinCut();
   const sinkSide = maxFlow.getSinkSideMinCut();
   assert(sourceSide.includes(0), `SimpleMaxFlow (${mode}) source-side min cut contains source`);
   assert(sinkSide.includes(4), `SimpleMaxFlow (${mode}) sink-side min cut contains sink`);
-  return { status, objectiveValue: maxFlow.optimalFlow() };
+  return { status, objectiveValue: Number(maxFlow.optimalFlow()) };
 }
 
 async function runMinCostFlowSample(api: NetworkFlowApi, mode: ExecutorFixtureMode): Promise<{ status: number; objectiveValue: number }> {
@@ -179,13 +182,13 @@ async function runMinCostFlowSample(api: NetworkFlowApi, mode: ExecutorFixtureMo
   assertNumber(minCostFlow.maximumFlow(), 20, `SimpleMinCostFlow (${mode}) maximumFlow`);
   const flows = minCostFlow.flows(allArcs);
   assertNumber(flows.length, allArcs.length, `SimpleMinCostFlow (${mode}) flows length`);
-  const cost = flows.reduce((sum, flow, arc) => sum + flow * unitCosts[arc], 0);
+  const cost = flows.reduce((sum, flow, arc) => sum + flow * BigInt(unitCosts[arc]), 0n);
   assertNumber(cost, 150, `SimpleMinCostFlow (${mode}) recomputed cost`);
   for (const [arc, flow] of flows.entries()) {
-    assert(flow >= 0 && flow <= capacities[arc], `SimpleMinCostFlow (${mode}) arc ${arc} flow within capacity`);
+    assert(flow >= 0n && flow <= BigInt(capacities[arc]), `SimpleMinCostFlow (${mode}) arc ${arc} flow within capacity`);
     assertNumber(minCostFlow.flow(arc), flow, `SimpleMinCostFlow (${mode}) flow accessor ${arc}`);
   }
-  return { status, objectiveValue: minCostFlow.optimalCost() };
+  return { status, objectiveValue: Number(minCostFlow.optimalCost()) };
 }
 
 async function runAssignmentSample(api: NetworkFlowApi, mode: ExecutorFixtureMode): Promise<{ status: number; objectiveValue: number }> {
@@ -228,7 +231,7 @@ async function runAssignmentSample(api: NetworkFlowApi, mode: ExecutorFixtureMod
     assertNumber(assignment.rightMate(worker), expectedMates[worker], `SimpleLinearSumAssignment (${mode}) rightMate(${worker})`);
     assertNumber(assignment.assignmentCost(worker), expectedCosts[worker], `SimpleLinearSumAssignment (${mode}) assignmentCost(${worker})`);
   }
-  return { status, objectiveValue: assignment.optimalCost() };
+  return { status, objectiveValue: Number(assignment.optimalCost()) };
 }
 
 type NetworkFlowCase = SharedCase<NetworkFlowApi, { status: number; objectiveValue: number }, ExecutorFixtureMode>;

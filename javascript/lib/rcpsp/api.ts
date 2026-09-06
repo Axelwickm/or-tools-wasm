@@ -3,7 +3,6 @@ import {
   CpSolver,
   CpSolverStatus,
   CpSolverSolutionCallback,
-  RuntimeError,
   type CpSolverStatus_Name,
   type BoolVar,
   type CpSatEvent,
@@ -67,8 +66,8 @@ export type RcpspResourceInput = {
 export type RcpspScheduleTask = {
   id: number;
   name: string;
-  start: number;
-  end: number;
+  start: bigint;
+  end: bigint;
   duration: number;
   selectedRecipe: number;
   demands: number[];
@@ -78,10 +77,10 @@ export type RcpspScheduleTask = {
 export type RcpspSolveResult = {
   status: CpSolverStatus | CpSolverStatus_Name;
   statusName: string;
-  makespan: number | null;
+  makespan: bigint | null;
   objectiveValue: number | null;
   tasks: RcpspScheduleTask[];
-  response: ReturnType<CpSolver['response']>;
+  response: CpSolver['response'];
   model: CpModel;
   starts: IntVar[];
   ends: IntVar[];
@@ -92,7 +91,7 @@ export type RcpspEvent =
   | Exclude<CpSatEvent, { type: 'solution' } | { type: 'bestBound' }>
   | {
     type: 'solution';
-    makespan: number;
+    makespan: bigint;
     objectiveValue: number;
     tasks: RcpspScheduleTask[];
   }
@@ -122,7 +121,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 function asInteger(value: unknown, label: string) {
-  assert(Number.isInteger(value), `${label} must be an integer`);
+  assert(Number.isSafeInteger(value), `${label} must be a safe integer`);
   return value as number;
 }
 
@@ -326,7 +325,7 @@ export class RcpspProblem {
 
   async solve(options: RcpspSolveOptions = {}): Promise<RcpspSolveResult> {
     if (this.solving) {
-      throw new RuntimeError('RcpspProblem.solve() is already in progress.');
+      throw new Error('RcpspProblem.solve() is already in progress.');
     }
     this.solving = true;
     try {
@@ -372,7 +371,7 @@ export class RcpspProblem {
         }
         : undefined,
     });
-    const response = solver.response();
+    const response = solver.response;
     const statusName = solver.statusName(status);
     const successful = statusName === 'OPTIMAL' || statusName === 'FEASIBLE';
     const tasks = successful ? extractSchedule(this.problem, solver, built) : [];
@@ -380,7 +379,7 @@ export class RcpspProblem {
       status: status ?? CpSolverStatus.UNKNOWN,
       statusName,
       makespan: successful ? solver.value(built.makespanVar) : null,
-      objectiveValue: successful ? solver.objectiveValue() : null,
+      objectiveValue: successful ? solver.objectiveValue : null,
       tasks,
       response,
       model: built.model,
@@ -396,7 +395,7 @@ class RcpspSolutionCallback extends CpSolverSolutionCallback {
     private readonly problem: RcpspProblemProto,
     private readonly built: BuiltModel,
     private readonly emit: (solution: {
-      makespan: number;
+      makespan: bigint;
       objectiveValue: number;
       tasks: RcpspScheduleTask[];
     }) => void,

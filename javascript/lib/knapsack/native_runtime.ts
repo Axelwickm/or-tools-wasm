@@ -3,22 +3,23 @@ import { readWasmResult, withWasmCString } from '../wasm_memory.js';
 
 export type NativeKnapsackResult = {
   ok: boolean;
-  profit?: number;
+  profit?: bigint;
   optimal?: boolean;
   name?: string;
   contains?: boolean[];
   error?: string;
 };
 
-function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]): number {
+function copyInt64ToHeap(module: OrToolsWasmModule, values: bigint[]): number {
   if (!values.length) return 0;
-  const ptr = module._malloc(values.length * Float64Array.BYTES_PER_ELEMENT);
-  new Float64Array(module.HEAPU8.buffer, ptr, values.length).set(values);
+  const array = BigInt64Array.from(values);
+  const ptr = module._malloc(array.byteLength);
+  module.HEAPU8.set(new Uint8Array(array.buffer), ptr);
   return ptr;
 }
 
-function flattenKnapsackWeights(weights: number[][], itemCount: number): number[] {
-  const flattened: number[] = [];
+function flattenKnapsackWeights(weights: bigint[][], itemCount: number): bigint[] {
+  const flattened: bigint[] = [];
   for (const dimension of weights) {
     if (dimension.length !== itemCount) {
       throw new Error('KnapsackSolver.init: each weight dimension must match profits length.');
@@ -34,14 +35,14 @@ export async function executeKnapsackWithModule(
   name: string,
   useReduction: boolean,
   timeLimitSeconds: number,
-  profits: number[],
-  weights: number[][],
-  capacities: number[],
+  profits: bigint[],
+  weights: bigint[][],
+  capacities: bigint[],
 ): Promise<NativeKnapsackResult> {
   const flattenedWeights = flattenKnapsackWeights(weights, profits.length);
-  const profitsPtr = copyFloat64ToHeap(module, profits);
-  const weightsPtr = copyFloat64ToHeap(module, flattenedWeights);
-  const capacitiesPtr = copyFloat64ToHeap(module, capacities);
+  const profitsPtr = copyInt64ToHeap(module, profits);
+  const weightsPtr = copyInt64ToHeap(module, flattenedWeights);
+  const capacitiesPtr = copyInt64ToHeap(module, capacities);
   try {
     const bytes = await withWasmCString(module, name, (namePtr) => readWasmResult(
       module,
@@ -65,7 +66,11 @@ export async function executeKnapsackWithModule(
       ) as Promise<number>,
       (pointer) => module.ccall('free_buffer', undefined, ['number'], [pointer]),
     ));
-    const result = JSON.parse(new TextDecoder().decode(bytes)) as NativeKnapsackResult;
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Omit<NativeKnapsackResult, 'profit'> & { profit?: string };
+    const result: NativeKnapsackResult = {
+      ...parsed,
+      profit: parsed.profit === undefined ? undefined : BigInt(parsed.profit),
+    };
     if (!result.ok) {
       throw new Error(result.error || 'KnapsackSolver.solve: native solve failed.');
     }

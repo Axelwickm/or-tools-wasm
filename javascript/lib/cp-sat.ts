@@ -26,36 +26,24 @@ export type {
   WorkerExecutorConfiguration,
 } from './executor_configuration.js';
 export {
-  ArithmeticError,
   BoolVar,
   BoundedLinearExpr,
-  BoundedLinearExpression,
   Constraint,
   CpModel,
   CpSolver,
   CpSolverSolutionCallback,
   Domain,
-  FlatFloatExpr,
-  FlatIntExpr,
   IntVar,
   IntervalVar,
   LinearExpr,
-  NotImplementedError,
   NotBoolVar,
-  RuntimeError,
-  ValueError,
-  objectIsAFalseLiteral,
-  objectIsATrueLiteral,
-  object_is_a_false_literal,
-  object_is_a_true_literal,
-  rebuildFromLinearExpressionProto,
-  rebuild_from_linear_expression_proto,
   sum,
   term,
   weightedSum,
 } from './cp_sat/high_level_api.js';
-export type { CpSolverSolveOptions } from './cp_sat/high_level_api.js';
+export type { CpSolverSolveOptions, IntValue, NumericValue } from './cp_sat/high_level_api.js';
 export type { LinearExprLike, LiteralLike } from './cp_sat/high_level_api.js';
+export { asNumber } from './int64.js';
 export {
   CpSolverStatus,
   DecisionStrategyProto_DomainReductionStrategy,

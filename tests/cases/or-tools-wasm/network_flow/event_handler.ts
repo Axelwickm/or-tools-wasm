@@ -5,7 +5,7 @@ type NetworkFlowEventHandlerApi = {
       executor: 'direct' | 'worker';
       onEvent?: (event: unknown) => void;
     }): Promise<number>;
-    optimalFlow(): number;
+    optimalFlow(): bigint;
   };
 };
 
@@ -35,7 +35,7 @@ async function assertCallbackRecovery(
     throw new Error(`${executor}: expected original callback error, got ${String(thrown)}`);
   }
   await flow.solve(0, 2, { executor });
-  if (flow.optimalFlow() !== 10) {
+  if (flow.optimalFlow() !== 10n) {
     throw new Error(`${executor}: expected recovery flow 10, got ${flow.optimalFlow()}`);
   }
 }

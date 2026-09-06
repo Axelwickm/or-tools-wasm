@@ -1,14 +1,7 @@
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { withWasmCString } from '../wasm_memory.js';
 import type { RoutingSolveRequest, RoutingSolveResult } from './protocol.js';
-
-function toNumber(value: unknown): number {
-  return typeof value === 'number' ? value : Number(value);
-}
-
-function toInt64(value: number): bigint {
-  return globalThis.BigInt(value);
-}
+import { toIndex, toInt64, type IntValue } from '../int64.js';
 
 function copyInt32Array(module: OrToolsWasmModule, values: number[]): number {
   const array = new Int32Array(values);
@@ -17,10 +10,10 @@ function copyInt32Array(module: OrToolsWasmModule, values: number[]): number {
   return ptr;
 }
 
-function copyInt64Array(module: OrToolsWasmModule, values: BigInt64Array | number[]): { ptr: number; length: number } {
+function copyInt64Array(module: OrToolsWasmModule, values: BigInt64Array | IntValue[]): { ptr: number; length: number } {
   const array = values instanceof BigInt64Array
     ? values
-    : new BigInt64Array(values.map((value) => BigInt(value)));
+    : BigInt64Array.from(values, (value) => toInt64(value));
   const ptr = module._malloc(array.byteLength);
   module.HEAPU8.set(new Uint8Array(array.buffer, array.byteOffset, array.byteLength), ptr);
   return { ptr, length: array.length };
@@ -111,7 +104,7 @@ export async function solveRoutingWithModule(
             module,
             'routing_add_dimension',
             ['number', 'number', 'bigint', 'bigint', 'number', 'number'],
-            [modelHandle, index, BigInt(operation.slackMax), BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
+            [modelHandle, index, operation.slackMax, operation.capacity, operation.fixStartCumulToZero ? 1 : 0, namePtr],
           );
         });
       } else if (operation.type === 'addDimensionWithVehicleCapacity') {
@@ -123,7 +116,7 @@ export async function solveRoutingWithModule(
               module,
               'routing_add_dimension_with_vehicle_capacity',
               ['number', 'number', 'bigint', 'number', 'number', 'number', 'number'],
-              [modelHandle, index, BigInt(operation.slackMax), capacities.ptr, capacities.length, operation.fixStartCumulToZero ? 1 : 0, namePtr],
+              [modelHandle, index, operation.slackMax, capacities.ptr, capacities.length, operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
@@ -141,7 +134,7 @@ export async function solveRoutingWithModule(
               module,
               'routing_add_dimension_with_vehicle_transits',
               ['number', 'number', 'number', 'bigint', 'bigint', 'number', 'number'],
-              [modelHandle, evaluatorsPtr, evaluatorIndices.length, BigInt(operation.slackMax), BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
+              [modelHandle, evaluatorsPtr, evaluatorIndices.length, operation.slackMax, operation.capacity, operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
@@ -153,7 +146,7 @@ export async function solveRoutingWithModule(
             module,
             'routing_add_constant_dimension',
             ['number', 'bigint', 'bigint', 'number', 'number'],
-            [modelHandle, BigInt(operation.value), BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
+            [modelHandle, operation.value, operation.capacity, operation.fixStartCumulToZero ? 1 : 0, namePtr],
           );
         });
       } else if (operation.type === 'addVectorDimension') {
@@ -164,7 +157,7 @@ export async function solveRoutingWithModule(
               module,
               'routing_add_vector_dimension',
               ['number', 'number', 'number', 'bigint', 'number', 'number'],
-              [modelHandle, values.ptr, values.length, BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
+              [modelHandle, values.ptr, values.length, operation.capacity, operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
@@ -179,7 +172,7 @@ export async function solveRoutingWithModule(
               module,
               'routing_add_matrix_dimension',
               ['number', 'number', 'number', 'number', 'bigint', 'number', 'number'],
-              [modelHandle, matrix.ptr, matrix.length, operation.matrix.length, BigInt(operation.capacity), operation.fixStartCumulToZero ? 1 : 0, namePtr],
+              [modelHandle, matrix.ptr, matrix.length, operation.matrix.length, operation.capacity, operation.fixStartCumulToZero ? 1 : 0, namePtr],
             );
           });
         } finally {
@@ -192,7 +185,7 @@ export async function solveRoutingWithModule(
             module,
             'routing_add_disjunction',
             ['number', 'number', 'number', 'bigint', 'number'],
-            [modelHandle, indices.ptr, indices.length, BigInt(operation.penalty ?? 0), operation.penalty === undefined ? 0 : 1],
+            [modelHandle, indices.ptr, indices.length, operation.penalty ?? 0n, operation.penalty === undefined ? 0 : 1],
           );
         } finally {
           module._free(indices.ptr);
@@ -281,13 +274,13 @@ export async function solveRoutingWithModule(
     const starts: number[] = [];
     const ends: number[] = [];
     const nextValues = Array.from({ length: message.transitMatrixDimension }, (_, index) => index);
-    const dimensionCumulValues: Record<string, number[]> = {};
+    const dimensionCumulValues: Record<string, bigint[]> = {};
 
     for (let vehicle = 0; vehicle < message.numVehicles; vehicle++) {
-      let index = toNumber(await ccallBigInt(module, 'routing_start', ['number', 'number'], [modelHandle, vehicle]));
+      let index = toIndex(await ccallBigInt(module, 'routing_start', ['number', 'number'], [modelHandle, vehicle]), 'route start index');
       starts.push(index);
       while (await ccallNumber(module, 'routing_is_end', ['number', 'bigint'], [modelHandle, toInt64(index)]) !== 1) {
-        const next = toNumber(await ccallBigInt(module, 'routing_next_value', ['number', 'bigint'], [modelHandle, toInt64(index)]));
+        const next = toIndex(await ccallBigInt(module, 'routing_next_value', ['number', 'bigint'], [modelHandle, toInt64(index)]), 'next index');
         nextValues[index] = next;
         index = next;
       }
@@ -298,21 +291,19 @@ export async function solveRoutingWithModule(
       dimensionCumulValues[dimensionName] = [];
       await withWasmCString(module, dimensionName, async (namePtr) => {
         for (let index = 0; index < message.transitMatrixDimension; index++) {
-          dimensionCumulValues[dimensionName][index] = toNumber(
-            await ccallBigInt(
+          dimensionCumulValues[dimensionName][index] = await ccallBigInt(
               module,
               'routing_assignment_dimension_cumul_value',
               ['number', 'number', 'bigint'],
               [modelHandle, namePtr, toInt64(index)],
-            ),
-          );
+            );
         }
       });
     }
 
     return {
       status: await ccallNumber(module, 'routing_status', ['number'], [modelHandle]),
-      objectiveValue: toNumber(await ccallBigInt(module, 'routing_assignment_objective_value', ['number'], [modelHandle])),
+      objectiveValue: await ccallBigInt(module, 'routing_assignment_objective_value', ['number'], [modelHandle]),
       nextValues,
       starts,
       ends,

@@ -1,4 +1,5 @@
 export * from './rcpsp/api.js';
+export { asNumber } from './int64.js';
 export { CloudExecutorUnavailableError } from './cloud_executor.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';
 export type { SolverJobEvent } from './solver_executor.js';

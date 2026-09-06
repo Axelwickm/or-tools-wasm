@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file network_flow.proto.
  */
 export const file_network_flow: GenFile = /*@__PURE__*/
-  fileDesc("ChJuZXR3b3JrX2Zsb3cucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi+wEKGE5ldHdvcmtGbG93QnJpZGdlUmVxdWVzdBI6CghtYXhfZmxvdxgBIAEoCzImLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF4Rmxvd1JlcXVlc3RIABJDCg1taW5fY29zdF9mbG93GAIgASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5NaW5Db3N0Rmxvd1JlcXVlc3RIABJTChVsaW5lYXJfc3VtX2Fzc2lnbm1lbnQYAyABKAsyMi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkxpbmVhclN1bUFzc2lnbm1lbnRSZXF1ZXN0SABCCQoHcGF5bG9hZCJgCg5NYXhGbG93UmVxdWVzdBINCgV0YWlscxgBIAMoARINCgVoZWFkcxgCIAMoARISCgpjYXBhY2l0aWVzGAMgAygBEg4KBnNvdXJjZRgEIAEoARIMCgRzaW5rGAUgASgBIpIBChJNaW5Db3N0Rmxvd1JlcXVlc3QSDQoFdGFpbHMYASADKAESDQoFaGVhZHMYAiADKAESEgoKY2FwYWNpdGllcxgDIAMoARISCgp1bml0X2Nvc3RzGAQgAygBEhAKCHN1cHBsaWVzGAUgAygBEiQKHHNvbHZlX21heF9mbG93X3dpdGhfbWluX2Nvc3QYBiABKAgiVAoaTGluZWFyU3VtQXNzaWdubWVudFJlcXVlc3QSEgoKbGVmdF9ub2RlcxgBIAMoARITCgtyaWdodF9ub2RlcxgCIAMoARINCgVjb3N0cxgDIAMoASKIAgoZTmV0d29ya0Zsb3dCcmlkZ2VSZXNwb25zZRIOCgZzdGF0dXMYASABKAUSFAoMb3B0aW1hbF9mbG93GAIgASgBEhQKDG9wdGltYWxfY29zdBgDIAEoARIUCgxtYXhpbXVtX2Zsb3cYBCABKAESEQoJbnVtX25vZGVzGAUgASgFEhAKCG51bV9hcmNzGAYgASgFEg0KBWZsb3dzGAcgAygBEhsKE3NvdXJjZV9zaWRlX21pbl9jdXQYCCADKAESGQoRc2lua19zaWRlX21pbl9jdXQYCSADKAESEwoLcmlnaHRfbWF0ZXMYCiADKAESGAoQYXNzaWdubWVudF9jb3N0cxgLIAMoAWIGcHJvdG8z");
+  fileDesc("ChJuZXR3b3JrX2Zsb3cucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi+wEKGE5ldHdvcmtGbG93QnJpZGdlUmVxdWVzdBI6CghtYXhfZmxvdxgBIAEoCzImLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF4Rmxvd1JlcXVlc3RIABJDCg1taW5fY29zdF9mbG93GAIgASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5NaW5Db3N0Rmxvd1JlcXVlc3RIABJTChVsaW5lYXJfc3VtX2Fzc2lnbm1lbnQYAyABKAsyMi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkxpbmVhclN1bUFzc2lnbm1lbnRSZXF1ZXN0SABCCQoHcGF5bG9hZCJgCg5NYXhGbG93UmVxdWVzdBINCgV0YWlscxgBIAMoBRINCgVoZWFkcxgCIAMoBRISCgpjYXBhY2l0aWVzGAMgAygDEg4KBnNvdXJjZRgEIAEoBRIMCgRzaW5rGAUgASgFIpIBChJNaW5Db3N0Rmxvd1JlcXVlc3QSDQoFdGFpbHMYASADKAUSDQoFaGVhZHMYAiADKAUSEgoKY2FwYWNpdGllcxgDIAMoAxISCgp1bml0X2Nvc3RzGAQgAygDEhAKCHN1cHBsaWVzGAUgAygDEiQKHHNvbHZlX21heF9mbG93X3dpdGhfbWluX2Nvc3QYBiABKAgiVAoaTGluZWFyU3VtQXNzaWdubWVudFJlcXVlc3QSEgoKbGVmdF9ub2RlcxgBIAMoBRITCgtyaWdodF9ub2RlcxgCIAMoBRINCgVjb3N0cxgDIAMoAyKIAgoZTmV0d29ya0Zsb3dCcmlkZ2VSZXNwb25zZRIOCgZzdGF0dXMYASABKAUSFAoMb3B0aW1hbF9mbG93GAIgASgDEhQKDG9wdGltYWxfY29zdBgDIAEoAxIUCgxtYXhpbXVtX2Zsb3cYBCABKAMSEQoJbnVtX25vZGVzGAUgASgFEhAKCG51bV9hcmNzGAYgASgFEg0KBWZsb3dzGAcgAygDEhsKE3NvdXJjZV9zaWRlX21pbl9jdXQYCCADKAUSGQoRc2lua19zaWRlX21pbl9jdXQYCSADKAUSEwoLcmlnaHRfbWF0ZXMYCiADKAUSGAoQYXNzaWdubWVudF9jb3N0cxgLIAMoA2IGcHJvdG8z");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.NetworkFlowBridgeRequest
@@ -74,27 +74,27 @@ export const NetworkFlowBridgeRequestSchema: GenMessage<NetworkFlowBridgeRequest
  */
 export type MaxFlowRequest = Message<"ortools_wasm.bridge.v1.MaxFlowRequest"> & {
   /**
-   * @generated from field: repeated double tails = 1;
+   * @generated from field: repeated int32 tails = 1;
    */
   tails: number[];
 
   /**
-   * @generated from field: repeated double heads = 2;
+   * @generated from field: repeated int32 heads = 2;
    */
   heads: number[];
 
   /**
-   * @generated from field: repeated double capacities = 3;
+   * @generated from field: repeated int64 capacities = 3;
    */
-  capacities: number[];
+  capacities: bigint[];
 
   /**
-   * @generated from field: double source = 4;
+   * @generated from field: int32 source = 4;
    */
   source: number;
 
   /**
-   * @generated from field: double sink = 5;
+   * @generated from field: int32 sink = 5;
    */
   sink: number;
 };
@@ -104,29 +104,29 @@ export type MaxFlowRequest = Message<"ortools_wasm.bridge.v1.MaxFlowRequest"> & 
  */
 export type MaxFlowRequestJson = {
   /**
-   * @generated from field: repeated double tails = 1;
+   * @generated from field: repeated int32 tails = 1;
    */
-  tails?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  tails?: number[];
 
   /**
-   * @generated from field: repeated double heads = 2;
+   * @generated from field: repeated int32 heads = 2;
    */
-  heads?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  heads?: number[];
 
   /**
-   * @generated from field: repeated double capacities = 3;
+   * @generated from field: repeated int64 capacities = 3;
    */
-  capacities?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  capacities?: string[];
 
   /**
-   * @generated from field: double source = 4;
+   * @generated from field: int32 source = 4;
    */
-  source?: number | "NaN" | "Infinity" | "-Infinity";
+  source?: number;
 
   /**
-   * @generated from field: double sink = 5;
+   * @generated from field: int32 sink = 5;
    */
-  sink?: number | "NaN" | "Infinity" | "-Infinity";
+  sink?: number;
 };
 
 export type MaxFlowRequestValid = MaxFlowRequest;
@@ -143,29 +143,29 @@ export const MaxFlowRequestSchema: GenMessage<MaxFlowRequest, {jsonType: MaxFlow
  */
 export type MinCostFlowRequest = Message<"ortools_wasm.bridge.v1.MinCostFlowRequest"> & {
   /**
-   * @generated from field: repeated double tails = 1;
+   * @generated from field: repeated int32 tails = 1;
    */
   tails: number[];
 
   /**
-   * @generated from field: repeated double heads = 2;
+   * @generated from field: repeated int32 heads = 2;
    */
   heads: number[];
 
   /**
-   * @generated from field: repeated double capacities = 3;
+   * @generated from field: repeated int64 capacities = 3;
    */
-  capacities: number[];
+  capacities: bigint[];
 
   /**
-   * @generated from field: repeated double unit_costs = 4;
+   * @generated from field: repeated int64 unit_costs = 4;
    */
-  unitCosts: number[];
+  unitCosts: bigint[];
 
   /**
-   * @generated from field: repeated double supplies = 5;
+   * @generated from field: repeated int64 supplies = 5;
    */
-  supplies: number[];
+  supplies: bigint[];
 
   /**
    * @generated from field: bool solve_max_flow_with_min_cost = 6;
@@ -178,29 +178,29 @@ export type MinCostFlowRequest = Message<"ortools_wasm.bridge.v1.MinCostFlowRequ
  */
 export type MinCostFlowRequestJson = {
   /**
-   * @generated from field: repeated double tails = 1;
+   * @generated from field: repeated int32 tails = 1;
    */
-  tails?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  tails?: number[];
 
   /**
-   * @generated from field: repeated double heads = 2;
+   * @generated from field: repeated int32 heads = 2;
    */
-  heads?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  heads?: number[];
 
   /**
-   * @generated from field: repeated double capacities = 3;
+   * @generated from field: repeated int64 capacities = 3;
    */
-  capacities?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  capacities?: string[];
 
   /**
-   * @generated from field: repeated double unit_costs = 4;
+   * @generated from field: repeated int64 unit_costs = 4;
    */
-  unitCosts?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  unitCosts?: string[];
 
   /**
-   * @generated from field: repeated double supplies = 5;
+   * @generated from field: repeated int64 supplies = 5;
    */
-  supplies?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  supplies?: string[];
 
   /**
    * @generated from field: bool solve_max_flow_with_min_cost = 6;
@@ -222,19 +222,19 @@ export const MinCostFlowRequestSchema: GenMessage<MinCostFlowRequest, {jsonType:
  */
 export type LinearSumAssignmentRequest = Message<"ortools_wasm.bridge.v1.LinearSumAssignmentRequest"> & {
   /**
-   * @generated from field: repeated double left_nodes = 1;
+   * @generated from field: repeated int32 left_nodes = 1;
    */
   leftNodes: number[];
 
   /**
-   * @generated from field: repeated double right_nodes = 2;
+   * @generated from field: repeated int32 right_nodes = 2;
    */
   rightNodes: number[];
 
   /**
-   * @generated from field: repeated double costs = 3;
+   * @generated from field: repeated int64 costs = 3;
    */
-  costs: number[];
+  costs: bigint[];
 };
 
 /**
@@ -242,19 +242,19 @@ export type LinearSumAssignmentRequest = Message<"ortools_wasm.bridge.v1.LinearS
  */
 export type LinearSumAssignmentRequestJson = {
   /**
-   * @generated from field: repeated double left_nodes = 1;
+   * @generated from field: repeated int32 left_nodes = 1;
    */
-  leftNodes?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  leftNodes?: number[];
 
   /**
-   * @generated from field: repeated double right_nodes = 2;
+   * @generated from field: repeated int32 right_nodes = 2;
    */
-  rightNodes?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  rightNodes?: number[];
 
   /**
-   * @generated from field: repeated double costs = 3;
+   * @generated from field: repeated int64 costs = 3;
    */
-  costs?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  costs?: string[];
 };
 
 export type LinearSumAssignmentRequestValid = LinearSumAssignmentRequest;
@@ -276,19 +276,19 @@ export type NetworkFlowBridgeResponse = Message<"ortools_wasm.bridge.v1.NetworkF
   status: number;
 
   /**
-   * @generated from field: double optimal_flow = 2;
+   * @generated from field: int64 optimal_flow = 2;
    */
-  optimalFlow: number;
+  optimalFlow: bigint;
 
   /**
-   * @generated from field: double optimal_cost = 3;
+   * @generated from field: int64 optimal_cost = 3;
    */
-  optimalCost: number;
+  optimalCost: bigint;
 
   /**
-   * @generated from field: double maximum_flow = 4;
+   * @generated from field: int64 maximum_flow = 4;
    */
-  maximumFlow: number;
+  maximumFlow: bigint;
 
   /**
    * @generated from field: int32 num_nodes = 5;
@@ -301,29 +301,29 @@ export type NetworkFlowBridgeResponse = Message<"ortools_wasm.bridge.v1.NetworkF
   numArcs: number;
 
   /**
-   * @generated from field: repeated double flows = 7;
+   * @generated from field: repeated int64 flows = 7;
    */
-  flows: number[];
+  flows: bigint[];
 
   /**
-   * @generated from field: repeated double source_side_min_cut = 8;
+   * @generated from field: repeated int32 source_side_min_cut = 8;
    */
   sourceSideMinCut: number[];
 
   /**
-   * @generated from field: repeated double sink_side_min_cut = 9;
+   * @generated from field: repeated int32 sink_side_min_cut = 9;
    */
   sinkSideMinCut: number[];
 
   /**
-   * @generated from field: repeated double right_mates = 10;
+   * @generated from field: repeated int32 right_mates = 10;
    */
   rightMates: number[];
 
   /**
-   * @generated from field: repeated double assignment_costs = 11;
+   * @generated from field: repeated int64 assignment_costs = 11;
    */
-  assignmentCosts: number[];
+  assignmentCosts: bigint[];
 };
 
 /**
@@ -336,19 +336,19 @@ export type NetworkFlowBridgeResponseJson = {
   status?: number;
 
   /**
-   * @generated from field: double optimal_flow = 2;
+   * @generated from field: int64 optimal_flow = 2;
    */
-  optimalFlow?: number | "NaN" | "Infinity" | "-Infinity";
+  optimalFlow?: string;
 
   /**
-   * @generated from field: double optimal_cost = 3;
+   * @generated from field: int64 optimal_cost = 3;
    */
-  optimalCost?: number | "NaN" | "Infinity" | "-Infinity";
+  optimalCost?: string;
 
   /**
-   * @generated from field: double maximum_flow = 4;
+   * @generated from field: int64 maximum_flow = 4;
    */
-  maximumFlow?: number | "NaN" | "Infinity" | "-Infinity";
+  maximumFlow?: string;
 
   /**
    * @generated from field: int32 num_nodes = 5;
@@ -361,29 +361,29 @@ export type NetworkFlowBridgeResponseJson = {
   numArcs?: number;
 
   /**
-   * @generated from field: repeated double flows = 7;
+   * @generated from field: repeated int64 flows = 7;
    */
-  flows?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  flows?: string[];
 
   /**
-   * @generated from field: repeated double source_side_min_cut = 8;
+   * @generated from field: repeated int32 source_side_min_cut = 8;
    */
-  sourceSideMinCut?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  sourceSideMinCut?: number[];
 
   /**
-   * @generated from field: repeated double sink_side_min_cut = 9;
+   * @generated from field: repeated int32 sink_side_min_cut = 9;
    */
-  sinkSideMinCut?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  sinkSideMinCut?: number[];
 
   /**
-   * @generated from field: repeated double right_mates = 10;
+   * @generated from field: repeated int32 right_mates = 10;
    */
-  rightMates?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  rightMates?: number[];
 
   /**
-   * @generated from field: repeated double assignment_costs = 11;
+   * @generated from field: repeated int64 assignment_costs = 11;
    */
-  assignmentCosts?: (number | "NaN" | "Infinity" | "-Infinity")[];
+  assignmentCosts?: string[];
 };
 
 export type NetworkFlowBridgeResponseValid = NetworkFlowBridgeResponse;

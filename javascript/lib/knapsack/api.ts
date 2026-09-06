@@ -6,6 +6,7 @@ import { SolverServerExecutor } from '../solver_server_executor.js';
 import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
 import { DirectKnapsackExecutor } from './direct_executor.js';
 import { knapsackProtocol, type KnapsackExecutor } from './protocol.js';
+import { toInt64, type IntValue } from '../int64.js';
 
 export enum KnapsackSolverType {
   KNAPSACK_BRUTE_FORCE_SOLVER = 0,
@@ -68,7 +69,7 @@ function abortError(signal: AbortSignal) {
   return error;
 }
 
-function validateInput(profits: number[], weights: number[][], capacities: number[]) {
+function normalizeInput(profits: IntValue[], weights: IntValue[][], capacities: IntValue[]) {
   if (profits.length === 0 || weights.length === 0) {
     throw new Error('KnapsackSolver.init: profits and weights must not be empty.');
   }
@@ -78,21 +79,19 @@ function validateInput(profits: number[], weights: number[][], capacities: numbe
   if (weights.some((dimension) => dimension.length !== profits.length)) {
     throw new Error('KnapsackSolver.init: each weight dimension must match profits length.');
   }
-  for (const [label, values] of [
-    ['profits', profits],
-    ['capacities', capacities],
-    ...weights.map((values, index) => [`weights[${index}]`, values] as const),
-  ] as const) {
-    if (values.some((value) => !Number.isSafeInteger(value))) {
-      throw new Error(`KnapsackSolver.init: ${label} must contain safe integers.`);
-    }
-  }
+  const normalize = (values: IntValue[], label: string) =>
+    values.map((value, index) => toInt64(value, `KnapsackSolver.init: ${label}[${index}]`));
+  return {
+    profits: normalize(profits, 'profits'),
+    capacities: normalize(capacities, 'capacities'),
+    weights: weights.map((values, index) => normalize(values, `weights[${index}]`)),
+  };
 }
 
 export class KnapsackSolver {
-  private profits: number[] = [];
-  private weights: number[][] = [];
-  private capacities: number[] = [];
+  private profits: bigint[] = [];
+  private weights: bigint[][] = [];
+  private capacities: bigint[] = [];
   private useReduction = true;
   private timeLimitSeconds = 0;
   private solutionContains: boolean[] = [];
@@ -108,16 +107,16 @@ export class KnapsackSolver {
     }
   }
 
-  init(profits: number[], weights: number[][], capacities: number[]): void {
-    validateInput(profits, weights, capacities);
-    this.profits = [...profits];
-    this.weights = weights.map((dimension) => [...dimension]);
-    this.capacities = [...capacities];
+  init(profits: IntValue[], weights: IntValue[][], capacities: IntValue[]): void {
+    const normalized = normalizeInput(profits, weights, capacities);
+    this.profits = normalized.profits;
+    this.weights = normalized.weights;
+    this.capacities = normalized.capacities;
     this.solutionContains = [];
     this.solutionOptimal = false;
   }
 
-  async solve(options: KnapsackSolveOptions = {}): Promise<number> {
+  async solve(options: KnapsackSolveOptions = {}): Promise<bigint> {
     if (this.solving) {
       throw new RuntimeError('KnapsackSolver.solve() is already in progress.');
     }
@@ -129,7 +128,7 @@ export class KnapsackSolver {
     }
   }
 
-  private async solveOnce(options: KnapsackSolveOptions): Promise<number> {
+  private async solveOnce(options: KnapsackSolveOptions): Promise<bigint> {
     if (options.signal?.aborted) throw abortError(options.signal);
     const executor = createKnapsackExecutor(options.executor);
     const operation = {

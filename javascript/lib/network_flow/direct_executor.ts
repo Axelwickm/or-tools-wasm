@@ -18,13 +18,34 @@ import type {
 
 type NativeResult =
   | { ok: false; error: string }
-  | ({ ok: true } & Pick<NetworkFlowResult, 'status' | 'numNodes' | 'numArcs'>
-    & Partial<Omit<NetworkFlowResult, 'status' | 'numNodes' | 'numArcs'>>);
+  | {
+    ok: true;
+    status: number;
+    numNodes: number;
+    numArcs: number;
+    optimalFlow?: string;
+    optimalCost?: string;
+    maximumFlow?: string;
+    flows?: string[];
+    sourceSideMinCut?: number[];
+    sinkSideMinCut?: number[];
+    rightMates?: number[];
+    assignmentCosts?: string[];
+  };
 
-function copyFloat64ToHeap(module: OrToolsWasmModule, values: number[]) {
+function copyInt32ToHeap(module: OrToolsWasmModule, values: number[]) {
   if (!values.length) return 0;
-  const ptr = module._malloc(values.length * Float64Array.BYTES_PER_ELEMENT);
-  new Float64Array(module.HEAPU8.buffer, ptr, values.length).set(values);
+  const array = new Int32Array(values);
+  const ptr = module._malloc(array.byteLength);
+  module.HEAPU8.set(new Uint8Array(array.buffer), ptr);
+  return ptr;
+}
+
+function copyInt64ToHeap(module: OrToolsWasmModule, values: bigint[]) {
+  if (!values.length) return 0;
+  const array = BigInt64Array.from(values);
+  const ptr = module._malloc(array.byteLength);
+  module.HEAPU8.set(new Uint8Array(array.buffer), ptr);
   return ptr;
 }
 
@@ -33,16 +54,16 @@ function parseResult(value: string): NetworkFlowResult {
   if (!result.ok) throw new Error(result.error);
   return {
     status: result.status,
-    optimalFlow: result.optimalFlow ?? 0,
-    optimalCost: result.optimalCost ?? 0,
-    maximumFlow: result.maximumFlow ?? 0,
+    optimalFlow: BigInt(result.optimalFlow ?? '0'),
+    optimalCost: BigInt(result.optimalCost ?? '0'),
+    maximumFlow: BigInt(result.maximumFlow ?? '0'),
     numNodes: result.numNodes,
     numArcs: result.numArcs,
-    flows: result.flows ?? [],
+    flows: (result.flows ?? []).map(BigInt),
     sourceSideMinCut: result.sourceSideMinCut ?? [],
     sinkSideMinCut: result.sinkSideMinCut ?? [],
     rightMates: result.rightMates ?? [],
-    assignmentCosts: result.assignmentCosts ?? [],
+    assignmentCosts: (result.assignmentCosts ?? []).map(BigInt),
   };
 }
 
@@ -119,9 +140,9 @@ export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
     operation: NetworkFlowOperation,
   ): Promise<NetworkFlowResult> {
     if (operation.type === 'maxFlow') {
-      const tails = copyFloat64ToHeap(module, operation.tails);
-      const heads = copyFloat64ToHeap(module, operation.heads);
-      const capacities = copyFloat64ToHeap(module, operation.capacities);
+      const tails = copyInt32ToHeap(module, operation.tails);
+      const heads = copyInt32ToHeap(module, operation.heads);
+      const capacities = copyInt64ToHeap(module, operation.capacities);
       try {
         return parseResult(await module.ccall(
           'graph_max_flow_solve_serialized', 'string',
@@ -134,11 +155,11 @@ export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
       }
     }
     if (operation.type === 'minCostFlow') {
-      const tails = copyFloat64ToHeap(module, operation.tails);
-      const heads = copyFloat64ToHeap(module, operation.heads);
-      const capacities = copyFloat64ToHeap(module, operation.capacities);
-      const costs = copyFloat64ToHeap(module, operation.unitCosts);
-      const supplies = copyFloat64ToHeap(module, operation.supplies);
+      const tails = copyInt32ToHeap(module, operation.tails);
+      const heads = copyInt32ToHeap(module, operation.heads);
+      const capacities = copyInt64ToHeap(module, operation.capacities);
+      const costs = copyInt64ToHeap(module, operation.unitCosts);
+      const supplies = copyInt64ToHeap(module, operation.supplies);
       try {
         return parseResult(await module.ccall(
           'graph_min_cost_flow_solve_serialized', 'string',
@@ -151,9 +172,9 @@ export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
         for (const ptr of [tails, heads, capacities, costs, supplies]) if (ptr) module._free(ptr);
       }
     }
-    const left = copyFloat64ToHeap(module, operation.leftNodes);
-    const right = copyFloat64ToHeap(module, operation.rightNodes);
-    const costs = copyFloat64ToHeap(module, operation.costs);
+    const left = copyInt32ToHeap(module, operation.leftNodes);
+    const right = copyInt32ToHeap(module, operation.rightNodes);
+    const costs = copyInt64ToHeap(module, operation.costs);
     try {
       return parseResult(await module.ccall(
         'graph_linear_sum_assignment_solve_serialized', 'string',

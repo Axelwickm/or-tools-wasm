@@ -12,6 +12,7 @@ import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolv
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
+import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -36,6 +37,9 @@ await runBunFixture(async () => {
 
   const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
   assertAllCases('bun high-level CP-SAT', highLevelCpSatResults);
+
+  const highLevelContractResults = await runCpSatHighLevelContractCases(CpSatApi as never);
+  assertAllCases('bun high-level CP-SAT contract', highLevelContractResults);
 
   const results = await runCpSatCases(CpSat as never);
 

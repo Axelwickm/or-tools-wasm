@@ -12,7 +12,7 @@ type RoutingDimensionLike = {
 };
 
 type RoutingAssignmentLike = {
-  objectiveValue(): number;
+  objectiveValue(): bigint;
   value(index: unknown): number;
   min?(index: unknown): number;
 };
@@ -28,7 +28,7 @@ type RoutingModelLike = {
   start(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
   status(): number;
   addDimension?: (
     transitCallbackIndex: number,
@@ -99,8 +99,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 function assertNumber(value: unknown, expected: number, message: string) {
-  assert(typeof value === 'number', `${message}: expected number, got ${String(value)}`);
-  assert(value === expected, `${message}: expected ${expected}, got ${value}`);
+  assert(value === expected || value === BigInt(expected), `${message}: expected ${expected}, got ${String(value)}`);
 }
 
 function distance(manager: { indexToNode(index: number): number }, fromIndex: number, toIndex: number) {
@@ -144,7 +143,7 @@ function inspectTspRoute(
 ) {
   const route: number[] = [];
   let index = routing.start(0);
-  let routeDistance = 0;
+  let routeDistance = 0n;
   while (!routing.isEnd(index)) {
     const next = assignment.value(routing.nextVar(index));
     route.push(manager.indexToNode(next));

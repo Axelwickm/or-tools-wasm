@@ -32,7 +32,7 @@ type RoutingSearchParameters = {
 };
 
 type RoutingAssignmentLike = {
-  objectiveValue(): number;
+  objectiveValue(): bigint;
   value(index: number): number;
 };
 
@@ -60,12 +60,12 @@ type RoutingSolverLike = {
 };
 
 type RoutingCostVarLike = {
-  max(): number;
+  max(): bigint;
 };
 
 type BoundCostLike = {
-  bound: number;
-  cost: number;
+  bound: bigint;
+  cost: bigint;
 };
 
 type RoutingModelLike = {
@@ -128,7 +128,7 @@ type RoutingModelLike = {
   vehicles(): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): number;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
   vehicleVar?(index: number): unknown;
   cumulVar?(index: number): unknown;
   solver?(): RoutingSolverLike;
@@ -143,7 +143,7 @@ type RoutingCase = {
 
 type AtSolutionCallback = {
   __call__(): void;
-  costs?: number[];
+  costs?: bigint[];
 };
 
 const PYTHON_SOURCE = 'ortools/constraint_solver/python/pywraprouting_test.py';
@@ -155,8 +155,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 function assertNumber(value: unknown, expected: number, message: string) {
-  assert(typeof value === 'number', `${message}: expected a numeric value`);
-  assert(value === expected, `${message}: expected ${expected}, got ${value}`);
+  assert(value === expected || value === BigInt(expected), `${message}: expected ${expected}, got ${String(value)}`);
 }
 
 function unsupported(message: string) {
@@ -385,7 +384,7 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
 
       const costs = callback.costs;
       assertNumber(assignment.objectiveValue(), 90, 'TestPyWrapRoutingModel.testCallback objectiveValue');
-      if (costs.length !== 1 || costs[0] !== 90) {
+      if (costs.length !== 1 || costs[0] !== 90n) {
         return unsupported(
           'TestPyWrapRoutingModel.testCallback needs solution callback ordering/execution in TS bindings',
         );
@@ -570,21 +569,21 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
 
       const defaultBoundCost = new BoundCost();
       assert(
-        defaultBoundCost.bound === 0,
+        defaultBoundCost.bound === 0n,
         `TestBoundCost.testCtor expected default bound 0, got ${defaultBoundCost.bound}`,
       );
       assert(
-        defaultBoundCost.cost === 0,
+        defaultBoundCost.cost === 0n,
         `TestBoundCost.testCtor expected default cost 0, got ${defaultBoundCost.cost}`,
       );
 
       const configuredBoundCost = new BoundCost(97, 43);
       assert(
-        configuredBoundCost.bound === 97,
+        configuredBoundCost.bound === 97n,
         `TestBoundCost.testCtor expected bound 97, got ${configuredBoundCost.bound}`,
       );
       assert(
-        configuredBoundCost.cost === 43,
+        configuredBoundCost.cost === 43n,
         `TestBoundCost.testCtor expected cost 43, got ${configuredBoundCost.cost}`,
       );
       return 'TestBoundCost.testCtor PASS';

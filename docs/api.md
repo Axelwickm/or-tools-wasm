@@ -18,6 +18,7 @@ Import:
 
 ```ts
 import {
+  asNumber,
   CpModel,
   CpSolver,
   CpSolverSolutionCallback,
@@ -55,7 +56,7 @@ solver.parameters.numWorkers = 4;
 const status = await solver.solve(model);
 
 console.log(solver.statusName(status));
-console.log(solver.value(x), solver.value(y), solver.objectiveValue());
+console.log(solver.value(x), solver.value(y), solver.objectiveValue);
 ```
 
 The high-level CP-SAT API uses explicit expression methods because JavaScript
@@ -65,9 +66,40 @@ does not support Python-style operator overloading. For example:
 - `x.le(10)`, `x.lt(10)`, `x.ge(0)`, `x.gt(0)`, `x.ne(y)`
 - `x.not()` or `x.negated()` for Boolean negation
 
-Most high-level methods are exported in idiomatic camelCase, with snake_case
-aliases for Python parity where useful. Some PascalCase aliases are also present
-for compatibility with existing OR-Tools examples.
+The high-level TypeScript API is camelCase-only. Python snake_case and deprecated
+pre-PEP8 PascalCase spellings are intentionally not exposed; Python parity tests
+exercise equivalent behavior through the canonical TypeScript names.
+
+Integer values use the exported `IntValue = number | bigint` type. A `number`
+must be a safe integer; use `bigint` outside JavaScript's safe-integer range.
+Bigints may span the full signed int64 range and are encoded exactly at the
+WebAssembly protobuf boundary. Unsafe integer numbers and out-of-int64 bigints
+throw `RangeError` instead of being rounded. Integer expressions return `bigint`
+from `solver.value()` and callback `value()`; objective values and bounds remain
+floating-point `number` values.
+
+```ts
+const exact = 9_007_199_254_740_993n;
+const x = model.newIntVar(exact, exact, 'exact');
+await solver.solve(model);
+console.log(solver.value(x) === exact); // true
+```
+
+Use the exported `asNumber()` helper when ordinary number arithmetic or an API
+that only accepts `number` is more convenient. It throws rather than rounding
+an unsafe value:
+
+```ts
+const value = asNumber(solver.value(x));
+```
+
+For JSON, either convert selected values with `asNumber()` or serialize large
+values as decimal strings with a bigint-aware replacer.
+
+Linear constraints require exact integer coefficients and bounds. Floating-point
+coefficients are supported for objectives. The lower-level generated proto types
+also accept protobuf int64 representations for direct serialization; those raw
+representations are not high-level `IntValue` inputs.
 
 ### `CpModel`
 
@@ -78,82 +110,48 @@ Creates a high-level model. Passing an existing proto clones it into a wrapper.
 Common variable methods:
 
 - `newIntVar(lb, ub, name?)`
-- `new_int_var(lb, ub, name?)`
-- `NewIntVar(lb, ub, name?)`
 - `newIntVarFromDomain(domain, name?)`
-- `new_int_var_from_domain(domain, name?)`
-- `NewIntVarFromDomain(domain, name?)`
 - `newBoolVar(name?)`
-- `new_bool_var(name?)`
-- `NewBoolVar(name?)`
 - `newConstant(value, name?)`
-- `new_constant(value, name?)`
-- `NewConstant(value, name?)`
 - `getIntVarFromProtoIndex(index)`
-- `get_int_var_from_proto_index(index)`
 - `getBoolVarFromProtoIndex(index)`
-- `get_bool_var_from_proto_index(index)`
 - `getIntervalVarFromProtoIndex(index)`
-- `get_interval_var_from_proto_index(index)`
 
 Model/proto helpers:
 
 - `name`: model name getter/setter.
-- `proto()` / `Proto()`: returns the mutable `CpModelProto`.
+- `modelProto`: returns a detached `CpModelProto` snapshot. Construct a new
+  `CpModel(snapshot)` after editing it; mutating the snapshot cannot invalidate
+  the original model's variable and constant caches.
 - `clone()`: returns a new `CpModel` wrapper around a cloned proto.
 - `removeAllNames()`
-- `remove_all_names()`
 - `validate(): Promise<string>`: returns `''` for a valid model, otherwise the
   native validation message.
 - `modelStats(): string`
 - `hasObjective(): boolean`
-- `getOrMakeIndexFromConstant(value)`
-- `get_or_make_index_from_constant(value)`
-- `getOrMakeVariableIndex(variable)`
-- `get_or_make_variable_index(variable)`
-- `isBooleanValue(value)` / `is_boolean_value(value)`
-- `isBooleanIndex(index)`
-- `literalReferences(literals)`
 
 Linear constraints and objectives:
 
 - `add(bound: BoundedLinearExpr | boolean)`
-- `Add(bound)`
 - `addLinearConstraint(expression, lb, ub)`
-- `add_linear_constraint(expression, lb, ub)`
-- `AddLinearConstraint(expression, lb, ub)`
 - `addEquality(left, right)`
 - `minimize(expression)`
-- `Minimize(expression)`
 - `maximize(expression)`
-- `Maximize(expression)`
 
 Logical constraints:
 
 - `addBoolOr(literals)`
-- `add_bool_or(literals)`
-- `AddBoolOr(literals)`
 - `addBoolAnd(literals)`
-- `add_bool_and(literals)`
-- `AddBoolAnd(literals)`
 - `addBoolXor(literals)`
-- `add_bool_xor(literals)`
-- `AddBoolXOr(literals)`
 - `addAtLeastOne(literals)`
-- `add_at_least_one(literals)`
 - `addAtMostOne(literals)`
-- `add_at_most_one(literals)`
 - `addExactlyOne(literals)`
-- `add_exactly_one(literals)`
 - `addImplication(left, right)`
-- `add_implication(left, right)`
 - `addMapDomain(variable, booleanVariables, offset?)`
-- `add_map_domain(variable, booleanVariables, offset?)`
 
 Integer and table constraints:
 
 - `addAllDifferent(expressions)`
-- `AddAllDifferent(expressions)`
 - `addElement(index, expressions, target)`
 - `addAllowedAssignments(expressions, tuples)`
 - `addForbiddenAssignments(expressions, tuples)`
@@ -162,36 +160,21 @@ Integer and table constraints:
 - `addMultipleCircuit(arcs)`
 - `addInverse(direct, inverse)`
 - `addMaxEquality(target, expressions)`
-- `add_max_equality(target, expressions)`
 - `addMinEquality(target, expressions)`
-- `add_min_equality(target, expressions)`
 - `addAbsEquality(target, expression)`
-- `add_abs_equality(target, expression)`
 - `addDivisionEquality(target, numerator, denominator)`
-- `add_division_equality(target, numerator, denominator)`
 - `addModuloEquality(target, expression, modulo)`
-- `add_modulo_equality(target, expression, modulo)`
 - `addMultiplicationEquality(target, expressions)`
-- `add_multiplication_equality(target, expressions)`
 
 Scheduling constraints:
 
 - `newIntervalVar(start, size, end, name?)`
-- `new_interval_var(start, size, end, name?)`
 - `newFixedSizeIntervalVar(start, size, name?)`
-- `new_fixed_size_interval_var(start, size, name?)`
 - `newOptionalFixedSizeIntervalVar(start, size, isPresent, name?)`
-- `new_optional_fixed_size_interval_var(start, size, isPresent, name?)`
 - `newOptionalIntervalVar(start, size, end, isPresent, name?)`
-- `new_optional_interval_var(start, size, end, isPresent, name?)`
 - `addNoOverlap(intervals)`
-- `add_no_overlap(intervals)`
-- `AddNoOverlap(intervals)`
 - `addNoOverlap2D(xIntervals, yIntervals)`
-- `add_no_overlap_2d(xIntervals, yIntervals)`
-- `AddNoOverlap2D(xIntervals, yIntervals)`
 - `addCumulative(intervals, demands, capacity)`
-- `add_cumulative(intervals, demands, capacity)`
 - `addReservoirConstraint(times, levelChanges, minLevel, maxLevel, activeLiterals?)`
 
 Search and hints:
@@ -207,16 +190,10 @@ Search and hints:
 The high-level package exports:
 
 - `IntVar`, `BoolVar`, `NotBoolVar`
-- `LinearExpr`, `BoundedLinearExpr`, `BoundedLinearExpression`
-- `FlatIntExpr`, `FlatFloatExpr`
+- `LinearExpr`, `BoundedLinearExpr`
 - `IntervalVar`, `Constraint`
 - `Domain`
-- `ValueError`, `RuntimeError`, `ArithmeticError`, `NotImplementedError`
 - `sum(values)`, `weightedSum(values, coeffs)`, `term(variable, coeff)`
-- `object_is_a_true_literal(literal)`, `object_is_a_false_literal(literal)`
-- `rebuild_from_linear_expression_proto(proto, modelProto)`
-- camelCase aliases: `objectIsATrueLiteral`, `objectIsAFalseLiteral`,
-  `rebuildFromLinearExpressionProto`
 - types: `LinearExprLike`, `LiteralLike`
 
 Expression helpers:
@@ -224,36 +201,35 @@ Expression helpers:
 - `LinearExpr.constant(value)`
 - `LinearExpr.from(value)`
 - `LinearExpr.affine(expression, coeff, offset)`
-- `LinearExpr.sum(values)` / `LinearExpr.Sum(values)`
+- `LinearExpr.sum(values)`
 - `LinearExpr.weightedSum(values, coeffs)`
-- `LinearExpr.weighted_sum(values, coeffs)`
-- `LinearExpr.WeightedSum(values, coeffs)`
-- `LinearExpr.term(variable, coeff)` / `LinearExpr.Term(variable, coeff)`
+- `LinearExpr.term(variable, coeff)`
 - `plus(value, coeff?)`, `minus(value)`, `times(coeff)`, `neg()`
 - `eq(value)`, `ne(value)`, `le(value)`, `lt(value)`, `ge(value)`, `gt(value)`
 - `toProto()`
-- `isInteger()` / `is_integer()`
+- `isInteger()`
 - `hasFloatingPointTerms()`
 - `toString()` and `repr()` for display/debug parity with Python-style tests
 - `toFloatObjective(maximize?)`
 
-Unsupported Python-style operation methods such as `abs()`, `div()`,
-`truediv()`, `mod()`, and the `__pow__`/bitwise helpers throw
-`NotImplementedError` with guidance to use the matching `CpModel` constraint
-method instead.
+Nonlinear operations are modeled explicitly with `addAbsEquality()`,
+`addDivisionEquality()`, and `addModuloEquality()`; expressions do not expose
+always-throwing operation methods. Accidental use of native JavaScript operators
+on CP-SAT expressions throws `TypeError`.
+
+The API uses standard JavaScript errors: `TypeError` for invalid operand or
+object types, `RangeError` for invalid numeric ranges, indexes, domains, and
+arities, and `Error` when an operation is invalid in the solver's current state.
 
 `IntVar` supports:
 
-- `name`, `model_proto`, `expr()`
+- `name`, `modelProto`, `expr()`
 - `plus(value, coeff?)`, `minus(value)`, `times(coeff)`, `neg()`
 - `eq(value)`, `ne(value)`, `le(value)`, `lt(value)`, `ge(value)`, `gt(value)`
-- `isInteger()` / `is_integer()`
-- `isBoolean()` / `is_boolean`
+- `isInteger()`
+- `isBoolean()`
 - `negated()` for Boolean variables
 - `debugString()`, `repr()`, `toString()`
-- Python-style helper aliases used by parity tests: `__add__`, `__mul__`,
-  `__lt__`, `__gt__`, `__abs__`, `__div__`, `__truediv__`, `__mod__`, and
-  unsupported bitwise/power helpers.
 
 `BoolVar` extends `IntVar` with:
 
@@ -262,20 +238,11 @@ method instead.
 
 `NotBoolVar` supports:
 
-- `variable`, `model`, `index`, `name`, `model_proto`
+- `variable`, `model`, `index`, `name`, `modelProto`
 - `not()` / `negated()`
 - `expr()`
 - `plus(value, coeff?)`, `minus(value)`, `times(coeff)`, `neg()`
-- `isInteger()` / `is_integer()`
-- `repr()`, `toString()`
-
-`FlatIntExpr` and `FlatFloatExpr` support:
-
-- `vars`
-- `coeffs`
-- `offset`
-- `expr()`
-- `plus(value)`, `minus(value)`, `times(coeff)`
+- `isInteger()`
 - `repr()`, `toString()`
 
 `BoundedLinearExpr` supports:
@@ -286,19 +253,13 @@ method instead.
 - `domain`
 - `toString()`
 
-`BoundedLinearExpression` builds a `BoundedLinearExpr` from an expression and a
-`Domain`.
-
 `Domain` supports:
 
 - `new Domain(lower, upper)`
 - `new Domain(value)`
 - `Domain.fromFlatIntervals(intervals)`
-- `Domain.from_flat_intervals(intervals)`
 - `Domain.fromIntervals(intervals)`
-- `Domain.from_intervals(intervals)`
 - `Domain.fromValues(values)`
-- `Domain.from_values(values)`
 - `flatIntervals`
 
 `Constraint` supports:
@@ -307,7 +268,6 @@ method instead.
 - `index`
 - `name`
 - `withName(name)`
-- `with_name(name)`
 - `onlyEnforceIf(literals)`
 
 `IntervalVar` supports:
@@ -315,7 +275,7 @@ method instead.
 - `model`
 - `index`
 - `name`
-- `model_proto`
+- `modelProto`
 - `startExpr()`
 - `sizeExpr()`
 - `endExpr()`
@@ -327,7 +287,7 @@ method instead.
 `new CpSolver()`
 
 High-level solver wrapper. It delegates to the proto-first `CpSat` runtime while
-keeping the latest decoded response for Python-like result helpers.
+keeping the latest decoded response for high-level result helpers.
 
 `solver.parameters`
 
@@ -345,40 +305,35 @@ Solves a `CpModel`. The second argument can be:
 
 Result helpers:
 
-- `response()`
 - `responseStats()`
-- `solutionInfo()`
 - `statusName(status?)`
-- `value(expression)`
-- `floatValue(expression)`
+- `value(expression)`: `bigint` for integer expressions, `number` for floating-point expressions
 - `booleanValue(literal)`
-- `objectiveValue()`
-- `bestObjectiveBound()`
 
 Response properties:
 
-- `response_proto`
-- `solve_log`
-- `objective_value`
-- `best_objective_bound`
-- `wall_time` / `wallTime`
-- `user_time`
-- `deterministic_time`
-- `num_booleans` / `numBooleans`
-- `num_conflicts` / `numConflicts`
-- `num_branches` / `numBranches`
-- `num_integers`
-- `num_binary_propagations`
-- `num_integer_propagations`
+- `response`: latest decoded `CpSolverResponse`, or `null` before solving
+- `objectiveValue`
+- `bestObjectiveBound`
+- `solutionInfo`
+- `solveLog`
+- `wallTime`
+- `userTime`
+- `deterministicTime`
+- `numBooleans`
+- `numConflicts`
+- `numBranches`
+- `numIntegers`
+- `numBinaryPropagations`
+- `numIntegerPropagations`
 
 Callbacks:
 
 - `solver.bestBoundCallback = (bound) => {}`
 - `solver.logCallback = (message) => {}`
-- Python-style aliases: `best_bound_callback`, `log_callback`
 
 `CpSolverSolutionCallback` can be subclassed or assigned an
-`onSolutionCallback()` method. During a callback, use `value()`, `floatValue()`,
+`onSolutionCallback()` method. During a callback, use `value()`,
 `booleanValue()`, `objectiveValue`, `bestObjectiveBound`, and `wallTime`.
 
 ```ts
@@ -456,6 +411,7 @@ Import:
 ```ts
 import {
   Assignment,
+  asNumber,
   BoundCost,
   defaultRoutingModelParameters,
   LocalSearchMetaheuristic,
@@ -483,6 +439,7 @@ params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
 const assignment = await routing.solveWithParameters(params, {
   executor: 'worker',
 });
+const objective = assignment ? asNumber(assignment.objectiveValue()) : null;
 ```
 
 The Routing API is a high-level wrapper around the compiled OR-Tools Routing
@@ -532,14 +489,18 @@ Construction:
 const routing = new RoutingModel(manager, parameters?);
 ```
 
+Routing quantities use `IntValue`; indexes remain checked JavaScript `number`
+values. Costs, cumul values, bounds, and objective values are returned as
+`bigint`.
+
 Callbacks and costs:
 
-- `registerTransitCallback((fromIndex, toIndex) => number): number`
-- `registerTransitMatrix(matrix: number[][]): number`
-- `registerUnaryTransitCallback((fromIndex) => number): number`
-- `registerUnaryTransitVector(values: number[]): number`
+- `registerTransitCallback((fromIndex, toIndex) => IntValue): number`
+- `registerTransitMatrix(matrix: IntValue[][]): number`
+- `registerUnaryTransitCallback((fromIndex) => IntValue): number`
+- `registerUnaryTransitVector(values: IntValue[]): number`
 - `setArcCostEvaluatorOfAllVehicles(evaluatorIndex): void`
-- `getArcCostForVehicle(fromIndex, toIndex, vehicle): number`
+- `getArcCostForVehicle(fromIndex, toIndex, vehicle): bigint`
 
 Dimensions:
 
@@ -574,7 +535,7 @@ Route structure and model helpers:
 - `getAutomaticFirstSolutionStrategy(): FirstSolutionStrategy`
 - `getNumberOfDecisionsInFirstSolution(parameters): number`
 - `getNumberOfRejectsInFirstSolution(parameters): number`
-- `costVar(): { max(): number }`
+- `costVar(): { max(): bigint }`
 - `solver(): { parameters(): { tracePropagation: boolean }; localSearchProfile(): string; add(...): void }`
 
 `nextVar(index)` returns an opaque next-variable handle represented by the
@@ -584,9 +545,9 @@ an opaque vehicle-variable handle for solver constraints.
 Advanced assignment helpers are also exposed for parity with the current
 wrapper implementation:
 
-- `assignmentObjectiveValue(): number`
+- `assignmentObjectiveValue(): bigint`
 - `nextValue(index): number`
-- `dimensionCumulValue(dimensionName, index): number`
+- `dimensionCumulValue(dimensionName, index): bigint`
 
 These helpers read values from the current assignment state and are usually
 used through `Assignment`.
@@ -642,14 +603,16 @@ new BoundCost(bound = 0, cost = 0)
 
 Fields:
 
-- `bound: number`
-- `cost: number`
+- `bound: bigint`
+- `cost: bigint`
 
 ### `Assignment`
 
-- `objectiveValue(): number`
-- `value(indexOrVar): number`
-- `min(indexOrVar): number`
+- `objectiveValue(): bigint`
+- `value(nextVar): number`
+- `value(cumulVar): bigint`
+- `min(nextVar): number`
+- `min(cumulVar): bigint`
 
 For `nextVar(index)`, pass the returned value into `assignment.value()` to get
 the next index. For dimensions, pass `dimension.cumulVar(index)`.
@@ -932,6 +895,7 @@ MPSolver WebAssembly runtime.
 
 ```ts
 import {
+  asNumber,
   KnapsackSolver,
   KnapsackSolverType,
 } from 'or-tools-wasm/knapsack';
@@ -948,7 +912,7 @@ solver.init(
 
 const profit = await solver.solve({ executor: 'worker' });
 const selected = [0, 1, 2, 3].filter((item) => solver.bestSolutionContains(item));
-console.log(profit, selected, solver.isSolutionOptimal());
+console.log(asNumber(profit), selected, solver.isSolutionOptimal());
 ```
 
 The runtime is loaded lazily. Select execution for each solve with
@@ -974,6 +938,8 @@ after the active executor job settles so the executor remains reusable.
 
 `KnapsackSolver` supports `init()`, `solve()`, `bestSolutionContains()`,
 `isSolutionOptimal()`, `setUseReduction()`, `setTimeLimit()`, and `getName()`.
+Profits, weights, and capacities accept `IntValue`; `solve()` returns the exact
+optimal profit as `bigint`.
 
 The MPSolver frontend also exposes
 `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.createSolver('KNAPSACK')`, and
@@ -1097,6 +1063,10 @@ The runtime is loaded lazily by `solve()`, and `executor` is selected per call.
 - `addActivity({ name, duration, demands?, successors? })`
 - `build(): RcpspProblem`
 
+Builder and parsed RCPSP quantities are safe-integer `number` values; unsafe
+numbers are rejected instead of being rounded. Solved schedule times are exact
+`bigint` values.
+
 `RcpspProblem` exposes:
 
 - `RcpspProblem.fromProto(proto)`
@@ -1109,10 +1079,10 @@ The runtime is loaded lazily by `solve()`, and `executor` is selected per call.
 `RcpspSolveResult` contains:
 
 - `status` and `statusName`
-- `makespan`
+- `makespan` as an exact `bigint`, or `null` when no schedule was found
 - `objectiveValue`
-- scheduled `tasks` with `name`, `start`, `end`, `duration`, `demands`, and
-  `successors`
+- scheduled `tasks` with exact `bigint` `start` and `end` values, plus `name`,
+  `duration`, `demands`, and `successors`
 - the generated `CpModel`, `starts`, `ends`, and `makespanVar` for callers that
   need the lower-level CP-SAT model path
 
@@ -1138,7 +1108,7 @@ The dedicated Network Flow API provides camelCase builders for
 CP-SAT, the runtime is loaded lazily and execution is selected per solve.
 
 ```ts
-import { SimpleMaxFlow, SimpleMaxFlowStatus } from 'or-tools-wasm/network-flow';
+import { asNumber, SimpleMaxFlow, SimpleMaxFlowStatus } from 'or-tools-wasm/network-flow';
 
 const maxFlow = new SimpleMaxFlow();
 const arcs = maxFlow.addArcsWithCapacity(
@@ -1148,7 +1118,7 @@ const arcs = maxFlow.addArcsWithCapacity(
 );
 const status = await maxFlow.solve(0, 4, { executor: 'worker' });
 if (status === SimpleMaxFlowStatus.OPTIMAL) {
-  console.log(maxFlow.optimalFlow(), maxFlow.flows(arcs));
+  console.log(asNumber(maxFlow.optimalFlow()), maxFlow.flows(arcs));
 }
 ```
 
@@ -1157,6 +1127,9 @@ the shared `direct`, `worker`, `server`, `cloud`, and `auto` selections. The
 default is `auto`; browser main-thread calls select a worker while environments
 without browser workers select direct execution. There is no global initializer
 or executor setting.
+
+Capacities, supplies, costs, flows, and objective totals accept `IntValue` and
+are returned as `bigint`. Node and arc indexes remain checked `number` values.
 
 `SimpleMaxFlow` exposes:
 
@@ -1167,11 +1140,12 @@ or executor setting.
 - `setArcsCapacity(arcs, capacities): void`
 - `numNodes(): number`
 - `numArcs(): number`
-- `tail(arc)`, `head(arc)`, `capacity(arc): number`
+- `tail(arc)`, `head(arc): number`
+- `capacity(arc): bigint`
 - `solve(source, sink, options?): Promise<number>`
-- `optimalFlow(): number`
-- `flow(arc): number`
-- `flows(arcs): number[]`
+- `optimalFlow(): bigint`
+- `flow(arc): bigint`
+- `flows(arcs): bigint[]`
 - `getSourceSideMinCut(): number[]`
 - `getSinkSideMinCut(): number[]`
 
@@ -1189,10 +1163,10 @@ or executor setting.
 - `supply(node)`, `unitCost(arc)`
 - `solve(options?): Promise<number>`
 - `solveMaxFlowWithMinCost(options?): Promise<number>`
-- `optimalCost(): number`
-- `maximumFlow(): number`
-- `flow(arc): number`
-- `flows(arcs): number[]`
+- `optimalCost(): bigint`
+- `maximumFlow(): bigint`
+- `flow(arc): bigint`
+- `flows(arcs): bigint[]`
 
 `SimpleLinearSumAssignment` exposes:
 
@@ -1203,11 +1177,11 @@ or executor setting.
 - `numArcs(): number`
 - `leftNode(arc): number`
 - `rightNode(arc): number`
-- `cost(arc): number`
+- `cost(arc): bigint`
 - `solve(options?): Promise<number>`
-- `optimalCost(): number`
+- `optimalCost(): bigint`
 - `rightMate(leftNode): number`
-- `assignmentCost(leftNode): number`
+- `assignmentCost(leftNode): bigint`
 
 Network Flow algorithms are single-threaded, so there is no solver thread-count
 parameter. A worker solve can be cancelled by terminating its worker; the

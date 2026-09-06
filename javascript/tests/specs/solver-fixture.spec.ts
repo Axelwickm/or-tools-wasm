@@ -167,6 +167,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
       workerProfile?: string;
       params?: Record<string, unknown>;
     }>;
+    highLevelCpSatContractResults?: Array<{
+      id?: string;
+      name?: string;
+      ok?: boolean;
+      mode?: string;
+      solverStatus?: string;
+      params?: Record<string, unknown>;
+    }>;
     highLevelCpSatWorkerStatsBefore?: WorkerStats;
     highLevelCpSatWorkerStatsAfter?: WorkerStats;
     cpSatWorkerStatsBefore?: WorkerStats;
@@ -446,6 +454,16 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   const [directResult] = parsedStatus.results ?? [];
   expect(directResult?.cases?.length).toBeGreaterThan(0);
   expectStableCaseIds(parsedStatus.highLevelCpSatResults, 'high-level CP-SAT');
+  expectStableCaseIds(parsedStatus.highLevelCpSatContractResults, 'high-level CP-SAT contract');
+  expect(parsedStatus.highLevelCpSatContractResults).toHaveLength(includeServer ? 15 : 10);
+  expect(parsedStatus.highLevelCpSatContractResults).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'cp_sat.high_level.reservoir', mode: 'direct', solverStatus: 'OPTIMAL', ok: true }),
+    expect.objectContaining({ id: 'cp_sat.high_level.reservoir', mode: 'worker', solverStatus: 'OPTIMAL', ok: true }),
+    expect.objectContaining({ id: 'cp_sat.high_level.typescript_helpers', mode: 'direct', solverStatus: 'OPTIMAL', ok: true }),
+    expect.objectContaining({ id: 'cp_sat.high_level.solver_results', mode: 'worker', solverStatus: 'OPTIMAL', ok: true }),
+    expect.objectContaining({ id: 'cp_sat.high_level.exact_integers', mode: 'direct', solverStatus: 'OPTIMAL', ok: true }),
+    expect.objectContaining({ id: 'cp_sat.high_level.exact_integers', mode: 'worker', solverStatus: 'OPTIMAL', ok: true }),
+  ]));
   for (const result of parsedStatus.results ?? []) {
     expectStableCaseIds(result.cases, `CP-SAT ${result.mode}/${result.workerProfile}`);
     expect(result.cases).toEqual(

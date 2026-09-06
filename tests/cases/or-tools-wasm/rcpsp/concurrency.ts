@@ -43,7 +43,7 @@ export async function runRcpspConcurrencyCase(api: RcpspConcurrencyApi) {
   const workerSolve = shared.solve({ executor: 'worker' });
   await expectError(
     shared.solve({ executor: 'direct' }),
-    'RuntimeError',
+    'Error',
     'concurrent solve on one RcpspProblem',
   );
   await workerSolve;
