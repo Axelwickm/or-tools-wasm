@@ -5,6 +5,7 @@ import {
   type SatParameters,
 } from 'or-tools-wasm/cp-sat';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { ActiveSolve, formatJson, requiredElement } from './site_support.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 const sampleModel = {
@@ -35,97 +36,75 @@ const sampleParams: SatParameters = {
   numWorkers: 1,
 };
 
-const modelInput = document.getElementById('model-input') as HTMLTextAreaElement | null;
-const paramsInput = document.getElementById('params-input') as HTMLTextAreaElement | null;
-const resultOutput = document.getElementById('result-output') as HTMLPreElement | null;
-const eventOutput = document.getElementById('event-output') as HTMLPreElement | null;
-const statusEl = document.getElementById('status') as HTMLElement | null;
-const loadSampleButton = document.getElementById('load-sample') as HTMLButtonElement | null;
-const validateButton = document.getElementById('validate') as HTMLButtonElement | null;
-const solveButton = document.getElementById('solve') as HTMLButtonElement | null;
-const cancelButton = document.getElementById('cancel') as HTMLButtonElement | null;
-const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
-const solutionEventsInput = document.getElementById('solution-events') as HTMLInputElement | null;
-const boundEventsInput = document.getElementById('bound-events') as HTMLInputElement | null;
-const logEventsInput = document.getElementById('log-events') as HTMLInputElement | null;
-const clearEventsButton = document.getElementById('clear-events') as HTMLButtonElement | null;
+const modelInput = requiredElement('model-input', 'textarea');
+const paramsInput = requiredElement('params-input', 'textarea');
+const resultOutput = requiredElement('result-output', 'pre');
+const eventOutput = requiredElement('event-output', 'pre');
+const statusEl = requiredElement('status', 'div');
+const loadSampleButton = requiredElement('load-sample', 'button');
+const validateButton = requiredElement('validate', 'button');
+const solveButton = requiredElement('solve', 'button');
+const cancelButton = requiredElement('cancel', 'button');
+const workerInput = requiredElement('workers', 'input');
+const executorSelector = requiredElement('cp-sat-executor', 'select');
+const solutionEventsInput = requiredElement('solution-events', 'input');
+const boundEventsInput = requiredElement('bound-events', 'input');
+const logEventsInput = requiredElement('log-events', 'input');
+const clearEventsButton = requiredElement('clear-events', 'button');
 const maxWorkerCount = getMaxWorkerCount();
-let solveController: AbortController | null = null;
+const activeSolve = new ActiveSolve('Playground solve');
 let solveStartedAt = 0;
 
-if (workerInput) {
-  workerInput.max = String(maxWorkerCount);
-  workerInput.min = '1';
-  workerInput.value = String(maxWorkerCount);
-}
+workerInput.max = String(maxWorkerCount);
+workerInput.min = '1';
+workerInput.value = String(maxWorkerCount);
 
 function setStatus(message: string) {
-  if (statusEl) {
-    statusEl.textContent = message;
-  }
+  statusEl.textContent = message;
 }
 
 function setResult(value: unknown) {
-  if (resultOutput) {
-    resultOutput.textContent =
-      typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  }
+  resultOutput.textContent =
+    typeof value === 'string' ? value : formatJson(value);
 }
 
 function setRunning(running: boolean, cancellable = false) {
-  if (validateButton) validateButton.disabled = running;
-  if (solveButton) solveButton.disabled = running;
-  if (loadSampleButton) loadSampleButton.disabled = running;
-  if (executorSelector) executorSelector.disabled = running;
-  if (cancelButton) cancelButton.disabled = !running || !cancellable;
+  validateButton.disabled = running;
+  solveButton.disabled = running;
+  loadSampleButton.disabled = running;
+  executorSelector.disabled = running;
+  cancelButton.disabled = !running || !cancellable;
 }
 
 function clearEvents() {
-  if (eventOutput) eventOutput.textContent = '';
-}
-
-function stringify(value: unknown): string {
-  return JSON.stringify(value, (_key, item) => {
-    if (typeof item === 'bigint') return item.toString();
-    if (item instanceof Uint8Array) return `<${item.byteLength} bytes>`;
-    return item;
-  });
+  eventOutput.textContent = '';
 }
 
 function appendEvent(event: CpSatEvent) {
-  if (!eventOutput) return;
   const elapsed = ((performance.now() - solveStartedAt) / 1000).toFixed(3);
   const display = event.type === 'solution'
     ? { type: event.type, response: event.response, bytes: `<${event.bytes.byteLength} bytes>` }
     : event;
-  eventOutput.textContent += `${elapsed}s ${stringify(display)}\n`;
+  eventOutput.textContent += `${elapsed}s ${formatJson(display)}\n`;
   eventOutput.scrollTop = eventOutput.scrollHeight;
 }
 
 function selectedEventMask(): CpSatEventMask {
   return {
-    solution: solutionEventsInput?.checked ?? false,
-    bestBound: boundEventsInput?.checked ?? false,
-    log: logEventsInput?.checked ?? false,
+    solution: solutionEventsInput.checked,
+    bestBound: boundEventsInput.checked,
+    log: logEventsInput.checked,
   };
 }
 
 function loadSample() {
-  if (modelInput) {
-    modelInput.value = JSON.stringify(sampleModel, null, 2);
-  }
-  if (paramsInput) {
-    paramsInput.value = JSON.stringify(sampleParams, null, 2);
-  }
+  modelInput.value = JSON.stringify(sampleModel, null, 2);
+  paramsInput.value = JSON.stringify(sampleParams, null, 2);
   setStatus('Sample loaded.');
   setResult('');
 }
 
-function parseJsonObject(input: HTMLTextAreaElement | null, label: string) {
-  if (!input) {
-    throw new Error(`${label} input is missing.`);
-  }
+function parseJsonObject(input: HTMLTextAreaElement, label: string) {
   const text = input.value.trim();
   if (!text) {
     throw new Error(`${label} is empty.`);
@@ -138,7 +117,7 @@ function parseJsonObject(input: HTMLTextAreaElement | null, label: string) {
 }
 
 function parseParams() {
-  if (!paramsInput || !paramsInput.value.trim()) {
+  if (!paramsInput.value.trim()) {
     return { numWorkers: getSelectedWorkerCount() } satisfies SatParameters;
   }
   const params = parseJsonObject(paramsInput, 'SAT parameters') as SatParameters;
@@ -147,11 +126,9 @@ function parseParams() {
 }
 
 function getSelectedWorkerCount() {
-  const requested = Number.parseInt(workerInput?.value ?? '1', 10) || 1;
+  const requested = Number.parseInt(workerInput.value, 10) || 1;
   const workers = Math.min(Math.max(1, requested), maxWorkerCount);
-  if (workerInput) {
-    workerInput.value = String(workers);
-  }
+  workerInput.value = String(workers);
   return workers;
 }
 
@@ -178,8 +155,7 @@ async function validateModel() {
 }
 
 async function solveModel() {
-  const controller = new AbortController();
-  solveController = controller;
+  const signal = activeSolve.start();
   solveStartedAt = performance.now();
   clearEvents();
   setRunning(true, true);
@@ -193,32 +169,32 @@ async function solveModel() {
       executor: selectedExecutor(),
       eventMask: selectedEventMask(),
       onEvent: appendEvent,
-      signal: controller.signal,
+      signal,
     });
     setResult(result.response ?? { bytes: Array.from(result.bytes) });
     setStatus('Solve finished.');
   } catch (error) {
-    setStatus(controller.signal.aborted ? 'Solve cancelled.' : 'Solve failed.');
+    setStatus(signal.aborted ? 'Solve cancelled.' : 'Solve failed.');
     setResult((error as Error).message);
   } finally {
-    if (solveController === controller) solveController = null;
+    activeSolve.finish(signal);
     setRunning(false);
   }
 }
 
 const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
-loadSampleButton?.addEventListener('click', loadSample);
-validateButton?.addEventListener('click', () => {
+loadSampleButton.addEventListener('click', loadSample);
+validateButton.addEventListener('click', () => {
   void validateModel();
 });
-solveButton?.addEventListener('click', () => {
+solveButton.addEventListener('click', () => {
   void solveModel();
 });
-cancelButton?.addEventListener('click', () => {
-  solveController?.abort();
+cancelButton.addEventListener('click', () => {
+  activeSolve.cancel();
   setStatus('Cancel requested.');
 });
-clearEventsButton?.addEventListener('click', clearEvents);
+clearEventsButton.addEventListener('click', clearEvents);
 
 loadSample();

@@ -4,43 +4,40 @@ import {
   type CpSatModelInstance,
 } from 'or-tools-wasm/cp-sat';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { ActiveSolve, formatJson, requiredElement } from './site_support.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
-const statusEl = document.getElementById('status') as HTMLPreElement | null;
-const solutionGrid = document.getElementById('solution-grid') as HTMLElement | null;
-const sizeInput = document.getElementById('size') as HTMLInputElement | null;
-const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
+const statusEl = requiredElement('status', 'pre');
+const solutionGrid = requiredElement('solution-grid', 'div');
+const sizeInput = requiredElement('size', 'input');
+const workerInput = requiredElement('workers', 'input');
+const executorSelector = requiredElement('cp-sat-executor', 'select');
+const runButton = requiredElement('run', 'button');
+const stopButton = requiredElement('stop', 'button');
 const maxWorkerCount = getMaxWorkerCount();
 const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
-let activeSolve: AbortController | null = null;
+const activeSolve = new ActiveSolve('Magic square solve');
 
-if (workerInput) {
-  workerInput.max = String(maxWorkerCount);
-  workerInput.min = '1';
-  workerInput.value = String(maxWorkerCount);
-}
+workerInput.max = String(maxWorkerCount);
+workerInput.min = '1';
+workerInput.value = String(maxWorkerCount);
 
 function append(text: string) {
-  if (statusEl) statusEl.textContent += `${text}\n`;
+  statusEl.textContent += `${text}\n`;
 }
 
 function setRunning(running: boolean) {
-  if (runButton) runButton.disabled = running;
-  if (stopButton) stopButton.disabled = !running;
+  runButton.disabled = running;
+  stopButton.disabled = !running;
 }
 
 function showSolutionMessage(message: string) {
-  if (!solutionGrid) return;
   solutionGrid.textContent = message;
   solutionGrid.style.removeProperty('gridTemplateColumns');
 }
 
 function renderSolution(size: number, values: Array<number | string>) {
-  if (!solutionGrid) return;
   solutionGrid.innerHTML = '';
   solutionGrid.style.gridTemplateColumns = `repeat(${size}, minmax(2.5rem, auto))`;
   for (const value of values) {
@@ -106,16 +103,15 @@ function buildMagicSquareModel(size: number): CpModelProto {
 }
 
 async function runMagicSquare() {
-  if (!sizeInput || !workerInput || activeSolve) return;
+  if (activeSolve.running) return;
 
   const size = Math.max(1, Number.parseInt(sizeInput.value, 10) || 1);
   const requestedWorkers = Number.parseInt(workerInput.value, 10) || 1;
   const numWorkers = Math.min(Math.max(1, requestedWorkers), maxWorkerCount);
   workerInput.value = String(numWorkers);
-  const controller = new AbortController();
-  activeSolve = controller;
+  const signal = activeSolve.start();
   setRunning(true);
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
   append(`Building raw model proto (size=${size})…`);
   showSolutionMessage('Solving…');
 
@@ -134,7 +130,7 @@ async function runMagicSquare() {
       executor: selectedExecutor(),
       numWorkers,
       logSearchProgress: true,
-      signal: controller.signal,
+      signal,
     });
     const response = result.response;
     if (!response) {
@@ -142,14 +138,14 @@ async function runMagicSquare() {
       showSolutionMessage('Solver returned no response.');
       return;
     }
-    if (statusEl) statusEl.textContent += `${JSON.stringify(response, null, 2)}\n`;
+    statusEl.textContent += `${formatJson(response)}\n`;
     if (!Array.isArray(response.solution)) {
       showSolutionMessage('No solution entries returned.');
       return;
     }
     renderSolution(size, response.solution as Array<number | string>);
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (signal.aborted) {
       append('Solve cancelled.');
       showSolutionMessage('Solve cancelled.');
     } else {
@@ -158,18 +154,16 @@ async function runMagicSquare() {
       showSolutionMessage('Solve failed.');
     }
   } finally {
-    if (activeSolve === controller) activeSolve = null;
+    activeSolve.finish(signal);
     setRunning(false);
   }
 }
 
-runButton?.addEventListener('click', () => {
+runButton.addEventListener('click', () => {
   void runMagicSquare();
 });
 
-if (stopButton) {
-  stopButton.disabled = true;
-  stopButton.addEventListener('click', () => {
-    activeSolve?.abort('Cancelled by the user.');
-  });
-}
+stopButton.disabled = true;
+stopButton.addEventListener('click', () => {
+  activeSolve.cancel('Cancelled by the user.');
+});

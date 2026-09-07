@@ -5,6 +5,7 @@ import {
   SetCoverModel,
 } from 'or-tools-wasm/set-cover';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { requiredElement } from './site_support.js';
 
 type ElementPoint = {
   id: number;
@@ -124,13 +125,13 @@ const regions: CoverRegion[] = [
   },
 ];
 
-const coverageMap = document.getElementById('coverage-map');
-const coverageLegend = document.getElementById('coverage-legend');
-const solutionOutput = document.getElementById('solution-output');
-const statusEl = document.getElementById('status');
-const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const clearButton = document.getElementById('clear') as HTMLButtonElement | null;
+const coverageMap = requiredElement('coverage-map', 'div');
+const coverageLegend = requiredElement('coverage-legend', 'div');
+const solutionOutput = requiredElement('solution-output', 'div');
+const statusEl = requiredElement('status', 'pre');
+const executorSelector = requiredElement('solver-executor', 'select');
+const runButton = requiredElement('run', 'button');
+const clearButton = requiredElement('clear', 'button');
 let readSetCoverExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let selectedSubsets: number[] = [];
@@ -140,13 +141,11 @@ let lastUncovered = elements.length;
 let hoveredRegionId: number | null = null;
 
 function setRunning(running: boolean) {
-  if (!runButton) return;
   runButton.disabled = running;
   runButton.textContent = running ? 'Solving...' : 'Solve Set Cover';
 }
 
 function appendStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent = statusEl.textContent ? `${statusEl.textContent}\n${message}` : message;
 }
 
@@ -189,7 +188,6 @@ function averagedColorForElement(elementId: number, selected: Set<number>) {
 }
 
 function renderMap() {
-  if (!coverageMap || !coverageLegend) return;
   const selected = new Set(selectedSubsets);
   const hasSolution = lastCost !== null;
   const hoveredRegion = hoveredRegionId === null ? null : regions[hoveredRegionId] ?? null;
@@ -235,7 +233,7 @@ function clearSolution() {
   lastUncovered = elements.length;
   renderMap();
   renderSolution();
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
 }
 
 function setHoveredRegion(regionId: number | null) {
@@ -245,7 +243,6 @@ function setHoveredRegion(regionId: number | null) {
 }
 
 function renderSolution() {
-  if (!solutionOutput) return;
   if (lastCost === null) {
     solutionOutput.textContent = 'Run the solver to view the solution.';
     return;
@@ -260,7 +257,7 @@ function renderSolution() {
 
 async function runSetCover() {
   setRunning(true);
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
   try {
     selectedSubsets = [];
     coveredElements = new Set();
@@ -272,7 +269,7 @@ async function runSetCover() {
     const inv = new SetCoverInvariant(model);
     const greedy = new GreedySolutionGenerator(inv);
 
-    appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
+    appendStatus(`Solving with ${executorSelector.value} executor...`);
     const hasFound = await greedy.nextSolution(undefined, {
       executor: readSetCoverExecutor(),
     });
@@ -289,7 +286,7 @@ async function runSetCover() {
         coveredElements.add(element);
       }
     }
-    lastCost = solution.cost;
+    lastCost = solution.cost ?? inv.cost();
     lastUncovered = inv.numUncoveredElements();
     renderMap();
     renderSolution();
@@ -302,28 +299,28 @@ async function runSetCover() {
   }
 }
 
-runButton?.addEventListener('click', () => void runSetCover());
-clearButton?.addEventListener('click', clearSolution);
-coverageMap?.addEventListener('pointerover', (event) => {
+runButton.addEventListener('click', () => void runSetCover());
+clearButton.addEventListener('click', clearSolution);
+coverageMap.addEventListener('pointerover', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const regionEl = target.closest<HTMLElement>('[data-region]');
   if (!regionEl) return;
   setHoveredRegion(Number(regionEl.dataset.region));
 });
-coverageMap?.addEventListener('pointerout', (event) => {
+coverageMap.addEventListener('pointerout', (event) => {
   const relatedTarget = event.relatedTarget;
   if (relatedTarget instanceof Element && coverageMap.contains(relatedTarget)) return;
   setHoveredRegion(null);
 });
-coverageLegend?.addEventListener('pointerover', (event) => {
+coverageLegend.addEventListener('pointerover', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const regionEl = target.closest<HTMLElement>('[data-region]');
   if (!regionEl) return;
   setHoveredRegion(Number(regionEl.dataset.region));
 });
-coverageLegend?.addEventListener('pointerout', (event) => {
+coverageLegend.addEventListener('pointerout', (event) => {
   const relatedTarget = event.relatedTarget;
   if (relatedTarget instanceof Element && coverageLegend.contains(relatedTarget)) return;
   setHoveredRegion(null);

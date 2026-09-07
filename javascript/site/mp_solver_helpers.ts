@@ -133,7 +133,10 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       if (!protoResult.loaded) {
         throw new Error('Solver returned a solution response that could not be loaded.');
       }
-      status = protoResult.response.status ?? MPSolver.OPTIMAL;
+      const responseStatus = protoResult.response.status;
+      status = typeof responseStatus === 'number' || typeof responseStatus === 'string'
+        ? responseStatus
+        : MPSolver.OPTIMAL;
     } else {
       status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);

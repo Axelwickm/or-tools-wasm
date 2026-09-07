@@ -2,6 +2,7 @@ import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import type { SolverJobEvent } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 import { SolverServerExecutor } from '../solver_server_executor.js';
 import {
   SolverWorkerExecutor,
@@ -228,28 +229,25 @@ async function solveModelRequestBytes(
     'executor' | 'numThreads' | 'onEvent' | 'signal'
   > = {},
 ): Promise<Uint8Array> {
-  if (options.signal?.aborted) throw createAbortError(options.signal);
   const numThreads = normalizedNumThreads(options) ?? 1;
   const executor = createMpSolverExecutor(options.executor);
-  const job = executor.execute(
+  const response = await executeSolverJob(
+    executor,
     {
       type: 'solve',
       request: requestBytes,
       numThreads,
       interruptible,
     },
-    { resources: { threads: numThreads }, onEvent: options.onEvent ?? (() => {}) },
+    {
+      resources: { threads: numThreads },
+      onEvent: options.onEvent,
+      signal: options.signal,
+      abortError: createAbortError,
+    },
   );
-  const abort = () => { void job.cancel().catch(() => {}); };
-  options.signal?.addEventListener('abort', abort, { once: true });
-  try {
-    const response = await job.result;
-    if (options.signal?.aborted) throw createAbortError(options.signal);
-    if (response.type !== 'solve') throw new Error('MP Solver executor returned the wrong solve response.');
-    return response.response;
-  } finally {
-    options.signal?.removeEventListener('abort', abort);
-  }
+  if (response.type !== 'solve') throw new Error('MP Solver executor returned the wrong solve response.');
+  return response.response;
 }
 
 export enum OptimizationProblemType {

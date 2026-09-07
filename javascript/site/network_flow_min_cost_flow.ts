@@ -3,42 +3,40 @@ import {
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { requiredElement } from './site_support.js';
 
 type Node = { id: number; label: string; x: number; y: number; supply: number };
 type Arc = { from: number; to: number; capacity: number; unitCost: number; flow?: number };
 
-const solutionOutput = document.getElementById('solution-output');
-const statusEl = document.getElementById('status');
-const graphEl = document.getElementById('flow-graph') as SVGSVGElement | null;
-const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-const supplyCountInput = document.getElementById('supply-count') as HTMLInputElement | null;
-const transitCountInput = document.getElementById('transit-count') as HTMLInputElement | null;
-const demandCountInput = document.getElementById('demand-count') as HTMLInputElement | null;
-const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
+const solutionOutput = requiredElement('solution-output', 'div');
+const statusEl = requiredElement('status', 'pre');
+const graphEl = requiredElement('flow-graph', 'svg');
+const executorSelector = requiredElement('solver-executor', 'select');
+const supplyCountInput = requiredElement('supply-count', 'input');
+const transitCountInput = requiredElement('transit-count', 'input');
+const demandCountInput = requiredElement('demand-count', 'input');
+const randomizeButton = requiredElement('randomize', 'button');
+const runButton = requiredElement('run', 'button');
 let readNetworkFlowExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let nodes: Node[] = [];
 let arcs: Arc[] = [];
 
 const randomInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
-const supplyCount = () => Math.max(1, Number.parseInt(supplyCountInput?.value ?? '2', 10) || 2);
-const transitCount = () => Math.max(1, Number.parseInt(transitCountInput?.value ?? '6', 10) || 6);
-const demandCount = () => Math.max(1, Number.parseInt(demandCountInput?.value ?? '3', 10) || 3);
+const supplyCount = () => Math.max(1, Number.parseInt(supplyCountInput.value, 10) || 2);
+const transitCount = () => Math.max(1, Number.parseInt(transitCountInput.value, 10) || 6);
+const demandCount = () => Math.max(1, Number.parseInt(demandCountInput.value, 10) || 3);
 
 function setRunning(running: boolean) {
-  if (runButton) {
-    runButton.disabled = running;
-    runButton.textContent = running ? 'Solving...' : 'Solve Min-Cost Flow';
-  }
-  if (randomizeButton) randomizeButton.disabled = running;
-  if (supplyCountInput) supplyCountInput.disabled = running;
-  if (transitCountInput) transitCountInput.disabled = running;
-  if (demandCountInput) demandCountInput.disabled = running;
+  runButton.disabled = running;
+  runButton.textContent = running ? 'Solving...' : 'Solve Min-Cost Flow';
+  randomizeButton.disabled = running;
+  supplyCountInput.disabled = running;
+  transitCountInput.disabled = running;
+  demandCountInput.disabled = running;
 }
 
 function appendStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent = statusEl.textContent ? `${statusEl.textContent}\n${message}` : message;
 }
 
@@ -118,7 +116,6 @@ function generateGraph() {
 }
 
 function renderSolution(minCostFlow: SimpleMinCostFlow, allArcs: number[]) {
-  if (!solutionOutput) return;
   const rows = allArcs.map((arc) =>
     `<tr><td>${minCostFlow.tail(arc)}</td><td>${minCostFlow.head(arc)}</td><td>${minCostFlow.capacity(arc)}</td><td>${minCostFlow.unitCost(arc)}</td><td>${minCostFlow.flow(arc)}</td></tr>`,
   ).join('');
@@ -133,7 +130,6 @@ function renderSolution(minCostFlow: SimpleMinCostFlow, allArcs: number[]) {
 }
 
 function renderGraph(solved = false) {
-  if (!graphEl) return;
   const maxFlow = Math.max(...arcs.map((arc) => arc.flow ?? 0), 1);
   const arcSvg = arcs.map((arc) => {
     const a = nodes[arc.from];
@@ -174,14 +170,14 @@ function renderGraph(solved = false) {
 }
 
 function resetView() {
-  if (statusEl) statusEl.textContent = '';
-  if (solutionOutput) solutionOutput.textContent = 'Run the solver to view the min-cost flow solution.';
+  statusEl.textContent = '';
+  solutionOutput.textContent = 'Run the solver to view the min-cost flow solution.';
   renderGraph(false);
 }
 
 async function runMinCostFlow() {
   setRunning(true);
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
   try {
     const minCostFlow = new SimpleMinCostFlow();
     const allArcs = minCostFlow.addArcsWithCapacityAndUnitCost(
@@ -192,15 +188,15 @@ async function runMinCostFlow() {
     );
     minCostFlow.setNodesSupplies(nodes.map((node) => node.id), nodes.map((node) => node.supply));
 
-    appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
+    appendStatus(`Solving with ${executorSelector.value} executor...`);
     const status = await minCostFlow.solve({ executor: readNetworkFlowExecutor() });
     appendStatus(`Done. Status ${status}.`);
     arcs = allArcs.map((arc) => ({
       from: minCostFlow.tail(arc),
       to: minCostFlow.head(arc),
-      capacity: minCostFlow.capacity(arc),
-      unitCost: minCostFlow.unitCost(arc),
-      flow: minCostFlow.flow(arc),
+      capacity: Number(minCostFlow.capacity(arc)),
+      unitCost: Number(minCostFlow.unitCost(arc)),
+      flow: Number(minCostFlow.flow(arc)),
     }));
     renderSolution(minCostFlow, allArcs);
     renderGraph(true);
@@ -212,23 +208,23 @@ async function runMinCostFlow() {
   }
 }
 
-runButton?.addEventListener('click', () => void runMinCostFlow());
-randomizeButton?.addEventListener('click', () => {
+runButton.addEventListener('click', () => void runMinCostFlow());
+randomizeButton.addEventListener('click', () => {
   generateGraph();
   resetView();
 });
-supplyCountInput?.addEventListener('change', () => {
-  if (supplyCountInput) supplyCountInput.value = String(supplyCount());
+supplyCountInput.addEventListener('change', () => {
+  supplyCountInput.value = String(supplyCount());
   generateGraph();
   resetView();
 });
-transitCountInput?.addEventListener('change', () => {
-  if (transitCountInput) transitCountInput.value = String(transitCount());
+transitCountInput.addEventListener('change', () => {
+  transitCountInput.value = String(transitCount());
   generateGraph();
   resetView();
 });
-demandCountInput?.addEventListener('change', () => {
-  if (demandCountInput) demandCountInput.value = String(demandCount());
+demandCountInput.addEventListener('change', () => {
+  demandCountInput.value = String(demandCount());
   generateGraph();
   resetView();
 });

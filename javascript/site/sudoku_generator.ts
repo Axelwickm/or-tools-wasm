@@ -1,5 +1,6 @@
 import { MathOpt, type MathOptVariable } from 'or-tools-wasm/mathopt';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { requiredElement } from './site_support.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Grid = number[];
@@ -8,17 +9,17 @@ const size = 9;
 const cells = size * size;
 const digits = 9;
 
-const boardEl = document.getElementById('sudoku-board') as HTMLElement | null;
-const statusEl = document.getElementById('status') as HTMLPreElement | null;
-const targetInput = document.getElementById('target-clues') as HTMLInputElement | null;
-const seedInput = document.getElementById('seed') as HTMLInputElement | null;
-const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;
-const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-const generateButton = document.getElementById('generate') as HTMLButtonElement | null;
-const solveButton = document.getElementById('solve') as HTMLButtonElement | null;
-const clearButton = document.getElementById('clear') as HTMLButtonElement | null;
-const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
+const boardEl = requiredElement('sudoku-board', 'div');
+const statusEl = requiredElement('status', 'pre');
+const targetInput = requiredElement('target-clues', 'input');
+const seedInput = requiredElement('seed', 'input');
+const solverSelect = requiredElement('solver', 'select');
+const workerInput = requiredElement('workers', 'input');
+const executorSelector = requiredElement('solver-executor', 'select');
+const generateButton = requiredElement('generate', 'button');
+const solveButton = requiredElement('solve', 'button');
+const clearButton = requiredElement('clear', 'button');
+const stopButton = requiredElement('stop', 'button');
 
 let cancelled = false;
 let givens = new Set<number>();
@@ -71,25 +72,23 @@ function sleep(ms: number) {
 }
 
 function appendStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent += `${message}\n`;
   statusEl.scrollTop = statusEl.scrollHeight;
 }
 
 function setStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent = `${message}\n`;
 }
 
 function setRunning(running: boolean) {
-  if (generateButton) generateButton.disabled = running;
-  if (solveButton) solveButton.disabled = running;
-  if (clearButton) clearButton.disabled = running;
-  if (stopButton) stopButton.disabled = !running;
+  generateButton.disabled = running;
+  solveButton.disabled = running;
+  clearButton.disabled = running;
+  stopButton.disabled = !running;
 }
 
 function selectedBackend(): SudokuBackend {
-  const value = solverSelect?.value;
+  const value = solverSelect.value;
   if (value === 'GSCIP' || value === 'GLPK') return value;
   return 'CP_SAT';
 }
@@ -100,7 +99,6 @@ function backendLabel(backend: SudokuBackend) {
 }
 
 function updateBackendControls() {
-  if (!workerInput) return;
   const glpk = selectedBackend() === 'GLPK';
   workerInput.disabled = glpk;
   if (glpk) workerInput.value = '1';
@@ -110,18 +108,15 @@ function configureMathOpt() {
   const backend = selectedBackend();
   const workers = Math.min(
     maxWorkerCount,
-    Math.max(1, Number.parseInt(workerInput?.value ?? '1', 10) || 1),
+    Math.max(1, Number.parseInt(workerInput.value, 10) || 1),
   );
-  if (workerInput) {
-    workerInput.min = '1';
-    workerInput.max = String(maxWorkerCount);
-    workerInput.value = String(workers);
-  }
+  workerInput.min = '1';
+  workerInput.max = String(maxWorkerCount);
+  workerInput.value = String(workers);
   return { backend, workers: backend === 'GLPK' ? 1 : workers };
 }
 
 function createBoard() {
-  if (!boardEl) return;
   boardEl.innerHTML = '';
   for (let index = 0; index < cells; ++index) {
     const input = document.createElement('input');
@@ -140,7 +135,7 @@ function createBoard() {
 }
 
 function boardInputs() {
-  return Array.from(boardEl?.querySelectorAll<HTMLInputElement>('.sudoku-cell') ?? []);
+  return Array.from(boardEl.querySelectorAll<HTMLInputElement>('.sudoku-cell'));
 }
 
 function renderGrid(grid: Grid, options: { testing?: number; solved?: boolean } = {}) {
@@ -254,7 +249,7 @@ function parseSolution(result: Awaited<ReturnType<typeof MathOpt.solve>>, variab
   for (let row = 0; row < size; ++row) {
     for (let col = 0; col < size; ++col) {
       for (let digit = 1; digit <= digits; ++digit) {
-        if (result.variableValues(variables[varIndex(row, col, digit)]) > 0.5) {
+        if ((result.variableValuesById[variables[varIndex(row, col, digit)].id] ?? 0) > 0.5) {
           grid[cellIndex(row, col)] = digit;
           break;
         }
@@ -316,7 +311,7 @@ async function solveSudoku(
     });
     return {
       status: result.terminationReason,
-      grid: result.has_primal_feasible_solution() ? parseSolution(result, variables) : null,
+      grid: isFeasibleStatus(result.terminationReason) ? parseSolution(result, variables) : null,
     };
   } finally {
     activeInterrupter = null;
@@ -353,10 +348,10 @@ async function generateFullGrid(seed: number, backend: SudokuBackend, workers: n
 async function generatePuzzle() {
   cancelled = false;
   const { backend, workers } = configureMathOpt();
-  const target = Math.min(81, Math.max(0, Number.parseInt(targetInput?.value ?? '0', 10) || 0));
-  const seed = Math.max(1, Number.parseInt(seedInput?.value ?? '1', 10) || 1);
-  if (targetInput) targetInput.value = String(target);
-  if (seedInput) seedInput.value = String(seed);
+  const target = Math.min(81, Math.max(0, Number.parseInt(targetInput.value, 10) || 0));
+  const seed = Math.max(1, Number.parseInt(seedInput.value, 10) || 1);
+  targetInput.value = String(target);
+  seedInput.value = String(seed);
 
   setRunning(true);
   setStatus(`Initializing MathOpt Sudoku generator with ${backendLabel(backend)} backend (target=${target}, seed=${seed})...`);
@@ -442,17 +437,17 @@ function clearBoard() {
 
 createBoard();
 clearBoard();
-if (workerInput) workerInput.value = String(Math.min(maxWorkerCount, 4));
-solverSelect?.addEventListener('change', updateBackendControls);
+workerInput.value = String(Math.min(maxWorkerCount, 4));
+solverSelect.addEventListener('change', updateBackendControls);
 updateBackendControls();
-generateButton?.addEventListener('click', () => {
+generateButton.addEventListener('click', () => {
   void generatePuzzle();
 });
-solveButton?.addEventListener('click', () => {
+solveButton.addEventListener('click', () => {
   void solveBoard();
 });
-clearButton?.addEventListener('click', clearBoard);
-stopButton?.addEventListener('click', () => {
+clearButton.addEventListener('click', clearBoard);
+stopButton.addEventListener('click', () => {
   cancelled = true;
   appendStatus('Stopping after the active MathOpt solve returns...');
   activeInterrupter?.interrupt();

@@ -1,5 +1,6 @@
 import { CpSat, type CpSatModelInstance, type SatParameters } from 'or-tools-wasm/cp-sat';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { ActiveSolve, requiredElement } from './site_support.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type Domain = [number, number] | number[];
@@ -28,63 +29,45 @@ type SchedulingBuild = {
   numDays: number;
 };
 
-const statusEl = document.getElementById('status') as HTMLPreElement | null;
-const scheduleMessage = document.getElementById('schedule-message') as HTMLElement | null;
-const dayGrid = document.getElementById('day-grid') as HTMLElement | null;
-const streakPanel = document.getElementById('streak-panel') as HTMLElement | null;
-const streakGrid = document.getElementById('streak-grid') as HTMLElement | null;
-const scheduleLegend = document.getElementById('schedule-legend') as HTMLElement | null;
-const solutionOutput = document.getElementById('solution-output') as HTMLElement | null;
-const teamsInput = document.getElementById('teams') as HTMLInputElement | null;
-const workerInput = document.getElementById('workers') as HTMLInputElement | null;
-const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
-const readyIndicator = document.getElementById('ready-indicator') as HTMLElement | null;
+const statusEl = requiredElement('status', 'pre');
+const scheduleMessage = requiredElement('schedule-message', 'p');
+const dayGrid = requiredElement('day-grid', 'div');
+const streakPanel = requiredElement('streak-panel', 'div');
+const streakGrid = requiredElement('streak-grid', 'div');
+const scheduleLegend = requiredElement('schedule-legend', 'div');
+const solutionOutput = requiredElement('solution-output', 'div');
+const teamsInput = requiredElement('teams', 'input');
+const workerInput = requiredElement('workers', 'input');
+const executorSelector = requiredElement('cp-sat-executor', 'select');
+const runButton = requiredElement('run', 'button');
+const stopButton = requiredElement('stop', 'button');
 let currentSchedule: ScheduleGrid | null = null;
 let hoveredTeam: number | null = null;
+const activeSolve = new ActiveSolve('Sports scheduling solve');
 const maxWorkerCount = getMaxWorkerCount();
-if (workerInput) {
-  workerInput.max = String(maxWorkerCount);
-  workerInput.min = '1';
-  workerInput.value = String(maxWorkerCount);
-}
+workerInput.max = String(maxWorkerCount);
+workerInput.min = '1';
+workerInput.value = String(maxWorkerCount);
 const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
 function append(text: string) {
-  if (statusEl) {
-    statusEl.textContent += `${text}\n`;
-  }
+  statusEl.textContent += `${text}\n`;
 }
 
 function setRunning(running: boolean) {
-  if (runButton) {
-    runButton.disabled = running;
-  }
-  if (stopButton) {
-    stopButton.disabled = !running;
-  }
+  runButton.disabled = running;
+  stopButton.disabled = !running;
 }
 
 function showScheduleMessage(message: string) {
-  if (scheduleMessage) {
-    scheduleMessage.textContent = message;
-  }
+  scheduleMessage.textContent = message;
   currentSchedule = null;
   hoveredTeam = null;
-  if (dayGrid) {
-    dayGrid.innerHTML = '';
-    dayGrid.classList.toggle('hidden', true);
-  }
-  if (streakGrid) {
-    streakGrid.innerHTML = '';
-  }
-  if (streakPanel) {
-    streakPanel.classList.toggle('hidden', true);
-  }
-  if (scheduleLegend) {
-    scheduleLegend.classList.toggle('hidden', true);
-  }
+  dayGrid.innerHTML = '';
+  dayGrid.classList.toggle('hidden', true);
+  streakGrid.innerHTML = '';
+  streakPanel.classList.toggle('hidden', true);
+  scheduleLegend.classList.toggle('hidden', true);
 }
 
 function countBreaks(schedule: ScheduleGrid) {
@@ -100,7 +83,6 @@ function countBreaks(schedule: ScheduleGrid) {
 }
 
 function renderSolution(statusName: string, objectiveValue: number | null | undefined, breaks: number, numTeams: number, numDays: number) {
-  if (!solutionOutput) return;
   solutionOutput.innerHTML = `
     <div class="summary-value">${breaks} breaks</div>
     <div><strong>Status:</strong> ${statusName}</div>
@@ -111,13 +93,12 @@ function renderSolution(statusName: string, objectiveValue: number | null | unde
 }
 
 function renderSchedule(schedule: ScheduleGrid, numDays: number) {
-  if (!dayGrid || !streakGrid) return;
   currentSchedule = schedule;
   dayGrid.innerHTML = '';
   streakGrid.innerHTML = '';
   dayGrid.classList.remove('hidden');
-  streakPanel?.classList.remove('hidden');
-  scheduleLegend?.classList.remove('hidden');
+  streakPanel.classList.remove('hidden');
+  scheduleLegend.classList.remove('hidden');
   streakGrid.style.setProperty('--days', String(numDays));
 
   const dayCards: string[] = [];
@@ -172,9 +153,7 @@ function renderSchedule(schedule: ScheduleGrid, numDays: number) {
     });
   });
 
-  if (scheduleMessage) {
-    scheduleMessage.textContent = 'Fixture cards show each day. Rhythm strips show each team’s home/away pattern; gold underline marks a break.';
-  }
+  scheduleMessage.textContent = 'Fixture cards show each day. Rhythm strips show each team’s home/away pattern; gold underline marks a break.';
   dayGrid.innerHTML = dayCards.join('');
   streakGrid.innerHTML = streakCells.join('');
 }
@@ -409,11 +388,6 @@ function extractSchedule(
 }
 
 async function runSportsScheduling() {
-  if (!teamsInput || !workerInput) {
-    append('Missing configuration inputs.');
-    return;
-  }
-
   const numTeams = Math.max(2, Number.parseInt(teamsInput.value, 10) || 2);
   if (numTeams % 2 !== 0) {
     append('Number of teams must be even.');
@@ -426,9 +400,10 @@ async function runSportsScheduling() {
   workerInput.value = String(workers);
   append(`Building sports scheduling model (teams=${numTeams})…`);
   showScheduleMessage('Solving…');
-  if (solutionOutput) solutionOutput.textContent = 'Solving...';
+  solutionOutput.textContent = 'Solving...';
 
   setRunning(true);
+  const signal = activeSolve.start();
   try {
     let build: SchedulingBuild;
     try {
@@ -467,9 +442,13 @@ async function runSportsScheduling() {
 
     append('Solving…');
     try {
-      const result = await CpSat.solve(model, { ...params, executor: selectedExecutor() });
+      const result = await CpSat.solve(model, {
+        ...params,
+        executor: selectedExecutor(),
+        signal,
+      });
       const response = result.response;
-      if (!response || !statusEl) {
+      if (!response) {
         append('Solver returned no response.');
         showScheduleMessage('Solver returned no response.');
         return;
@@ -494,47 +473,42 @@ async function runSportsScheduling() {
       showScheduleMessage('Solve failed.');
     }
   } finally {
+    activeSolve.finish(signal);
     setRunning(false);
   }
 }
 
-if (runButton) {
-  runButton.addEventListener('click', () => {
-    void runSportsScheduling();
-  });
-}
+runButton.addEventListener('click', () => {
+  void runSportsScheduling();
+});
 
-dayGrid?.addEventListener('pointerover', (event) => {
+dayGrid.addEventListener('pointerover', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const match = target.closest<HTMLElement>('[data-home]');
   if (!match) return;
   setHoveredTeam(Number(match.dataset.home));
 });
-dayGrid?.addEventListener('pointerout', (event) => {
+dayGrid.addEventListener('pointerout', (event) => {
   const relatedTarget = event.relatedTarget;
   if (relatedTarget instanceof Element && dayGrid.contains(relatedTarget)) return;
   setHoveredTeam(null);
 });
-streakGrid?.addEventListener('pointerover', (event) => {
+streakGrid.addEventListener('pointerover', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const cell = target.closest<HTMLElement>('[data-team]');
   if (!cell) return;
   setHoveredTeam(Number(cell.dataset.team));
 });
-streakGrid?.addEventListener('pointerout', (event) => {
+streakGrid.addEventListener('pointerout', (event) => {
   const relatedTarget = event.relatedTarget;
   if (relatedTarget instanceof Element && streakGrid.contains(relatedTarget)) return;
   setHoveredTeam(null);
 });
 
-if (stopButton) {
-  stopButton.disabled = true;
-  stopButton.addEventListener('click', () => {
-    append('Cancellation requested.');
-    void CpSat.cancelSolve().catch((err) => {
-      append(`Cancellation failed: ${(err as Error).message}`);
-    });
-  });
-}
+stopButton.disabled = true;
+stopButton.addEventListener('click', () => {
+  append('Cancellation requested.');
+  activeSolve.cancel(new Error('Sports scheduling solve cancelled.'));
+});

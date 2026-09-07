@@ -14,6 +14,7 @@ import {
   type SetCoverOperation,
 } from './protocol.js';
 import type { SolverJobEvent } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 
 export enum ConsistencyLevel {
   COST_AND_COVERAGE = 1,
@@ -130,34 +131,12 @@ function deciles(values: number[]) {
 }
 
 async function runNativeSetCover(operation: SetCoverOperation, options: SetCoverSolveOptions = {}) {
-  if (options.signal?.aborted) throw abortError(options.signal);
   const executor = createSetCoverExecutor(options.executor);
-  let callbackError: unknown = null;
-  const onEvent = async (event: SetCoverEvent) => {
-    if (callbackError) return;
-    try {
-      await options.onEvent?.(event);
-    } catch (error) {
-      callbackError = error;
-    }
-  };
-  const job = executor.execute(operation, { onEvent });
-  let aborted: Error | null = null;
-  const onAbort = () => {
-    if (!options.signal) return;
-    aborted = abortError(options.signal);
-    void job.cancel().catch(() => {});
-  };
-  options.signal?.addEventListener('abort', onAbort, { once: true });
-  if (options.signal?.aborted) onAbort();
-  try {
-    const result = await job.result;
-    if (callbackError) throw callbackError;
-    if (aborted) throw aborted;
-    return result;
-  } finally {
-    options.signal?.removeEventListener('abort', onAbort);
-  }
+  return executeSolverJob(executor, operation, {
+    signal: options.signal,
+    abortError,
+    onEvent: options.onEvent,
+  });
 }
 
 export class SetCoverModelStats {

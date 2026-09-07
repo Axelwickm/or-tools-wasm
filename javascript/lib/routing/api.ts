@@ -2,6 +2,7 @@ import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import type { SolverJobEvent } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 import { SolverServerExecutor } from '../solver_server_executor.js';
 import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
 import { DirectRoutingExecutor } from './direct_executor.js';
@@ -467,19 +468,15 @@ export class RoutingModel {
         : undefined,
     };
     const executor = createRoutingExecutor(options.executor);
-    const job = executor.execute(
+    const response = await executeSolverJob(
+      executor,
       { type: 'solve', request, interruptible: Boolean(options.signal) },
-      { onEvent: options.onEvent ?? (() => {}) },
+      {
+        onEvent: options.onEvent,
+        signal: options.signal,
+        abortError: routingAbortError,
+      },
     );
-    const onAbort = () => { void job.cancel().catch(() => {}); };
-    options.signal?.addEventListener('abort', onAbort, { once: true });
-    let response;
-    try {
-      response = await job.result;
-      if (options.signal?.aborted) throw routingAbortError(options.signal);
-    } finally {
-      options.signal?.removeEventListener('abort', onAbort);
-    }
     const result = response.solution;
     this.lastResult = result;
     this.lastStatus = result?.status ?? null;

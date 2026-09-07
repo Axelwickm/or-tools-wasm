@@ -3,14 +3,15 @@ import {
   SimpleLinearSumAssignment,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { requiredElement } from './site_support.js';
 
-const solutionOutput = document.getElementById('solution-output');
-const statusEl = document.getElementById('status');
-const graphEl = document.getElementById('assignment-graph') as SVGSVGElement | null;
-const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-const sizeInput = document.getElementById('assignment-size') as HTMLInputElement | null;
-const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
+const solutionOutput = requiredElement('solution-output', 'div');
+const statusEl = requiredElement('status', 'pre');
+const graphEl = requiredElement('assignment-graph', 'svg');
+const executorSelector = requiredElement('solver-executor', 'select');
+const sizeInput = requiredElement('assignment-size', 'input');
+const randomizeButton = requiredElement('randomize', 'button');
+const runButton = requiredElement('run', 'button');
 let readNetworkFlowExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let costs: number[][] = [
@@ -21,16 +22,13 @@ let costs: number[][] = [
 ];
 
 function setRunning(running: boolean) {
-  if (runButton) {
-    runButton.disabled = running;
-    runButton.textContent = running ? 'Solving...' : 'Solve Assignment';
-  }
-  if (randomizeButton) randomizeButton.disabled = running;
-  if (sizeInput) sizeInput.disabled = running;
+  runButton.disabled = running;
+  runButton.textContent = running ? 'Solving...' : 'Solve Assignment';
+  randomizeButton.disabled = running;
+  sizeInput.disabled = running;
 }
 
 function appendStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent = statusEl.textContent ? `${statusEl.textContent}\n${message}` : message;
 }
 
@@ -49,7 +47,7 @@ function buildAssignmentData() {
 }
 
 function assignmentSize() {
-  return Math.max(2, Number.parseInt(sizeInput?.value ?? '4', 10) || 4);
+  return Math.max(2, Number.parseInt(sizeInput.value, 10) || 4);
 }
 
 function randomCost() {
@@ -63,13 +61,12 @@ function generateCosts(size = assignmentSize()) {
 }
 
 function resetView() {
-  if (statusEl) statusEl.textContent = '';
-  if (solutionOutput) solutionOutput.textContent = 'Run the solver to view the assignment.';
+  statusEl.textContent = '';
+  solutionOutput.textContent = 'Run the solver to view the assignment.';
   renderGraph();
 }
 
 function renderSolution(assignment: SimpleLinearSumAssignment) {
-  if (!solutionOutput) return;
   const rows = Array.from({ length: assignment.numNodes() }, (_, worker) =>
     `<tr><td>${worker}</td><td>${assignment.rightMate(worker)}</td><td>${assignment.assignmentCost(worker)}</td></tr>`,
   ).join('');
@@ -82,8 +79,7 @@ function renderSolution(assignment: SimpleLinearSumAssignment) {
   `;
 }
 
-function renderGraph(matches: Array<{ worker: number; task: number; cost: number }> = []) {
-  if (!graphEl) return;
+function renderGraph(matches: Array<{ worker: number; task: number }> = []) {
   const allCosts = costs.reduce<number[]>((values, row) => values.concat(row), []);
   const minCost = Math.min(...allCosts);
   const maxCost = Math.max(...allCosts);
@@ -140,20 +136,19 @@ function renderGraph(matches: Array<{ worker: number; task: number; cost: number
 
 async function runAssignment() {
   setRunning(true);
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
   try {
     const { leftNodes, rightNodes, arcCosts } = buildAssignmentData();
     const assignment = new SimpleLinearSumAssignment();
     assignment.addArcsWithCost(leftNodes, rightNodes, arcCosts);
 
-    appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
+    appendStatus(`Solving with ${executorSelector.value} executor...`);
     const status = await assignment.solve({ executor: readNetworkFlowExecutor() });
     appendStatus(`Done. Status ${status}.`);
     renderSolution(assignment);
     renderGraph(Array.from({ length: assignment.numNodes() }, (_, worker) => ({
       worker,
       task: assignment.rightMate(worker),
-      cost: assignment.assignmentCost(worker),
     })));
   } catch (error) {
     appendStatus(error instanceof Error ? error.message : String(error));
@@ -163,13 +158,13 @@ async function runAssignment() {
   }
 }
 
-runButton?.addEventListener('click', () => void runAssignment());
-randomizeButton?.addEventListener('click', () => {
+runButton.addEventListener('click', () => void runAssignment());
+randomizeButton.addEventListener('click', () => {
   generateCosts();
   resetView();
 });
-sizeInput?.addEventListener('change', () => {
-  if (sizeInput) sizeInput.value = String(assignmentSize());
+sizeInput.addEventListener('change', () => {
+  sizeInput.value = String(assignmentSize());
   generateCosts();
   resetView();
 });

@@ -1702,9 +1702,14 @@ export class CpModel {
   }
 
   addAssumption(literal: LiteralLike) {
-    this.model.assumptions ??= [];
     const index = literalIndex(literal);
     assert(typeof index === 'number', 'assumptions require variable literals');
+    assert(
+      literal instanceof BoolVar || literal instanceof NotBoolVar,
+      'assumptions require variable literals',
+    );
+    requireSameModel(this, literal.model, 'assumption literal');
+    this.model.assumptions ??= [];
     this.model.assumptions.push(index);
   }
 

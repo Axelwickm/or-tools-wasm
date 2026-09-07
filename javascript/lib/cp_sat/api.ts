@@ -19,11 +19,12 @@ import {
   type ExecutorSelection,
   type ResolvedExecutorConfiguration,
 } from '../executor_configuration.js';
-import type {
-  SolverExecutorEventHandler,
-  SolverJobEvent,
-  SolverResourceRequest,
+import {
+  type SolverExecutorEventHandler,
+  type SolverJobEvent,
+  type SolverResourceRequest,
 } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 import { decodeProtobufWithExactLongs, encodeProtobufBigInts } from '../protobufjs_helpers.js';
 import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
@@ -210,12 +211,6 @@ function createAbortError(signal: AbortSignal) {
   return error;
 }
 
-function throwIfAborted(signal?: AbortSignal) {
-  if (signal?.aborted) {
-    throw createAbortError(signal);
-  }
-}
-
 function normalizeCpModelForProtobuf(model: CpModelProto) {
   return {
     ...model,
@@ -276,26 +271,17 @@ async function executeSolve(
   modelBytes: Uint8Array,
   options: CpSatExecuteOptions,
 ) {
-  throwIfAborted(options.signal);
-
   const eventMask = options.onEvent
     ? options.eventMask ?? { solution: true, bestBound: true, log: true }
     : {};
   const executor = options.executor;
-  let callbackError: unknown = null;
-  let abortError: unknown = null;
   const onEvent: SolverExecutorEventHandler<
     SolverJobEvent | CpSatSolverEvent
   > = async (event) => {
-    if (callbackError) return;
     const mappedEvent = decodeCpSatEvent(options.solverType, event);
-    try {
-      await options.onEvent?.(mappedEvent);
-    } catch (error) {
-      callbackError = error;
-    }
+    await options.onEvent?.(mappedEvent);
   };
-  const job = executor.execute({
+  const response = await executeSolverJob(executor, {
     type: 'solve',
     model: modelBytes,
     parameters: options.solverParametersBytes,
@@ -304,31 +290,16 @@ async function executeSolve(
       bestBound: Boolean(eventMask.bestBound),
       log: Boolean(eventMask.log),
     },
-  }, { resources: options.resources, onEvent });
-  const abortSolve = () => {
-    if (!options.signal) return;
-    abortError = createAbortError(options.signal);
-    void job.cancel().catch(() => {});
-  };
-  options.signal?.addEventListener('abort', abortSolve, { once: true });
-  if (options.signal?.aborted) {
-    abortSolve();
+  }, {
+    resources: options.resources,
+    onEvent,
+    signal: options.signal,
+    abortError: createAbortError,
+  });
+  if (response.type !== 'solve') {
+    throw new Error('CP-SAT executor returned the wrong solve payload.');
   }
-  try {
-    const response = await job.result;
-    if (callbackError) {
-      throw callbackError;
-    }
-    if (abortError) {
-      throw abortError;
-    }
-    if (response.type !== 'solve') {
-      throw new Error('CP-SAT executor returned the wrong solve payload.');
-    }
-    return response.response;
-  } finally {
-    options.signal?.removeEventListener('abort', abortSolve);
-  }
+  return response.response;
 }
 
 function schedulerResourcesFromParameters(
@@ -371,27 +342,15 @@ async function validate(
   model: Uint8Array,
   options: CpSatValidateOptions = {},
 ) {
-  throwIfAborted(options.signal);
   const executor = createCpSatExecutor(options.executor);
-  const job = executor.execute({
+  const response = await executeSolverJob(executor, {
     type: 'validate',
     model,
-  }, { onEvent: ignoreCpSatProgress });
-  let abortError: unknown = null;
-  const abortValidation = () => {
-    if (!options.signal) return;
-    abortError = createAbortError(options.signal);
-    void job.cancel().catch(() => {});
-  };
-  options.signal?.addEventListener('abort', abortValidation, { once: true });
-  if (options.signal?.aborted) abortValidation();
-  let response;
-  try {
-    response = await job.result;
-    if (abortError) throw abortError;
-  } finally {
-    options.signal?.removeEventListener('abort', abortValidation);
-  }
+  }, {
+    onEvent: ignoreCpSatProgress,
+    signal: options.signal,
+    abortError: createAbortError,
+  });
   if (response.type !== 'validate') {
     throw new Error('CP-SAT executor returned the wrong validate payload.');
   }

@@ -2,6 +2,7 @@ import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import type { SolverJobEvent } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 import { SolverServerExecutor } from '../solver_server_executor.js';
 import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
 import { DirectKnapsackExecutor } from './direct_executor.js';
@@ -129,7 +130,6 @@ export class KnapsackSolver {
   }
 
   private async solveOnce(options: KnapsackSolveOptions): Promise<bigint> {
-    if (options.signal?.aborted) throw abortError(options.signal);
     const executor = createKnapsackExecutor(options.executor);
     const operation = {
       solverType: this.solverType,
@@ -140,34 +140,14 @@ export class KnapsackSolver {
       weights: this.weights,
       capacities: this.capacities,
     };
-    let callbackError: unknown = null;
-    const onEvent = async (event: KnapsackEvent) => {
-      if (callbackError) return;
-      try {
-        await options.onEvent?.(event);
-      } catch (error) {
-        callbackError = error;
-      }
-    };
-    const job = executor.execute(operation, { onEvent });
-    let aborted: Error | null = null;
-    const onAbort = () => {
-      if (!options.signal) return;
-      aborted = abortError(options.signal);
-      void job.cancel().catch(() => {});
-    };
-    options.signal?.addEventListener('abort', onAbort, { once: true });
-    if (options.signal?.aborted) onAbort();
-    try {
-      const result = await job.result;
-      if (callbackError) throw callbackError;
-      if (aborted) throw aborted;
-      this.solutionContains = [...result.contains];
-      this.solutionOptimal = result.optimal;
-      return result.profit;
-    } finally {
-      options.signal?.removeEventListener('abort', onAbort);
-    }
+    const result = await executeSolverJob(executor, operation, {
+      signal: options.signal,
+      abortError,
+      onEvent: options.onEvent,
+    });
+    this.solutionContains = [...result.contains];
+    this.solutionOptimal = result.optimal;
+    return result.profit;
   }
 
   bestSolutionContains(itemId: number): boolean { return this.solutionContains[itemId] === true; }

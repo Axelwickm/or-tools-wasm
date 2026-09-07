@@ -4,17 +4,18 @@ import {
   KnapsackSolverType,
 } from 'or-tools-wasm/knapsack';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { requiredElement } from './site_support.js';
 
-const matrixEl = document.getElementById('matrix') as HTMLTableElement | null;
-const solutionOutput = document.getElementById('solution-output');
-const usageOutput = document.getElementById('usage-output');
-const statusEl = document.getElementById('status');
-const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const addItemButton = document.getElementById('add-item') as HTMLButtonElement | null;
-const removeItemButton = document.getElementById('remove-item') as HTMLButtonElement | null;
-const addResourceButton = document.getElementById('add-resource') as HTMLButtonElement | null;
-const removeResourceButton = document.getElementById('remove-resource') as HTMLButtonElement | null;
+const matrixEl = requiredElement('matrix', 'table');
+const solutionOutput = requiredElement('solution-output', 'div');
+const usageOutput = requiredElement('usage-output', 'div');
+const statusEl = requiredElement('status', 'pre');
+const executorSelector = requiredElement('solver-executor', 'select');
+const runButton = requiredElement('run', 'button');
+const addItemButton = requiredElement('add-item', 'button');
+const removeItemButton = requiredElement('remove-item', 'button');
+const addResourceButton = requiredElement('add-resource', 'button');
+const removeResourceButton = requiredElement('remove-resource', 'button');
 
 let values = [
   360, 83, 59, 130, 431, 67, 230, 52, 93, 125, 670, 892, 600, 38, 48, 147,
@@ -28,18 +29,16 @@ let weights = [[
 let capacities = [240, 150];
 let resourceNames = ['Weight', 'Volume'];
 let selectedItems: number[] = [];
-let lastProfit: number | null = null;
+let lastProfit: bigint | null = null;
 let lastOptimal = false;
 let readKnapsackExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 function setRunning(running: boolean) {
-  if (!runButton) return;
   runButton.disabled = running;
   runButton.textContent = running ? 'Solving...' : 'Solve Knapsack';
 }
 
 function appendStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent = statusEl.textContent ? `${statusEl.textContent}\n${message}` : message;
 }
 
@@ -49,7 +48,6 @@ function readNumberInput(input: HTMLInputElement): number {
 }
 
 function syncFromInputs() {
-  if (!matrixEl) return;
   for (const input of matrixEl.querySelectorAll<HTMLInputElement>('input[data-kind="value"]')) {
     values[Number(input.dataset.item)] = readNumberInput(input);
   }
@@ -74,7 +72,6 @@ function resourceName(dimension: number) {
 }
 
 function renderMatrix() {
-  if (!matrixEl) return;
   const selected = new Set(selectedItems);
   const headerCells = values
     .map((_, item) => `<th class="${selected.has(item) ? 'selected-column' : ''}">Item ${item}</th>`)
@@ -139,7 +136,6 @@ function renderMatrix() {
 }
 
 function renderSolution() {
-  if (!solutionOutput || !usageOutput) return;
   if (lastProfit === null) {
     solutionOutput.textContent = 'Run the solver to view the solution.';
     usageOutput.innerHTML = '';
@@ -173,7 +169,7 @@ function renderSolution() {
 
 async function runKnapsack() {
   setRunning(true);
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
   try {
     syncFromInputs();
     selectedItems = [];
@@ -187,7 +183,7 @@ async function runKnapsack() {
     );
     solver.init(values, weights, capacities);
 
-    appendStatus(`Solving with ${executorSelector?.value ?? 'auto'} executor...`);
+    appendStatus(`Solving with ${executorSelector.value} executor...`);
     lastProfit = await solver.solve({ executor: readKnapsackExecutor() });
     selectedItems = values
       .map((_, item) => item)
@@ -240,17 +236,17 @@ function removeResource() {
   clearSolution();
 }
 
-matrixEl?.addEventListener('input', () => {
+matrixEl.addEventListener('input', () => {
   selectedItems = [];
   lastProfit = null;
   lastOptimal = false;
   renderSolution();
 });
-runButton?.addEventListener('click', () => void runKnapsack());
-addItemButton?.addEventListener('click', addItem);
-removeItemButton?.addEventListener('click', removeItem);
-addResourceButton?.addEventListener('click', addResource);
-removeResourceButton?.addEventListener('click', removeResource);
+runButton.addEventListener('click', () => void runKnapsack());
+addItemButton.addEventListener('click', addItem);
+removeItemButton.addEventListener('click', removeItem);
+addResourceButton.addEventListener('click', addResource);
+removeResourceButton.addEventListener('click', removeResource);
 
 renderMatrix();
 renderSolution();

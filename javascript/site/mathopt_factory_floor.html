@@ -502,10 +502,12 @@ const demand = model.addLinearConstraint({
 model.maximize([{ variable: startBreadNow, coefficient: 100 }]);
 
 // Keep this solver object alive between replans.
+const controller = new AbortController();
 const solver = new MathOpt.IncrementalSolver(model, MathOpt.SolverType.CP_SAT, {
   executor: 'worker',
   threads: 4,
   cpSat: { maxTimeInSeconds: 1 },
+  signal: controller.signal,
 });
 
 async function replanAfterFactoryStateChanges(openBreadOrders: number, freeMixers: number) {
@@ -523,7 +525,14 @@ async function replanAfterFactoryStateChanges(openBreadOrders: number, freeMixer
 
   // The example also solves a short conveyor traffic model for safe dispatch timing.
   await planTrafficDispatches();
-}</code></pre>
+}
+
+async function stopPlanner() {
+  controller.abort(new Error('The planner was stopped.'));
+  await solver.close();
+}
+
+window.addEventListener('pagehide', () => void stopPlanner().catch(console.error), { once: true });</code></pre>
       </details>
     </div>
 

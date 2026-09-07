@@ -4,6 +4,7 @@ import {
   type RcpspScheduleTask,
 } from 'or-tools-wasm/rcpsp';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { requiredElement } from './site_support.js';
 
 type ActivitySpec = {
   name: string;
@@ -11,6 +12,11 @@ type ActivitySpec = {
   crew: number;
   successors: string[];
   color: string;
+};
+
+type DisplayScheduleTask = Omit<RcpspScheduleTask, 'start' | 'end'> & {
+  start: number;
+  end: number;
 };
 
 const activities: ActivitySpec[] = [
@@ -21,26 +27,24 @@ const activities: ActivitySpec[] = [
   { name: 'inspect', duration: 1, crew: 1, successors: [], color: '#cf222e' },
 ];
 
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const statusEl = document.getElementById('status');
-const metricsEl = document.getElementById('metrics');
-const timelineEl = document.getElementById('timeline');
-const activitiesEl = document.getElementById('activities');
-const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-const workersInput = document.getElementById('workers') as HTMLInputElement | null;
+const runButton = requiredElement('run', 'button');
+const statusEl = requiredElement('status', 'pre');
+const metricsEl = requiredElement('metrics', 'div');
+const timelineEl = requiredElement('timeline', 'div');
+const activitiesEl = requiredElement('activities', 'div');
+const executorSelector = requiredElement('solver-executor', 'select');
+const workersInput = requiredElement('workers', 'input');
 
-let scheduleTasks: RcpspScheduleTask[] = [];
+let scheduleTasks: DisplayScheduleTask[] = [];
 let makespan: number | null = null;
 let hoveredActivity: string | null = null;
 
 function setRunning(running: boolean) {
-  if (!runButton) return;
   runButton.disabled = running;
   runButton.textContent = running ? 'Solving...' : 'Solve Schedule';
 }
 
 function appendStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent = statusEl.textContent ? `${statusEl.textContent}\n${message}` : message;
 }
 
@@ -70,7 +74,6 @@ function readPositiveInteger(input: HTMLInputElement, fallback: number) {
 }
 
 function syncActivitiesFromInputs() {
-  if (!activitiesEl) return;
   for (const input of activitiesEl.querySelectorAll<HTMLInputElement>('input[data-field]')) {
     const activity = activityByName(input.dataset.activity ?? '');
     if (!activity) continue;
@@ -97,7 +100,6 @@ function buildProject() {
 }
 
 function renderActivities() {
-  if (!activitiesEl) return;
   const related = relatedActivities(hoveredActivity);
   const byName = scheduleByName();
   activitiesEl.innerHTML = activities.map((activity) => {
@@ -129,7 +131,6 @@ function renderActivities() {
 }
 
 function renderMetrics(statusName: string, workers: number) {
-  if (!metricsEl) return;
   metricsEl.innerHTML = `
     <div class="summary-value">Makespan ${makespan ?? '-'}</div>
     <div><strong>Status:</strong> ${statusName}</div>
@@ -138,7 +139,6 @@ function renderMetrics(statusName: string, workers: number) {
 }
 
 function renderTimeline() {
-  if (!timelineEl) return;
   if (makespan === null) {
     timelineEl.textContent = 'Run the solver to view the schedule.';
     return;
@@ -186,7 +186,7 @@ function setHoveredActivity(name: string | null) {
 
 async function solve() {
   setRunning(true);
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
   try {
     syncActivitiesFromInputs();
     scheduleTasks = [];
@@ -194,15 +194,19 @@ async function solve() {
     renderActivities();
     renderTimeline();
 
-    const workers = Math.max(1, Number(workersInput?.value || 1));
-    appendStatus(`Solving with the ${executorSelector?.value ?? 'auto'} executor...`);
+    const workers = Math.max(1, Number(workersInput.value || 1));
+    appendStatus(`Solving with the ${executorSelector.value} executor...`);
     const result = await buildProject().solve({
       numWorkers: workers,
       maxTimeInSeconds: 5,
       executor: selectedExecutor() as ExecutorConfiguration,
     });
-    scheduleTasks = result.tasks;
-    makespan = result.makespan;
+    scheduleTasks = result.tasks.map((task) => ({
+      ...task,
+      start: Number(task.start),
+      end: Number(task.end),
+    }));
+    makespan = result.makespan === null ? null : Number(result.makespan);
     renderActivities();
     renderMetrics(result.statusName, workers);
     renderTimeline();
@@ -217,36 +221,36 @@ async function solve() {
 
 const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
-activitiesEl?.addEventListener('pointerover', (event) => {
+activitiesEl.addEventListener('pointerover', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const card = target.closest<HTMLElement>('[data-activity]');
   setHoveredActivity(card?.dataset.activity ?? null);
 });
-activitiesEl?.addEventListener('pointerout', (event) => {
+activitiesEl.addEventListener('pointerout', (event) => {
   const relatedTarget = event.relatedTarget;
   if (relatedTarget instanceof Element && activitiesEl.contains(relatedTarget)) return;
   setHoveredActivity(null);
 });
-activitiesEl?.addEventListener('input', () => {
+activitiesEl.addEventListener('input', () => {
   syncActivitiesFromInputs();
   scheduleTasks = [];
   makespan = null;
-  if (metricsEl) metricsEl.textContent = 'Run the solver to view the solution.';
+  metricsEl.textContent = 'Run the solver to view the solution.';
   renderTimeline();
 });
-timelineEl?.addEventListener('pointerover', (event) => {
+timelineEl.addEventListener('pointerover', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const bar = target.closest<HTMLElement>('[data-activity]');
   setHoveredActivity(bar?.dataset.activity ?? null);
 });
-timelineEl?.addEventListener('pointerout', (event) => {
+timelineEl.addEventListener('pointerout', (event) => {
   const relatedTarget = event.relatedTarget;
   if (relatedTarget instanceof Element && timelineEl.contains(relatedTarget)) return;
   setHoveredActivity(null);
 });
-runButton?.addEventListener('click', () => void solve());
+runButton.addEventListener('click', () => void solve());
 
 renderActivities();
 renderTimeline();

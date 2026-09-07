@@ -114,6 +114,7 @@ type MathOptSolveOptions = {
   cpSat?: unknown;
   pdlp?: unknown;
   glpk?: unknown;
+  signal?: AbortSignal;
 };
 
 type MathOptSolverTypeLike = {
@@ -791,6 +792,11 @@ async function testIncrementalSolveErrorOnReject(api: MathOptApi): Promise<strin
     /duplicate name/i,
     `${name}: duplicate name after rejected update should be rejected`,
   );
+  await assertRejects(
+    () => solver.solve(),
+    /unusable after a failed operation/i,
+    `${name}: solver should remain unusable after a failed native operation`,
+  );
   await solver.close();
   return `${name} PASS`;
 }
@@ -845,9 +851,13 @@ async function testMultipleIncrementalLps(api: MathOptApi): Promise<string> {
 // Ported from ortools/math_opt/python/solve_test.py:576-593 (close/close twice)
 async function testIncrementalSolverClose(api: MathOptApi): Promise<string> {
   const name = 'SolveTest/test_incremental_solver_close';
-  // TEMP: parity - close releases the native handle, is idempotent, and future solve calls reject as closed.
+  // TEMP: parity - close releases the native handle, ignores an expired solve signal, is idempotent, and rejects future solves.
   const model = api.MathOpt.Model();
-  const solver = new api.MathOpt.IncrementalSolver(model, 'GLOP');
+  model.addVariable({ lowerBound: 0, upperBound: 1 });
+  const controller = new AbortController();
+  const solver = new api.MathOpt.IncrementalSolver(model, 'GLOP', { signal: controller.signal });
+  await solver.solve();
+  controller.abort(new Error('solve signal expired'));
   await solver.close();
   await solver.close();
   await assertRejects(

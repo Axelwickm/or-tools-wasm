@@ -14,6 +14,7 @@ import {
   type NetworkFlowResult,
 } from './protocol.js';
 import type { SolverJobEvent } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 import { toIndex, toInt64, type IntValue } from '../int64.js';
 
 const INT32_MAX = 2_147_483_647;
@@ -93,34 +94,12 @@ async function solveNetworkFlow(
   operation: NetworkFlowOperation,
   options: NetworkFlowSolveOptions = {},
 ): Promise<NetworkFlowResult> {
-  if (options.signal?.aborted) throw abortError(options.signal);
   const executor = createNetworkFlowExecutor(options.executor);
-  let callbackError: unknown = null;
-  const onEvent = async (event: NetworkFlowEvent) => {
-    if (callbackError) return;
-    try {
-      await options.onEvent?.(event);
-    } catch (error) {
-      callbackError = error;
-    }
-  };
-  const job = executor.execute(operation, { onEvent });
-  let aborted: Error | null = null;
-  const onAbort = () => {
-    if (!options.signal) return;
-    aborted = abortError(options.signal);
-    void job.cancel().catch(() => {});
-  };
-  options.signal?.addEventListener('abort', onAbort, { once: true });
-  if (options.signal?.aborted) onAbort();
-  try {
-    const result = await job.result;
-    if (callbackError) throw callbackError;
-    if (aborted) throw aborted;
-    return result;
-  } finally {
-    options.signal?.removeEventListener('abort', onAbort);
-  }
+  return executeSolverJob(executor, operation, {
+    signal: options.signal,
+    abortError,
+    onEvent: options.onEvent,
+  });
 }
 
 export enum SimpleMaxFlowStatus {

@@ -118,6 +118,12 @@ await solver.solve(model, { numWorkers: 1, executor: 'worker' });
 console.log(solver.value(x));
 ```
 
+All solver operations accept the same lifecycle controls at the solve boundary:
+choose execution with `executor`, observe job events with `onEvent`, and cancel
+with an `AbortSignal` in `signal`. Persistent `MathOpt.IncrementalSolver`
+instances should be closed when replaced or no longer needed; `close()` waits
+for active work and performs cleanup independently of the solve signal.
+
 ## API reference
 
 See [docs/api.md](docs/api.md) for the full TypeScript API reference.

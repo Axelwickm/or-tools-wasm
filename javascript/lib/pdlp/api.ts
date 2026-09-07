@@ -13,10 +13,11 @@ import {
   type PdlpSolveParameters as BridgePdlpSolveParameters,
   type PdlpSolverResult as BridgePdlpSolverResult,
 } from '../generated/bridge/pdlp_pb.js';
-import type {
-  SolverJobEvent,
-  SolverResourceRequest,
+import {
+  type SolverJobEvent,
+  type SolverResourceRequest,
 } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 import { SolverServerExecutor } from '../solver_server_executor.js';
 import {
   SolverWorkerExecutor,
@@ -378,27 +379,13 @@ async function execute(
   options: PdlpExecutionOptions = {},
   resources?: SolverResourceRequest,
 ): Promise<PdlpResult> {
-  throwIfAborted(options.signal);
   const executor = createPdlpExecutor(options.executor);
-  const job = executor.execute(request, {
-    onEvent: options.onEvent ?? (() => {}),
+  return executeSolverJob(executor, request, {
+    onEvent: options.onEvent,
     resources,
+    signal: options.signal,
+    abortError: createAbortError,
   });
-  let cancellationError: Error | undefined;
-  const onAbort = () => {
-    if (!options.signal) return;
-    cancellationError = createAbortError(options.signal);
-    void job.cancel().catch(() => {});
-  };
-  options.signal?.addEventListener('abort', onAbort, { once: true });
-  if (options.signal?.aborted) onAbort();
-  try {
-    const response = await job.result;
-    if (cancellationError) throw cancellationError;
-    return response;
-  } finally {
-    options.signal?.removeEventListener('abort', onAbort);
-  }
 }
 
 function schedulerResourcesFromParameters(
@@ -418,10 +405,6 @@ function createAbortError(signal: AbortSignal) {
   );
   error.name = 'AbortError';
   return error;
-}
-
-function throwIfAborted(signal?: AbortSignal) {
-  if (signal?.aborted) throw createAbortError(signal);
 }
 
 export class QuadraticProgram {

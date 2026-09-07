@@ -56,7 +56,7 @@ function createServerSettings(selector: HTMLSelectElement) {
   endpointInput.type = 'url';
   endpointInput.placeholder = defaultServerEndpoint();
   endpointInput.value = storedServerEndpoint();
-  endpointInput.autocomplete = 'url';
+  endpointInput.setAttribute('autocomplete', 'url');
   endpointInput.spellcheck = false;
   endpointLabel.append(endpointInput);
 

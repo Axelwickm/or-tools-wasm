@@ -67,6 +67,10 @@ jobs:
         if: ${{ !env.ACT }}
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
 
+      - name: Run JavaScript unit tests
+        if: ${{ !env.ACT }}
+        run: npm --prefix javascript run test:unit
+
       - name: Prepare package README for release tag
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: node scripts/prepare_package_readme.mjs "$GITHUB_REF_NAME"

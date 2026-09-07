@@ -3,36 +3,34 @@ import {
   SimpleMaxFlow,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { requiredElement } from './site_support.js';
 
 type Node = { id: number; label: string; x: number; y: number; kind: 'source' | 'middle' | 'sink' };
 type Arc = { from: number; to: number; capacity: number; flow?: number };
 
-const solutionOutput = document.getElementById('solution-output');
-const statusEl = document.getElementById('status');
-const graphEl = document.getElementById('flow-graph') as SVGSVGElement | null;
-const executorSelector = document.getElementById('solver-executor') as HTMLSelectElement | null;
-const middleCountInput = document.getElementById('middle-count') as HTMLInputElement | null;
-const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
+const solutionOutput = requiredElement('solution-output', 'div');
+const statusEl = requiredElement('status', 'pre');
+const graphEl = requiredElement('flow-graph', 'svg');
+const executorSelector = requiredElement('solver-executor', 'select');
+const middleCountInput = requiredElement('middle-count', 'input');
+const randomizeButton = requiredElement('randomize', 'button');
+const runButton = requiredElement('run', 'button');
 let readNetworkFlowExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let nodes: Node[] = [];
 let arcs: Arc[] = [];
 
 const randomInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
-const middleCount = () => Math.max(3, Number.parseInt(middleCountInput?.value ?? '8', 10) || 8);
+const middleCount = () => Math.max(3, Number.parseInt(middleCountInput.value, 10) || 8);
 
 function setRunning(running: boolean) {
-  if (runButton) {
-    runButton.disabled = running;
-    runButton.textContent = running ? 'Solving...' : 'Solve Max Flow';
-  }
-  if (randomizeButton) randomizeButton.disabled = running;
-  if (middleCountInput) middleCountInput.disabled = running;
+  runButton.disabled = running;
+  runButton.textContent = running ? 'Solving...' : 'Solve Max Flow';
+  randomizeButton.disabled = running;
+  middleCountInput.disabled = running;
 }
 
 function appendStatus(message: string) {
-  if (!statusEl) return;
   statusEl.textContent = statusEl.textContent ? `${statusEl.textContent}\n${message}` : message;
 }
 
@@ -71,7 +69,6 @@ function generateGraph() {
 }
 
 function renderGraph(solved = false) {
-  if (!graphEl) return;
   const maxFlow = Math.max(...arcs.map((arc) => arc.flow ?? 0), 1);
   const arcSvg = arcs.map((arc) => {
     const from = nodes[arc.from];
@@ -116,14 +113,14 @@ function renderGraph(solved = false) {
 }
 
 function resetView() {
-  if (statusEl) statusEl.textContent = '';
-  if (solutionOutput) solutionOutput.textContent = 'Run the solver to view the max-flow solution.';
+  statusEl.textContent = '';
+  solutionOutput.textContent = 'Run the solver to view the max-flow solution.';
   renderGraph(false);
 }
 
 async function runMaxFlow() {
   setRunning(true);
-  if (statusEl) statusEl.textContent = '';
+  statusEl.textContent = '';
   try {
     const maxFlow = new SimpleMaxFlow();
     const allArcs = maxFlow.addArcsWithCapacity(
@@ -132,7 +129,7 @@ async function runMaxFlow() {
       arcs.map((arc) => arc.capacity),
     );
 
-    appendStatus(`Solving with ${executorSelector?.value ?? 'worker'} executor...`);
+    appendStatus(`Solving with ${executorSelector.value} executor...`);
     const status = await maxFlow.solve(0, nodes.length - 1, {
       executor: readNetworkFlowExecutor(),
     });
@@ -141,17 +138,15 @@ async function runMaxFlow() {
     arcs = allArcs.map((arc) => ({
       from: maxFlow.tail(arc),
       to: maxFlow.head(arc),
-      capacity: maxFlow.capacity(arc),
-      flow: maxFlow.flow(arc),
+      capacity: Number(maxFlow.capacity(arc)),
+      flow: Number(maxFlow.flow(arc)),
     }));
     renderGraph(true);
-    if (solutionOutput) {
-      solutionOutput.innerHTML = `
+    solutionOutput.innerHTML = `
         <strong>Optimal flow:</strong> ${maxFlow.optimalFlow()}<br>
         <strong>Source-side min cut:</strong> ${maxFlow.getSourceSideMinCut().join(', ')}<br>
         <strong>Sink-side min cut:</strong> ${maxFlow.getSinkSideMinCut().join(', ')}
       `;
-    }
   } catch (error) {
     appendStatus(error instanceof Error ? error.message : String(error));
     throw error;
@@ -160,13 +155,13 @@ async function runMaxFlow() {
   }
 }
 
-runButton?.addEventListener('click', () => void runMaxFlow());
-randomizeButton?.addEventListener('click', () => {
+runButton.addEventListener('click', () => void runMaxFlow());
+randomizeButton.addEventListener('click', () => {
   generateGraph();
   resetView();
 });
-middleCountInput?.addEventListener('change', () => {
-  if (middleCountInput) middleCountInput.value = String(middleCount());
+middleCountInput.addEventListener('change', () => {
+  middleCountInput.value = String(middleCount());
   generateGraph();
   resetView();
 });

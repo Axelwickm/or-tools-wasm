@@ -148,6 +148,7 @@ type StartDecision = {
 type PlannerModel = {
   model: MathOptModel;
   solver: MathOptIncrementalSolver;
+  controller: AbortController;
   starts: Record<ProductType, MathOptVariable[]>;
   demandConstraints: Record<ProductType, MathOptLinearConstraint>;
   resourceConstraints: Record<ResourceType, MathOptLinearConstraint>;
@@ -486,6 +487,7 @@ let totalDelivered = 0;
 let ingredientStock: Record<ResourceType, number> = { ...initialIngredients };
 let cells = buildCells();
 let planner: PlannerModel | null = null;
+let plannerCleanup: Promise<void> = Promise.resolve();
 let plan: BakeryPlan | null = null;
 let lastError = '';
 let movementPlanStatus = 'Idle';
@@ -765,7 +767,12 @@ async function solvePlan(): Promise<void> {
     let launched = zeroProductRecord();
     if (Object.values(need).some((value) => value > 0)) {
       updatePlanner(nextPlanner, need);
-      result = await solveWithPlanner(nextPlanner);
+      try {
+        result = await solveWithPlanner(nextPlanner);
+      } catch (error) {
+        await disposePlanner(nextPlanner, 'The production planner solve failed.');
+        throw error;
+      }
       startDecisions = plannedStartDecisions(result.variableValues, nextPlanner);
       desiredStarts = summarizeStartDecisions(startDecisions);
       launched = launchFromPlan(startDecisions);
@@ -794,6 +801,7 @@ async function solvePlan(): Promise<void> {
 }
 
 async function ensurePlanner(): Promise<PlannerModel> {
+  await plannerCleanup;
   if (planner) return planner;
   const model = MathOpt.Model('rolling_bakery_cp_sat_planner');
   const starts = Object.fromEntries(productTypes.map((product) => [
@@ -852,14 +860,16 @@ async function ensurePlanner(): Promise<PlannerModel> {
     coefficient: objectiveCoefficient(product, slot, zeroProductRecord()),
   }))));
 
+  const controller = new AbortController();
   const solver = new MathOpt.IncrementalSolver(
     model,
     MathOpt.SolverType.CP_SAT,
-    { ...cpSatPlannerOptions(), executor: selectedExecutor() },
+    { ...cpSatPlannerOptions(), executor: selectedExecutor(), signal: controller.signal },
   );
   planner = {
     model,
     solver,
+    controller,
     starts,
     demandConstraints,
     resourceConstraints,
@@ -867,6 +877,22 @@ async function ensurePlanner(): Promise<PlannerModel> {
     totalStartsConstraint,
   };
   return planner;
+}
+
+function disposePlanner(current = planner, reason = 'The production planner was replaced.'): Promise<void> {
+  if (!current) return plannerCleanup;
+  if (planner === current) planner = null;
+  current.controller.abort(new Error(reason));
+  const cleanup = plannerCleanup.then(async () => {
+    try {
+      await current.solver.close();
+    } catch {
+      // close() retains the native handle after a cleanup failure, so retry once.
+      await current.solver.close();
+    }
+  });
+  plannerCleanup = cleanup.catch(() => {});
+  return cleanup;
 }
 
 function updatePlanner(current: PlannerModel, need: Record<ProductType, number>): void {
@@ -2222,6 +2248,9 @@ function stopSimulation(): void {
 
 function resetSimulation(): void {
   stopSimulation();
+  void disposePlanner().catch((error) => {
+    lastError = `Could not close production planner: ${(error as Error).message}`;
+  });
   for (const machine of machineLayout) machine.tokenId = null;
   customers = [];
   jobs = [];
@@ -2241,7 +2270,6 @@ function resetSimulation(): void {
   movementPlanStatus = 'Idle';
   renderedBoardRunning = null;
   plan = null;
-  planner = null;
   lastError = '';
   if (workerThreadsInput) workerThreadsInput.value = String(Math.min(4, maxWorkerCount));
   renderAll();
@@ -2302,7 +2330,9 @@ toggleRunningButton?.addEventListener('click', () => {
 resetFloorButton?.addEventListener('click', resetSimulation);
 
 executorSelector?.addEventListener('change', () => {
-  planner = null;
+  void disposePlanner().catch((error) => {
+    lastError = `Could not close production planner: ${(error as Error).message}`;
+  });
   requestPlanSoon();
   renderMetrics();
 });
@@ -2310,9 +2340,15 @@ executorSelector?.addEventListener('change', () => {
 workerThreadsInput?.addEventListener('input', () => {
   const clamped = currentThreadCount();
   if (workerThreadsInput) workerThreadsInput.value = String(clamped);
-  planner = null;
+  void disposePlanner().catch((error) => {
+    lastError = `Could not close production planner: ${(error as Error).message}`;
+  });
   requestPlanSoon();
   renderMetrics();
 });
+
+window.addEventListener('pagehide', () => {
+  void disposePlanner(undefined, 'The bakery page is closing.').catch(() => {});
+}, { once: true });
 
 renderAll();

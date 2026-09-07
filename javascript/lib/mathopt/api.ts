@@ -4,10 +4,11 @@ import {
   type ExecutorSelection,
   type ResolvedExecutorConfiguration,
 } from '../executor_configuration.js';
-import type {
-  SolverJobEvent,
-  SolverResourceRequest,
+import {
+  type SolverJobEvent,
+  type SolverResourceRequest,
 } from '../solver_executor.js';
+import { executeSolverJob } from '../solver_job.js';
 import { SolverServerExecutor } from '../solver_server_executor.js';
 import {
   SolverWorkerExecutor,
@@ -1362,7 +1363,7 @@ export class MathOptModel {
   }
 
   encodeModelUpdateSince(snapshot: MathOptModelSnapshot, options: { removeNames?: boolean } = {}): Uint8Array | null {
-    return encodeModelUpdate(this, snapshot, options);
+    return encodeModelUpdate(snapshot, this.snapshot(), options);
   }
 
   assertOwnsVariable(variable: MathOptVariable): void {
@@ -2151,7 +2152,10 @@ export class MathOptIncrementalSolver {
   private readonly initPromise: Promise<number>;
   private checkpoint: MathOptModelSnapshot;
   private handle: number | null = null;
-  private closed = false;
+  private state: 'open' | 'failed' | 'closing' | 'closed' = 'open';
+  private activeSolve: Promise<MathOptSolveResult> | null = null;
+  private closePromise: Promise<void> | null = null;
+  private callbackDepth = 0;
   private readonly executor: MathOptExecutor;
   readonly options: MathOptIncrementalSolveOptions;
 
@@ -2171,74 +2175,145 @@ export class MathOptIncrementalSolver {
   }
 
   private async create(): Promise<number> {
-    const requestBytes = MathOpt.encodeSolveRequest(this.model, {
+    const requestBytes = encodeSolveRequest(this.model, {
       ...this.options,
       solverType: this.solverType,
     });
-    const responseBytes = await executeMathOptRequest(this.executor, {
+    let handle = 0;
+    await executeMathOptRequest(this.executor, {
       type: 'incrementalCreate',
       request: requestBytes,
-    }, this.options);
-    const response = readMessage(responseBytes);
-    const statusBytes = response.messages.get(3)?.[0];
-    if (statusBytes) {
-      const status = readMessage(statusBytes);
-      throw new Error(status.strings.get(2)?.[0] ?? 'MathOpt incremental solver creation failed.');
-    }
-    const handleText = response.strings.get(2)?.[0];
-    const handle = handleText === undefined ? 0 : toIndex(BigInt(handleText), 'MathOpt incremental solver handle');
-    if (handle <= 0) {
-      throw new Error('MathOpt incremental solver creation returned no solver handle.');
-    }
-    this.handle = handle;
+    }, this.withLifecycleEvent(this.options), (responseBytes) => {
+      const response = readMessage(responseBytes);
+      const statusBytes = response.messages.get(3)?.[0];
+      if (statusBytes) {
+        const status = readMessage(statusBytes);
+        throw new Error(status.strings.get(2)?.[0] ?? 'MathOpt incremental solver creation failed.');
+      }
+      const handleText = response.strings.get(2)?.[0];
+      handle = handleText === undefined
+        ? 0
+        : toIndex(BigInt(handleText), 'MathOpt incremental solver handle');
+      if (handle <= 0) {
+        throw new Error('MathOpt incremental solver creation returned no solver handle.');
+      }
+      this.handle = handle;
+    });
     return handle;
   }
 
-  async solve(options: MathOptIncrementalSolveOptions = {}): Promise<MathOptSolveResult> {
-    if (this.closed) {
-      throw new Error('MathOpt IncrementalSolver is closed.');
+  solve(options: MathOptIncrementalSolveOptions = {}): Promise<MathOptSolveResult> {
+    if (this.state === 'failed') {
+      return Promise.reject(new Error('MathOpt IncrementalSolver is unusable after a failed operation; close it and create a new solver.'));
     }
-    const handle = await this.initPromise;
+    if (this.state !== 'open') {
+      return Promise.reject(new Error('MathOpt IncrementalSolver is closed or closing.'));
+    }
+    if (this.activeSolve) {
+      return Promise.reject(new Error('MathOpt IncrementalSolver already has a solve in progress.'));
+    }
+    let operation!: Promise<MathOptSolveResult>;
+    operation = this.solveOnce(options).finally(() => {
+      if (this.activeSolve === operation) this.activeSolve = null;
+    });
+    this.activeSolve = operation;
+    return operation;
+  }
+
+  private async solveOnce(options: MathOptIncrementalSolveOptions): Promise<MathOptSolveResult> {
+    let handle: number;
+    try {
+      handle = await this.initPromise;
+    } catch (error) {
+      if (this.state === 'open') this.state = 'failed';
+      throw error;
+    }
     const mergedOptions: MathOptSolveOptions = {
       ...this.options,
       ...options,
       solverType: this.solverType,
     };
     const removeNames = mergedOptions.removeNames ?? false;
-    const updateBytes = this.model.encodeModelUpdateSince(this.checkpoint, { removeNames });
-    const requestBytes = MathOpt.encodeSolveRequest(this.model, mergedOptions);
+    const requestBytes = encodeSolveRequest(this.model, mergedOptions);
+    const submittedCheckpoint = this.model.snapshot();
+    const updateBytes = encodeModelUpdate(this.checkpoint, submittedCheckpoint, { removeNames });
     const interrupterState = solveInterrupterState(mergedOptions);
-    const responseBytes = await executeMathOptRequest(this.executor, {
-      type: 'incrementalSolve',
-      handle: BigInt(handle),
-      request: requestBytes,
-      modelUpdate: updateBytes ?? undefined,
-      useInterrupter: interrupterState.useInterrupter,
-      interruptAtStart: interrupterState.interrupted,
-    }, mergedOptions);
-    const result = decodeSolveResponse(responseBytes, this.model);
-    this.checkpoint = this.model.snapshot();
+    let result: MathOptSolveResult | undefined;
+    let operationCommitted = false;
+    try {
+      await executeMathOptRequest(this.executor, {
+        type: 'incrementalSolve',
+        handle: BigInt(handle),
+        request: requestBytes,
+        modelUpdate: updateBytes ?? undefined,
+        useInterrupter: interrupterState.useInterrupter,
+        interruptAtStart: interrupterState.interrupted,
+      }, this.withLifecycleEvent(mergedOptions), (responseBytes) => {
+        result = decodeSolveResponse(responseBytes, this.model);
+        this.checkpoint = submittedCheckpoint;
+        operationCommitted = true;
+      });
+    } catch (error) {
+      if (!operationCommitted && this.state === 'open') this.state = 'failed';
+      throw error;
+    }
+    if (!result) throw new Error('MathOpt incremental solve returned no result.');
     const messageCallback = solveMessageCallback(mergedOptions);
     if (messageCallback && result.messages.length > 0) {
-      messageCallback(result.messages);
+      this.callbackDepth += 1;
+      try {
+        messageCallback(result.messages);
+      } finally {
+        this.callbackDepth -= 1;
+      }
     }
     return result;
   }
 
-  async close(): Promise<void> {
-    if (this.closed) return;
-    this.closed = true;
-    try {
-      const handle = this.handle ?? await this.initPromise.catch(() => 0);
-      if (handle > 0) {
-        await executeMathOptRequest(this.executor, {
-          type: 'incrementalDelete',
-          handle: BigInt(handle),
-        }, this.options);
-      }
-    } finally {
-      this.handle = null;
+  close(): Promise<void> {
+    if (this.callbackDepth > 0) {
+      return Promise.reject(new Error('MathOpt IncrementalSolver cannot be closed while one of its callbacks is running.'));
     }
+    if (this.state === 'closed') return Promise.resolve();
+    if (this.closePromise) return this.closePromise;
+    this.state = 'closing';
+    let attempt!: Promise<void>;
+    attempt = this.closeOnce().then(() => {
+      this.handle = null;
+      this.state = 'closed';
+    }).finally(() => {
+      if (this.closePromise === attempt) this.closePromise = null;
+    });
+    this.closePromise = attempt;
+    return attempt;
+  }
+
+  private async closeOnce(): Promise<void> {
+    await this.initPromise.catch(() => undefined);
+    const activeSolve = this.activeSolve;
+    if (activeSolve) await activeSolve.catch(() => undefined);
+    const handle = this.handle;
+    if (handle === null) return;
+    await executeMathOptRequest(this.executor, {
+      type: 'incrementalDelete',
+      handle: BigInt(handle),
+    }, { threads: this.options.threads });
+  }
+
+  private withLifecycleEvent<T extends Pick<MathOptSolveOptions, 'threads' | 'onEvent' | 'signal'>>(options: T): T {
+    if (!options.onEvent) return options;
+    const onEvent = options.onEvent;
+    return {
+      ...options,
+      onEvent: async (event: MathOptEvent) => {
+        this.callbackDepth += 1;
+        try {
+          await onEvent(event);
+        } finally {
+          this.callbackDepth -= 1;
+        }
+      },
+    };
   }
 }
 
@@ -2422,31 +2497,21 @@ async function executeMathOptRequest(
   executor: MathOptExecutor,
   operation: MathOptOperation,
   options: Pick<MathOptSolveOptions, 'threads' | 'onEvent' | 'signal'>,
+  onSuccess?: (response: Uint8Array) => void | Promise<void>,
 ): Promise<Uint8Array> {
-  throwIfAborted(options.signal);
   const resources: SolverResourceRequest = {
     threads: operation.type === 'solve' || operation.type === 'incrementalSolve'
       ? options.threads ?? 1
       : 1,
   };
-  const job = executor.execute(operation, {
+  const response = await executeSolverJob(executor, operation, {
     resources,
-    onEvent: options.onEvent ?? (() => {}),
+    onEvent: options.onEvent,
+    onSuccess: (response) => onSuccess?.(response.response),
+    signal: options.signal,
+    abortError: createAbortError,
   });
-  let cancellationError: Error | undefined;
-  const abort = () => {
-    if (!options.signal) return;
-    cancellationError = createAbortError(options.signal);
-    void job.cancel().catch(() => {});
-  };
-  options.signal?.addEventListener('abort', abort, { once: true });
-  try {
-    const response = await job.result;
-    if (cancellationError) throw cancellationError;
-    return response.response;
-  } finally {
-    options.signal?.removeEventListener('abort', abort);
-  }
+  return response.response;
 }
 
 function createAbortError(signal: AbortSignal): Error {
@@ -2460,11 +2525,10 @@ function createAbortError(signal: AbortSignal): Error {
   return error;
 }
 
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) throw createAbortError(signal);
-}
-
-function encodeSolveRequest(model: MathOptModel, options: MathOptSolveOptions): Uint8Array {
+function encodeSolveRequest(
+  model: MathOptModel,
+  options: MathOptSolveOptions,
+): Uint8Array {
   const solverType = typeof options.solverType === 'string'
     ? MathOptSolverType[options.solverType]
     : options.solverType ?? MathOptSolverType.GLOP;
@@ -2589,25 +2653,24 @@ function encodeSparseDoubleMatrix(
 }
 
 function encodeModelUpdate(
-  model: MathOptModel,
-  snapshot: MathOptModelSnapshot,
+  previous: MathOptModelSnapshot,
+  current: MathOptModelSnapshot,
   options: { removeNames?: boolean } = {},
 ): Uint8Array | null {
-  const current = model.snapshot();
-  const previousVariables = new Map(snapshot.variables.map((variable) => [variable.id, variable]));
+  const previousVariables = new Map(previous.variables.map((variable) => [variable.id, variable]));
   const currentVariables = new Map(current.variables.map((variable) => [variable.id, variable]));
-  const previousConstraints = new Map(snapshot.linearConstraints.map((constraint) => [constraint.id, constraint]));
+  const previousConstraints = new Map(previous.linearConstraints.map((constraint) => [constraint.id, constraint]));
   const currentConstraints = new Map(current.linearConstraints.map((constraint) => [constraint.id, constraint]));
-  const previousIndicators = new Map(snapshot.indicatorConstraints.map((constraint) => [constraint.id, constraint]));
+  const previousIndicators = new Map(previous.indicatorConstraints.map((constraint) => [constraint.id, constraint]));
   const currentIndicators = new Map(current.indicatorConstraints.map((constraint) => [constraint.id, constraint]));
 
-  const deletedVariableIds = snapshot.variables
+  const deletedVariableIds = previous.variables
     .filter((variable) => !variable.deleted && currentVariables.get(variable.id)?.deleted)
     .map((variable) => variable.id);
-  const deletedLinearConstraintIds = snapshot.linearConstraints
+  const deletedLinearConstraintIds = previous.linearConstraints
     .filter((constraint) => !constraint.deleted && currentConstraints.get(constraint.id)?.deleted)
     .map((constraint) => constraint.id);
-  const deletedIndicatorConstraintIds = snapshot.indicatorConstraints
+  const deletedIndicatorConstraintIds = previous.indicatorConstraints
     .filter((constraint) => !constraint.deleted && currentIndicators.get(constraint.id)?.deleted)
     .map((constraint) => constraint.id);
 
@@ -2624,13 +2687,13 @@ function encodeModelUpdate(
     return !constraint.deleted && (!previous || previous.deleted);
   });
 
-  const variableLowerUpdates = changedValues(snapshot.variables, current.variables, (item) => item.lowerBound);
-  const variableUpperUpdates = changedValues(snapshot.variables, current.variables, (item) => item.upperBound);
-  const variableIntegerUpdates = changedValues(snapshot.variables, current.variables, (item) => item.integer);
-  const linearLowerUpdates = changedValues(snapshot.linearConstraints, current.linearConstraints, (item) => item.lowerBound);
-  const linearUpperUpdates = changedValues(snapshot.linearConstraints, current.linearConstraints, (item) => item.upperBound);
-  const matrixUpdates = changedMatrixEntries(snapshot.linearConstraints, current.linearConstraints);
-  const objectiveUpdate = encodeObjectiveUpdate(snapshot.objective, current.objective);
+  const variableLowerUpdates = changedValues(previous.variables, current.variables, (item) => item.lowerBound);
+  const variableUpperUpdates = changedValues(previous.variables, current.variables, (item) => item.upperBound);
+  const variableIntegerUpdates = changedValues(previous.variables, current.variables, (item) => item.integer);
+  const linearLowerUpdates = changedValues(previous.linearConstraints, current.linearConstraints, (item) => item.lowerBound);
+  const linearUpperUpdates = changedValues(previous.linearConstraints, current.linearConstraints, (item) => item.upperBound);
+  const matrixUpdates = changedMatrixEntries(previous.linearConstraints, current.linearConstraints);
+  const objectiveUpdate = encodeObjectiveUpdate(previous.objective, current.objective);
 
   const indicatorUpdate = message([
     deletedIndicatorConstraintIds.length ? fieldPackedVarints(1, deletedIndicatorConstraintIds.sort((a, b) => a - b)) : empty(),

@@ -140,6 +140,22 @@ async function runTypescriptHelpersCase(api: HighLevelCpSatPackage, mode: Execut
   snapshot.variables.push({ name: 'external', domain: [0, 1] });
   assert(model.name === 'original', 'mutating a modelProto snapshot must not change the model name');
   assert(model.modelProto.variables.length === 4, 'mutating a modelProto snapshot must not change model variables');
+  const foreignModel = new api.CpModel();
+  const foreignBool = foreignModel.newBoolVar('foreign_bool');
+  assertThrows(
+    Error,
+    () => model.addAssumption(foreignBool),
+    'assumption from another model',
+  );
+  assertThrows(
+    Error,
+    () => model.addAssumption(foreignBool.negated()),
+    'negated assumption from another model',
+  );
+  assert(
+    (model.modelProto.assumptions?.length ?? 0) === 0,
+    'rejected foreign assumptions must not mutate the model',
+  );
   model.addEquality(x, y);
   model.maximize(x);
 

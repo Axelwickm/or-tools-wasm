@@ -1343,6 +1343,8 @@ Solving:
 - `cpSat?: Omit<SatParameters, 'numWorkers' | 'numSearchWorkers'> | Uint8Array`
 - `pdlp?: PdlpParameters | PdlpParametersOptions | Uint8Array`
 - `glpk?: GlpkParameters | GlpkParametersOptions | Uint8Array`
+- `onEvent?: (event: MathOptEvent) => void | Promise<void>`
+- `signal?: AbortSignal`
 
 `removeNames` omits model, variable, linear constraint, and
 indicator constraint names from the encoded `ModelProto`, matching upstream
@@ -1372,16 +1374,22 @@ const model = MathOpt.Model('rolling_lp');
 const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
 model.maximize([{ variable: x, coefficient: 2 }]);
 
+const controller = new AbortController();
 const solver = new MathOpt.IncrementalSolver(model, MathOpt.SolverType.GLOP, {
   presolve: MathOpt.Emphasis.OFF,
+  executor: 'worker',
+  signal: controller.signal,
 });
 
-let result = await solver.solve();
+try {
+  let result = await solver.solve();
 
-x.upperBound = 3;
-result = await solver.solve(); // sends the bound update to the native solver
-
-await solver.close();
+  x.upperBound = 3;
+  result = await solver.solve(); // sends the bound update to the native solver
+} finally {
+  controller.abort(); // cancel an active solve, if any
+  await solver.close();
+}
 ```
 
 Tracked incremental updates include variable bounds/integrality, linear
@@ -1389,8 +1397,11 @@ constraint bounds, objective changes, new/deleted variables and linear
 constraints, matrix coefficient changes, and new/deleted indicator constraints.
 Constructor options are used as defaults for every solve; per-call `solve()`
 options override those defaults except for executor placement and solver type,
-which are fixed by the incremental solver. `close()` releases the native handle
-and is safe to call more than once.
+which are fixed by the incremental solver. `close()` waits for initialization
+and any active solve, releases the native handle independently of the solve's
+abort signal, and is safe to call more than once. If deletion fails, the handle
+is retained and a later `close()` retries it. Do not call `close()` while one of
+that solver's callbacks is running.
 
 `solve()` accepts the same solver options as `MathOpt.solve()`, including
 message callbacks, `ModelSolveParameters`, backend-specific parameters, and
@@ -1400,6 +1411,12 @@ recreates the native solver and solves from that current full model. This keeps
 callers on one API for backends with limited update support, while still
 surfacing errors from invalid full models. Duplicate names are rejected for
 incremental solvers unless `removeNames` is set.
+
+A failed native update or solve leaves the underlying OR-Tools incremental
+solver unusable. Further `solve()` calls reject explicitly; call `close()` and
+construct a new incremental solver. Errors raised by `onEvent` after the native
+operation succeeds do not poison the solver, because its submitted checkpoint
+has already been committed.
 
 `ModelSolveParameters` can request a filtered result. This is a result-size
 filter, not a separate partial optimization model: the solver still optimizes
@@ -1895,6 +1912,12 @@ Pass `executor: 'direct'`, `executor: 'worker'`, a server/cloud configuration,
 or `executor: 'auto'` in the operation's options object. `auto` selects worker
 execution on browser main threads when workers are available and direct
 execution elsewhere. There is no global executor or worker-bridge setting.
+
+Solve calls also accept `signal` and `onEvent`. Event handlers run in delivery
+order and asynchronous handlers are awaited one at a time. If a handler throws,
+later handlers are suppressed and the error is reported after the executor job
+settles. Aborting requests cancellation and likewise waits for the job to settle,
+so callers can safely start another solve after the rejected promise completes.
 
 ## Generated Protobuf Types
 

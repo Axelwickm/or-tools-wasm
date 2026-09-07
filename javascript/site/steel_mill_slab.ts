@@ -1,5 +1,6 @@
 import { CpSat, type CpSatModelInstance } from 'or-tools-wasm/cp-sat';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { ActiveSolve, formatJson, requiredElement } from './site_support.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 type SolverMethod = 'sat' | 'sat_table' | 'sat_column';
@@ -280,48 +281,36 @@ type ModelBundle = {
   metadata: ModelMetadata;
 };
 
-const statusEl = document.getElementById('status') as HTMLPreElement | null;
-const summaryEl = document.getElementById('summary') as HTMLElement | null;
-const readyIndicator = document.getElementById('ready-indicator') as HTMLElement | null;
-const slabTable = document.getElementById('slab-table') as HTMLTableElement | null;
-const slabDrawing = document.getElementById('slab-drawing') as SVGSVGElement | null;
-const orderDrawing = document.getElementById('order-drawing') as HTMLElement | null;
-const solverSelect = document.getElementById('solver-method') as HTMLSelectElement | null;
-const problemSelect = document.getElementById('problem-id') as HTMLSelectElement | null;
-const breakSymCheckbox = document.getElementById('break-symmetries') as HTMLInputElement | null;
-const workersInput = document.getElementById('workers') as HTMLInputElement | null;
-const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const stopButton = document.getElementById('stop') as HTMLButtonElement | null;
-const executorSelector = document.getElementById('cp-sat-executor') as HTMLSelectElement | null;
+const statusEl = requiredElement('status', 'pre');
+const summaryEl = requiredElement('summary', 'div');
+const slabTable = requiredElement('slab-table', 'table');
+const slabDrawing = requiredElement('slab-drawing', 'svg');
+const orderDrawing = requiredElement('order-drawing', 'div');
+const solverSelect = requiredElement('solver-method', 'select');
+const problemSelect = requiredElement('problem-id', 'select');
+const breakSymCheckbox = requiredElement('break-symmetries', 'input');
+const workersInput = requiredElement('workers', 'input');
+const runButton = requiredElement('run', 'button');
+const stopButton = requiredElement('stop', 'button');
+const activeSolve = new ActiveSolve('Steel mill solve');
+const executorSelector = requiredElement('cp-sat-executor', 'select');
 const maxWorkerCount = getMaxWorkerCount();
 
 const appendStatus = (text: string) => {
-  if (!statusEl) return;
   statusEl.textContent += `${text}\n`;
 };
 
 const resetStatus = () => {
-  if (statusEl) {
-    statusEl.textContent = '';
-  }
-};
-
-const setReadyIndicator = (text: string) => {
-  if (readyIndicator) {
-    readyIndicator.textContent = text;
-  }
+  statusEl.textContent = '';
 };
 
 const selectedExecutor = configureSolverExecutorSelector(executorSelector);
 
-if (workersInput) {
-  workersInput.max = String(maxWorkerCount);
-  workersInput.min = '1';
-  workersInput.value = String(maxWorkerCount);
-}
+workersInput.max = String(maxWorkerCount);
+workersInput.min = '1';
+workersInput.value = String(maxWorkerCount);
 
 const createProblemSelector = () => {
-  if (!problemSelect) return;
   PROBLEMS.forEach((problem) => {
     const option = document.createElement('option');
     option.value = String(problem.id);
@@ -814,8 +803,8 @@ const parseDrawOrders = (orders: string): DrawOrder[] => {
 };
 
 const clearOrderHover = () => {
-  slabDrawing?.classList.remove('has-hover');
-  orderDrawing?.querySelector('.order-grid')?.classList.remove('has-hover');
+  slabDrawing.classList.remove('has-hover');
+  orderDrawing.querySelector('.order-grid')?.classList.remove('has-hover');
   document.querySelectorAll('[data-order-id].is-hovered').forEach((el) => {
     el.classList.remove('is-hovered');
   });
@@ -824,8 +813,8 @@ const clearOrderHover = () => {
 const setOrderHover = (orderId: number | null) => {
   clearOrderHover();
   if (orderId === null) return;
-  slabDrawing?.classList.add('has-hover');
-  orderDrawing?.querySelector('.order-grid')?.classList.add('has-hover');
+  slabDrawing.classList.add('has-hover');
+  orderDrawing.querySelector('.order-grid')?.classList.add('has-hover');
   document.querySelectorAll(`[data-order-id="${orderId}"]`).forEach((el) => {
     el.classList.add('is-hovered');
   });
@@ -844,7 +833,6 @@ const bindOrderHover = (element: Element | null) => {
 };
 
 const renderSlabDrawing = (rows: SlabRow[]) => {
-  if (!slabDrawing) return;
   const visibleRows = rows.filter((row) => row.load > 0);
   if (visibleRows.length === 0) {
     slabDrawing.classList.add('hidden');
@@ -927,7 +915,6 @@ const renderSlabDrawing = (rows: SlabRow[]) => {
 };
 
 const renderOrderDrawing = (problem: ProblemData, rows: SlabRow[]) => {
-  if (!orderDrawing) return;
   const maxWidth = Math.max(...problem.orders.map((order) => order.width), 1);
   const assignmentByOrder = new Map<number, string>();
   rows.forEach((row) => {
@@ -955,7 +942,6 @@ const renderOrderDrawing = (problem: ProblemData, rows: SlabRow[]) => {
 };
 
 const renderTable = (rows: SlabRow[]) => {
-  if (!slabTable) return;
   slabTable.innerHTML = '';
   const header = document.createElement('thead');
   header.innerHTML = `<tr>
@@ -1057,16 +1043,14 @@ const buildColumnRows = (solution: number[], metadata: ModelMetadata): SlabRow[]
 };
 
 const runExperiment = async () => {
-  if (!runButton) return;
+  const signal = activeSolve.start();
   runButton.disabled = true;
-  if (stopButton) {
-    stopButton.disabled = false;
-  }
-  const solverMethod = (solverSelect?.value as SolverMethod) ?? 'sat';
-  const problemId = Number.parseInt(problemSelect?.value ?? '3', 10);
-  const breakSymmetries = breakSymCheckbox?.checked ?? true;
+  stopButton.disabled = false;
+  const solverMethod = solverSelect.value as SolverMethod;
+  const problemId = Number.parseInt(problemSelect.value, 10);
+  const breakSymmetries = breakSymCheckbox.checked;
   const workerCount = Math.min(
-    Math.max(1, Number.parseInt(workersInput?.value ?? '1', 10)),
+    Math.max(1, Number.parseInt(workersInput.value, 10)),
     maxWorkerCount,
   );
   const params: Record<string, unknown> = {
@@ -1076,17 +1060,11 @@ const runExperiment = async () => {
   };
 
   resetStatus();
-  if (summaryEl) {
-    summaryEl.textContent = 'Running…';
-  }
-  if (slabDrawing) {
-    slabDrawing.classList.add('hidden');
-    slabDrawing.innerHTML = '';
-  }
-  if (orderDrawing) {
-    orderDrawing.classList.add('hidden');
-    orderDrawing.innerHTML = '';
-  }
+  summaryEl.textContent = 'Running…';
+  slabDrawing.classList.add('hidden');
+  slabDrawing.innerHTML = '';
+  orderDrawing.classList.add('hidden');
+  orderDrawing.innerHTML = '';
   appendStatus(`Building ${solverMethod} model for problem ${problemId}…`);
   const problem = buildProblem(problemId);
   const bundle = buildModel(solverMethod, problem, breakSymmetries);
@@ -1108,13 +1086,17 @@ const runExperiment = async () => {
 
     appendStatus('Solving…');
     try {
-      const result = await CpSat.solve(modelInstance, { ...params, executor: selectedExecutor() });
+      const result = await CpSat.solve(modelInstance, {
+        ...params,
+        executor: selectedExecutor(),
+        signal,
+      });
       const response = result.response;
       if (!response) {
         appendStatus('Solver returned no response.');
         return;
       }
-      appendStatus(`Solver response: ${JSON.stringify(response, null, 2)}`);
+      appendStatus(`Solver response: ${formatJson(response)}`);
 
       const solution = parseSolution(response);
       if (!solution) {
@@ -1132,11 +1114,9 @@ const runExperiment = async () => {
       renderTable(rows);
       renderSlabDrawing(rows);
       renderOrderDrawing(bundle.metadata.problem, rows);
-      if (summaryEl) {
-        const totalLoss = rows.reduce((sum, row) => sum + row.loss, 0);
-        summaryEl.textContent =
-          `Solver ${bundle.metadata.solver} used ${rows.length} slabs with total loss ${totalLoss}.`;
-      }
+      const totalLoss = rows.reduce((sum, row) => sum + row.loss, 0);
+      summaryEl.textContent =
+        `Solver ${bundle.metadata.solver} used ${rows.length} slabs with total loss ${totalLoss}.`;
     } catch (error) {
       const err = error as Error;
       const message = err?.message ?? String(err);
@@ -1151,31 +1131,22 @@ const runExperiment = async () => {
       }
     }
   } finally {
+    activeSolve.finish(signal);
     runButton.disabled = false;
-    if (stopButton) {
-      stopButton.disabled = true;
-    }
+    stopButton.disabled = true;
   }
 };
 
-if (runButton) {
-  runButton.addEventListener('click', () => void runExperiment());
-}
+runButton.addEventListener('click', () => void runExperiment());
 
-if (stopButton) {
-  stopButton.addEventListener('click', () => {
-    appendStatus('Cancellation requested.');
-    void CpSat.cancelSolve().catch((error) => {
-      appendStatus(`Cancellation failed: ${(error as Error).message}`);
-    });
-  });
-}
+stopButton.addEventListener('click', () => {
+  appendStatus('Cancellation requested.');
+  activeSolve.cancel(new Error('Steel mill solve cancelled.'));
+});
 
-if (solverSelect && breakSymCheckbox) {
-  const updateBreakSymVisibility = () => {
-    const isColumn = solverSelect.value === 'sat_column';
-    breakSymCheckbox.disabled = isColumn;
-  };
-  solverSelect.addEventListener('change', updateBreakSymVisibility);
-  updateBreakSymVisibility();
-}
+const updateBreakSymVisibility = () => {
+  const isColumn = solverSelect.value === 'sat_column';
+  breakSymCheckbox.disabled = isColumn;
+};
+solverSelect.addEventListener('change', updateBreakSymVisibility);
+updateBreakSymVisibility();

@@ -50,7 +50,7 @@ export function extractRoutes(
     while (!routing.isEnd(index)) {
       const previousIndex = index;
       index = assignment.value(routing.nextVar(index));
-      distance += routing.getArcCostForVehicle(previousIndex, index, vehicle);
+      distance += Number(routing.getArcCostForVehicle(previousIndex, index, vehicle));
       nodes.push(manager.indexToNode(index));
       step++;
       if (step > manager.getNumberOfIndices() + manager.getNumberOfVehicles()) {
