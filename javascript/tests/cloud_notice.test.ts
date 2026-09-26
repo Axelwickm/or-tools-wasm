@@ -78,3 +78,21 @@ test('cloud notice uses terminal color and cannot fail a completed solve', async
   await api.executeSolverJob(executor, {}, { showCloudNotice: true });
   assert.equal(messages.length, 1);
 });
+
+test('denied environment access does not fail a solve or suppress the notice', async () => {
+  const messages: string[] = [];
+  const context = createContext({
+    console: { info: (message: string) => messages.push(message) },
+    process: {
+      env: new Proxy({}, { get() { throw new Error('environment access denied'); } }),
+      stdout: { isTTY: false },
+    },
+  });
+  runInContext(bundled.outputFiles[0].text, context);
+  const api: Api = context.api;
+  assert.equal(await api.executeSolverJob(executor, {}, { showCloudNotice: true }), 42);
+  await api.executeSolverJob(executor, {}, { showCloudNotice: true });
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /OR-Tools WASM Cloud/);
+  assert.doesNotMatch(messages[0], /\x1b\[/);
+});

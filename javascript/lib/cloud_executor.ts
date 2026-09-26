@@ -43,11 +43,21 @@ function processLike(): ProcessLike | undefined {
 export function terminalSupportsColor(): boolean {
   const process = processLike();
   if (!process) return false;
-  if (process.env?.NO_COLOR !== undefined) return false;
-  if (process.env?.FORCE_COLOR !== undefined) {
-    return process.env.FORCE_COLOR !== '0';
+  if (optionalEnvironmentVariable('NO_COLOR') !== undefined) return false;
+  const forceColor = optionalEnvironmentVariable('FORCE_COLOR');
+  if (forceColor !== undefined) {
+    return forceColor !== '0';
   }
   return process.stdout?.isTTY === true;
+}
+
+export function optionalEnvironmentVariable(name: string): string | undefined {
+  try {
+    return processLike()?.env?.[name];
+  } catch {
+    // Deno can deny environment access; optional console settings need no permission.
+    return undefined;
+  }
 }
 
 export class CloudExecutor<Request, Response, Event>

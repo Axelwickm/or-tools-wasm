@@ -1,10 +1,9 @@
-import { terminalSupportsColor } from './cloud_executor.js';
+import { optionalEnvironmentVariable, terminalSupportsColor } from './cloud_executor.js';
 
 const stateKey = Symbol.for('or-tools-wasm.cloud-notice');
 type NoticeState = { printed: boolean; enabled?: boolean };
 const host = globalThis as typeof globalThis & {
   [stateKey]?: NoticeState;
-  process?: { env?: Record<string, string | undefined> };
 };
 
 function state(): NoticeState {
@@ -23,7 +22,7 @@ export function setCloudNoticeEnabled(enabled: boolean): void {
 
 export function printCloudNotice(): void {
   const notice = state();
-  if (notice.printed || !(notice.enabled ?? (host.process?.env?.ORTOOLS_WASM_CLOUD_NOTICE !== '0'))) return;
+  if (notice.printed || !(notice.enabled ?? (optionalEnvironmentVariable('ORTOOLS_WASM_CLOUD_NOTICE') !== '0'))) return;
   notice.printed = true;
   const lines = [
     'OR-Tools WASM Cloud',
