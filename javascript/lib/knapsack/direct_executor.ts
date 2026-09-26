@@ -20,7 +20,6 @@ import type {
 export class DirectKnapsackExecutor implements KnapsackExecutor {
   readonly solver = 'knapsack';
 
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -52,7 +51,7 @@ export class DirectKnapsackExecutor implements KnapsackExecutor {
   }
 
   private module() {
-    return this.modulePromise ??= this.loadModuleImpl();
+    return this.loadModuleImpl();
   }
 
   private async run(

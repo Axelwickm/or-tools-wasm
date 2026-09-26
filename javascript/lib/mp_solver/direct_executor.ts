@@ -20,7 +20,6 @@ import type {
 export class DirectMpSolverExecutor implements MpSolverExecutor {
   readonly solver = 'mp-solver';
 
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -54,7 +53,7 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
   }
 
   private module() {
-    return this.modulePromise ??= this.loadModuleImpl();
+    return this.loadModuleImpl();
   }
 
   private async run(
@@ -127,16 +126,36 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
     }
 
     const requestPointer = allocateWasmBytes(module, operation.request);
+    let parametersHandle = 0;
     try {
+      if (operation.parameters) {
+        parametersHandle = module.ccall('mp_solver_parameters_create', 'number', [], []) as number;
+        if (!parametersHandle) throw new Error('MPSolver: failed to create solve parameters.');
+        for (const [key, value] of Object.entries(operation.parameters.doubleParams)) {
+          module.ccall('mp_solver_parameters_set_double_param', null,
+            ['number', 'number', 'number'], [parametersHandle, Number(key), value]);
+        }
+        for (const [key, value] of Object.entries(operation.parameters.integerParams)) {
+          module.ccall('mp_solver_parameters_set_integer_param', null,
+            ['number', 'number', 'number'], [parametersHandle, Number(key), value]);
+        }
+      }
       const response = await readWasmResult(module, async (length) => await module.ccall(
-        operation.numThreads > 1
+        parametersHandle
+          ? 'mp_solver_solve_model_request_with_parameters'
+          : operation.numThreads > 1
           ? 'mp_solver_solve_model_request_with_threads'
           : 'mp_solver_solve_model_request',
         'number',
-        operation.numThreads > 1
+        parametersHandle
+          ? ['number', 'number', 'number', 'number', 'number', 'number']
+          : operation.numThreads > 1
           ? ['number', 'number', 'number', 'number', 'number']
           : ['number', 'number', 'number', 'number'],
-        operation.numThreads > 1
+        parametersHandle
+          ? [requestPointer, operation.request.length, operation.numThreads,
+            parametersHandle, operation.interruptible ? 1 : 0, length]
+          : operation.numThreads > 1
           ? [
             requestPointer,
             operation.request.length,
@@ -154,6 +173,7 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
       ) as number);
       return { type: 'solve', response };
     } finally {
+      if (parametersHandle) module.ccall('mp_solver_parameters_delete', null, ['number'], [parametersHandle]);
       if (requestPointer) module._free(requestPointer);
     }
   }

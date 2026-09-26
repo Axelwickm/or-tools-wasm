@@ -57,7 +57,7 @@ function isZero(value: ProtoInt64 | undefined) {
 
 async function solve(CpSat: CpSatLike, solverParameters: Record<string, unknown>) {
   const model = await CpSat.createModel(MODEL);
-  const result = await CpSat.solve(model, {
+  const result = await CpSat.solveProto(model, {
     ...BASE_PARAMETERS,
     ...solverParameters,
   });

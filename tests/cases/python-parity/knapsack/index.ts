@@ -1,3 +1,4 @@
+import { assertCaseMatrix } from '../../../harness/shared_case.ts';
 import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from '../../../harness/shared_case.ts';
 import {
   assertServerExecutorIsRunning,
@@ -27,9 +28,7 @@ type KnapsackSolverLike = {
   solve(options?: {
     executor?: 'direct' | 'worker' | ReturnType<typeof serverExecutorConfiguration>;
     onEvent?: (event: { type: string; status?: { state: number } }) => void;
-  }): Promise<bigint>;
-  bestSolutionContains(itemId: number): boolean;
-  isSolutionOptimal(): boolean;
+  }): Promise<{ profit: bigint; optimal: boolean; contains(itemId: number): boolean }>;
   setUseReduction(useReduction: boolean): void;
 };
 
@@ -67,7 +66,7 @@ async function realSolve(
   solver.setUseReduction(useReduction);
   solver.init(profits, weights, capacities);
   const states: number[] = [];
-  const profit = await solver.solve({
+  const result = await solver.solve({
     ...knapsackExecutionOptions(),
     onEvent: (event) => {
       if (event.type === 'status' && event.status) states.push(event.status.state);
@@ -76,9 +75,9 @@ async function realSolve(
   assert(states.includes(solverJobStates.RUNNING), 'Knapsack solve did not emit RUNNING status');
   assert(states.includes(solverJobStates.SUCCEEDED), 'Knapsack solve did not emit SUCCEEDED status');
   return {
-    profit,
-    selectedItems: profits.map((_, item) => item).filter((item) => solver.bestSolutionContains(item)),
-    optimal: solver.isSolutionOptimal(),
+    profit: result.profit,
+    selectedItems: profits.map((_, item) => item).filter((item) => result.contains(item)),
+    optimal: result.optimal,
   };
 }
 
@@ -295,5 +294,6 @@ export async function runKnapsackCases(
     }
   }
   setKnapsackMode('direct');
+  assertCaseMatrix(results, knapsackCases, modes);
   return results;
 }

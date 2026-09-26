@@ -40,7 +40,6 @@ const algorithmCode: Record<SetCoverOperation['algorithm'], number> = {
 
 export class DirectSetCoverExecutor implements SetCoverExecutor {
   readonly solver = 'set-cover';
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -66,7 +65,7 @@ export class DirectSetCoverExecutor implements SetCoverExecutor {
   }
 
   private module() {
-    return this.modulePromise ??= this.loadModuleImpl();
+    return this.loadModuleImpl();
   }
 
   private async run(

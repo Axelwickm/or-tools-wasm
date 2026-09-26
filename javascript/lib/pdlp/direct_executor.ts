@@ -267,7 +267,6 @@ function decodeSolverResult(bytes: Uint8Array) {
 export class DirectPdlpExecutor implements PdlpExecutor {
   readonly solver = 'pdlp';
 
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -298,7 +297,7 @@ export class DirectPdlpExecutor implements PdlpExecutor {
   }
 
   private module() {
-    return this.modulePromise ??= this.loadModuleImpl();
+    return this.loadModuleImpl();
   }
 
   private async run(

@@ -18,6 +18,8 @@ namespace ortools_wasm::server {
 
 class SolverJobService {
  public:
+  // The scheduler must outlive the service. Destroying the service shuts the
+  // scheduler down and waits for active jobs before destroying its executors.
   SolverJobService(JobScheduler& scheduler,
                    std::chrono::milliseconds completed_job_retention);
   ~SolverJobService();
@@ -25,6 +27,8 @@ class SolverJobService {
   SolverJobService(const SolverJobService&) = delete;
   SolverJobService& operator=(const SolverJobService&) = delete;
 
+  // Throws std::invalid_argument for null executors or duplicate solver names.
+  // Registered executors remain owned by the service until destruction.
   void Register(std::unique_ptr<SolverExecutor> executor);
 
   HttpBinaryResponse Submit(const HttpBinaryRequest& request);

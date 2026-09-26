@@ -15,6 +15,7 @@ export type MpSolverOperation =
     request: Uint8Array;
     numThreads: number;
     interruptible: boolean;
+    parameters?: { doubleParams: Record<number, number>; integerParams: Record<number, number> };
   }
   | { type: 'schema' };
 
@@ -37,6 +38,7 @@ function encodeOperation(operation: MpSolverOperation): Uint8Array {
         requestProto: operation.request,
         numThreads: operation.numThreads,
         interruptible: operation.interruptible,
+        parameters: operation.parameters,
       }),
     }
     : {
@@ -58,6 +60,7 @@ function decodeOperation(payload: Uint8Array): MpSolverOperation {
         request: request.payload.value.requestProto,
         numThreads: request.payload.value.numThreads,
         interruptible: request.payload.value.interruptible,
+        parameters: request.payload.value.parameters,
       };
     case 'schema':
       return { type: 'schema' };

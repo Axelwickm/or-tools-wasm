@@ -24,7 +24,7 @@ type SimpleMpResult = {
   variables: number;
   constraints: number;
   wallTime: number;
-  iterations: number;
+  iterations?: number;
   nodes?: number;
   executor: 'direct' | 'worker' | 'server';
   workerCount?: number;
@@ -173,7 +173,7 @@ export function renderSimpleMpResult(element: HTMLElement | null, result: Simple
         <tr><th>Status</th><td>${status}</td></tr>
         <tr><th>Executor</th><td>${result.executor}</td></tr>
         ${result.solverThreads ? `<tr><th>Requested solver threads</th><td>${result.solverThreads}</td></tr>` : ''}
-        ${result.solverThreads ? `<tr><th>Thread request accepted</th><td>${result.solverThreadsAccepted ? 'yes' : 'no'}</td></tr>` : ''}
+        ${result.solverThreadsAccepted !== undefined ? `<tr><th>Thread request accepted</th><td>${result.solverThreadsAccepted ? 'yes' : 'no'}</td></tr>` : ''}
         ${result.activeSolverThreads ? `<tr><th>Active solver threads</th><td>${result.activeSolverThreads}</td></tr>` : ''}
         <tr><th>Objective</th><td>${formatNumber(result.objective)}</td></tr>
         <tr><th>x</th><td>${formatNumber(result.x)}</td></tr>
@@ -181,7 +181,7 @@ export function renderSimpleMpResult(element: HTMLElement | null, result: Simple
         <tr><th>Variables</th><td>${result.variables}</td></tr>
         <tr><th>Constraints</th><td>${result.constraints}</td></tr>
         <tr><th>Wall time</th><td>${result.wallTime} ms</td></tr>
-        <tr><th>Iterations</th><td>${result.iterations}</td></tr>
+        ${result.iterations !== undefined ? `<tr><th>Iterations</th><td>${result.iterations}</td></tr>` : ''}
         ${result.nodes !== undefined
           ? `<tr><th>Branch-and-bound nodes</th><td>${result.nodes}</td></tr>`
           : ''}

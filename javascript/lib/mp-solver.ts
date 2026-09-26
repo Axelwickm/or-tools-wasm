@@ -6,6 +6,8 @@ export {
   MPConstraint,
   MPObjective,
   MPSolver,
+  MpModel,
+  MpResult,
   MPSolverParameters,
   MPSolverResultStatus,
   MPVariable,
@@ -22,6 +24,8 @@ export type {
   MPSolverEvent,
   MPSolverExecutionOptions,
   MPSolverSolveOptions,
+  MpSolveOptions,
+  MpSolveParameters,
 } from './mp_solver/api.js';
 export type {
   ExecutorConfiguration,

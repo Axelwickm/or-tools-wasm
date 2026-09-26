@@ -5,7 +5,9 @@ import {
   type CpModelProto,
   type CpSolverResponse,
   type DecisionStrategyProto_DomainReductionStrategy,
+  type DecisionStrategyProto_DomainReductionStrategy_Name,
   type DecisionStrategyProto_VariableSelectionStrategy,
+  type DecisionStrategyProto_VariableSelectionStrategy_Name,
   type LinearExpressionProto,
   type ProtoInt64,
 } from '../generated/cp_model.js';
@@ -62,11 +64,7 @@ function asInt64(value: IntValue): ProtoInt64 {
 }
 
 function protoInt64ToBigInt(value: ProtoInt64) {
-  if (typeof value === 'number' || typeof value === 'bigint') return toInt64(value);
-  const exact = typeof value === 'string'
-    ? BigInt(value)
-    : BigInt(value.high) * 0x1_0000_0000n + BigInt(value.low >>> 0);
-  return toInt64(exact);
+  return toInt64(value);
 }
 
 function protoInt64ToString(value: ProtoInt64) {
@@ -1680,8 +1678,8 @@ export class CpModel {
 
   addDecisionStrategy(
     expressions: Iterable<LinearExprLike>,
-    variableSelectionStrategy: DecisionStrategyProto_VariableSelectionStrategy,
-    domainReductionStrategy: DecisionStrategyProto_DomainReductionStrategy,
+    variableSelectionStrategy: DecisionStrategyProto_VariableSelectionStrategy | DecisionStrategyProto_VariableSelectionStrategy_Name,
+    domainReductionStrategy: DecisionStrategyProto_DomainReductionStrategy | DecisionStrategyProto_DomainReductionStrategy_Name,
   ) {
     this.model.searchStrategy ??= [];
     this.model.searchStrategy.push({
@@ -1915,6 +1913,67 @@ export class CpSolverSolutionCallback {
   }
 }
 
+/** The answer to one solve; later model edits and solves do not change it. */
+export class CpResult {
+  private readonly answer: CpSolverResponse | null;
+  readonly status: CpSolverResponse['status'];
+
+  constructor(
+    private readonly model: CpModel,
+    response: CpSolverResponse | null,
+    private readonly variableCount: number,
+  ) {
+    this.answer = response === null ? null : cloneProto(response);
+    this.status = this.answer?.status;
+  }
+
+  get response(): CpSolverResponse | null {
+    return this.answer === null ? null : cloneProto(this.answer);
+  }
+
+  get hasSolution(): boolean {
+    return this.status === CpSolverStatus.OPTIMAL || this.status === CpSolverStatus.FEASIBLE ||
+      this.status === 'OPTIMAL' || this.status === 'FEASIBLE';
+  }
+
+  value(expression: IntVar | NotBoolVar): bigint;
+  value(expression: LinearExprLike): NumericValue;
+  value(expression: LinearExprLike): NumericValue {
+    const expr = LinearExpr.from(expression);
+    if (expr.model !== null && expr.model !== this.model) {
+      throw new Error('Expression belongs to a different CpModel.');
+    }
+    if ([...expr.terms.keys()].some((index) => index >= this.variableCount)) {
+      throw new Error('Expression uses a variable added after this solve.');
+    }
+    return evaluateLinearExpression(this.requireSolution(), expression);
+  }
+
+  booleanValue(literal: LiteralLike): boolean {
+    if (literal instanceof IntVar && literal.model !== this.model ||
+        literal instanceof NotBoolVar && literal.variable.model !== this.model) {
+      throw new Error('Literal belongs to a different CpModel.');
+    }
+    const index = literal instanceof NotBoolVar ? literal.variable.index
+      : literal instanceof IntVar ? literal.index : -1;
+    if (index >= this.variableCount) throw new Error('Literal was added after this solve.');
+    return evaluateBooleanLiteral(this.requireSolution(), literal);
+  }
+
+  get objectiveValue(): number | null {
+    return this.hasSolution ? this.answer?.objectiveValue ?? null : null;
+  }
+
+  get bestObjectiveBound(): number | null {
+    return this.answer?.bestObjectiveBound ?? null;
+  }
+
+  private requireSolution(): CpSolverResponse {
+    stateError(this.hasSolution && this.answer !== null, 'solve result has no solution');
+    return this.answer;
+  }
+}
+
 export class CpSolver {
   private lastResponse: CpSolverResponse | null = null;
   private solving = false;
@@ -1954,7 +2013,7 @@ export class CpSolver {
         log: Boolean(this.logCallback) || Boolean(eventMask?.log),
       };
     }
-    const result = await CpSat.solve(modelBytes, {
+    const result = await CpSat.solveProto(modelBytes, {
       ...mergedParams,
       executor,
       signal,

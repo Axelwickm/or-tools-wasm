@@ -6,12 +6,12 @@ export {
   BoundCost,
   defaultRoutingModelParameters,
   defaultRoutingSearchParameters,
-  findErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   LocalSearchMetaheuristic,
   RoutingDimension,
   RoutingIndexManager,
   RoutingModel,
+  RoutingResult,
   RoutingSearchStatus,
 } from './routing/api.js';
 export { CloudExecutorUnavailableError } from './cloud_executor.js';

@@ -1,4 +1,7 @@
 {
   "private": true,
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "or-tools-wasm": "file:../javascript/build/javascript/lib/or-tools-wasm-local.tgz"
+  }
 }

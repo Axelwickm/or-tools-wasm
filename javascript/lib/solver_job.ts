@@ -11,15 +11,23 @@ export type ExecuteSolverJobOptions<Response, Event> = {
   // Commit solver-specific state before deferred callback or abort failures escape.
   onSuccess?(response: Response): void | Promise<void>;
   signal?: AbortSignal;
-  abortError(signal: AbortSignal): unknown;
 };
+
+export function createAbortError(signal: AbortSignal): Error {
+  if (signal.reason instanceof Error) return signal.reason;
+  const message = signal.reason === undefined ? 'The solver job was aborted.' : String(signal.reason);
+  if (typeof DOMException !== 'undefined') return new DOMException(message, 'AbortError');
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
+}
 
 export async function executeSolverJob<Request, Response, Event>(
   executor: SolverExecutor<Request, Response, Event>,
   request: Request,
   options: ExecuteSolverJobOptions<Response, Event>,
 ): Promise<Response> {
-  if (options.signal?.aborted) throw options.abortError(options.signal);
+  if (options.signal?.aborted) throw createAbortError(options.signal);
 
   let callbackFailure: { error: unknown } | undefined;
   let eventChain = Promise.resolve();
@@ -42,7 +50,7 @@ export async function executeSolverJob<Request, Response, Event>(
   let abortFailure: { error: unknown } | undefined;
   const onAbort = () => {
     if (!options.signal || abortFailure) return;
-    abortFailure = { error: options.abortError(options.signal) };
+    abortFailure = { error: createAbortError(options.signal) };
     void job.cancel().catch(() => {});
   };
   options.signal?.addEventListener('abort', onAbort, { once: true });

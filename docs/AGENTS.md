@@ -13,8 +13,8 @@ Do not remove or obscure the proto path while adding higher-level wrappers. The 
 
 When adding or changing solver functionality, check the public API entry points as well as implementation files. In particular:
 
-- Update high-level wrapper files such as `javascript/lib/cp_sat_high_level.ts` when adding Python-like behavior.
-- Update package exports in `javascript/lib/index.ts` so new public classes, helpers, enums, and types are reachable.
+- Update high-level wrapper files such as `javascript/lib/cp_sat/high_level_api.ts` when adding Python-like behavior.
+- Update the solver subpath exports (for example, `javascript/lib/cp-sat.ts`) and `javascript/lib/index.ts` so new public classes, helpers, enums, and types are reachable.
 - Check generated API files and generator scripts when the missing surface belongs to generated protobuf or parameter types.
 - Keep names close to upstream Python concepts where that helps parity, but use idiomatic TypeScript casing for public methods unless an existing pattern says otherwise.
 

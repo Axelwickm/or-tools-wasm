@@ -1,5 +1,6 @@
 export {
   KnapsackSolver,
+  KnapsackResult,
   KnapsackSolverType,
   RuntimeError,
 } from './knapsack/api.js';

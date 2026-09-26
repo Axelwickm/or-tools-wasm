@@ -1,8 +1,8 @@
 import { mathOptExpressionContractCases } from './mathopt_expression_contract.ts';
-import { runMathOptModelContractCases } from './mathopt_model_contract.ts';
+import { mathOptModelContractCases, runMathOptModelContractCases } from './mathopt_model_contract.ts';
 import { mathoptSolveResultContractCases } from './mathopt_solve_result_contract.ts';
 import type { ExecutorFixtureMode, FixtureMode } from '../../../harness/shared_case.ts';
-import { assertServerExecutorIsRunning, executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
+import { assertCaseMatrix, assertServerExecutorIsRunning, executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
 
 export type MathOptCaseResult = {
   id?: string;
@@ -672,6 +672,22 @@ async function runGlpkLp(api: MathOptApi, mode: ExecutorFixtureMode): Promise<Ma
   });
 }
 
+const mathOptBackendCases = [
+  { id: 'mathopt.backend.glop_linear_program', name: 'MathOpt.testGlopLinearProgram', run: runGlopLp, threads: [1, 4] },
+  { id: 'mathopt.backend.cp_sat_integer_program', name: 'MathOpt.testCpSatIntegerProgram', run: runCpSatMip, threads: [1, 4] },
+  { id: 'mathopt.backend.gscip_integer_program', name: 'MathOpt.testGScipIntegerProgram', run: runGScipMip, threads: [1, 4] },
+  { id: 'mathopt.backend.pdlp_linear_program', name: 'MathOpt.testPdlpLinearProgram', run: runPdlpLp, threads: [1, 4] },
+  { id: 'mathopt.backend.glpk_linear_program', name: 'MathOpt.testGlpkLinearProgram', run: runGlpkLp, threads: [1] },
+];
+
+const activeSolveResultCases = mathoptSolveResultContractCases.filter((testCase) => activeSolveResultContractNames.has(testCase.name));
+
+export const mathOptCaseDefinitions = [
+  ...mathOptBackendCases,
+  ...[...activeSolveResultCases, ...mathOptExpressionContractCases, ...mathOptModelContractCases]
+    .map((testCase) => ({ id: mathOptCaseId(testCase.name), name: testCase.name })),
+];
+
 export async function runMathOptCases(api: MathOptApi, options: MathOptRunOptions = {}): Promise<MathOptCaseResult[]> {
   const results: MathOptCaseResult[] = [];
   const modes = options.modes ?? executorFixtureModes;
@@ -682,20 +698,12 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
       mode === 'server' ? serverExecutorConfiguration() : mode,
     );
     for (const threads of [1, 4]) {
-      options.onProgress?.('MathOpt.testGlopLinearProgram', mode, threads);
-      results.push(await runGlopLp(scopedApi, mode, threads));
-      options.onProgress?.('MathOpt.testCpSatIntegerProgram', mode, threads);
-      results.push(await runCpSatMip(scopedApi, mode, threads));
-      options.onProgress?.('MathOpt.testGScipIntegerProgram', mode, threads);
-      results.push(await runGScipMip(scopedApi, mode, threads));
-      options.onProgress?.('MathOpt.testPdlpLinearProgram', mode, threads);
-      results.push(await runPdlpLp(scopedApi, mode, threads));
-      if (threads === 1) {
-        options.onProgress?.('MathOpt.testGlpkLinearProgram', mode, threads);
-        results.push(await runGlpkLp(scopedApi, mode));
+      for (const testCase of mathOptBackendCases) {
+        if (!testCase.threads.includes(threads)) continue;
+        options.onProgress?.(testCase.name, mode, threads);
+        results.push(await testCase.run(scopedApi, mode, threads));
       }
-      for (const testCase of mathoptSolveResultContractCases) {
-        if (!activeSolveResultContractNames.has(testCase.name)) continue;
+      for (const testCase of activeSolveResultCases) {
         options.onProgress?.(`MathOpt.${testCase.name}`, mode, threads);
         const output = await testCase.run(scopedApi);
         results.push(withMathOptMetadata({
@@ -739,5 +747,6 @@ export async function runMathOptCases(api: MathOptApi, options: MathOptRunOption
       })
     ));
   }
+  assertCaseMatrix(results, mathOptCaseDefinitions, modes);
   return results;
 }

@@ -102,7 +102,7 @@ export type CpSatExecutorSelection =
   | CpSatExecutorConfiguration;
 
 export type CpSatLike = {
-  solve(model: Uint8Array, options?: CpSatSolveOptions): Promise<{
+  solveProto(model: Uint8Array, options?: CpSatSolveOptions): Promise<{
     response: SolverResponse | null;
     bytes: Uint8Array;
   }>;
@@ -120,7 +120,7 @@ export function withCpSatExecutor(
 ): CpSatLike {
   return {
     ...CpSat,
-    solve: (model, options = {}) => CpSat.solve(model, { ...options, executor }),
+    solveProto: (model, options = {}) => CpSat.solveProto(model, { ...options, executor }),
     validate: (model, options = {}) => CpSat.validate(model, { ...options, executor }),
   };
 }

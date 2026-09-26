@@ -73,7 +73,7 @@ export async function solveRoutingWithModule(
   module: OrToolsWasmModule,
   message: RoutingSolveRequest,
   interruptible = false,
-): Promise<RoutingSolveResult | null> {
+): Promise<{ status: number; solution: RoutingSolveResult | null }> {
   let managerHandle = 0;
   let modelHandle = 0;
   let startsPtr = 0;
@@ -267,9 +267,8 @@ export async function solveRoutingWithModule(
         [modelHandle, message.firstSolutionStrategy, message.solutionLimit, interruptible ? 1 : 0],
       );
     }
-    if (ok !== 1) {
-      return null;
-    }
+    const status = await ccallNumber(module, 'routing_status', ['number'], [modelHandle]);
+    if (ok !== 1) return { status, solution: null };
 
     const starts: number[] = [];
     const ends: number[] = [];
@@ -301,14 +300,15 @@ export async function solveRoutingWithModule(
       });
     }
 
-    return {
-      status: await ccallNumber(module, 'routing_status', ['number'], [modelHandle]),
+    const solution = {
+      status,
       objectiveValue: await ccallBigInt(module, 'routing_assignment_objective_value', ['number'], [modelHandle]),
       nextValues,
       starts,
       ends,
       dimensionCumulValues,
     };
+    return { status, solution };
   } finally {
     if (modelHandle) {
       await ccallVoid(module, 'routing_delete_model', ['number'], [modelHandle]);

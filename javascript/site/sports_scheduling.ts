@@ -441,37 +441,37 @@ async function runSportsScheduling() {
     });
 
     append('Solving…');
-    try {
-      const result = await CpSat.solve(model, {
-        ...params,
-        executor: selectedExecutor(),
-        signal,
-      });
-      const response = result.response;
-      if (!response) {
-        append('Solver returned no response.');
-        showScheduleMessage('Solver returned no response.');
-        return;
-      }
-      statusEl.textContent = [
-        `Status: ${response.status}`,
-        `Objective: ${response.objectiveValue ?? 'NA'}`,
-        `Best bound: ${response.bestObjectiveBound ?? 'NA'}`,
-        `Wall time: ${response.wallTime ?? 'NA'}`,
-      ].join('\n');
-      const values = parseSolution(response.solution);
-      if (!values) {
-        showScheduleMessage('Unable to parse solver solution.');
-        return;
-      }
-      const schedule = extractSchedule(values, build.fixtures, build.numTeams, build.numDays);
-      const breaks = countBreaks(schedule);
-      renderSchedule(schedule, build.numDays);
-      renderSolution(String(response.status ?? 'UNKNOWN'), response.objectiveValue, breaks, build.numTeams, build.numDays);
-    } catch (err) {
-      append(`Solve failed: ${(err as Error).message}`);
-      showScheduleMessage('Solve failed.');
+    const result = await CpSat.solveProto(model, {
+      ...params,
+      executor: selectedExecutor(),
+      signal,
+    });
+    const response = result.response;
+    if (!response) {
+      append('Solver returned no response.');
+      showScheduleMessage('Solver returned no response.');
+      return;
     }
+    statusEl.textContent = [
+      `Status: ${response.status}`,
+      `Objective: ${response.objectiveValue ?? 'NA'}`,
+      `Best bound: ${response.bestObjectiveBound ?? 'NA'}`,
+      `Wall time: ${response.wallTime ?? 'NA'}`,
+    ].join('\n');
+    const values = parseSolution(response.solution);
+    if (!values) {
+      showScheduleMessage('Unable to parse solver solution.');
+      return;
+    }
+    const schedule = extractSchedule(values, build.fixtures, build.numTeams, build.numDays);
+    const breaks = countBreaks(schedule);
+    renderSchedule(schedule, build.numDays);
+    renderSolution(String(response.status ?? 'UNKNOWN'), response.objectiveValue, breaks, build.numTeams, build.numDays);
+  } catch (error) {
+    const message = `Schedule failed: ${error instanceof Error ? error.message : String(error)}`;
+    append(message);
+    showScheduleMessage(message);
+    solutionOutput.textContent = message;
   } finally {
     activeSolve.finish(signal);
     setRunning(false);

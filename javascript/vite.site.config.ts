@@ -68,6 +68,7 @@ export default defineConfig({
         index: path.resolve(siteRoot, 'index.html'),
         knapsack_simple: path.resolve(siteRoot, 'knapsack_simple.html'),
         magic_square: path.resolve(siteRoot, 'magic_square.html'),
+        project_calendar: path.resolve(siteRoot, 'project_calendar.html'),
         mathopt_basic: path.resolve(siteRoot, 'mathopt_basic.html'),
         mathopt_factory_floor: path.resolve(siteRoot, 'mathopt_factory_floor.html'),
         model_playground: path.resolve(siteRoot, 'model_playground.html'),

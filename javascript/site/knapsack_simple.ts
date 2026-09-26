@@ -184,17 +184,19 @@ async function runKnapsack() {
     solver.init(values, weights, capacities);
 
     appendStatus(`Solving with ${executorSelector.value} executor...`);
-    lastProfit = await solver.solve({ executor: readKnapsackExecutor() });
+    const result = await solver.solve({ executor: readKnapsackExecutor() });
+    lastProfit = result.profit;
     selectedItems = values
       .map((_, item) => item)
-      .filter((item) => solver.bestSolutionContains(item));
-    lastOptimal = solver.isSolutionOptimal();
+      .filter((item) => result.contains(item));
+    lastOptimal = result.optimal;
     renderMatrix();
     renderSolution();
     appendStatus(`Done. Total value ${lastProfit}.`);
   } catch (error) {
-    appendStatus(error instanceof Error ? error.message : String(error));
-    throw error;
+    const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
+    appendStatus(message);
+    solutionOutput.textContent = message;
   } finally {
     setRunning(false);
   }

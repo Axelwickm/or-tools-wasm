@@ -1,7 +1,6 @@
 type RoutingApi = {
   defaultRoutingSearchParameters: () => RoutingSearchParameters;
   defaultRoutingModelParameters?: () => unknown;
-  findErrorInRoutingSearchParameters?: (params: unknown) => string;
   RoutingIndexManager: new (numLocations: number, numVehicles: number, depot: number) => RoutingIndexManagerLike;
   RoutingModel: new (manager: RoutingIndexManagerLike, parameters?: unknown) => RoutingModelLike;
   FirstSolutionStrategy?: {
@@ -26,8 +25,6 @@ type RoutingIndexManagerLike = {
 
 type RoutingSearchParameters = {
   firstSolutionStrategy?: number;
-  localSearchMetaheuristic?: unknown;
-  localSearchOperators?: unknown;
   solutionLimit?: number;
 };
 
@@ -71,16 +68,13 @@ type BoundCostLike = {
 type RoutingModelLike = {
   registerTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
   setArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
-  solve(options?: unknown): Promise<RoutingAssignmentLike | null> | RoutingAssignmentLike | null;
+  solve(options?: unknown): Promise<{ status: number; hasSolution: boolean; assignment: RoutingAssignmentLike | null }>;
   solveWithParameters(parameters: RoutingSearchParameters, options?: unknown): Promise<RoutingAssignmentLike | null>;
   solveFromAssignmentWithParameters?(
     assignment: RoutingAssignmentLike,
     parameters: RoutingSearchParameters,
     options?: unknown,
   ): Promise<RoutingAssignmentLike | null>;
-  getNumberOfDecisionsInFirstSolution?(parameters: RoutingSearchParameters): number;
-  getNumberOfRejectsInFirstSolution?(parameters: RoutingSearchParameters): number;
-  closeModelWithParameters?(parameters: RoutingSearchParameters): void;
   readAssignmentFromRoutes?(routes: number[][], closeRoutes: boolean): RoutingAssignmentLike;
   getAutomaticFirstSolutionStrategy?(): number;
   addAtSolutionCallback?(callback: (() => void) | { __call__(): void }): void;
@@ -249,105 +243,6 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
         );
       }
       return 'TestPyWrapRoutingModel.testRoutingLocalSearchFiltering PASS';
-    },
-  },
-  {
-    name: 'TestPyWrapRoutingModel.testRoutingSearchParameters',
-    source: PYTHON_SOURCE,
-    async run(routingApi) {
-      const manager = new routingApi.RoutingIndexManager(10, 1, 0);
-      const routing = new routingApi.RoutingModel(manager as RoutingIndexManagerLike);
-      const transitIdx = routing.registerTransitCallback((fromIndex, toIndex) => distance(manager, fromIndex, toIndex));
-      routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
-
-      const searchParameters = routingApi.defaultRoutingSearchParameters();
-      searchParameters.firstSolutionStrategy = routingApi.FirstSolutionStrategy?.SAVINGS ?? 10;
-      (searchParameters as { localSearchMetaheuristic?: unknown }).localSearchMetaheuristic =
-        routingApi.LocalSearchMetaheuristic?.GUIDED_LOCAL_SEARCH ?? 1;
-      (searchParameters as { localSearchOperators?: Record<string, unknown> }).localSearchOperators = {
-        useTwoOpt: toNumber(routingApi.BOOL_FALSE ?? false),
-      };
-      searchParameters.solutionLimit = 20;
-
-      const closeModel = routing.closeModelWithParameters;
-      if (typeof closeModel !== 'function') {
-        return unsupported(
-          'TestPyWrapRoutingModel.testRoutingSearchParameters requires closeModelWithParameters in TS bindings',
-        );
-      }
-      closeModel.call(routing, searchParameters);
-
-      const assignment = await routing.solveWithParameters(searchParameters, routingExecutionOptions());
-      assert(assignment, 'TestPyWrapRoutingModel.testRoutingSearchParameters expected an assignment');
-      if (!assignment) return unsupported('assignment');
-
-      assertNumber(
-        assignment.objectiveValue(),
-        90,
-        'TestPyWrapRoutingModel.testRoutingSearchParameters objectiveValue',
-      );
-
-      const getDecisions = routing.getNumberOfDecisionsInFirstSolution?.(searchParameters);
-      const getRejects = routing.getNumberOfRejectsInFirstSolution?.(searchParameters);
-      if (typeof getDecisions !== 'number' || typeof getRejects !== 'number') {
-        return unsupported(
-          'TestPyWrapRoutingModel.testRoutingSearchParameters needs first-solution decision/reject stats APIs in TS bindings',
-        );
-      }
-      assertNumber(
-        getDecisions,
-        11,
-        'TestPyWrapRoutingModel.testRoutingSearchParameters numberOfDecisionsInFirstSolution',
-      );
-      assertNumber(getRejects, 0, 'TestPyWrapRoutingModel.testRoutingSearchParameters numberOfRejectsInFirstSolution');
-
-      const solveFromAssignmentWithParameters = routing.solveFromAssignmentWithParameters;
-      if (typeof solveFromAssignmentWithParameters !== 'function') {
-        return unsupported(
-          'TestPyWrapRoutingModel.testRoutingSearchParameters needs solveFromAssignmentWithParameters in TS bindings',
-        );
-      }
-      const refinedAssignment = await solveFromAssignmentWithParameters.call(
-        routing,
-        assignment,
-        searchParameters as RoutingSearchParameters,
-        routingExecutionOptions(),
-      );
-      assert(refinedAssignment, 'TestPyWrapRoutingModel.testRoutingSearchParameters missing refined assignment');
-      assertNumber(
-        refinedAssignment?.objectiveValue() ?? NaN,
-        90,
-        'TestPyWrapRoutingModel.testRoutingSearchParameters solveFromAssignmentWithParameters objectiveValue',
-      );
-      return 'TestPyWrapRoutingModel.testRoutingSearchParameters PASS';
-    },
-  },
-  {
-    name: 'TestPyWrapRoutingModel.testfindErrorInRoutingSearchParameters',
-    source: PYTHON_SOURCE,
-    async run(routingApi) {
-      const findError = routingApi.findErrorInRoutingSearchParameters;
-      if (typeof findError !== 'function') {
-        return unsupported(
-          'TestPyWrapRoutingModel.testfindErrorInRoutingSearchParameters requires findErrorInRoutingSearchParameters in TS bindings',
-        );
-      }
-
-      const params = routingApi.defaultRoutingSearchParameters() as RoutingSearchParameters & {
-        localSearchOperators?: { useCross?: number | boolean };
-      };
-      (params.localSearchOperators as { useCross?: number | boolean } | undefined) ??= {};
-      (params.localSearchOperators as { useCross?: number | boolean }).useCross = toNumber(
-        routingApi.BOOL_UNSPECIFIED ?? 2,
-      );
-
-      const result = findError(params);
-      if (typeof result !== 'string' || !result.toLowerCase().includes('cross')) {
-        return unsupported(
-          'TestPyWrapRoutingModel.testfindErrorInRoutingSearchParameters expects error text containing "cross" from TS bindings',
-        );
-      }
-      return `TestPyWrapRoutingModel.testfindErrorInRoutingSearchParameters PASS`;
     },
   },
   {

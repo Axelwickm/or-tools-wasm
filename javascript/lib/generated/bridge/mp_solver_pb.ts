@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mp_solver.proto.
  */
 export const file_mp_solver: GenFile = /*@__PURE__*/
-  fileDesc("Cg9tcF9zb2x2ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEiWQoUTXBTb2x2ZXJTb2x2ZVJlcXVlc3QSFQoNcmVxdWVzdF9wcm90bxgBIAEoDBITCgtudW1fdGhyZWFkcxgCIAEoBRIVCg1pbnRlcnJ1cHRpYmxlGAMgASgIIhcKFU1wU29sdmVyU2NoZW1hUmVxdWVzdCJhChRNcFNvbHZlclNjaGVtYVJlc3VsdBIiChpsaW5lYXJfc29sdmVyX3Byb3RvX3NjaGVtYRgBIAEoCRIlCh1vcHRpb25hbF9ib29sZWFuX3Byb3RvX3NjaGVtYRgCIAEoCSKiAQoVTXBTb2x2ZXJCcmlkZ2VSZXF1ZXN0Ej0KBXNvbHZlGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNvbHZlUmVxdWVzdEgAEj8KBnNjaGVtYRgCIAEoCzItLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTY2hlbWFSZXF1ZXN0SABCCQoHcGF5bG9hZCJ9ChZNcFNvbHZlckJyaWRnZVJlc3BvbnNlEhgKDnJlc3BvbnNlX3Byb3RvGAEgASgMSAASPgoGc2NoZW1hGAIgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNjaGVtYVJlc3VsdEgAQgkKB3BheWxvYWRiBnByb3RvMw");
+  fileDesc("Cg9tcF9zb2x2ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEimQEKFE1wU29sdmVyU29sdmVSZXF1ZXN0EhUKDXJlcXVlc3RfcHJvdG8YASABKAwSEwoLbnVtX3RocmVhZHMYAiABKAUSFQoNaW50ZXJydXB0aWJsZRgDIAEoCBI+CgpwYXJhbWV0ZXJzGAQgASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclBhcmFtZXRlcnMiqwIKEk1wU29sdmVyUGFyYW1ldGVycxJTCg1kb3VibGVfcGFyYW1zGAEgAygLMjwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclBhcmFtZXRlcnMuRG91YmxlUGFyYW1zRW50cnkSVQoOaW50ZWdlcl9wYXJhbXMYAiADKAsyPS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyUGFyYW1ldGVycy5JbnRlZ2VyUGFyYW1zRW50cnkaMwoRRG91YmxlUGFyYW1zRW50cnkSCwoDa2V5GAEgASgFEg0KBXZhbHVlGAIgASgBOgI4ARo0ChJJbnRlZ2VyUGFyYW1zRW50cnkSCwoDa2V5GAEgASgFEg0KBXZhbHVlGAIgASgFOgI4ASIXChVNcFNvbHZlclNjaGVtYVJlcXVlc3QiYQoUTXBTb2x2ZXJTY2hlbWFSZXN1bHQSIgoabGluZWFyX3NvbHZlcl9wcm90b19zY2hlbWEYASABKAkSJQodb3B0aW9uYWxfYm9vbGVhbl9wcm90b19zY2hlbWEYAiABKAkiogEKFU1wU29sdmVyQnJpZGdlUmVxdWVzdBI9CgVzb2x2ZRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTb2x2ZVJlcXVlc3RIABI/CgZzY2hlbWEYAiABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyU2NoZW1hUmVxdWVzdEgAQgkKB3BheWxvYWQifQoWTXBTb2x2ZXJCcmlkZ2VSZXNwb25zZRIYCg5yZXNwb25zZV9wcm90bxgBIAEoDEgAEj4KBnNjaGVtYRgCIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTY2hlbWFSZXN1bHRIAEIJCgdwYXlsb2FkYgZwcm90bzM");
 
 /**
  * The nested payloads retain their existing OR-Tools protobuf types:
@@ -34,6 +34,11 @@ export type MpSolverSolveRequest = Message<"ortools_wasm.bridge.v1.MpSolverSolve
    * @generated from field: bool interruptible = 3;
    */
   interruptible: boolean;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverParameters parameters = 4;
+   */
+  parameters?: MpSolverParameters | undefined;
 };
 
 /**
@@ -58,6 +63,11 @@ export type MpSolverSolveRequestJson = {
    * @generated from field: bool interruptible = 3;
    */
   interruptible?: boolean;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverParameters parameters = 4;
+   */
+  parameters?: MpSolverParametersJson;
 };
 
 export type MpSolverSolveRequestValid = MpSolverSolveRequest;
@@ -68,6 +78,45 @@ export type MpSolverSolveRequestValid = MpSolverSolveRequest;
  */
 export const MpSolverSolveRequestSchema: GenMessage<MpSolverSolveRequest, {jsonType: MpSolverSolveRequestJson, validType: MpSolverSolveRequestValid}> = /*@__PURE__*/
   messageDesc(file_mp_solver, 0);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverParameters
+ */
+export type MpSolverParameters = Message<"ortools_wasm.bridge.v1.MpSolverParameters"> & {
+  /**
+   * @generated from field: map<int32, double> double_params = 1;
+   */
+  doubleParams: { [key: number]: number };
+
+  /**
+   * @generated from field: map<int32, int32> integer_params = 2;
+   */
+  integerParams: { [key: number]: number };
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverParameters
+ */
+export type MpSolverParametersJson = {
+  /**
+   * @generated from field: map<int32, double> double_params = 1;
+   */
+  doubleParams?: { [key: number]: number | "NaN" | "Infinity" | "-Infinity" };
+
+  /**
+   * @generated from field: map<int32, int32> integer_params = 2;
+   */
+  integerParams?: { [key: number]: number };
+};
+
+export type MpSolverParametersValid = MpSolverParameters;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverParameters.
+ * Use `create(MpSolverParametersSchema)` to create a new message.
+ */
+export const MpSolverParametersSchema: GenMessage<MpSolverParameters, {jsonType: MpSolverParametersJson, validType: MpSolverParametersValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 1);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MpSolverSchemaRequest
@@ -88,7 +137,7 @@ export type MpSolverSchemaRequestValid = MpSolverSchemaRequest;
  * Use `create(MpSolverSchemaRequestSchema)` to create a new message.
  */
 export const MpSolverSchemaRequestSchema: GenMessage<MpSolverSchemaRequest, {jsonType: MpSolverSchemaRequestJson, validType: MpSolverSchemaRequestValid}> = /*@__PURE__*/
-  messageDesc(file_mp_solver, 1);
+  messageDesc(file_mp_solver, 2);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MpSolverSchemaResult
@@ -127,7 +176,7 @@ export type MpSolverSchemaResultValid = MpSolverSchemaResult;
  * Use `create(MpSolverSchemaResultSchema)` to create a new message.
  */
 export const MpSolverSchemaResultSchema: GenMessage<MpSolverSchemaResult, {jsonType: MpSolverSchemaResultJson, validType: MpSolverSchemaResultValid}> = /*@__PURE__*/
-  messageDesc(file_mp_solver, 2);
+  messageDesc(file_mp_solver, 3);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MpSolverBridgeRequest
@@ -173,7 +222,7 @@ export type MpSolverBridgeRequestValid = MpSolverBridgeRequest;
  * Use `create(MpSolverBridgeRequestSchema)` to create a new message.
  */
 export const MpSolverBridgeRequestSchema: GenMessage<MpSolverBridgeRequest, {jsonType: MpSolverBridgeRequestJson, validType: MpSolverBridgeRequestValid}> = /*@__PURE__*/
-  messageDesc(file_mp_solver, 3);
+  messageDesc(file_mp_solver, 4);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MpSolverBridgeResponse
@@ -219,5 +268,5 @@ export type MpSolverBridgeResponseValid = MpSolverBridgeResponse;
  * Use `create(MpSolverBridgeResponseSchema)` to create a new message.
  */
 export const MpSolverBridgeResponseSchema: GenMessage<MpSolverBridgeResponse, {jsonType: MpSolverBridgeResponseJson, validType: MpSolverBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_mp_solver, 4);
+  messageDesc(file_mp_solver, 5);
 

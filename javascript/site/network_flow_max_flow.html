@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Network Flow - Max Flow</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -33,7 +34,12 @@
 
 const maxFlow = new SimpleMaxFlow();
 maxFlow.addArcsWithCapacity(startNodes, endNodes, capacities);
-const status = await maxFlow.solve(sourceNode, sinkNode, { executor: 'worker' });</code></pre>
+const result = await maxFlow.solve({
+  source: sourceNode,
+  sink: sinkNode,
+  executor: 'worker',
+});
+console.log(result.status, result.optimalFlow);</code></pre>
       </details>
     </div>
     <ul class="example-notes">

@@ -29,6 +29,7 @@ import { decodeProtobufWithExactLongs, encodeProtobufBigInts } from '../protobuf
 import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
 import * as protobufModule from 'protobufjs';
+import { CpResult } from './high_level_api.js';
 
 export {
   CpSolverStatus,
@@ -37,6 +38,19 @@ export {
 } from '../generated/cp_model.js';
 export type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 export type { SatParameters } from '../generated/sat_parameters.js';
+export {
+  SatParameters_VariableOrder,
+  SatParameters_Polarity,
+  SatParameters_ConflictMinimizationAlgorithm,
+  SatParameters_BinaryMinizationAlgorithm,
+  SatParameters_ClauseOrdering,
+  SatParameters_RestartAlgorithm,
+  SatParameters_MaxSatAssumptionOrder,
+  SatParameters_MaxSatStratificationAlgorithm,
+  SatParameters_SearchBranching,
+  SatParameters_SharedTreeSplitStrategy,
+  SatParameters_FPRoundingMethod,
+} from '../generated/sat_parameters.js';
 
 export type CpSatSchemas = {
   cp_model: string;
@@ -77,7 +91,8 @@ export type CpSatValidateOptions = {
 };
 
 export type CpSatApi = {
-  solve(model: Uint8Array, options?: CpSatSolveOptions): Promise<CpSatSolveResult>;
+  solve(model: import('./high_level_api.js').CpModel, options?: import('./high_level_api.js').CpSolverSolveOptions): Promise<import('./high_level_api.js').CpResult>;
+  solveProto(model: Uint8Array, options?: CpSatSolveOptions): Promise<CpSatSolveResult>;
   validate(
     model: Uint8Array,
     options?: CpSatValidateOptions,
@@ -171,7 +186,7 @@ function encodeSatParameters(
   if (unknownParameter) {
     throw new Error(`CpSat.solve: unknown solver parameter "${unknownParameter}".`);
   }
-  const protobufParams = encodeProtobufBigInts(params) as Record<string, unknown>;
+  const protobufParams = encodeProtobufBigInts(params, parametersType) as Record<string, unknown>;
   const validationError = parametersType.verify(protobufParams);
   if (validationError) {
     throw new Error(`CpSat.solve: ${validationError}`);
@@ -196,20 +211,6 @@ function decodeCpSatEvent(
   return event;
 }
 
-function createAbortError(signal: AbortSignal) {
-  if (signal.reason instanceof Error) {
-    return signal.reason;
-  }
-  if (signal.reason !== undefined) {
-    return new Error(String(signal.reason));
-  }
-  if (typeof DOMException !== 'undefined') {
-    return new DOMException('The CP-SAT solve was aborted.', 'AbortError');
-  }
-  const error = new Error('The CP-SAT solve was aborted.');
-  error.name = 'AbortError';
-  return error;
-}
 
 function normalizeCpModelForProtobuf(model: CpModelProto) {
   return {
@@ -230,7 +231,7 @@ function normalizeCpModelForProtobuf(model: CpModelProto) {
 
 async function createModel(model: CpModelProto): Promise<Uint8Array> {
   const { modelType: type } = getProtobufContext();
-  const protobufModel = encodeProtobufBigInts(normalizeCpModelForProtobuf(model)) as Record<string, unknown>;
+  const protobufModel = encodeProtobufBigInts(normalizeCpModelForProtobuf(model), type) as Record<string, unknown>;
   const validationError = type.verify(protobufModel);
   if (validationError) {
     throw new Error(`CpSat.createModel: ${validationError}`);
@@ -253,7 +254,7 @@ async function modelStats(model: Uint8Array): Promise<string> {
     name: object.name ?? '',
     variables: object.variables?.length ?? 0,
     constraints: object.constraints?.length ?? 0,
-    hasObjective: object.objective !== undefined || object.floatingPointObjective !== undefined,
+    hasObjective: object.objective != null || object.floatingPointObjective != null,
   });
 }
 
@@ -294,7 +295,6 @@ async function executeSolve(
     resources: options.resources,
     onEvent,
     signal: options.signal,
-    abortError: createAbortError,
   });
   if (response.type !== 'solve') {
     throw new Error('CP-SAT executor returned the wrong solve payload.');
@@ -309,7 +309,7 @@ function schedulerResourcesFromParameters(
   return threads !== undefined && threads > 0 ? { threads } : undefined;
 }
 
-async function solve(
+async function solveProto(
   modelBytes: Uint8Array,
   options: CpSatSolveOptions = {},
 ): Promise<CpSatSolveResult> {
@@ -338,6 +338,29 @@ async function solve(
   return { bytes, response };
 }
 
+async function solve(
+  model: import('./high_level_api.js').CpModel,
+  options: import('./high_level_api.js').CpSolverSolveOptions = {},
+): Promise<import('./high_level_api.js').CpResult> {
+  if (model instanceof Uint8Array) {
+    throw new TypeError('CpSat.solve() accepts a CpModel; use CpSat.solveProto() for serialized models.');
+  }
+  const { solutionCallback, onEvent, eventMask, ...solverOptions } = options;
+  const submitted = model.modelProto;
+  const bytes = await createModel(submitted);
+  const result = await solveProto(bytes, {
+    ...solverOptions,
+    eventMask: solutionCallback ? { ...eventMask, solution: true } : eventMask,
+    onEvent: solutionCallback || onEvent
+      ? async (event) => {
+          if (event.type === 'solution') solutionCallback?._run(event.response);
+          await onEvent?.(event);
+        }
+      : undefined,
+  });
+  return new CpResult(model, result.response, submitted.variables?.length ?? 0);
+}
+
 async function validate(
   model: Uint8Array,
   options: CpSatValidateOptions = {},
@@ -349,7 +372,6 @@ async function validate(
   }, {
     onEvent: ignoreCpSatProgress,
     signal: options.signal,
-    abortError: createAbortError,
   });
   if (response.type !== 'validate') {
     throw new Error('CP-SAT executor returned the wrong validate payload.');
@@ -361,7 +383,8 @@ async function validate(
 }
 
 export const CpSat: CpSatApi = {
-  solve: (model, options = {}) => solve(model, options),
+  solve,
+  solveProto,
   validate,
   modelStats,
   getSchemas,

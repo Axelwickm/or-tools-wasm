@@ -9,6 +9,12 @@ message MpSolverSolveRequest {
   bytes request_proto = 1;
   int32 num_threads = 2;
   bool interruptible = 3;
+  MpSolverParameters parameters = 4;
+}
+
+message MpSolverParameters {
+  map<int32, double> double_params = 1;
+  map<int32, int32> integer_params = 2;
 }
 
 message MpSolverSchemaRequest {}

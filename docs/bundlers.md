@@ -5,7 +5,7 @@
 For Vite apps, keep `or-tools-wasm` out of dependency optimization so Vite
 handles the worker and WebAssembly URLs through its normal asset pipeline.
 `protobufjs` is CommonJS, so include it in dependency optimization. The worker
-runtime also needs ES module worker output. Browser solves require
+runtime also needs ES module worker output. Local browser WASM solves require
 cross-origin-isolation headers for WebAssembly threads:
 
 ```ts

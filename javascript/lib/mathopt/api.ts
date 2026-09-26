@@ -210,6 +210,8 @@ export type MathOptSolveResult = {
   dualStatus: string | null;
   primalOrDualInfeasible: boolean;
   objectiveValue: number | null;
+  hasSolution: boolean;
+  value(variable: MathOptVariable): number;
   variableValues: Record<string, number>;
   variableValuesById: Record<number, number>;
   solutions: MathOptSolutionResult[];
@@ -2172,6 +2174,9 @@ export class MathOptIncrementalSolver {
       assertNoDuplicateNamesForIncrementalSolver(this.checkpoint);
     }
     this.initPromise = this.create();
+    // Initialization is eager; retain its rejection for solve(), but handle it
+    // immediately even when the caller waits before using or closing the solver.
+    void this.initPromise.catch(() => {});
   }
 
   private async create(): Promise<number> {
@@ -2509,21 +2514,10 @@ async function executeMathOptRequest(
     onEvent: options.onEvent,
     onSuccess: (response) => onSuccess?.(response.response),
     signal: options.signal,
-    abortError: createAbortError,
   });
   return response.response;
 }
 
-function createAbortError(signal: AbortSignal): Error {
-  if (signal.reason instanceof Error) return signal.reason;
-  const error = new Error(
-    signal.reason === undefined
-      ? 'The MathOpt operation was aborted.'
-      : String(signal.reason),
-  );
-  error.name = 'AbortError';
-  return error;
-}
 
 function encodeSolveRequest(
   model: MathOptModel,
@@ -2945,10 +2939,13 @@ function decodeSolveResponse(bytes: Uint8Array, model: MathOptModel): MathOptSol
   const solutions = (result.messages.get(3) ?? []).map((solutionBytes) => decodeSolution(solutionBytes, model));
   const primalRays = (result.messages.get(4) ?? []).map((rayBytes) => decodePrimalRay(rayBytes, model));
   const dualRays = (result.messages.get(5) ?? []).map((rayBytes) => decodeDualRay(rayBytes, model));
-  const firstPrimalSolution = solutions.find((solution) => solution.primalSolution !== null)?.primalSolution ?? null;
+  const firstPrimalSolution = solutions.find(
+    (solution) => solution.primalSolution?.feasibilityStatus === 'SOLUTION_STATUS_FEASIBLE',
+  )?.primalSolution ?? null;
   const objectiveValue = firstPrimalSolution?.objectiveValue ?? null;
   const variableValues = firstPrimalSolution?.variableValues ?? {};
   const variableValuesById = firstPrimalSolution?.variableValuesById ?? {};
+  const answerValuesById = { ...variableValuesById };
 
   const solveResult: MathOptSolveResult = {
     terminationReason: terminationReasonNames[terminationReasonNumber] ?? `TERMINATION_REASON_${terminationReasonNumber}`,
@@ -2962,6 +2959,14 @@ function decodeSolveResponse(bytes: Uint8Array, model: MathOptModel): MathOptSol
     dualStatus: problemStatusMessage ? feasibilityStatusNames[dualStatus] ?? `FEASIBILITY_STATUS_${dualStatus}` : null,
     primalOrDualInfeasible,
     objectiveValue,
+    hasSolution: firstPrimalSolution !== null,
+    value(variable: MathOptVariable): number {
+      if (firstPrimalSolution === null) throw new Error('Solve result has no feasible solution.');
+      if (variable.model !== model) throw new Error('Variable belongs to a different MathOpt model.');
+      const value = answerValuesById[variable.id];
+      if (value === undefined) throw new Error('Solve result has no value for this variable.');
+      return value;
+    },
     variableValues,
     variableValuesById,
     solutions,

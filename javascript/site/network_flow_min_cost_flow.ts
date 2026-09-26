@@ -1,5 +1,6 @@
 import {
   type ExecutorConfiguration,
+  type MinCostFlowResult,
   SimpleMinCostFlow,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
@@ -115,13 +116,13 @@ function generateGraph() {
   arcs = generated;
 }
 
-function renderSolution(minCostFlow: SimpleMinCostFlow, allArcs: number[]) {
+function renderSolution(minCostFlow: SimpleMinCostFlow, result: MinCostFlowResult, allArcs: number[]) {
   const rows = allArcs.map((arc) =>
-    `<tr><td>${minCostFlow.tail(arc)}</td><td>${minCostFlow.head(arc)}</td><td>${minCostFlow.capacity(arc)}</td><td>${minCostFlow.unitCost(arc)}</td><td>${minCostFlow.flow(arc)}</td></tr>`,
+    `<tr><td>${minCostFlow.tail(arc)}</td><td>${minCostFlow.head(arc)}</td><td>${minCostFlow.capacity(arc)}</td><td>${minCostFlow.unitCost(arc)}</td><td>${result.flow(arc)}</td></tr>`,
   ).join('');
   solutionOutput.innerHTML = `
-    <strong>Optimal cost:</strong> ${minCostFlow.optimalCost()}<br>
-    <strong>Maximum flow:</strong> ${minCostFlow.maximumFlow()}
+    <strong>Optimal cost:</strong> ${result.optimalCost}<br>
+    <strong>Maximum flow:</strong> ${result.maximumFlow}
     <table>
       <thead><tr><th>Tail</th><th>Head</th><th>Capacity</th><th>Unit cost</th><th>Flow</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -189,20 +190,21 @@ async function runMinCostFlow() {
     minCostFlow.setNodesSupplies(nodes.map((node) => node.id), nodes.map((node) => node.supply));
 
     appendStatus(`Solving with ${executorSelector.value} executor...`);
-    const status = await minCostFlow.solve({ executor: readNetworkFlowExecutor() });
-    appendStatus(`Done. Status ${status}.`);
+    const result = await minCostFlow.solve({ executor: readNetworkFlowExecutor() });
+    appendStatus(`Done. Status ${result.status}.`);
     arcs = allArcs.map((arc) => ({
       from: minCostFlow.tail(arc),
       to: minCostFlow.head(arc),
       capacity: Number(minCostFlow.capacity(arc)),
       unitCost: Number(minCostFlow.unitCost(arc)),
-      flow: Number(minCostFlow.flow(arc)),
+      flow: Number(result.flow(arc)),
     }));
-    renderSolution(minCostFlow, allArcs);
+    renderSolution(minCostFlow, result, allArcs);
     renderGraph(true);
   } catch (error) {
-    appendStatus(error instanceof Error ? error.message : String(error));
-    throw error;
+    const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
+    appendStatus(message);
+    solutionOutput.textContent = message;
   } finally {
     setRunning(false);
   }

@@ -20,7 +20,7 @@ type RoutingIndexManagerLike = {
 type RoutingModelLike = {
   registerTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
   setArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
-  solve(options?: unknown): Promise<RoutingAssignmentLike | null>;
+  solve(options?: unknown): Promise<{ status: number; hasSolution: boolean; assignment: RoutingAssignmentLike | null }>;
   solveWithParameters(
     parameters: { firstSolutionStrategy?: number },
     options?: unknown,
@@ -185,7 +185,7 @@ export const basicContractCases: RoutingCase[] = [
       const manager = new routingApi.RoutingIndexManager(42, 3, 7);
       const routing = new routingApi.RoutingModel(manager);
       assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-      const assignment = await routing.solve(routingExecutionOptions());
+      const assignment = (await routing.solve(routingExecutionOptions())).assignment;
       assert(assignment !== null, `${caseName} did not return a solution`);
       assertNumber(routing.status(), ROUTING_OPTIMAL, `${caseName} final status`);
       assertNumber(assignment.objectiveValue(), 0, `${caseName} objectiveValue`);
@@ -201,7 +201,7 @@ export const basicContractCases: RoutingCase[] = [
       const manager = new routingApi.RoutingIndexManager(42, 3, [1, 2, 3], [4, 5, 6]);
       const routing = new routingApi.RoutingModel(manager);
       assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-      const assignment = await routing.solve(routingExecutionOptions());
+      const assignment = (await routing.solve(routingExecutionOptions())).assignment;
       assert(assignment !== null, `${caseName} did not return a solution`);
       assertNumber(routing.status(), ROUTING_OPTIMAL, `${caseName} final status`);
       assertNumber(assignment.objectiveValue(), 0, `${caseName} objectiveValue`);
@@ -220,7 +220,7 @@ export const basicContractCases: RoutingCase[] = [
       assertNumber(transitIdx, 1, `${caseName} first transit callback index`);
       routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
       assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-      const assignment = await routing.solve(routingExecutionOptions());
+      const assignment = (await routing.solve(routingExecutionOptions())).assignment;
       assert(assignment !== null, `${caseName} did not return a solution`);
       assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
       assertNumber(assignment.objectiveValue(), 20, `${caseName} objectiveValue`);
@@ -239,7 +239,7 @@ export const basicContractCases: RoutingCase[] = [
       assertNumber(transitIdx, 1, `${caseName} first transit callback index`);
       routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
       assertNumber(routing.status(), ROUTING_NOT_SOLVED, `${caseName} initial status`);
-      const assignment = await routing.solve(routingExecutionOptions());
+      const assignment = (await routing.solve(routingExecutionOptions())).assignment;
       assert(assignment !== null, `${caseName} did not return a solution`);
       assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
       assertNumber(assignment.objectiveValue(), 5, `${caseName} objectiveValue`);

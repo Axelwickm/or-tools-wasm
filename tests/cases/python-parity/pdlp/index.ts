@@ -1,3 +1,4 @@
+import { assertCaseMatrix } from '../../../harness/shared_case.ts';
 import type { ExecutorFixtureMode, FixtureMode, SharedCase, SharedCaseResult } from '../../../harness/shared_case.ts';
 import { assertServerExecutorIsRunning, executorFixtureModes, passedCase, serverExecutorConfiguration, solverJobStates } from '../../../harness/shared_case.ts';
 
@@ -704,6 +705,7 @@ export async function runPdlpCases(
       results.push(passedCase(testCase, { mode }, result));
     }
   }
+  assertCaseMatrix(results, pdlpCases, modes);
   return results;
 }
 

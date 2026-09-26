@@ -12,6 +12,7 @@ import {
   type SetCoverAlgorithm,
   type SetCoverExecutor,
   type SetCoverOperation,
+  type SetCoverResult as SetCoverBridgeResult,
 } from './protocol.js';
 import type { SolverJobEvent } from '../solver_executor.js';
 import { executeSolverJob } from '../solver_job.js';
@@ -41,6 +42,45 @@ export type SetCoverSolveOptions = {
   executor?: ExecutorSelection;
   onEvent?: (event: SetCoverEvent) => void | Promise<void>;
   signal?: AbortSignal;
+};
+
+export type SetCoverOneShotOptions = SetCoverSolveOptions & {
+  algorithm?: SetCoverAlgorithm;
+  maxIterations?: number;
+};
+
+/** Snapshot returned by a one-shot solve; iterative generators remain separate. */
+export class SetCoverResult {
+  readonly cost: number;
+  readonly numUncoveredElements: number;
+  readonly hasSolution: boolean;
+  private readonly selected: readonly boolean[];
+
+  constructor(result: SetCoverBridgeResult) {
+    this.cost = result.cost;
+    this.numUncoveredElements = result.numUncoveredElements;
+    this.hasSolution = result.nextSolution;
+    this.selected = [...result.selected];
+  }
+
+  contains(subset: number): boolean {
+    assertSubsetIndex(subset, this.selected.length);
+    return this.selected[subset];
+  }
+
+  selectedSubsets(): number[] {
+    return this.selected.flatMap((value, index) => value ? [index] : []);
+  }
+}
+
+export const SetCover = {
+  async solve(model: SetCoverModel, options: SetCoverOneShotOptions = {}): Promise<SetCoverResult> {
+    const { algorithm = 'greedy', maxIterations = Number.POSITIVE_INFINITY, ...execution } = options;
+    const selected = Array.from({ length: model.numSubsets }, () => false);
+    return new SetCoverResult(await runNativeSetCover(
+      createSetCoverOperation(model, selected, null, algorithm, maxIterations), execution,
+    ));
+  },
 };
 
 export class RuntimeError extends Error {
@@ -73,16 +113,6 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): S
   }
 }
 
-function abortError(signal: AbortSignal) {
-  if (signal.reason instanceof Error) return signal.reason;
-  if (signal.reason !== undefined) return new Error(String(signal.reason));
-  if (typeof DOMException !== 'undefined') {
-    return new DOMException('The Set Cover solve was aborted.', 'AbortError');
-  }
-  const error = new Error('The Set Cover solve was aborted.');
-  error.name = 'AbortError';
-  return error;
-}
 
 function assertSubsetIndex(index: number, numSubsets: number, label = 'subset') {
   if (!Number.isInteger(index) || index < 0 || index >= numSubsets) {
@@ -134,7 +164,6 @@ async function runNativeSetCover(operation: SetCoverOperation, options: SetCover
   const executor = createSetCoverExecutor(options.executor);
   return executeSolverJob(executor, operation, {
     signal: options.signal,
-    abortError,
     onEvent: options.onEvent,
   });
 }

@@ -1,4 +1,17 @@
 export { CpSat } from './cp_sat/api.js';
+export {
+  SatParameters_VariableOrder,
+  SatParameters_Polarity,
+  SatParameters_ConflictMinimizationAlgorithm,
+  SatParameters_BinaryMinizationAlgorithm,
+  SatParameters_ClauseOrdering,
+  SatParameters_RestartAlgorithm,
+  SatParameters_MaxSatAssumptionOrder,
+  SatParameters_MaxSatStratificationAlgorithm,
+  SatParameters_SearchBranching,
+  SatParameters_SharedTreeSplitStrategy,
+  SatParameters_FPRoundingMethod,
+} from './cp_sat/api.js';
 export { default } from './cp_sat/api.js';
 export {
   CloudExecutorUnavailableError,
@@ -31,6 +44,7 @@ export {
   Constraint,
   CpModel,
   CpSolver,
+  CpResult,
   CpSolverSolutionCallback,
   Domain,
   IntVar,

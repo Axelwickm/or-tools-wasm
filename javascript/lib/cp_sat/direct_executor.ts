@@ -99,7 +99,6 @@ function createCpSatFailureEvent(
 export class DirectCpSatExecutor implements CpSatExecutor {
   readonly solver = 'cp-sat';
 
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -110,8 +109,7 @@ export class DirectCpSatExecutor implements CpSatExecutor {
   }
 
   private module() {
-    this.modulePromise ??= this.loadModuleImpl();
-    return this.modulePromise;
+    return this.loadModuleImpl();
   }
 
   execute(

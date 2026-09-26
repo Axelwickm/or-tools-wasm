@@ -212,8 +212,9 @@ async function solve() {
     renderTimeline();
     appendStatus(`Done. ${result.statusName} makespan ${result.makespan}.`);
   } catch (error) {
-    appendStatus(error instanceof Error ? error.message : String(error));
-    throw error;
+    const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
+    appendStatus(message);
+    metricsEl.textContent = message;
   } finally {
     setRunning(false);
   }

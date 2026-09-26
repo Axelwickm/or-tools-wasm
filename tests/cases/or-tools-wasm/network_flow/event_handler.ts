@@ -1,11 +1,12 @@
 type NetworkFlowEventHandlerApi = {
   SimpleMaxFlow: new () => {
     addArcWithCapacity(tail: number, head: number, capacity: number): number;
-    solve(source: number, sink: number, options: {
+    solve(options: {
+      source: number;
+      sink: number;
       executor: 'direct' | 'worker';
       onEvent?: (event: unknown) => void;
-    }): Promise<number>;
-    optimalFlow(): bigint;
+    }): Promise<{ optimalFlow: bigint }>;
   };
 };
 
@@ -24,7 +25,7 @@ async function assertCallbackRecovery(
   const callbackError = new Error(`${executor} callback failed`);
   let thrown: unknown;
   try {
-    await flow.solve(0, 2, {
+    await flow.solve({ source: 0, sink: 2,
       executor,
       onEvent: () => { throw callbackError; },
     });
@@ -34,9 +35,9 @@ async function assertCallbackRecovery(
   if (thrown !== callbackError) {
     throw new Error(`${executor}: expected original callback error, got ${String(thrown)}`);
   }
-  await flow.solve(0, 2, { executor });
-  if (flow.optimalFlow() !== 10n) {
-    throw new Error(`${executor}: expected recovery flow 10, got ${flow.optimalFlow()}`);
+  const result = await flow.solve({ source: 0, sink: 2, executor });
+  if (result.optimalFlow !== 10n) {
+    throw new Error(`${executor}: expected recovery flow 10, got ${result.optimalFlow}`);
   }
 }
 

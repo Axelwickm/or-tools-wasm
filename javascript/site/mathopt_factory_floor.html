@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MathOpt - Bakery Floor Planner with IncrementalSolver</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -470,6 +471,9 @@
         padding: 0.3rem 0.4rem;
       }
 
+      @media (max-width: 760px) {
+        .factory-stage { grid-template-columns: minmax(0, 1fr); }
+      }
     </style>
   </head>
   <body>

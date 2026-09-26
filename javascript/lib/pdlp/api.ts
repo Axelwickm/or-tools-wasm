@@ -384,7 +384,6 @@ async function execute(
     onEvent: options.onEvent,
     resources,
     signal: options.signal,
-    abortError: createAbortError,
   });
 }
 
@@ -396,16 +395,6 @@ function schedulerResourcesFromParameters(
     : undefined;
 }
 
-function createAbortError(signal: AbortSignal) {
-  if (signal.reason instanceof Error) return signal.reason;
-  const error = new Error(
-    signal.reason === undefined
-      ? 'The PDLP operation was aborted.'
-      : String(signal.reason),
-  );
-  error.name = 'AbortError';
-  return error;
-}
 
 export class QuadraticProgram {
   problemName = '';

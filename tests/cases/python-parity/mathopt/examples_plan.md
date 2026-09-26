@@ -1,4 +1,9 @@
-# MathOpt Python Samples to Port (Browser Basic)
+# MathOpt Python Sample Planning Notes
+
+These are model-selection notes, not a current coverage checklist. Cases now
+live in the shared MathOpt fixture catalog rather than a browser-only runner.
+See the [parity audit](../../../../docs/test-audit/solver-python-test-parity-audit.md)
+for current classifications.
 
 ## Selected examples (in order of increasing complexity)
 
@@ -79,7 +84,7 @@
     - Objective `sum completion times = 26`
 - **Porting notes**
   - GSCIP is now available in the browser fixture.
-  - The TypeScript MathOpt API now supports mutable variable bounds through `upperBound` / `upper_bound`, so the release-time restrictions can be represented directly.
+  - The TypeScript MathOpt API supports mutable variable bounds through `upperBound`, so the release-time restrictions can be represented directly.
   - Larger, two-dimensional binary variable matrices plus time-indexed overlap constraints remain useful as a real complexity step after small MIP examples.
 
 ## Rationale

@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Network Flow - Assignment</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -53,12 +54,12 @@ for (let worker = 0; worker &lt; costs.length; ++worker) {
 
 const assignment = new SimpleLinearSumAssignment();
 assignment.addArcsWithCost(leftNodes, rightNodes, arcCosts);
-const status = await assignment.solve({ executor: 'worker' });
+const result = await assignment.solve({ executor: 'worker' });
 
-if (status === SimpleLinearSumAssignmentStatus.OPTIMAL) {
-  console.log(assignment.optimalCost());
+if (result.status === SimpleLinearSumAssignmentStatus.OPTIMAL) {
+  console.log(result.optimalCost);
   for (let worker = 0; worker &lt; assignment.numNodes(); ++worker) {
-    console.log(worker, assignment.rightMate(worker), assignment.assignmentCost(worker));
+    console.log(worker, result.rightMate(worker), result.assignmentCost(worker));
   }
 }</code></pre>
       </details>

@@ -51,9 +51,9 @@ async function runMPSolverSmoke() {
 async function runNetworkFlowSmoke() {
   const maxFlow = new SimpleMaxFlow();
   maxFlow.addArcsWithCapacity([0, 0, 1, 2], [1, 2, 3, 3], [5, 3, 4, 4]);
-  const status = await maxFlow.solve(0, 3, { executor: 'direct' });
-  assert(status === SimpleMaxFlowStatus.OPTIMAL, `SimpleMaxFlow expected OPTIMAL, got ${status}`);
-  assert(maxFlow.optimalFlow() === 7, `SimpleMaxFlow expected flow 7, got ${maxFlow.optimalFlow()}`);
+  const result = await maxFlow.solve({ source: 0, sink: 3, executor: 'direct' });
+  assert(result.status === SimpleMaxFlowStatus.OPTIMAL, `SimpleMaxFlow expected OPTIMAL, got ${result.status}`);
+  assert(result.optimalFlow === 7n, `SimpleMaxFlow expected flow 7, got ${result.optimalFlow}`);
 }
 
 async function runMathOptSmoke() {

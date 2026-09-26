@@ -1,7 +1,7 @@
 type NetworkFlowConcurrencyApi = {
   SimpleMaxFlow: new () => {
     addArcWithCapacity(tail: number, head: number, capacity: number): number;
-    solve(source: number, sink: number, options: { executor: 'direct' | 'worker' }): Promise<number>;
+    solve(options: { source: number; sink: number; executor: 'direct' | 'worker' }): Promise<unknown>;
   };
 };
 
@@ -15,11 +15,11 @@ function createFlow(api: NetworkFlowConcurrencyApi) {
 export async function runNetworkFlowConcurrencyCase(api: NetworkFlowConcurrencyApi) {
   const first = createFlow(api);
   const second = createFlow(api);
-  const activeSolve = first.solve(0, 2, { executor: 'direct' });
+  const activeSolve = first.solve({ source: 0, sink: 2, executor: 'direct' });
 
   let busyError: unknown;
   try {
-    await second.solve(0, 2, { executor: 'direct' });
+    await second.solve({ source: 0, sink: 2, executor: 'direct' });
   } catch (error) {
     busyError = error;
   }
@@ -27,13 +27,13 @@ export async function runNetworkFlowConcurrencyCase(api: NetworkFlowConcurrencyA
     throw new Error(`expected SolverExecutorBusyError, got ${String(busyError)}`);
   }
   await activeSolve;
-  await second.solve(0, 2, { executor: 'direct' });
+  await second.solve({ source: 0, sink: 2, executor: 'direct' });
 
   const shared = createFlow(api);
-  const workerSolve = shared.solve(0, 2, { executor: 'worker' });
+  const workerSolve = shared.solve({ source: 0, sink: 2, executor: 'worker' });
   let instanceError: unknown;
   try {
-    await shared.solve(0, 2, { executor: 'direct' });
+    await shared.solve({ source: 0, sink: 2, executor: 'direct' });
   } catch (error) {
     instanceError = error;
   }
@@ -41,7 +41,7 @@ export async function runNetworkFlowConcurrencyCase(api: NetworkFlowConcurrencyA
     throw new Error(`expected RuntimeError, got ${String(instanceError)}`);
   }
   await workerSolve;
-  await shared.solve(0, 2, { executor: 'direct' });
+  await shared.solve({ source: 0, sink: 2, executor: 'direct' });
 
   return {
     id: 'network_flow.executor.concurrency' as const,

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CP-SAT - Calendar Scheduling</title>
+  <link rel="stylesheet" href="./example.css"><link rel="stylesheet" href="./project_calendar.css">
+</head>
+<body>
+  <nav><a href="./index.html">← All examples</a><a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a></nav>
+  <h1>CP-SAT - Calendar Scheduling</h1>
+  <p>Schedule project tasks around prerequisites, lunch and staff availability.</p>
+  <div class="code-toggle"><details><summary>Show code</summary><pre class="code-block"><code id="model-code" data-highlight="ts"></code></pre></details></div>
+  <p>Each day has a column for each person. Shared tasks span their participants' columns.
+    Drag a task to set a preferred time. Click <strong>Replan</strong> to calculate a schedule.
+    To require an exact time, select the task and click <strong>Lock time</strong> below the calendar.</p>
+  <p>The initial draft places Integration during Bo's time off. Click Replan to resolve it.</p>
+  <section class="controls" aria-label="Calendar controls">
+    <button id="run">Replan</button><button id="reset">Reset schedule</button>
+    <label>Finish by <select id="deadline"><option value="40">Friday · 17:00</option><option value="35">Friday · 12:00</option><option value="32">Thursday · 17:00</option><option value="24">Wednesday · 17:00</option></select></label>
+    <label>Executor <select id="solver-executor"><option value="worker">Worker</option><option value="direct">Direct</option><option value="server">Server</option></select></label>
+  </section>
+  <div class="plan-status"><p id="status" class="status-line" role="status" aria-live="polite"></p><span id="score"></span></div>
+  <div class="calendar-scroll" tabindex="0" role="region" aria-label="Weekly calendar. Scroll horizontally to view all days."><div class="calendar-shell"><div id="day-headings"></div><div id="calendar" aria-label="Project working week"></div></div></div>
+  <div class="legend"><span>🔒 Required time</span><span>Hatched: unavailable</span><span>Red: current conflict. Select the task for details.</span></div>
+  <section class="below">
+    <div><h2 id="task-title">Project brief</h2><p id="task-detail"></p>
+      <form id="pin-form"><label>Task <select id="task"></select></label><label>Day <select id="day"></select></label><label>Start <select id="hour"></select></label>
+        <button id="pin" type="submit" aria-pressed="false">Lock time</button></form>
+      <p id="task-conflicts" class="hint" aria-live="polite"></p>
+    </div>
+    <div><h2>Model</h2><p>Tasks cannot overlap for the same person and must follow their dependencies.
+      Work stays within 09:00–17:00, excluding lunch (12:00–13:00) and Bo's Wednesday morning off.
+      All tasks must finish by the deadline.</p>
+      <p>Moving an unlocked task changes its preferred time, not a requirement. Replan may move it again to satisfy the constraints.
+        The objective is total deviation from preferred times, counting daytime hours only.</p></div>
+  </section>
+  <script type="module" src="./project_calendar.ts"></script>
+</body></html>

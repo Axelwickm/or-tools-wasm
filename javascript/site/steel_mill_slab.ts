@@ -1086,7 +1086,7 @@ const runExperiment = async () => {
 
     appendStatus('Solving…');
     try {
-      const result = await CpSat.solve(modelInstance, {
+      const result = await CpSat.solveProto(modelInstance, {
         ...params,
         executor: selectedExecutor(),
         signal,
@@ -1121,6 +1121,7 @@ const runExperiment = async () => {
       const err = error as Error;
       const message = err?.message ?? String(err);
       appendStatus(`Solve failed: ${message}`);
+      summaryEl.textContent = `Solve failed: ${message}`;
       if (err?.stack) {
         appendStatus(err.stack);
       }
@@ -1130,6 +1131,10 @@ const runExperiment = async () => {
         console.error(err.stack);
       }
     }
+  } catch (error) {
+    const message = `Run failed: ${error instanceof Error ? error.message : String(error)}`;
+    appendStatus(message);
+    summaryEl.textContent = message;
   } finally {
     activeSolve.finish(signal);
     runButton.disabled = false;

@@ -196,8 +196,8 @@ async function solveKnapsack(problem, threads) {
     problem.problem,
   );
   solver.init(values, weights, capacities);
-  const objective = await solver.solve({ executor: 'direct' });
-  return [solver.isSolutionOptimal() ? 'OPTIMAL' : 'FEASIBLE', String(objective)];
+  const result = await solver.solve({ executor: 'direct' });
+  return [result.optimal ? 'OPTIMAL' : 'FEASIBLE', String(result.profit)];
 }
 
 async function solveMaxFlow(problem, threads) {
@@ -238,10 +238,10 @@ async function solveMaxFlow(problem, threads) {
 
   const maxFlow = new SimpleMaxFlow();
   maxFlow.addArcsWithCapacity(tails, heads, capacities);
-  const status = await maxFlow.solve(source, sink, { executor: 'direct' });
+  const result = await maxFlow.solve({ source, sink, executor: 'direct' });
   return [
-    statusName(status, SimpleMaxFlowStatus),
-    status === SimpleMaxFlowStatus.OPTIMAL ? String(maxFlow.optimalFlow()) : '',
+    statusName(result.status, SimpleMaxFlowStatus),
+    result.status === SimpleMaxFlowStatus.OPTIMAL ? String(result.optimalFlow) : '',
   ];
 }
 

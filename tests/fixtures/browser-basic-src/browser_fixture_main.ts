@@ -37,6 +37,7 @@ import { runSetCoverEventHandlerCase } from '../../cases/or-tools-wasm/set_cover
 import { runSetCoverWorkerLifecycleCase } from '../../cases/or-tools-wasm/set_cover/worker_lifecycle.ts';
 import { runSolverPeakConcurrencyCase, runSolverRestartCase, runSolverReuseCase } from '../../cases/or-tools-wasm/solver_reuse.ts';
 import type { BrowserFixtureGroup } from '../../harness/browser_groups.ts';
+import { runSolveResultCases, type SolveResultApis } from '../../cases/or-tools-wasm/solve_results.ts';
 
 type PackageModule = Record<string, any>;
 
@@ -324,7 +325,6 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     BoundCost: RoutingApiModule.BoundCost,
     defaultRoutingModelParameters: RoutingApiModule.defaultRoutingModelParameters,
     defaultRoutingSearchParameters: RoutingApiModule.defaultRoutingSearchParameters,
-    findErrorInRoutingSearchParameters: RoutingApiModule.findErrorInRoutingSearchParameters,
     FirstSolutionStrategy: RoutingApiModule.FirstSolutionStrategy,
     LocalSearchMetaheuristic: RoutingApiModule.LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingApiModule.RoutingIndexManager,
@@ -593,8 +593,13 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
       version: PackageApi.version,
     })
   );
+  const solveResultContracts = await runSolveResultCases({
+    cpSat: CpSatApi, mp: MPSolverApi, routing: RoutingApiModule,
+    knapsack: KnapsackApi, flow: NetworkFlowApi, cover: SetCoverApi, mathopt: MathOptApi,
+  } as SolveResultApis, { solver: selectedGroup ?? undefined });
   setStatus({
     ok: true,
+    solveResultContracts,
     cloudExecutorResult,
     cpSatConcurrencyResult,
     cpSatThreadReuseResult: cpSatThreadReuseResult?.result,

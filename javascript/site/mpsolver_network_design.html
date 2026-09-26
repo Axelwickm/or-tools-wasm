@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MPSolver - Network Design MIP</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -128,6 +129,9 @@
       }
       #solution-output { margin: 0.75rem 0; }
       #status { min-height: 8rem; }
+      @media (max-width: 760px) {
+        .network-layout { grid-template-columns: minmax(0, 1fr); }
+      }
     </style>
   </head>
   <body>

@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Set Cover - Greedy Heuristic</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -130,6 +131,9 @@
         margin-bottom: 0.35rem;
       }
       #status { min-height: 7rem; }
+      @media (max-width: 760px) {
+        .coverage-layout { grid-template-columns: minmax(0, 1fr); }
+      }
     </style>
   </head>
   <body>

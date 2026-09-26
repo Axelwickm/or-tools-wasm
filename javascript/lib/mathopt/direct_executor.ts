@@ -20,7 +20,6 @@ import type {
 export class DirectMathOptExecutor implements MathOptExecutor {
   readonly solver = 'mathopt';
 
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -54,7 +53,7 @@ export class DirectMathOptExecutor implements MathOptExecutor {
   }
 
   private module() {
-    return this.modulePromise ??= this.loadModuleImpl();
+    return this.loadModuleImpl();
   }
 
   private async run(

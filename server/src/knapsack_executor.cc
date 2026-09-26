@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "knapsack.pb.h"
+#include "javascript/knapsack_validation.h"
 #include "ortools/algorithms/knapsack_solver.h"
 
 namespace ortools_wasm::server {
@@ -24,51 +25,10 @@ SolverExecutorResult Error(std::string message) {
   return result;
 }
 
-bool ToInt64(double value, int64_t* result) {
-  constexpr double kMaxSafeInteger = 9007199254740991.0;
-  if (!std::isfinite(value) || std::trunc(value) != value ||
-      value < -kMaxSafeInteger || value > kMaxSafeInteger) {
-    return false;
-  }
-  *result = static_cast<int64_t>(value);
-  return true;
-}
-
-template <typename Repeated>
-bool CopyIntegers(const Repeated& values, std::vector<int64_t>* result) {
-  result->reserve(values.size());
-  for (double value : values) {
-    int64_t integer;
-    if (!ToInt64(value, &integer)) return false;
-    result->push_back(integer);
-  }
-  return true;
-}
-
-bool KnownSolverType(int solver_type) {
-  switch (solver_type) {
-    case KnapsackSolver::KNAPSACK_BRUTE_FORCE_SOLVER:
-    case KnapsackSolver::KNAPSACK_64ITEMS_SOLVER:
-    case KnapsackSolver::KNAPSACK_DYNAMIC_PROGRAMMING_SOLVER:
-    case KnapsackSolver::KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER:
-    case KnapsackSolver::KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER:
-    case KnapsackSolver::KNAPSACK_MULTIDIMENSION_SCIP_MIP_SOLVER:
-    case KnapsackSolver::KNAPSACK_MULTIDIMENSION_XPRESS_MIP_SOLVER:
-    case KnapsackSolver::KNAPSACK_MULTIDIMENSION_CPLEX_MIP_SOLVER:
-    case KnapsackSolver::KNAPSACK_DIVIDE_AND_CONQUER_SOLVER:
-    case KnapsackSolver::KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER:
-      return true;
-    default:
-      return false;
-  }
-}
 
 SolverExecutorResult Solve(const bridge::KnapsackBridgeRequest& request,
                            const JobContext& context) {
-  if (!KnownSolverType(request.solver_type())) return Error("Unknown Knapsack solver type.");
-  if (request.profits().empty() || request.weights().empty()) {
-    return Error("Knapsack profits and weights must not be empty.");
-  }
+  if (const char* error = ValidateKnapsackShape(request.solver_type(), request.profits_size(), request.weights_size())) return Error(error);
   if (request.weights_size() != request.capacities_size()) {
     return Error("Knapsack weights dimensions must match capacities.");
   }
@@ -76,19 +36,15 @@ SolverExecutorResult Solve(const bridge::KnapsackBridgeRequest& request,
     return Error("Knapsack time limit must be finite and non-negative.");
   }
 
-  std::vector<int64_t> profits;
-  if (!CopyIntegers(request.profits(), &profits)) return Error("Knapsack profits must be integers.");
-  std::vector<int64_t> capacities;
-  if (!CopyIntegers(request.capacities(), &capacities)) return Error("Knapsack capacities must be integers.");
+  const std::vector<int64_t> profits(request.profits().begin(), request.profits().end());
+  const std::vector<int64_t> capacities(request.capacities().begin(), request.capacities().end());
   std::vector<std::vector<int64_t>> weights;
   weights.reserve(request.weights_size());
   for (const auto& dimension : request.weights()) {
     if (dimension.values_size() != profits.size()) {
       return Error("Each Knapsack weight dimension must match the number of profits.");
     }
-    std::vector<int64_t> values;
-    if (!CopyIntegers(dimension.values(), &values)) return Error("Knapsack weights must be integers.");
-    weights.push_back(std::move(values));
+    weights.emplace_back(dimension.values().begin(), dimension.values().end());
   }
   if (context.cancellation_requested()) {
     SolverExecutorResult result = Error("Knapsack solve was cancelled before it started.");
@@ -104,7 +60,7 @@ SolverExecutorResult Solve(const bridge::KnapsackBridgeRequest& request,
   const int64_t profit = solver.Solve();
 
   bridge::KnapsackBridgeResponse response;
-  response.set_profit(static_cast<double>(profit));
+  response.set_profit(profit);
   response.set_optimal(solver.IsSolutionOptimal());
   for (int item = 0; item < profits.size(); ++item) {
     response.add_contains(solver.BestSolutionContains(item));

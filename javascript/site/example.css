@@ -136,40 +136,72 @@ pre,
 
 .server-executor-settings {
 	display: grid;
-	grid-template-columns: minmax(18rem, 1fr) auto;
-	gap: 0.4rem 0.75rem;
-	align-items: center;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+	align-items: start;
+	box-sizing: border-box;
+	width: 100%;
 	max-width: 900px;
 	margin: 0 0 0.75rem;
-	padding: 0.65rem 0.75rem;
-	border-left: 3px solid #0b57d0;
-	background: #f6f8fa;
+	padding: 1rem;
+	border: 1px solid #d0d7de;
+	border-radius: 6px;
+	background: #fff;
 }
 
 .server-executor-settings[hidden] {
 	display: none;
 }
 
-.server-executor-settings label {
-	min-width: 0;
+.server-error {
+	grid-column: 1 / -1;
+	color: #a32020;
+	background: #fff0f0;
+	border-left: 3px solid currentColor;
+	padding: 0.75rem;
+	margin: 0;
+	font-weight: 600;
 }
 
-.server-endpoint-input {
+.server-executor-settings label {
+	display: grid;
+	gap: 0.3rem;
+	align-items: start;
+	min-width: 0;
+	font-weight: 600;
+}
+
+.server-endpoint-input,
+.server-auth-input {
 	box-sizing: border-box;
-	width: min(30rem, 65vw);
-	min-width: 12rem;
+	width: 100%;
+	min-width: 0;
+	padding: 0.45rem 0.55rem;
+	border: 1px solid #8c959f;
+	border-radius: 4px;
+	background: #fff;
+	font-weight: 400;
 }
 
 .server-endpoint-target {
-	color: #555;
+	grid-column: 1 / -1;
+	color: #57606a;
 	font-size: 0.9rem;
 }
 
+.server-endpoint-target + span {
+	grid-column: 1 / -1;
+	font-weight: 600;
+}
+
 .server-start-command {
-	padding: 0.2rem 0.4rem;
+	grid-column: 1 / -1;
+	display: block;
+	padding: 0.55rem 0.65rem;
 	overflow-wrap: anywhere;
-	background: #fff;
+	background: #f6f8fa;
 	border: 1px solid #d0d7de;
+	border-radius: 4px;
 	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -195,6 +227,7 @@ pre,
 
 .stack {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 0.75rem;
 }
 
@@ -239,7 +272,31 @@ th {
 		grid-template-columns: 1fr;
 	}
 
-	.server-endpoint-input {
+	.server-endpoint-input,
+	.server-auth-input {
 		width: 100%;
+	}
+
+	.controls label {
+		flex-wrap: wrap;
+		max-width: 100%;
+	}
+
+	select,
+	input {
+		box-sizing: border-box;
+		max-width: 100%;
+	}
+
+	pre,
+	p,
+	li,
+	.server-endpoint-target {
+		overflow-wrap: anywhere;
+	}
+
+	table {
+		display: block;
+		overflow-x: auto;
 	}
 }

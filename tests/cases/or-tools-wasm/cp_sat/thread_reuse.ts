@@ -2,7 +2,7 @@ type ExecutorMode = 'direct' | 'worker';
 
 type CpSatThreadReuseApi = {
   createModel(model: object): Promise<Uint8Array>;
-  solve(
+  solveProto(
     model: Uint8Array,
     options: {
       executor: ExecutorMode;
@@ -75,7 +75,7 @@ export async function runCpSatThreadReuseCase(
     for (let cycle = 1; cycle <= CYCLES; cycle += 1) {
       for (const numWorkers of [1, 4]) {
         const label = `CP-SAT ${executor} solve ${cycle}/${CYCLES} with ${numWorkers} workers`;
-        const result = await withTimeout(CpSat.solve(model, {
+        const result = await withTimeout(CpSat.solveProto(model, {
           executor,
           numWorkers,
           cpModelPresolve: false,

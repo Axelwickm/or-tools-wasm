@@ -7,6 +7,23 @@ export type FixtureMode = Exclude<ExecutorFixtureMode, 'server'>;
 
 export const fixtureModes = ['direct', 'worker'] as const satisfies readonly FixtureMode[];
 
+export function assertCaseMatrix(
+  results: readonly { id?: string; mode?: string; ok: boolean }[],
+  cases: readonly { id?: string }[],
+  modes: readonly string[],
+): void {
+  if (cases.some(({ id }) => !id)) throw new Error('Expected cases must have stable IDs');
+  const expected = new Set(cases.flatMap(({ id }) => modes.map((mode) => `${id}:${mode}`)));
+  const actual = new Set<string>();
+  for (const result of results) {
+    const key = `${result.id}:${result.mode}`;
+    if (!result.id || !result.ok || !expected.has(key)) throw new Error(`Unexpected or failed case: ${key}`);
+    actual.add(key);
+  }
+  const missing = [...expected].filter((key) => !actual.has(key));
+  if (missing.length) throw new Error(`Missing case/executor combinations: ${missing.join(', ')}`);
+}
+
 type ProcessLike = { env?: Record<string, string | undefined> };
 
 const processLike = (globalThis as typeof globalThis & { process?: ProcessLike }).process;

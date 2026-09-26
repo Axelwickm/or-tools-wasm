@@ -292,8 +292,9 @@ async function runSetCover() {
     renderSolution();
     appendStatus(`Done. Cost ${inv.cost()}.`);
   } catch (error) {
-    appendStatus(error instanceof Error ? error.message : String(error));
-    throw error;
+    const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
+    appendStatus(message);
+    solutionOutput.textContent = message;
   } finally {
     setRunning(false);
   }

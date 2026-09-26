@@ -1,9 +1,11 @@
+import { serverRequest } from './server_request.js';
+
 type ExecutorMode = 'direct' | 'worker' | 'cloud' | 'server';
 export type ExecutorConfiguration =
   | { type: 'direct' }
   | { type: 'worker' }
   | { type: 'cloud' }
-  | { type: 'server'; url: string };
+  | { type: 'server'; url: string; authToken?: string; fetch: typeof fetch };
 
 const SERVER_ENDPOINT_STORAGE_KEY = 'ortools-wasm.server-endpoint';
 const DEFAULT_SERVER_PORT = '17827';
@@ -60,19 +62,39 @@ function createServerSettings(selector: HTMLSelectElement) {
   endpointInput.spellcheck = false;
   endpointLabel.append(endpointInput);
 
+  const authLabel = document.createElement('label');
+  authLabel.textContent = 'Bearer token (optional)';
+  const authInput = document.createElement('input');
+  authInput.className = 'server-auth-input';
+  authInput.type = 'password';
+  authInput.autocomplete = 'off';
+  authInput.spellcheck = false;
+  authInput.placeholder = 'Not stored; enter token without Bearer';
+  authLabel.append(authInput);
+
   const target = document.createElement('span');
   target.className = 'server-endpoint-target';
 
   const commandLabel = document.createElement('span');
-  commandLabel.textContent = 'Start from the repository root:';
+  commandLabel.append('Start from the ');
+  const repositoryLink = document.createElement('a');
+  repositoryLink.href = 'https://github.com/Axelwickm/or-tools-wasm';
+  repositoryLink.textContent = 'repository';
+  repositoryLink.rel = 'noopener';
+  commandLabel.append(repositoryLink, ' root:');
   const command = document.createElement('code');
   command.className = 'server-start-command';
 
-  settings.append(endpointLabel, target, commandLabel, command);
+  const error = document.createElement('p');
+  error.className = 'server-error';
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+
+  settings.append(endpointLabel, authLabel, target, commandLabel, command, error);
   const controls = selector.closest('.controls, .runtime-controls');
   (controls ?? selector.parentElement)?.insertAdjacentElement('afterend', settings);
 
-  return { settings, endpointInput, target, command };
+  return { settings, endpointInput, authInput, target, command, error };
 }
 
 export function configureSolverExecutorSelector(
@@ -82,6 +104,27 @@ export function configureSolverExecutorSelector(
   if (!selector) return () => configuration;
 
   const serverSettings = createServerSettings(selector);
+
+  const configurationFor = (url: string): ExecutorConfiguration => ({
+    type: 'server', url,
+    authToken: serverSettings.authInput.value.trim() || undefined,
+    fetch: async (input, init) => {
+      try {
+        const response = await serverRequest(input, init);
+        // These statuses are part of the server's polling/stream fallback protocol.
+        const streamFallback = String(input).includes('/stream?') && [404, 409].includes(response.status);
+        if (!response.ok && !streamFallback) {
+          serverSettings.error.textContent = `Server ${url}: HTTP ${response.status} ${response.statusText}. Check the endpoint and server logs.`;
+          serverSettings.error.hidden = false;
+        }
+        return response;
+      } catch (error) {
+        serverSettings.error.textContent = `Server ${url}: ${error instanceof Error ? error.message : String(error)}`;
+        serverSettings.error.hidden = false;
+        throw error;
+      }
+    },
+  });
 
   const readEndpoint = () => {
     const endpoint = normalizeServerEndpoint(serverSettings.endpointInput.value);
@@ -105,7 +148,7 @@ export function configureSolverExecutorSelector(
 
     const endpoint = readEndpoint();
     if (endpoint) {
-      configuration = { type: 'server', url: endpoint };
+      configuration = configurationFor(endpoint);
     }
   };
 
@@ -121,8 +164,16 @@ export function configureSolverExecutorSelector(
       // Storage can be unavailable in privacy-restricted browser contexts.
     }
     if (selector.value === 'server') {
-      configuration = { type: 'server', url: endpoint };
+      configuration = configurationFor(endpoint);
     }
   });
-  return () => configuration;
+  return () => {
+    serverSettings.error.hidden = true;
+    if (selector.value === 'server') {
+      const endpoint = readEndpoint();
+      if (!endpoint) throw new Error('Enter a valid HTTP or HTTPS server endpoint.');
+      configuration = configurationFor(endpoint);
+    }
+    return configuration;
+  };
 }

@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Network Flow - Min Cost Flow</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -48,15 +49,15 @@ const allArcs = minCostFlow.addArcsWithCapacityAndUnitCost(
 );
 minCostFlow.setNodesSupplies([0, 1, 2, 3, 4], supplies);
 
-const status = await minCostFlow.solve({ executor: 'worker' });
-if (status === SimpleMinCostFlowStatus.OPTIMAL) {
-  console.log(minCostFlow.optimalCost(), minCostFlow.maximumFlow());
+const result = await minCostFlow.solve({ executor: 'worker' });
+if (result.status === SimpleMinCostFlowStatus.OPTIMAL) {
+  console.log(result.optimalCost, result.maximumFlow);
   console.log(allArcs.map((arc) => ({
     tail: minCostFlow.tail(arc),
     head: minCostFlow.head(arc),
     capacity: minCostFlow.capacity(arc),
     cost: minCostFlow.unitCost(arc),
-    flow: minCostFlow.flow(arc),
+    flow: result.flow(arc),
   })));
 }</code></pre>
       </details>

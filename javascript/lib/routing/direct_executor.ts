@@ -20,7 +20,6 @@ import type {
 export class DirectRoutingExecutor implements RoutingExecutor {
   readonly solver = 'routing';
 
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -54,7 +53,7 @@ export class DirectRoutingExecutor implements RoutingExecutor {
   }
 
   private module() {
-    return this.modulePromise ??= this.loadModuleImpl();
+    return this.loadModuleImpl();
   }
 
   private async run(
@@ -78,7 +77,7 @@ export class DirectRoutingExecutor implements RoutingExecutor {
         createdAt,
         BigInt(Date.now()),
       ));
-      const solution = await solveRoutingWithModule(
+      const result = await solveRoutingWithModule(
         module,
         operation.request,
         operation.interruptible,
@@ -89,7 +88,7 @@ export class DirectRoutingExecutor implements RoutingExecutor {
         SolverJobState.SUCCEEDED,
         createdAt,
       ));
-      return { type: 'solve', solution };
+      return { type: 'solve', ...result };
     } catch (error) {
       await options.onEvent(createSolverFailureEvent(
         this.solver,

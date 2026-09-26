@@ -9,8 +9,24 @@ import { RoutingIndexManager, RoutingModel } from 'or-tools-wasm/routing';
 ```
 
 Most solver runtimes are loaded lazily. Browser solves use the package worker
-bridge by default so the main thread stays responsive. Browser pages still need
-cross-origin isolation headers; see [Browser requirements](../README.md#browser-requirements).
+bridge by default so the main thread stays responsive. Local browser WASM needs
+cross-origin isolation headers; server-only execution does not. See
+[Browser requirements](../README.md#browser-requirements).
+
+The one-shot APIs keep inputs on the model/problem and return a result for that
+particular solve. Solver settings and executor controls go in one options object:
+
+| Solver | One-shot call | Answer |
+| --- | --- | --- |
+| CP-SAT | `CpSat.solve(model, options)` | `CpResult` |
+| MPSolver | `MPSolver.solve(model, options)` | `MpResult` |
+| Routing | `routing.solve(options)` | `RoutingResult` |
+| MathOpt | `MathOpt.solve(model, options)` | `MathOptSolveResult` |
+| PDLP | `Pdlp.solve(problem, options)` | `PdlpSolverResult` |
+| Knapsack | `solver.solve(options)` | `KnapsackResult` |
+| Network Flow | `maxFlow.solve(options)` and related classes | Flow result |
+| Set Cover | `SetCover.solve(model, options)` | `SetCoverResult` |
+| RCPSP | `problem.solve(options)` | `RcpspSolveResult` |
 
 ## CP-SAT
 
@@ -32,14 +48,10 @@ import {
 } from 'or-tools-wasm/cp-sat';
 ```
 
-CP-SAT exposes two public API layers:
-
-- A high-level Python-like model builder around `CpModel` and `CpSolver`.
-- The proto-first `CpSat` API for callers that build or serialize
-  `CpModelProto` objects directly.
-
-Prefer the high-level API for application code, and use `CpSat` when you need
-direct generated protobuf access.
+For application code, build a `CpModel`, call `CpSat.solve(model, options)`,
+and read the returned `CpResult`. The Python-style `CpSolver` instance remains
+available for compatibility. Call `CpSat.solveProto(bytes, options)` when you
+need the byte-oriented protobuf path.
 
 ### High-Level CP-SAT
 
@@ -51,12 +63,9 @@ const y = model.newIntVar(0, 10, 'y');
 model.add(x.plus(y.times(2)).eq(14));
 model.maximize(x.plus(y));
 
-const solver = new CpSolver();
-solver.parameters.numWorkers = 4;
-const status = await solver.solve(model);
-
-console.log(solver.statusName(status));
-console.log(solver.value(x), solver.value(y), solver.objectiveValue);
+const result = await CpSat.solve(model, { numWorkers: 4 });
+console.log(result.status);
+console.log(result.value(x), result.value(y), result.objectiveValue);
 ```
 
 The high-level CP-SAT API uses explicit expression methods because JavaScript
@@ -75,14 +84,14 @@ must be a safe integer; use `bigint` outside JavaScript's safe-integer range.
 Bigints may span the full signed int64 range and are encoded exactly at the
 WebAssembly protobuf boundary. Unsafe integer numbers and out-of-int64 bigints
 throw `RangeError` instead of being rounded. Integer expressions return `bigint`
-from `solver.value()` and callback `value()`; objective values and bounds remain
+from `result.value()` and callback `value()`; objective values and bounds remain
 floating-point `number` values.
 
 ```ts
 const exact = 9_007_199_254_740_993n;
 const x = model.newIntVar(exact, exact, 'exact');
-await solver.solve(model);
-console.log(solver.value(x) === exact); // true
+const result = await CpSat.solve(model);
+console.log(result.value(x) === exact); // true
 ```
 
 Use the exported `asNumber()` helper when ordinary number arithmetic or an API
@@ -90,7 +99,7 @@ that only accepts `number` is more convenient. It throws rather than rounding
 an unsafe value:
 
 ```ts
-const value = asNumber(solver.value(x));
+const value = asNumber(result.value(x));
 ```
 
 For JSON, either convert selected values with `asNumber()` or serialize large
@@ -291,17 +300,20 @@ keeping the latest decoded response for high-level result helpers.
 
 `solver.parameters`
 
-Mutable `SatParameters` object merged into every `solve()` call unless raw
-parameters are passed.
+Mutable `CpSatSolverParameters` object merged into every `solve()` call.
+Per-call options override these defaults. Use `numWorkers` for the thread count.
 
-`solver.solve(model, paramsOrCallback?, callbacks?): Promise<CpSolverStatus | undefined>`
+`solver.solve(model, options?: CpSolverSolveOptions): Promise<CpSolverStatus | undefined>`
 
-Solves a `CpModel`. The second argument can be:
+Solves a `CpModel`. The options object combines:
 
-- a `SatParameters` object
-- raw `Uint8Array` parameter bytes
-- a `CpSolverSolutionCallback`
-- `null`
+- CP-SAT parameters such as `numWorkers` and `maxTimeInSeconds`
+- `solutionCallback?: CpSolverSolutionCallback`
+- `executor`, `signal`, `onEvent`, and `eventMask`
+
+Positional callbacks and raw parameter bytes are not accepted. Use
+`CpSat.solveProto()` for byte-oriented models; its parameters still use an
+options object.
 
 Result helpers:
 
@@ -343,7 +355,21 @@ class Printer extends CpSolverSolutionCallback {
   }
 }
 
-await solver.solve(model, new Printer());
+await solver.solve(model, { solutionCallback: new Printer() });
+```
+
+### CP-SAT model and result
+
+`CpSat.solve(model: CpModel, options?: CpSolverSolveOptions)` returns a `CpResult`.
+The result owns one answer, so a later solve or model edit does not change its
+values. `hasSolution` must be true before reading variable values.
+
+```ts
+const model = new CpModel();
+const x = model.newIntVar(0, 10, 'x');
+model.maximize(x);
+const result = await CpSat.solve(model, { numWorkers: 4 });
+if (result.hasSolution) console.log(result.value(x), result.objectiveValue);
 ```
 
 ### Proto-First CP-SAT
@@ -351,11 +377,15 @@ await solver.solve(model, new Printer());
 Build or serialize a `CpModelProto`, validate it, then solve it:
 
 ```ts
-const modelBytes = await CpSat.createModel(model);
+const proto: CpModelProto = {
+  variables: [{ name: 'x', domain: [0, 10] }],
+  objective: { vars: [0], coeffs: [1] },
+};
+const modelBytes = await CpSat.createModel(proto);
 const validation = await CpSat.validate(modelBytes);
 if (!validation.ok) throw new Error(validation.message);
 
-const result = await CpSat.solve(modelBytes, {
+const result = await CpSat.solveProto(modelBytes, {
   numWorkers: 4,
   logSearchProgress: true,
 });
@@ -368,12 +398,12 @@ const result = await CpSat.solve(modelBytes, {
 Encodes a JSON-like `CpModelProto` object into binary protobuf bytes. The input
 uses the generated TypeScript `CpModelProto` shape from OR-Tools.
 
-`CpSat.validate(model: Uint8Array): Promise<{ ok: boolean; message: string }>`
+`CpSat.validate(model: Uint8Array, options?: { executor?: ExecutorSelection; signal?: AbortSignal }): Promise<{ ok: boolean; message: string }>`
 
 Runs native CP-SAT model validation. `ok` is `false` when OR-Tools rejects the
 model; `message` contains the native validation message.
 
-`CpSat.solve(model: Uint8Array, options?: CpSatSolveOptions): Promise<CpSatSolveResult>`
+`CpSat.solveProto(model: Uint8Array, options?: CpSatSolveOptions): Promise<CpSatSolveResult>`
 
 Solves a binary `CpModelProto`. Solver parameters and execution options share
 one options object. The returned `CpSatSolveResult` contains:
@@ -384,11 +414,13 @@ one options object. The returned `CpSatSolveResult` contains:
 `options.onEvent` receives enabled solution, best-bound, log, status, and
 failure events. Pass an `AbortSignal` as `options.signal` to cancel a solve.
 
-`CpSat.getSchemas(): Promise<{ cp_model: string; sat_parameters: string; linear_solver?: string; optional_boolean?: string }>`
+`CpSat.getSchemas(): Promise<{ cp_model: string; sat_parameters: string }>`
 
-Returns embedded `.proto` schemas. CP-SAT always returns `cp_model` and
-`sat_parameters`; MPSolver-related schemas may be present when fetched through
-the worker path.
+Returns embedded `.proto` schemas without loading a solver runtime. CP-SAT
+returns `cp_model` and `sat_parameters`.
+
+`CpSat.modelStats(model: Uint8Array): Promise<string>` returns model statistics
+without solving.
 
 ### CP-SAT Types And Enums
 
@@ -434,11 +466,11 @@ const transit = routing.registerTransitCallback((from, to) => {
 });
 routing.setArcCostEvaluatorOfAllVehicles(transit);
 
-const params = defaultRoutingSearchParameters();
-params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-const assignment = await routing.solveWithParameters(params, {
+const result = await routing.solve({
+  firstSolutionStrategy: FirstSolutionStrategy.PATH_CHEAPEST_ARC,
   executor: 'worker',
 });
+const assignment = result.assignment;
 const objective = assignment ? asNumber(assignment.objectiveValue()) : null;
 ```
 
@@ -446,8 +478,12 @@ The Routing API is a high-level wrapper around the compiled OR-Tools Routing
 runtime. Public methods use camelCase while preserving the corresponding Python
 Routing concepts.
 
-`solve()`, `solveWithParameters()`, and
-`solveFromAssignmentWithParameters()` accept execution options containing
+`solve(options)` takes search and execution settings in one object. Its
+`RoutingResult` snapshots the status and optional `Assignment` for that solve.
+This is a breaking change from the earlier `Assignment | null` return: read
+`result.assignment` instead. The specialized `solveWithParameters()` method
+continues to return `Assignment | null`.
+`solveFromAssignmentWithParameters()` accepts execution options containing
 `executor`, `signal`, and `onEvent`. Use the worker executor for cancellation;
 it interrupts the native Routing search and remains reusable afterward. Direct
 execution cannot stop native work already in progress. `onEvent` reports the
@@ -486,8 +522,11 @@ Properties:
 Construction:
 
 ```ts
-const routing = new RoutingModel(manager, parameters?);
+const routing = new RoutingModel(manager);
 ```
+
+An optional second argument accepts `RoutingModelParameters`; see the
+compatibility limitations under [Routing Parameters And Enums](#routing-parameters-and-enums).
 
 Routing quantities use `IntValue`; indexes remain checked JavaScript `number`
 values. Costs, cumul values, bounds, and objective values are returned as
@@ -512,13 +551,16 @@ Dimensions:
 - `addMatrixDimension(matrix, capacity, fixStartCumulToZero, name): [number, boolean]`
 - `getDimensionOrDie(name): RoutingDimension`
 
+Per-stop cumul bounds such as `cumulVar(index).setRange(start, end)` are not
+exposed. The bridge therefore does not currently support individual customer
+time windows.
+
 Search and assignments:
 
-- `solve(options?): Promise<Assignment | null>`
+- `solve(options?): Promise<RoutingResult>`
 - `solveWithParameters(parameters, options?): Promise<Assignment | null>`
 - `solveFromAssignmentWithParameters(assignment, parameters, options?): Promise<Assignment | null>`
 - `readAssignmentFromRoutes(routes, ignoreInactiveIndices): Assignment`
-- `closeModelWithParameters(parameters): void`
 - `status(): RoutingSearchStatus`
 
 Route structure and model helpers:
@@ -533,10 +575,12 @@ Route structure and model helpers:
 - `addPickupAndDelivery(pickup, delivery): void`
 - `addAtSolutionCallback(callback): void`
 - `getAutomaticFirstSolutionStrategy(): FirstSolutionStrategy`
-- `getNumberOfDecisionsInFirstSolution(parameters): number`
-- `getNumberOfRejectsInFirstSolution(parameters): number`
 - `costVar(): { max(): bigint }`
 - `solver(): { parameters(): { tracePropagation: boolean }; localSearchProfile(): string; add(...): void }`
+
+Pass search parameters directly to `solve(options)` or `solveWithParameters(parameters, options)`.
+Each solve prepares its own native model. The wrapper does not expose a separate
+model-closing step or first-solution decision/reject statistics.
 
 `nextVar(index)` returns an opaque next-variable handle represented by the
 index. Pass that value to `assignment.value(...)`. `vehicleVar(index)` returns
@@ -621,15 +665,17 @@ the next index. For dimensions, pass `dimension.cumulVar(index)`.
 
 - `defaultRoutingSearchParameters(): RoutingSearchParameters`
 - `defaultRoutingModelParameters(): RoutingModelParameters`
-- `findErrorInRoutingSearchParameters(params): string`
 - `BOOL_FALSE`, `BOOL_TRUE`, `BOOL_UNSPECIFIED`
 
 `RoutingSearchParameters` currently exposes the subset used by the bridge:
 
 - `firstSolutionStrategy?: FirstSolutionStrategy`
 - `solutionLimit?: number`
-- `localSearchOperators?: Record<string, unknown>`
-- `localSearchMetaheuristic?: LocalSearchMetaheuristic`
+
+Local-search operators and metaheuristics are not exposed by this bridge.
+Standalone search-parameter validation is also omitted: upstream's operator
+checks require protobuf reflection and are disabled in WASM. Native routing
+still runs its available parameter checks when solving.
 
 `RoutingModelParameters` exposes:
 
@@ -637,8 +683,10 @@ the next index. For dimensions, pass `dimension.cumulVar(index)`.
 - `solverParameters.tracePropagation: boolean`
 - `solverParameters.profileLocalSearch: boolean`
 
-`findErrorInRoutingSearchParameters(params)` returns an empty string when the
-supported parameter subset is valid.
+These model parameters are compatibility stubs. `copyFrom()` does nothing;
+`tracePropagation` can be read back through `routing.solver().parameters()`,
+but neither tracing nor profiling is forwarded to the native solver.
+`localSearchProfile()` returns an explanatory message, not profiling data.
 
 `FirstSolutionStrategy` contains:
 
@@ -681,28 +729,34 @@ supported parameter subset is valid.
 Import:
 
 ```ts
-import { MPSolver, MPSolverParameters } from 'or-tools-wasm/mp-solver';
+import { MpModel, MPSolver } from 'or-tools-wasm/mp-solver';
 ```
 
 Build the model and select the executor at the solve boundary:
 
 ```ts
-const solver = MPSolver.createSolver('GLOP'); // or 'CLP' / 'GLPK_LP' for LP backends
-if (!solver) throw new Error('LP backend unavailable');
-
-const x = solver.addNumVariable(0, solver.infinity(), 'x');
-const y = solver.addNumVariable(0, solver.infinity(), 'y');
-const c = solver.addConstraint(-solver.infinity(), 14, 'c');
+const model = new MpModel('example');
+const x = model.addNumVariable(0, Infinity, 'x');
+const y = model.addNumVariable(0, Infinity, 'y');
+const c = model.addConstraint(-Infinity, 14, 'c');
 c.setCoefficient(x, 1);
 c.setCoefficient(y, 2);
-solver.objective().setCoefficient(x, 3);
-solver.objective().setCoefficient(y, 1);
-solver.objective().setMaximization();
+model.objective().setCoefficient(x, 3);
+model.objective().setCoefficient(y, 1);
+model.objective().setMaximization();
 
-const status = await solver.solve({ executor: 'worker' });
+const result = await MPSolver.solve(model, {
+  solverType: MPSolver.GLOP_LINEAR_PROGRAMMING,
+  executor: 'worker',
+});
+if (result.hasSolution) console.log(result.value(x), result.objectiveValue);
 ```
 
-`solve()`, `solveWithProto()`, and `MPSolver.solveModelRequest()` accept the
+Each `MpResult` owns its response and variable values, so solving the same
+model again does not change an earlier result. The existing `MPSolver`
+instance API remains for Python-style compatibility, and
+`solveWithProto()` / `MPSolver.solveModelRequest()` remain available for
+protobuf-oriented callers. All solve paths accept the
 same execution controls as CP-SAT: choose an executor with `executor`, cancel
 with an `AbortSignal` in `signal`, and observe lifecycle events with `onEvent`.
 Cancellation should use the worker executor. GLOP, SAT, and PDLP solves are
@@ -742,9 +796,9 @@ Static helpers:
 - `parseSolverType(solverId): OptimizationProblemType | null`
 - `parseAndCheckSupportForProblemType(solverId): OptimizationProblemType | null`
 - `getLinearSolverSchemas(options?): Promise<LinearSolverSchemas>`
-- `createModelRequest(request): Promise<Uint8Array>`
-- `createSolutionResponse(response): Promise<Uint8Array>`
-- `decodeSolutionResponse(bytes): Promise<MPSolverSolutionResponse>`
+- `createModelRequest(request, options?): Promise<Uint8Array>`
+- `createSolutionResponse(response, options?): Promise<Uint8Array>`
+- `decodeSolutionResponse(bytes, options?): Promise<MPSolverSolutionResponse>`
 - `solveModelRequest(request, options?): Promise<MPSolverProtoSolveResult>`
 
 Construction:
@@ -910,15 +964,16 @@ solver.init(
   [50],
 );
 
-const profit = await solver.solve({ executor: 'worker' });
-const selected = [0, 1, 2, 3].filter((item) => solver.bestSolutionContains(item));
-console.log(asNumber(profit), selected, solver.isSolutionOptimal());
+const result = await solver.solve({ executor: 'worker' });
+const selected = [0, 1, 2, 3].filter((item) => result.contains(item));
+console.log(asNumber(result.profit), selected, result.optimal);
 ```
 
 The runtime is loaded lazily. Select execution for each solve with
 `executor: 'auto' | 'direct' | 'worker'` or a server/cloud executor
-configuration. `signal` cancels worker and remote jobs; a direct native solve
-cannot be interrupted after it starts. Knapsack emits the shared solver
+configuration. `signal` requests cancellation; worker execution can terminate
+its worker, but running native Knapsack solves have no interruption hook,
+including on the server. Knapsack emits the shared solver
 lifecycle events through `onEvent` but has no native solution-progress callback.
 A solver instance accepts one solve at a time, and an `onEvent` error is reported
 after the active executor job settles so the executor remains reusable.
@@ -936,10 +991,20 @@ after the active executor job settles so the executor remains reusable.
 - `KNAPSACK_DIVIDE_AND_CONQUER_SOLVER`
 - `KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER`
 
-`KnapsackSolver` supports `init()`, `solve()`, `bestSolutionContains()`,
-`isSolutionOptimal()`, `setUseReduction()`, `setTimeLimit()`, and `getName()`.
-Profits, weights, and capacities accept `IntValue`; `solve()` returns the exact
-optimal profit as `bigint`.
+`solve(options)` returns an independent `KnapsackResult`. This replaces the
+earlier scalar return and mutable last-solution accessors: use `result.profit`,
+`result.contains(item)`, and `result.optimal`. `KnapsackSolver` also supports
+`init()`, `setUseReduction()`, `setTimeLimit()`, and `getName()`. Profits,
+weights, and capacities accept `IntValue`; `result.profit` is an exact `bigint`.
+
+`init(profits, weights, capacities)` requires at least one item and one weight
+dimension. Each weight dimension must have one weight per item and a matching
+capacity. Brute force accepts at most 30 items; the 64-item solver accepts at
+most 64. Those two algorithms, dynamic programming, and divide-and-conquer
+require exactly one weight dimension. Limits apply before reduction and invalid
+inputs throw before changing the initialized problem. `setTimeLimit(seconds)`
+uses seconds. Exported solver IDs do not imply that every backend is compiled
+in; commercial backends such as CPLEX and XPRESS are not included.
 
 The MPSolver frontend also exposes
 `KNAPSACK_MIXED_INTEGER_PROGRAMMING`, `MPSolver.createSolver('KNAPSACK')`, and
@@ -952,12 +1017,7 @@ heuristic searches. The runtime is loaded lazily and execution is selected per
 search, following the same execution contract as CP-SAT.
 
 ```ts
-import {
-  ConsistencyLevel,
-  GreedySolutionGenerator,
-  SetCoverInvariant,
-  SetCoverModel,
-} from 'or-tools-wasm/set-cover';
+import { SetCover, SetCoverModel } from 'or-tools-wasm/set-cover';
 
 const model = new SetCoverModel();
 model.addEmptySubset(2.0);
@@ -968,13 +1028,12 @@ model.addEmptySubset(1.0);
 model.addElementToLastSubset(0);
 model.addElementToLastSubset(1);
 
-const inv = new SetCoverInvariant(model);
-const greedy = new GreedySolutionGenerator(inv);
-if (await greedy.nextSolution(undefined, { executor: 'worker' })) {
-  console.log(inv.cost(), inv.exportSolutionAsProto().subset);
-  console.log(inv.checkConsistency(ConsistencyLevel.COST_AND_COVERAGE));
-}
+const result = await SetCover.solve(model, { algorithm: 'greedy', executor: 'worker' });
+if (result.hasSolution) console.log(result.cost, result.selectedSubsets());
 ```
+
+Use `SetCoverInvariant` and a solution generator for iterative or focused
+search. The one-shot result is independent of that mutable search state.
 
 `nextSolution(focus?, options?)` accepts `executor`, `signal`, and `onEvent`.
 `executor` supports `direct`, `worker`, `server`, `cloud`, and `auto`; the
@@ -1116,11 +1175,16 @@ const arcs = maxFlow.addArcsWithCapacity(
   [1, 2, 3, 2, 4, 3, 4, 2, 4],
   [20, 30, 10, 40, 30, 10, 20, 5, 20],
 );
-const status = await maxFlow.solve(0, 4, { executor: 'worker' });
-if (status === SimpleMaxFlowStatus.OPTIMAL) {
-  console.log(asNumber(maxFlow.optimalFlow()), maxFlow.flows(arcs));
+const result = await maxFlow.solve({ source: 0, sink: 4, executor: 'worker' });
+if (result.status === SimpleMaxFlowStatus.OPTIMAL) {
+  console.log(asNumber(result.optimalFlow), arcs.map((arc) => result.flow(arc)));
 }
 ```
+
+`solve(options)` on each Network Flow class returns an independent
+`MaxFlowResult`, `MinCostFlowResult`, or `LinearSumAssignmentResult` snapshot.
+This replaces the earlier status-only return and mutable result accessors. Read
+the status, objective, flows, cuts, and assignments from the returned result.
 
 Every solve accepts `executor`, `signal`, and `onEvent`. `executor` supports
 the shared `direct`, `worker`, `server`, `cloud`, and `auto` selections. The
@@ -1130,6 +1194,8 @@ or executor setting.
 
 Capacities, supplies, costs, flows, and objective totals accept `IntValue` and
 are returned as `bigint`. Node and arc indexes remain checked `number` values.
+Single-arc insertion validates every field before changing the graph, so a
+rejected insertion does not leave a partial arc.
 
 `SimpleMaxFlow` exposes:
 
@@ -1142,12 +1208,10 @@ are returned as `bigint`. Node and arc indexes remain checked `number` values.
 - `numArcs(): number`
 - `tail(arc)`, `head(arc): number`
 - `capacity(arc): bigint`
-- `solve(source, sink, options?): Promise<number>`
-- `optimalFlow(): bigint`
-- `flow(arc): bigint`
-- `flows(arcs): bigint[]`
-- `getSourceSideMinCut(): number[]`
-- `getSinkSideMinCut(): number[]`
+- `solve({ source, sink, ...options }): Promise<MaxFlowResult>`
+
+`MaxFlowResult` exposes `status`, `optimalFlow`, `flow(arc)`, `flows(arcs)`,
+`getSourceSideMinCut()`, and `getSinkSideMinCut()`.
 
 `SimpleMinCostFlow` exposes:
 
@@ -1161,12 +1225,11 @@ are returned as `bigint`. Node and arc indexes remain checked `number` values.
 - `setNodesSupplies(nodes, supplies): void`
 - `numNodes()`, `numArcs()`, `tail(arc)`, `head(arc)`, `capacity(arc)`
 - `supply(node)`, `unitCost(arc)`
-- `solve(options?): Promise<number>`
-- `solveMaxFlowWithMinCost(options?): Promise<number>`
-- `optimalCost(): bigint`
-- `maximumFlow(): bigint`
-- `flow(arc): bigint`
-- `flows(arcs): bigint[]`
+- `solve(options?): Promise<MinCostFlowResult>`
+- pass `maxFlowWithMinCost: true` to request maximum flow with minimum cost
+
+`MinCostFlowResult` exposes `status`, `optimalCost`, `maximumFlow`, `flow(arc)`,
+and `flows(arcs)`.
 
 `SimpleLinearSumAssignment` exposes:
 
@@ -1178,10 +1241,10 @@ are returned as `bigint`. Node and arc indexes remain checked `number` values.
 - `leftNode(arc): number`
 - `rightNode(arc): number`
 - `cost(arc): bigint`
-- `solve(options?): Promise<number>`
-- `optimalCost(): bigint`
-- `rightMate(leftNode): number`
-- `assignmentCost(leftNode): bigint`
+- `solve(options?): Promise<LinearSumAssignmentResult>`
+
+`LinearSumAssignmentResult` exposes `status`, `optimalCost`, `rightMate(leftNode)`,
+and `assignmentCost(leftNode)`.
 
 Network Flow algorithms are single-threaded, so there is no solver thread-count
 parameter. A worker solve can be cancelled by terminating its worker; the
@@ -1198,7 +1261,7 @@ Import:
 import { GScipParameters, GlpkParameters, MathOpt, MathOptModel, MathOptObjective } from 'or-tools-wasm/mathopt';
 ```
 
-Initialize, build a model, and solve:
+Build a model and solve:
 
 ```ts
 const model = MathOpt.Model('basic');
@@ -1214,6 +1277,7 @@ const result = await MathOpt.solve(model, {
   executor: 'worker',
   solverType: MathOpt.SolverType.GLOP,
 });
+if (result.hasSolution) console.log(result.value(x), result.objectiveValue);
 ```
 
 The runtime is loaded lazily. Select `auto`, `direct`, `worker`, `server`, or
@@ -1314,7 +1378,7 @@ Solving:
 
 `MathOptSolveOptions`:
 
-- `executor?: 'auto' | 'direct' | 'worker' | 'server' | 'cloud' | ExecutorConfiguration`
+- `executor?: ExecutorSelection` (server execution requires `{ type: 'server', url }`)
 - `solverType?: MathOptSolverType | keyof typeof MathOptSolverType`
 - `removeNames?: boolean`
 - `interrupter?: MathOptSolveInterrupter`
@@ -1403,7 +1467,8 @@ abort signal, and is safe to call more than once. If deletion fails, the handle
 is retained and a later `close()` retries it. Do not call `close()` while one of
 that solver's callbacks is running.
 
-`solve()` accepts the same solver options as `MathOpt.solve()`, including
+`solve()` accepts the solver settings from `MathOpt.solve()` (excluding the
+fixed executor and solver type), including
 message callbacks, `ModelSolveParameters`, backend-specific parameters, and
 pre-interrupted solve interrupters. If a backend rejects an
 incremental model update but can solve the current full model, the wrapper
@@ -1411,6 +1476,9 @@ recreates the native solver and solves from that current full model. This keeps
 callers on one API for backends with limited update support, while still
 surfacing errors from invalid full models. Duplicate names are rejected for
 incremental solvers unless `removeNames` is set.
+
+A failed initialization is reported by `solve()`, even when initialization
+failed before that call. Close the instance and construct a new one to retry.
 
 A failed native update or solve leaves the underlying OR-Tools incremental
 solver unusable. Further `solve()` calls reject explicitly; call `close()` and
@@ -1496,6 +1564,8 @@ GLPK is single-threaded in this package. MathOpt GLPK solves reject
 - `dualStatus: string | null`
 - `primalOrDualInfeasible: boolean`
 - `objectiveValue: number | null`
+- `hasSolution: boolean`
+- `value(variable: MathOptVariable): number` (throws for a foreign or missing variable)
 - `variableValues: Record<string, number>`
 - `variableValuesById: Record<number, number>`
 - `solutions: MathOptSolutionResult[]`
@@ -1919,13 +1989,48 @@ later handlers are suppressed and the error is reported after the executor job
 settles. Aborting requests cancellation and likewise waits for the job to settle,
 so callers can safely start another solve after the rejected promise completes.
 
+### Server execution and errors
+
+Server execution requires a URL, not the string `'server'`:
+
+```ts
+const result = await CpSat.solve(model, {
+  executor: { type: 'server', url: 'http://localhost:17827' },
+  onEvent(event) {
+    if (event.type === 'failure') console.error(event.failure.message);
+  },
+});
+```
+
+The configuration also accepts `authToken`, `headers`, a custom `fetch`, and
+`statusIntervalMs` (default 2000). The client streams events with polling as a
+fallback, then releases terminal job state. Cleanup failure does not replace
+the solve result or original error. See [server setup](../server/README.md).
+
+Catch solve rejections as well as displaying failure events. Infeasibility is
+a solver result, not a transport exception. Server failure events distinguish
+connection failures (`SERVER_DISCONNECTED`), timeouts (`TIMEOUT`), cancellation
+(`CANCELLED`), authentication (`UNAUTHENTICATED`), throttling (`QUEUE_FULL`),
+invalid requests (`INVALID_REQUEST`), and other execution failures
+(`EXECUTOR_ERROR`). Native structured failures retain their server-provided
+details. `retryable` is a hint; the library does not automatically resubmit a
+failed solve.
+
+The library has no default connection timeout. Applications can supply a
+custom `fetch` with their timeout policy. The example site uses a 10-second
+timeout until response headers arrive, not a limit on solving or streaming.
+Cancellation of queued server work is immediate; interruption of running work
+depends on the native solver. Cloud execution is reserved and currently reports
+unavailability rather than solving.
+
 ## Generated Protobuf Types
 
 The package exports generated CP-SAT model and response types from
 `generated/cp_model`, plus `SatParameters` from `generated/sat_parameters`.
 These are large generated definitions matching OR-Tools protobuf schemas. Use
 them to type JSON-like model and parameter objects passed to `CpSat.createModel`
-and `CpSat.solve`.
+and `CpSat.solveProto`. High-level `CpSat.solve` takes a `CpModel` and
+`CpSolverSolveOptions`.
 
 For raw protobuf workflows, use the schema helpers:
 

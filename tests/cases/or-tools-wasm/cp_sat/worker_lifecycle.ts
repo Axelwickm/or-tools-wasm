@@ -1,6 +1,6 @@
 type CpSatWorkerApi = {
   createModel(model: object): Promise<Uint8Array>;
-  solve(
+  solveProto(
     model: Uint8Array,
     options: {
       executor: 'worker';
@@ -26,7 +26,7 @@ export async function runCpSatWorkerLifecycleCase(
 ): Promise<CpSatWorkerLifecycleResult> {
   const model = await CpSat.createModel({ name: 'worker_lifecycle' });
   const controller = new AbortController();
-  const activeSolve = CpSat.solve(model, {
+  const activeSolve = CpSat.solveProto(model, {
     executor: 'worker',
     signal: controller.signal,
     maxTimeInSeconds: 30,
@@ -34,7 +34,7 @@ export async function runCpSatWorkerLifecycleCase(
 
   let busyError: unknown;
   try {
-    await CpSat.solve(model, { executor: 'worker' });
+    await CpSat.solveProto(model, { executor: 'worker' });
   } catch (error) {
     busyError = error;
   }
@@ -57,7 +57,7 @@ export async function runCpSatWorkerLifecycleCase(
     `expected AbortError, got ${cancellationError.name}`,
   );
 
-  const recovered = await CpSat.solve(model, { executor: 'worker' });
+  const recovered = await CpSat.solveProto(model, { executor: 'worker' });
   assert(recovered.bytes.length > 0, 'worker must solve again after cancellation');
 
   return {

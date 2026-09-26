@@ -72,6 +72,7 @@ export type RoutingOperation = {
 
 export type RoutingResult = {
   type: 'solve';
+  status: number;
   solution: RoutingSolveResult | null;
 };
 
@@ -234,7 +235,7 @@ function encodeResult(result: RoutingResult): Uint8Array {
   const solution = result.solution;
   return toBinary(RoutingBridgeResponseSchema, create(RoutingBridgeResponseSchema, solution ? {
     hasSolution: true,
-    status: solution.status,
+    status: result.status,
     objectiveValue: solution.objectiveValue,
     nextValues: bridgeIndices(solution.nextValues, 'next values'),
     starts: bridgeIndices(solution.starts, 'starts'),
@@ -243,13 +244,14 @@ function encodeResult(result: RoutingResult): Uint8Array {
       name,
       cumulValues,
     })),
-  } : { hasSolution: false }));
+  } : { hasSolution: false, status: result.status }));
 }
 
 function decodeResult(payload: Uint8Array): RoutingResult {
   const response = fromBinary(RoutingBridgeResponseSchema, payload);
   return {
     type: 'solve',
+    status: response.status,
     solution: response.hasSolution ? {
       status: response.status,
       objectiveValue: response.objectiveValue,

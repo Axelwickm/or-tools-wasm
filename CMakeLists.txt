@@ -376,6 +376,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(MP_SOLVER_JSPI_EXPORTS
     mp_solver_solve_model_request
     mp_solver_solve_model_request_with_threads
+    mp_solver_solve_model_request_with_parameters
     knapsack_solve_serialized)
   set(MATHOPT_JSPI_EXPORTS
     mathopt_solve_request

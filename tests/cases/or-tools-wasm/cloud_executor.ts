@@ -6,7 +6,7 @@ type CloudExecutorConfiguration = {
 type CloudCpSatApi = {
   CloudExecutorUnavailableError: abstract new (...args: never[]) => Error;
   CpSat: {
-    solve(
+    solveProto(
       model: Uint8Array,
       options: { executor: CloudExecutorConfiguration },
     ): Promise<unknown>;
@@ -48,7 +48,7 @@ export async function runCloudExecutorCase(
 
   let error: unknown;
   try {
-    await api.CpSat.solve(new Uint8Array([1, 2, 3]), {
+    await api.CpSat.solveProto(new Uint8Array([1, 2, 3]), {
       executor: { type: 'cloud', test: true },
     });
   } catch (caught) {

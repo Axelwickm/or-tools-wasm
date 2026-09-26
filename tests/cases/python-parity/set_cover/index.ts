@@ -1,3 +1,4 @@
+import { assertCaseMatrix } from '../../../harness/shared_case.ts';
 import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from '../../../harness/shared_case.ts';
 import {
   assertServerExecutorIsRunning,
@@ -421,5 +422,6 @@ export async function runSetCoverCases(
     }
   }
   setSetCoverMode('direct');
+  assertCaseMatrix(results, setCoverCases, modes);
   return results;
 }

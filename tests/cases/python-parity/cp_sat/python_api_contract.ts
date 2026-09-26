@@ -103,7 +103,7 @@ async function solveModel(CpSat: CpSatLike, testCase: CpSatCase, params: CpSatSo
   const modelBytes = await CpSat.createModel(testCase.model);
   const validation = await CpSat.validate(modelBytes);
   assert(validation.ok, `${testCase.name} validation failed: ${validation.message}`);
-  const result = await CpSat.solve(modelBytes, solveParams(params, overrides));
+  const result = await CpSat.solveProto(modelBytes, solveParams(params, overrides));
   assert(result.response, `${testCase.name} returned no solver response`);
   return result.response;
 }
@@ -246,7 +246,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       const modelBytes = await CpSat.createModel(this.model);
       const caseName = this.name;
       let solutionCount = 0;
-      const result = await CpSat.solve(
+      const result = await CpSat.solveProto(
         modelBytes,
         {
           ...exactEnumerationParams(params),
@@ -285,7 +285,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
       let bestBound = 0;
-      const result = await CpSat.solve(
+      const result = await CpSat.solveProto(
         modelBytes,
         {
           ...solveParams(params),
@@ -1126,7 +1126,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
       const logLines: string[] = [];
-      const result = await CpSat.solve(
+      const result = await CpSat.solveProto(
         modelBytes,
         {
           ...solveParams(params),
@@ -1167,7 +1167,7 @@ export const pythonApiContractCases: CpSatCase[] = [
       const modelBytes = await CpSat.createModel(this.model);
       const caseName = this.name;
       const seen: bigint[] = [];
-      const result = await CpSat.solve(
+      const result = await CpSat.solveProto(
         modelBytes,
         {
           ...exactEnumerationParams(params),
@@ -1207,7 +1207,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
       let bestBound = 0;
-      const result = await CpSat.solve(
+      const result = await CpSat.solveProto(
         modelBytes,
         {
           ...solveParams(params),
@@ -1234,7 +1234,7 @@ export const pythonApiContractCases: CpSatCase[] = [
     },
     async run(CpSat, params) {
       const modelBytes = await CpSat.createModel(this.model);
-      const result = await CpSat.solve(modelBytes, {
+      const result = await CpSat.solveProto(modelBytes, {
         ...solveParams(params),
         logSearchProgress: true,
       });

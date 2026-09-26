@@ -24,6 +24,19 @@ Decision rule: this is a contract relevance pass, not a promise that every Pytho
 
 Shared fixture case IDs are the stable link between this audit and the runtime suites. Current ID prefixes are `cp_sat.*`, `cp_sat_high_level.*`, `routing.*`, `mp_solver.*`, `knapsack.*`, `network_flow.*`, `set_cover.*`, `rcpsp.*`, `mathopt.*`, and `pdlp.*`. Runtime context such as direct vs worker bridge and thread count is reported separately from the case ID.
 
+The non-parity group `tests/cases/or-tools-wasm/solve_results.ts` covers the
+TypeScript result contracts: independent answers after model edits, infeasible
+result access, and observable MP parameter forwarding using GLPK primal tolerance.
+They also check MathOpt answer isolation from exposed result data and Routing
+assignment rejection of variables from another model.
+Knapsack input limits and Network Flow recovery after invalid arc insertion
+are also checked in this non-parity group.
+These cases use the existing direct/worker/server modes and are registered in
+the Node, Bun, Deno, and browser fixtures; they are not counted as Python parity.
+
+MP and MathOpt case/mode completeness is checked against case definitions,
+independently of observed results. This does not change parity classifications.
+
 ## ortools/sat/python/cp_model_helper_test.py
 - CpModelHelperTest
   - ✅ 🔎 CpModelHelperTest.test_simple_solve
@@ -227,8 +240,8 @@ These cases cover public TypeScript behavior that has no direct upstream
   - ✅ 🔎 TestPyWrapRoutingModel.testDisjunctionPenaltyTSP
   - ✅ 🔎 TestPyWrapRoutingModel.testRoutingModelParameters
   - ✅ 🔎 TestPyWrapRoutingModel.testRoutingLocalSearchFiltering
-  - ✅ 🔎 TestPyWrapRoutingModel.testRoutingSearchParameters
-  - ✅ 🔎 TestPyWrapRoutingModel.testFindErrorInRoutingSearchParameters
+  - ⚪ 🔎 TestPyWrapRoutingModel.testRoutingSearchParameters - intentionally excluded: its explicit model-closing and first-solution decision/reject statistics contract is outside the per-solve TypeScript API; pass search parameters to solve instead
+  - ⚪ 🔎 TestPyWrapRoutingModel.testFindErrorInRoutingSearchParameters - unsupported: upstream disables the reflection-based local-search-operator checks in WASM; standalone validation is not exposed
   - ✅ 🔎 TestPyWrapRoutingModel.testCallback
   - ✅ 🔎 TestPyWrapRoutingModel.testReadAssignment
   - ✅ 🔎 TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_simple
@@ -282,9 +295,9 @@ These cases cover public TypeScript behavior that has no direct upstream
 - Python graph wrapper tests
   - ⚪ 🔎 No upstream Python `*_test.py` files were found for `ortools/graph/python/max_flow.cc`, `min_cost_flow.cc`, or `linear_sum_assignment.cc`; parity coverage is based on the Python samples plus the exposed Python wrapper method/status surface.
 - Representative Python sample parity
-  - ✅ 🔎 `ortools/graph/samples/simple_max_flow_program.py` - shared TS/WASM Network Flow fixture uses `SimpleMaxFlow.addArcsWithCapacity`, checks graph accessors, solves source `0` to sink `4`, verifies `OPTIMAL`, `optimalFlow() == 60`, per-arc flow length/accessors, capacity bounds, source/sink conservation, and min-cut source/sink membership.
-  - ✅ 🔎 `ortools/graph/samples/simple_min_cost_flow_program.py` - shared TS/WASM Network Flow fixture uses `SimpleMinCostFlow.addArcsWithCapacityAndUnitCost` and `setNodesSupplies`, checks graph/supply/cost accessors, verifies `OPTIMAL`, `optimalCost() == 150`, `maximumFlow() == 20`, per-arc flow length/accessors, capacity bounds, and recomputed cost.
-  - ✅ 🔎 `ortools/graph/samples/assignment_linear_sum_assignment.py` - shared TS/WASM Network Flow fixture uses `SimpleLinearSumAssignment.addArcsWithCost`, checks accessors, verifies `OPTIMAL`, `optimalCost() == 265`, and the expected worker-to-task mates/costs.
+  - ✅ 🔎 `ortools/graph/samples/simple_max_flow_program.py` - shared TS/WASM Network Flow fixture uses `SimpleMaxFlow.addArcsWithCapacity`, checks graph accessors, solves source `0` to sink `4`, verifies the result's `OPTIMAL` status, `optimalFlow == 60`, per-arc flow length/accessors, capacity bounds, source/sink conservation, and min-cut source/sink membership.
+  - ✅ 🔎 `ortools/graph/samples/simple_min_cost_flow_program.py` - shared TS/WASM Network Flow fixture uses `SimpleMinCostFlow.addArcsWithCapacityAndUnitCost` and `setNodesSupplies`, checks graph/supply/cost accessors, verifies the result's `OPTIMAL` status, `optimalCost == 150`, `maximumFlow == 20`, per-arc flow length/accessors, capacity bounds, and recomputed cost.
+  - ✅ 🔎 `ortools/graph/samples/assignment_linear_sum_assignment.py` - shared TS/WASM Network Flow fixture uses `SimpleLinearSumAssignment.addArcsWithCost`, checks accessors, verifies the result's `OPTIMAL` status, `optimalCost == 265`, and the expected worker-to-task mates/costs.
   - 🧪 Worker-bridge coverage note - the same three graph sample cases run in direct and worker-bridge modes across the shared fixture suites. These sample entries are not included in the upstream Python test totals because upstream does not provide Python graph test files for these wrappers.
 
 ## ortools/linear_solver/python/lp_test.py

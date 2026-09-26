@@ -5,6 +5,7 @@ import {
   type CpSatSolveParams,
 } from '../../../harness/cpsat_types.ts';
 import {
+  assertCaseMatrix,
   assertServerExecutorIsRunning,
   executorFixtureModes,
   serverExecutorConfiguration,
@@ -94,6 +95,7 @@ export async function runCpSatCases(CpSat: CpSatLike, options: RunOptions = {}) 
     }
   }
 
+  assertCaseMatrix(results.flatMap((run) => run.cases.map((item) => ({ ...item, mode: run.mode }))), cpSatCases, modes);
   return results;
 }
 

@@ -69,7 +69,6 @@ function parseResult(value: string): NetworkFlowResult {
 
 export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
   readonly solver = 'network-flow';
-  private modulePromise: Promise<OrToolsWasmModule> | null = null;
   private nextRequestId = 1;
   private activeJob: object | null = null;
 
@@ -98,7 +97,7 @@ export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
   }
 
   private module() {
-    return this.modulePromise ??= this.loadModuleImpl();
+    return this.loadModuleImpl();
   }
 
   private async run(

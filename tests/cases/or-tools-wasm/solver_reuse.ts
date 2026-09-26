@@ -26,7 +26,8 @@ export type SolverPeakConcurrencyResult = {
 };
 
 const CYCLES = 10 as const;
-const OPERATION_TIMEOUT_MS = 10_000;
+// The first operation includes cold WASM/worker startup on every runtime.
+const OPERATION_TIMEOUT_MS = 60_000;
 
 async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;

@@ -2,7 +2,7 @@ import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
 import type { SolverJobEvent } from '../solver_executor.js';
-import { executeSolverJob } from '../solver_job.js';
+import { createAbortError, executeSolverJob } from '../solver_job.js';
 import { SolverServerExecutor } from '../solver_server_executor.js';
 import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
 import { DirectRoutingExecutor } from './direct_executor.js';
@@ -46,11 +46,12 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): R
 }
 
 export type RoutingEvent = SolverJobEvent;
-export type RoutingSolveOptions = {
+export type RoutingSolveOptions = RoutingSearchParameters & {
   executor?: ExecutorSelection;
   onEvent?: (event: RoutingEvent) => void | Promise<void>;
   signal?: AbortSignal;
 };
+
 
 export enum FirstSolutionStrategy {
   UNSET = 0,
@@ -95,8 +96,6 @@ export const BOOL_UNSPECIFIED = 0;
 export type RoutingSearchParameters = {
   firstSolutionStrategy?: FirstSolutionStrategy;
   solutionLimit?: number;
-  localSearchOperators?: Record<string, unknown>;
-  localSearchMetaheuristic?: LocalSearchMetaheuristic;
 };
 
 export function defaultRoutingSearchParameters(): RoutingSearchParameters {
@@ -121,13 +120,6 @@ export function defaultRoutingModelParameters(): RoutingModelParameters {
   };
 }
 
-export function findErrorInRoutingSearchParameters(params: RoutingSearchParameters): string {
-  if (params.localSearchOperators?.useCross === BOOL_UNSPECIFIED) {
-    return 'localSearchOperators.useCross must not be BOOL_UNSPECIFIED';
-  }
-  return '';
-}
-
 export class BoundCost {
   readonly bound: bigint;
   readonly cost: bigint;
@@ -140,6 +132,7 @@ export class BoundCost {
 
 type RoutingCumulVar = {
   kind: 'routingCumulVar';
+  readonly model: RoutingModel;
   dimensionName: string;
   index: number;
 };
@@ -301,6 +294,7 @@ type RoutingDimensionState = {
 
 export class RoutingDimension {
   constructor(
+    private readonly model: RoutingModel,
     private readonly name: string,
     private readonly state: RoutingDimensionState,
     private readonly recordSoftSpanUpperBound: (boundCost: BoundCost, vehicle: number) => void,
@@ -308,7 +302,7 @@ export class RoutingDimension {
   ) {}
 
   cumulVar(index: number): RoutingCumulVar {
-    return { kind: 'routingCumulVar', dimensionName: this.name, index };
+    return { kind: 'routingCumulVar', model: this.model, dimensionName: this.name, index };
   }
 
   hasSoftSpanUpperBounds(): boolean {
@@ -356,22 +350,29 @@ export class Assignment {
     routes?: number[][],
     ignoreInactiveIndices = false,
   ) {
-    assignmentStates.set(this, { routing, result, routes, ignoreInactiveIndices });
+    const snapshot = result === null ? null : structuredClone(result);
+    this.result = snapshot;
+    assignmentStates.set(this, { routing, result: snapshot, routes, ignoreInactiveIndices });
   }
 
   objectiveValue(): bigint {
-    return this.result?.objectiveValue ?? this.routing.assignmentObjectiveValue();
+    return this.result ? this.result.objectiveValue : this.routing.assignmentObjectiveValue();
   }
 
   value(indexOrVar: number): number;
   value(indexOrVar: RoutingCumulVar): bigint;
   value(indexOrVar: number | RoutingCumulVar): number | bigint {
     if (typeof indexOrVar === 'object') {
-      return this.result
-        ? this.result.dimensionCumulValues[indexOrVar.dimensionName]?.[indexOrVar.index] ?? 0n
-        : this.routing.dimensionCumulValue(indexOrVar.dimensionName, indexOrVar.index);
+      if (indexOrVar.model !== this.routing) throw new Error('Variable belongs to a different Routing model.');
+      if (!this.result) return this.routing.dimensionCumulValue(indexOrVar.dimensionName, indexOrVar.index);
+      const value = this.result.dimensionCumulValues[indexOrVar.dimensionName]?.[indexOrVar.index];
+      if (value === undefined) throw new RangeError('Assignment has no value for this dimension index.');
+      return value;
     }
-    return this.result?.nextValues[indexOrVar] ?? this.routing.nextValue(indexOrVar);
+    if (!this.result) return this.routing.nextValue(indexOrVar);
+    const value = this.result.nextValues[indexOrVar];
+    if (value === undefined) throw new RangeError('Assignment has no value for this index.');
+    return value;
   }
 
   min(indexOrVar: number): number;
@@ -380,6 +381,19 @@ export class Assignment {
     return typeof indexOrVar === 'object' ? this.value(indexOrVar) : this.value(indexOrVar);
   }
 }
+
+/** The status and optional assignment from one routing solve. */
+export class RoutingResult {
+  readonly hasSolution: boolean;
+
+  constructor(
+    readonly status: RoutingSearchStatus,
+    readonly assignment: Assignment | null,
+  ) {
+    this.hasSolution = assignment !== null;
+  }
+}
+
 
 function initialRoutesForAssignment(
   assignment: Assignment,
@@ -417,11 +431,13 @@ function initialRoutesForAssignment(
 }
 
 export class RoutingModel {
+  private solving = false;
   private arcCostEvaluatorIndex: number | null = null;
   private lastResult: RoutingSolveResult | null = null;
   private readonly evaluatorCallbacks = new Map<number, RoutingTransitCallback>();
   private nextEvaluatorIndex = 1;
   private readonly operations: RoutingModelOperation[] = [];
+  private numDisjunctions = 0;
   private readonly dimensions = new Map<string, RoutingDimensionState>();
   private readonly atSolutionCallbacks: Array<() => void> = [];
   private lastObjectiveValue = 0n;
@@ -431,6 +447,7 @@ export class RoutingModel {
   constructor(private readonly manager: RoutingIndexManager, parameters?: RoutingModelParameters) {
     this.parameters = parameters;
   }
+
 
   registerTransitCallback(callback: RoutingTransitCallback): number {
     const evaluatorIndex = this.nextEvaluatorIndex++;
@@ -446,19 +463,33 @@ export class RoutingModel {
     parameters: RoutingSearchParameters,
     options: RoutingSolveOptions,
     initialAssignment?: { routes: number[][]; ignoreInactiveIndices: boolean },
-  ): Promise<Assignment | null> {
-    if (options.signal?.aborted) throw routingAbortError(options.signal);
+  ): Promise<RoutingResult> {
+    if (this.solving) throw new Error('RoutingModel.solve() is already in progress.');
+    this.solving = true;
+    try {
+      return await this.executeSolve(parameters, options, initialAssignment);
+    } finally {
+      this.solving = false;
+    }
+  }
+
+  private async executeSolve(
+    parameters: RoutingSearchParameters,
+    options: RoutingSolveOptions,
+    initialAssignment?: { routes: number[][]; ignoreInactiveIndices: boolean },
+  ): Promise<RoutingResult> {
+    if (options.signal?.aborted) throw createAbortError(options.signal);
     const dimension = this.manager.getNumberOfIndices();
     const request = {
       numLocations: this.manager.numLocations,
       numVehicles: this.manager.numVehicles,
-      starts: this.manager.starts,
-      ends: this.manager.ends,
+      starts: [...this.manager.starts],
+      ends: [...this.manager.ends],
       firstSolutionStrategy: toIndex(parameters.firstSolutionStrategy ?? 0, 'Routing first solution strategy', INT32_MAX),
       solutionLimit: toIndex(parameters.solutionLimit ?? 0, 'Routing solution limit', INT32_MAX),
       transitMatrix: this.buildTransitMatrix(),
       transitMatrixDimension: dimension,
-      operations: this.operations,
+      operations: structuredClone(this.operations),
       dimensionNames: [...this.dimensions.keys()],
       initialAssignment: initialAssignment
         ? {
@@ -474,28 +505,27 @@ export class RoutingModel {
       {
         onEvent: options.onEvent,
         signal: options.signal,
-        abortError: routingAbortError,
       },
     );
     const result = response.solution;
     this.lastResult = result;
-    this.lastStatus = result?.status ?? null;
-    if (!result) return null;
+    this.lastStatus = response.status;
+    if (!result) return new RoutingResult(response.status, null);
     const assignment = new Assignment(this, result);
     this.lastObjectiveValue = assignment.objectiveValue();
     this.runAtSolutionCallbacks();
-    return assignment;
+    return new RoutingResult(response.status, assignment);
   }
 
   async solveWithParameters(
     parameters: RoutingSearchParameters = defaultRoutingSearchParameters(),
     options: RoutingSolveOptions = {},
   ): Promise<Assignment | null> {
-    return this.solveWithExecutor(parameters, options);
+    return (await this.solveWithExecutor(parameters, options)).assignment;
   }
 
-  async solve(options: RoutingSolveOptions = {}): Promise<Assignment | null> {
-    return this.solveWithParameters(defaultRoutingSearchParameters(), options);
+  async solve(options: RoutingSolveOptions = {}): Promise<RoutingResult> {
+    return this.solveWithExecutor(options, options);
   }
 
   status(): RoutingSearchStatus {
@@ -625,6 +655,7 @@ export class RoutingModel {
       throw new Error(`RoutingModel.getDimensionOrDie: unknown dimension '${name}'.`);
     }
     return new RoutingDimension(
+      this,
       name,
       state,
       (boundCost, vehicle) => this.operations.push({
@@ -646,22 +677,7 @@ export class RoutingModel {
 
   addDisjunction(indices: number[], penalty?: IntValue): number {
     this.operations.push({ type: 'addDisjunction', indices, penalty: penalty === undefined ? undefined : toInt64(penalty) });
-    return this.operations.length - 1;
-  }
-
-  closeModelWithParameters(parameters: RoutingSearchParameters): void {
-    void parameters;
-  }
-
-  getNumberOfDecisionsInFirstSolution(parameters: RoutingSearchParameters): number {
-    return parameters.firstSolutionStrategy === FirstSolutionStrategy.SAVINGS
-      ? this.manager.getNumberOfIndices()
-      : 0;
-  }
-
-  getNumberOfRejectsInFirstSolution(parameters: RoutingSearchParameters): number {
-    void parameters;
-    return 0;
+    return this.numDisjunctions++;
   }
 
   async solveFromAssignmentWithParameters(
@@ -669,11 +685,11 @@ export class RoutingModel {
     parameters: RoutingSearchParameters,
     options: RoutingSolveOptions = {},
   ): Promise<Assignment | null> {
-    return this.solveWithExecutor(
+    return (await this.solveWithExecutor(
       parameters,
       options,
       initialRoutesForAssignment(assignment, this),
-    );
+    )).assignment;
   }
 
   readAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): Assignment {
@@ -878,11 +894,4 @@ export class RoutingModel {
       callback();
     }
   }
-}
-
-function routingAbortError(signal: AbortSignal) {
-  if (signal.reason instanceof Error) return signal.reason;
-  const error = new Error(signal.reason === undefined ? 'The Routing solve was aborted.' : String(signal.reason));
-  error.name = 'AbortError';
-  return error;
 }

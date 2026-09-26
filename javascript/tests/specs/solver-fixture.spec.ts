@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import browserFixtureGroups from '../../../tests/harness/browser_groups.ts';
+import { solveResultCases } from '../../../tests/cases/or-tools-wasm/solve_results.ts';
 
 type WorkerStats = {
   total?: number;
@@ -76,7 +77,14 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
         ].join('\n\n'),
       );
     }
-    groupStatuses.push(JSON.parse(await status.textContent() ?? '{}'));
+    const groupStatus = JSON.parse(await status.textContent() ?? '{}');
+    const expectedResultIds = solveResultCases.filter((item) => item.solver === group)
+      .flatMap((item) => (includeServer ? ['direct', 'worker', 'server'] : ['direct', 'worker'])
+        .map((mode) => `${item.id}:${mode}`));
+    expect(groupStatus.solveResultContracts.map((item: { id: string; mode: string }) => `${item.id}:${item.mode}`))
+      .toEqual(expectedResultIds);
+    expect(groupStatus.solveResultContracts.every((item: { ok: boolean }) => item.ok)).toBe(true);
+    groupStatuses.push(groupStatus);
   }
 
   const parsedStatus = Object.assign({}, ...groupStatuses) as {
@@ -501,18 +509,18 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     parsedStatus.cpSatWorkerStatsBefore?.activeExecutorWorkers?.['cp-sat'],
   );
   expect(parsedStatus.results?.[0].workerStats?.executorWorkerRequests?.['cp-sat']).toBe(
-    parsedStatus.highLevelCpSatWorkerStatsAfter?.executorWorkerRequests?.['cp-sat'],
+    parsedStatus.cpSatWorkerStatsBefore?.executorWorkerRequests?.['cp-sat'],
   );
   expect(parsedStatus.results?.[2].workerStats?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(
     parsedStatus.results?.[0].workerStats?.executorWorkerRequests?.['cp-sat'] ?? 0,
   );
   expect(parsedStatus.routingResults).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      name: 'TestPyWrapRoutingModel.testRoutingSearchParameters (direct)',
+      name: 'TestPyWrapRoutingModel.testCallback (direct)',
       ok: true,
     }),
     expect.objectContaining({
-      name: 'TestPyWrapRoutingModel.testRoutingSearchParameters (worker)',
+      name: 'TestPyWrapRoutingModel.testCallback (worker)',
       ok: true,
     }),
   ]));

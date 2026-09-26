@@ -57,8 +57,8 @@ async function findPackedTarballs() {
   return tarballs.sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
 
-async function installTarball(tarballPath) {
-  await rm(path.join(fixtureDir, 'node_modules/or-tools-wasm'), {
+async function installTarball(tarballPath, directory) {
+  await rm(path.join(directory, 'node_modules/or-tools-wasm'), {
     force: true,
     recursive: true,
   });
@@ -75,7 +75,7 @@ async function installTarball(tarballPath) {
       '--install-strategy=nested',
     ],
     {
-      cwd: fixtureDir,
+      cwd: directory,
       stdio: 'inherit',
       env: {
         ...process.env,
@@ -112,4 +112,6 @@ const tarball = tarballs[0];
 const tarballPath = tarball.path;
 await copyFile(tarballPath, stableTarballPath);
 console.log(`Installing ${tarballPath} into ${fixtureDir}`);
-await installTarball(tarballPath);
+await installTarball(tarballPath, fixtureDir);
+// Shared cases resolve public types from the same artifact, not repository sources.
+await installTarball(tarballPath, path.join(repoRoot, 'tests'));

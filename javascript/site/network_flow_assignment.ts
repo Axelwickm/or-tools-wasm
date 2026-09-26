@@ -1,5 +1,6 @@
 import {
   type ExecutorConfiguration,
+  type LinearSumAssignmentResult,
   SimpleLinearSumAssignment,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
@@ -66,12 +67,12 @@ function resetView() {
   renderGraph();
 }
 
-function renderSolution(assignment: SimpleLinearSumAssignment) {
+function renderSolution(assignment: SimpleLinearSumAssignment, result: LinearSumAssignmentResult) {
   const rows = Array.from({ length: assignment.numNodes() }, (_, worker) =>
-    `<tr><td>${worker}</td><td>${assignment.rightMate(worker)}</td><td>${assignment.assignmentCost(worker)}</td></tr>`,
+    `<tr><td>${worker}</td><td>${result.rightMate(worker)}</td><td>${result.assignmentCost(worker)}</td></tr>`,
   ).join('');
   solutionOutput.innerHTML = `
-    <strong>Optimal cost:</strong> ${assignment.optimalCost()}
+    <strong>Optimal cost:</strong> ${result.optimalCost}
     <table>
       <thead><tr><th>Worker</th><th>Task</th><th>Cost</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -143,16 +144,17 @@ async function runAssignment() {
     assignment.addArcsWithCost(leftNodes, rightNodes, arcCosts);
 
     appendStatus(`Solving with ${executorSelector.value} executor...`);
-    const status = await assignment.solve({ executor: readNetworkFlowExecutor() });
-    appendStatus(`Done. Status ${status}.`);
-    renderSolution(assignment);
+    const result = await assignment.solve({ executor: readNetworkFlowExecutor() });
+    appendStatus(`Done. Status ${result.status}.`);
+    renderSolution(assignment, result);
     renderGraph(Array.from({ length: assignment.numNodes() }, (_, worker) => ({
       worker,
-      task: assignment.rightMate(worker),
+      task: result.rightMate(worker),
     })));
   } catch (error) {
-    appendStatus(error instanceof Error ? error.message : String(error));
-    throw error;
+    const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
+    appendStatus(message);
+    solutionOutput.textContent = message;
   } finally {
     setRunning(false);
   }

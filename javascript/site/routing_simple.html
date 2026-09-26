@@ -2,6 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>Routing - Simple Routing</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
@@ -34,6 +35,9 @@
 			}
 			#route-output { margin: 0.75rem 0 0; }
 			#status { min-height: 9rem; }
+      @media (max-width: 760px) {
+        .route-visual-layout { grid-template-columns: minmax(0, 1fr); }
+      }
 		</style>
 	</head>
 	<body>
@@ -47,7 +51,6 @@
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import {
-  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
   RoutingIndexManager,
   RoutingModel,
@@ -71,9 +74,11 @@ const transit = routing.registerTransitCallback((from, to) =&gt; {
 });
 routing.setArcCostEvaluatorOfAllVehicles(transit);
 
-const params = defaultRoutingSearchParameters();
-params.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-const assignment = await routing.solveWithParameters(params, { executor: 'worker' });</code></pre>
+const result = await routing.solve({
+  firstSolutionStrategy: FirstSolutionStrategy.PATH_CHEAPEST_ARC,
+  executor: 'worker',
+});
+console.log(result.status, result.assignment?.objectiveValue());</code></pre>
 			</details>
 		</div>
 		<ul class="example-notes">

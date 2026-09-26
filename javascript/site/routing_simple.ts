@@ -1,5 +1,4 @@
 import {
-  defaultRoutingSearchParameters,
   FirstSolutionStrategy,
   RoutingIndexManager,
   RoutingModel,
@@ -161,14 +160,12 @@ async function runSimpleRouting() {
       });
       routing.setArcCostEvaluatorOfAllVehicles(transitCallbackIndex);
 
-      const searchParameters = defaultRoutingSearchParameters();
-      searchParameters.firstSolutionStrategy = FirstSolutionStrategy.PATH_CHEAPEST_ARC;
-
       appendStatus(statusEl, 'Solving...');
-      const assignment = await routing.solveWithParameters(
-        searchParameters,
-        currentRoutingExecutionOptions(),
-      );
+      const result = await routing.solve({
+        ...currentRoutingExecutionOptions(),
+        firstSolutionStrategy: FirstSolutionStrategy.PATH_CHEAPEST_ARC,
+      });
+      const assignment = result.assignment;
       if (!assignment) {
         if (routeOutput) {
           routeOutput.textContent = 'No solution found.';

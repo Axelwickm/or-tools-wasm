@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EMSDK_DIR="${ROOT_DIR}/emsdk"
 EMCC_BIN="${EMSDK_DIR}/upstream/emscripten/emcc"
 EMSDK_BIN="${EMSDK_DIR}/emsdk"
-EMSCRIPTEN_VERSION="6.0.8"
+EMSCRIPTEN_VERSION="6.0.10"
 
 installed_version=""
 if [[ -x "${EMCC_BIN}" ]]; then

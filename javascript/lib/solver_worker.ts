@@ -113,5 +113,8 @@ export function installSolverWorker<Request, Response, Event>(
       }, []);
     }
     post(encodeSolverBridgeReady(codec.solver));
-  })();
+  })().catch((error: unknown) => {
+    // Surface startup rejection as a worker error so the parent rejects readiness.
+    setTimeout(() => { throw error; }, 0);
+  });
 }

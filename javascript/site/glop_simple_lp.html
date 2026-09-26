@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>GLOP - Simple LP</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -19,24 +20,25 @@
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
-const solver = MPSolver.createSolver('GLOP');
-if (!solver) throw new Error('GLOP is unavailable');
-solver.setNumThreads(4);
-
-const x = solver.addNumVariable(0, solver.infinity(), 'x');
-const y = solver.addNumVariable(0, solver.infinity(), 'y');
-const c0 = solver.addConstraint(-solver.infinity(), 17.5);
+        <pre class="code-block"><code data-highlight="ts">import { MpModel, MPSolver } from 'or-tools-wasm/mp-solver';
+const model = new MpModel('simple_lp');
+const x = model.addNumVariable(0, Infinity, 'x');
+const y = model.addNumVariable(0, Infinity, 'y');
+const c0 = model.addConstraint(-Infinity, 17.5);
 c0.setCoefficient(x, 1);
 c0.setCoefficient(y, 7);
-const c1 = solver.addConstraint(-solver.infinity(), 3.5);
+const c1 = model.addConstraint(-Infinity, 3.5);
 c1.setCoefficient(x, 1);
-const objective = solver.objective();
+const objective = model.objective();
 objective.setCoefficient(x, 1);
 objective.setCoefficient(y, 10);
 objective.setMaximization();
 
-await solver.solve({ executor: 'worker' });</code></pre>
+const result = await MPSolver.solve(model, {
+  solverType: MPSolver.GLOP_LINEAR_PROGRAMMING,
+  executor: 'worker', threads: 4,
+});
+console.log(result.value(x), result.objectiveValue);</code></pre>
       </details>
     </div>
     <p>

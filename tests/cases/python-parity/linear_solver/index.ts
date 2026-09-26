@@ -1,5 +1,6 @@
 import type { ExecutorFixtureMode } from '../../../harness/shared_case.ts';
 import {
+  assertCaseMatrix,
   assertServerExecutorIsRunning,
   executorFixtureModes,
   serverExecutorConfiguration,
@@ -27,6 +28,8 @@ export type MpSolverCaseResult = {
 function mpSolverCaseId(name: string): string {
   return `mp_solver.${name
     .replace(/^MPSolver:\s*/, '')
+    .replace(/ \((?:direct|worker|server)\)/g, '')
+    .replace(/\((?:direct|worker|server), /g, '(')
     .replaceAll(/[().:,/-]+/g, '_')
     .replaceAll(/\s+/g, '_')
     .replaceAll(/^_+|_+$/g, '')
@@ -333,25 +336,6 @@ async function runSimpleProgram(
   }
 }
 
-async function runSimpleProgramBridgeMatrix(
-  api: MPSolverApi,
-  mode: ExecutorFixtureMode,
-  name: string,
-  solverId: string,
-  createX: (solver: MPSolverLike, infinity: number) => MPVariableLike,
-  createY: (solver: MPSolverLike, infinity: number) => MPVariableLike,
-  expected: { objective: number; x: number; y: number },
-): Promise<MpSolverCaseResult[]> {
-  return [await runSimpleProgram(
-    api,
-    `${name} (${mode})`,
-    solverId,
-    createX,
-    createY,
-    expected,
-  )];
-}
-
 async function runMixedIntegerCppStyleCase(api: MPSolverApi): Promise<MpSolverCaseResult> {
   return runMixedIntegerCppStyleBackendCase(api, 'SAT', 'MPSolver: lp_test.py RunMixedIntegerExampleCppStyleAPI');
 }
@@ -420,18 +404,6 @@ async function runCbcMixedIntegerCase(api: MPSolverApi): Promise<MpSolverCaseRes
     'MPSolver: CBC parseAndCheckSupportForProblemType mismatch',
   );
   return runMixedIntegerCppStyleBackendCase(api, 'CBC', 'MPSolver: CBC_MIXED_INTEGER_PROGRAMMING');
-}
-
-async function runCbcExecutorCase(api: MPSolverApi, mode: ExecutorFixtureMode): Promise<MpSolverCaseResult[]> {
-  return [await runSimpleProgram(
-    api,
-    `MPSolver: CBC threaded execution (${mode})`,
-    'CBC',
-    (solver, infinity) => solver.addIntVariable(0, infinity, 'x'),
-    (solver, infinity) => solver.addIntVariable(0, infinity, 'y'),
-    { objective: 23, x: 3, y: 2 },
-    4,
-  )];
 }
 
 function bopBinaryRequest(api: MPSolverApi) {
@@ -1221,177 +1193,64 @@ async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string)
   }
 }
 
-async function runProtoSolveMatrix(
-  api: MPSolverApi,
-  options: MPSolverRunOptions,
-  mode: ExecutorFixtureMode,
-): Promise<MpSolverCaseResult[]> {
-  const results: MpSolverCaseResult[] = [];
-  for (const numWorkers of [1, 4]) {
-    options.onProgress?.('MPSolver: MPModelRequest solve', { mode, numWorkers });
-    results.push(await runProtoSolveCase(api, mode, numWorkers));
-  }
-  return results;
-}
+type MpSolverCase = {
+  name: string;
+  run(mode: ExecutorFixtureMode): Promise<MpSolverCaseResult> | MpSolverCaseResult;
+};
 
-async function runMPSolverModeMatrix(
-  api: MPSolverApi,
-  options: MPSolverRunOptions,
-  label: string,
-  mode: ExecutorFixtureMode,
-  run: (mode: ExecutorFixtureMode) => Promise<MpSolverCaseResult>,
-): Promise<MpSolverCaseResult[]> {
-  options.onProgress?.(label, { mode });
-  return [await run(mode)];
-}
-
-async function runMPSolverContractCasesForMode(
-  api: MPSolverApi,
-  options: MPSolverRunOptions,
-  mode: ExecutorFixtureMode,
-): Promise<MpSolverCaseResult[]> {
-  setMPSolverMode(api, mode);
-  const protoResults = await runProtoSolveMatrix(api, options, mode);
-  const linearBackends = lpBackends(api);
-  const externalApiResults = [];
-  const lpApiProtoResults = [];
-  const linearCppStyleResults = [];
-  const solveFromProtoResults = [];
-  for (const backend of linearBackends) {
-    options.onProgress?.('MPSolver: pywraplp_test.py/test_external_api', { backend: backend.solverId });
-    externalApiResults.push(await runExternalApiCase(api, backend));
-    options.onProgress?.('MPSolver: lp_api_test.py/test_proto', { backend: backend.solverId });
-    lpApiProtoResults.push(await runLpApiTestProtoCase(api, backend));
-    options.onProgress?.('MPSolver: lp_test.py/RunLinearExampleCppStyleAPI', { backend: backend.solverId });
-    linearCppStyleResults.push(await runLinearCppStyleCase(api, backend));
-    options.onProgress?.('MPSolver: lp_test.py/testSolveFromProto', { backend: backend.solverId });
-    solveFromProtoResults.push(await runLpTestSolveFromProtoCase(api, backend));
-  }
-  options.onProgress?.('MPSolver: MPModelRequest stateful solve');
-  const statefulProtoSolve = await runStatefulProtoSolveCase(api);
-  options.onProgress?.('MPSolver: pywraplp_test.py/test_proto CBC');
-  const cbcProto = await runPywrapLpTestCbcProtoCase(api);
-  options.onProgress?.('MPSolver: lp_test.py/RunMixedIntegerExampleCppStyleAPI');
-  const mixedIntegerCppStyle = await runMixedIntegerCppStyleCase(api);
-  options.onProgress?.('MPSolver: GLPK simple_mip_program.py');
-  const glpkMixedInteger = await runGlpkMixedIntegerCase(api);
-  options.onProgress?.('MPSolver: SCIP simple_mip_program.py');
-  const scipMixedInteger = await runScipMixedIntegerCase(api);
-  options.onProgress?.('MPSolver: CBC simple_mip_program.py');
-  const cbcMixedInteger = await runCbcMixedIntegerCase(api);
-  const bopBinaryResults = await runMPSolverModeMatrix(
-    api,
-    options,
-    'MPSolver: BOP binary project selection',
-    mode,
-    (mode) => runBopBinaryCase(api, mode),
-  );
-  const bopIntegerResults = await runMPSolverModeMatrix(
-    api,
-    options,
-    'MPSolver: BOP integer production',
-    mode,
-    (mode) => runBopIntegerCase(api, mode),
-  );
-  const knapsackBackendResults = await runMPSolverModeMatrix(
-    api,
-    options,
-    'MPSolver: Knapsack backend',
-    mode,
-    (mode) => runKnapsackBackendCase(api, mode),
-  );
-  options.onProgress?.('MPSolver: lp_test.py/RunBooleanExampleCppStyleAPI');
-  const booleanCppStyle = await runBooleanCppStyleCase(api);
-  const results = [
-    statefulProtoSolve,
-    ...protoResults,
-    ...externalApiResults,
-    skipped(
-      'MPSolver: lp_api_test.py test_sum_no_brackets',
-      'Not applicable: this tests Python generator/list summation helper behavior, not OR-Tools solver API.',
-    ),
-    cbcProto,
-    ...lpApiProtoResults,
-    skipped(
-      'MPSolver: lp_test.py RunLinearExampleNaturalLanguageAPI',
-      'Blocked: Python operator-overloaded natural expression API is not exposed in TypeScript.',
-    ),
-    ...linearCppStyleResults,
-    mixedIntegerCppStyle,
-    glpkMixedInteger,
-    scipMixedInteger,
-    cbcMixedInteger,
-    ...bopBinaryResults,
-    ...bopIntegerResults,
-    ...knapsackBackendResults,
-    booleanCppStyle,
-    skipped(
-      'MPSolver: lp_test.py testApi',
-      'Partially mirrored by backend-specific C++ style cases; upstream also exercises Python-only natural expression helpers.',
-    ),
-    await runSetHintCase(api),
-    await runBopInfeasibleCase(api),
-    await runLpTestLoadSolutionFromProtoCase(api),
-    ...solveFromProtoResults,
-    await runExportToMpsCase(api),
-    await runClearSupportCase(api),
-    ...(await runSimpleProgramBridgeMatrix(
-      api,
-      mode,
-      'MPSolver: simple_lp_program.py',
-      'GLOP',
-      (solver, infinity) => solver.addNumVariable(0, infinity, 'x'),
-      (solver, infinity) => solver.addNumVariable(0, infinity, 'y'),
-      { objective: 25, x: 0, y: 2.5 },
-    )),
-    ...(await runSimpleProgramBridgeMatrix(
-      api,
-      mode,
-      'MPSolver: CLP simple_lp_program.py',
-      'CLP',
-      (solver, infinity) => solver.addNumVariable(0, infinity, 'x'),
-      (solver, infinity) => solver.addNumVariable(0, infinity, 'y'),
-      { objective: 25, x: 0, y: 2.5 },
-    )),
-    ...(await runSimpleProgramBridgeMatrix(
-      api,
-      mode,
-      'MPSolver: GLPK_LP simple_lp_program.py',
-      'GLPK_LP',
-      (solver, infinity) => solver.addNumVariable(0, infinity, 'x'),
-      (solver, infinity) => solver.addNumVariable(0, infinity, 'y'),
-      { objective: 25, x: 0, y: 2.5 },
-    )),
-    ...(await runSimpleProgramBridgeMatrix(
-      api,
-      mode,
-      'MPSolver: simple_mip_program.py',
-      'SAT',
-      (solver, infinity) => solver.addIntVariable(0, infinity, 'x'),
-      (solver, infinity) => solver.addIntVariable(0, infinity, 'y'),
-      { objective: 23, x: 3, y: 2 },
-    )),
-    ...(await runSimpleProgramBridgeMatrix(
-      api,
-      mode,
-      'MPSolver: GLPK simple_mip_program.py',
-      'GLPK',
-      (solver, infinity) => solver.addIntVariable(0, infinity, 'x'),
-      (solver, infinity) => solver.addIntVariable(0, infinity, 'y'),
-      { objective: 23, x: 3, y: 2 },
-    )),
-    ...(await runSimpleProgramBridgeMatrix(
-      api,
-      mode,
-      'MPSolver: SCIP simple_mip_program.py',
-      'SCIP',
-      (solver, infinity) => solver.addIntVariable(0, infinity, 'x'),
-      (solver, infinity) => solver.addIntVariable(0, infinity, 'y'),
-      { objective: 23, x: 3, y: 2 },
-    )),
-    ...(await runCbcExecutorCase(api, mode)),
+export function mpSolverCases(api: MPSolverApi) {
+  const cases: MpSolverCase[] = [
+    { name: 'MPSolver: solveWithProto loads solution', run: () => runStatefulProtoSolveCase(api) },
+    ...[1, 4].map((numWorkers) => ({
+      name: `MPSolver: MPModelRequest solve (${numWorkers} worker${numWorkers === 1 ? '' : 's'})`,
+      run: (mode: ExecutorFixtureMode) => runProtoSolveCase(api, mode, numWorkers),
+    })),
+    ...lpBackends(api).flatMap((backend) => [
+      { name: `MPSolver: pywraplp_test.py test_external_api (${backend.solverId})`, run: () => runExternalApiCase(api, backend) },
+      { name: `MPSolver: lp_api_test.py test_proto (${backend.solverId})`, run: () => runLpApiTestProtoCase(api, backend) },
+      { name: `MPSolver: lp_test.py RunLinearExampleCppStyleAPI (${backend.solverId})`, run: () => runLinearCppStyleCase(api, backend) },
+      { name: `MPSolver: lp_test.py testSolveFromProto (${backend.solverId})`, run: () => runLpTestSolveFromProtoCase(api, backend) },
+    ]),
+    { name: 'MPSolver: pywraplp_test.py test_proto (CBC)', run: () => runPywrapLpTestCbcProtoCase(api) },
+    { name: 'MPSolver: lp_test.py RunMixedIntegerExampleCppStyleAPI', run: () => runMixedIntegerCppStyleCase(api) },
+    { name: 'MPSolver: GLPK_MIXED_INTEGER_PROGRAMMING', run: () => runGlpkMixedIntegerCase(api) },
+    { name: 'MPSolver: SCIP_MIXED_INTEGER_PROGRAMMING', run: () => runScipMixedIntegerCase(api) },
+    { name: 'MPSolver: CBC_MIXED_INTEGER_PROGRAMMING', run: () => runCbcMixedIntegerCase(api) },
+    { name: 'MPSolver: BOP binary project selection', run: (mode) => runBopBinaryCase(api, mode) },
+    { name: 'MPSolver: BOP integer production', run: (mode) => runBopIntegerCase(api, mode) },
+    { name: 'MPSolver: KNAPSACK_MIXED_INTEGER_PROGRAMMING', run: (mode) => runKnapsackBackendCase(api, mode) },
+    { name: 'MPSolver: lp_test.py RunBooleanExampleCppStyleAPI', run: () => runBooleanCppStyleCase(api) },
+    { name: 'MPSolver: lp_test.py testSetHint', run: () => runSetHintCase(api) },
+    { name: 'MPSolver: lp_test.py testBopInfeasible', run: () => runBopInfeasibleCase(api) },
+    { name: 'MPSolver: lp_test.py testLoadSolutionFromProto', run: () => runLpTestLoadSolutionFromProtoCase(api) },
+    { name: 'MPSolver: lp_test.py testExportToMps', run: () => runExportToMpsCase(api) },
+    { name: 'MPSolver support: clear', run: () => runClearSupportCase(api) },
   ];
-  return results.map((result) => ({ ...decorateMpSolverResult(result), mode }));
+  for (const [name, reason] of [
+    ['MPSolver: lp_api_test.py test_sum_no_brackets', 'Not applicable: this tests Python generator/list summation helper behavior, not OR-Tools solver API.'],
+    ['MPSolver: lp_test.py RunLinearExampleNaturalLanguageAPI', 'Blocked: Python operator-overloaded natural expression API is not exposed in TypeScript.'],
+    ['MPSolver: lp_test.py testApi', 'Partially mirrored by backend-specific C++ style cases; upstream also exercises Python-only natural expression helpers.'],
+  ]) {
+    cases.push({ name, run: () => skipped(name, reason) });
+  }
+  for (const [solverId, name, integer, threads] of [
+    ['GLOP', 'MPSolver: simple_lp_program.py', false, 1],
+    ['CLP', 'MPSolver: CLP simple_lp_program.py', false, 1],
+    ['GLPK_LP', 'MPSolver: GLPK_LP simple_lp_program.py', false, 1],
+    ['SAT', 'MPSolver: simple_mip_program.py', true, 1],
+    ['GLPK', 'MPSolver: GLPK simple_mip_program.py', true, 1],
+    ['SCIP', 'MPSolver: SCIP simple_mip_program.py', true, 1],
+    ['CBC', 'MPSolver: CBC threaded execution', true, 4],
+  ] as const) {
+    cases.push({ name, run: (mode) => runSimpleProgram(
+      api, `${name} (${mode})`, solverId,
+      (solver, infinity) => integer ? solver.addIntVariable(0, infinity, 'x') : solver.addNumVariable(0, infinity, 'x'),
+      (solver, infinity) => integer ? solver.addIntVariable(0, infinity, 'y') : solver.addNumVariable(0, infinity, 'y'),
+      integer ? { objective: 23, x: 3, y: 2 } : { objective: 25, x: 0, y: 2.5 },
+      threads,
+    ) });
+  }
+  return cases.map((testCase) => ({ ...testCase, id: mpSolverCaseId(testCase.name) }));
 }
 
 export async function runMPSolverContractCases(
@@ -1400,9 +1259,15 @@ export async function runMPSolverContractCases(
 ): Promise<MpSolverCaseResult[]> {
   const modes = options.modes ?? executorFixtureModes;
   if (modes.includes('server')) await assertServerExecutorIsRunning();
+  const cases = mpSolverCases(api);
   const results: MpSolverCaseResult[] = [];
   for (const mode of modes) {
-    results.push(...await runMPSolverContractCasesForMode(api, options, mode));
+    setMPSolverMode(api, mode);
+    for (const testCase of cases) {
+      options.onProgress?.(testCase.name, { mode });
+      results.push({ ...decorateMpSolverResult(await testCase.run(mode)), mode });
+    }
   }
+  assertCaseMatrix(results, cases, modes);
   return results;
 }

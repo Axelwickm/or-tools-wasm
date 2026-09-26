@@ -1,5 +1,6 @@
 #include "server/src/solver_job_service.h"
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdlib>
@@ -146,7 +147,8 @@ bridge::SolverBridgeResponse SubmitJob(SolverJobService* service) {
   Expect(decoded.job_id() > 0, "submit response includes job id");
   ExpectEq(decoded.payload_case(), bridge::SolverBridgeResponse::kStatus,
            "submit response carries status");
-  Expect(decoded.sequence_id() > 0, "submit response is sequenced");
+  ExpectEq(decoded.sequence_id(), 1u,
+           "submit response starts the event-delivery cursor");
   return decoded;
 }
 
@@ -252,6 +254,33 @@ void ResultIsIndependentFromEvents() {
          "fast job retains running status in event log");
   Expect(ContainsState(events, bridge::SOLVER_JOB_STATE_SUCCEEDED),
          "fast job retains succeeded status in event log");
+}
+
+void FastJobCallbacksRemainAfterSubmissionCursor() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&,
+         const SolverEventSink& emit_event) {
+        emit_event("event-one");
+        emit_event("event-two");
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  const auto submitted = SubmitJob(&service);
+  WaitForResult(&service, submitted.job_id());
+  const auto events = DecodeBatch(service.Events(
+      EventsRequest(submitted.job_id(), submitted.sequence_id())));
+  std::vector<std::string> callback_payloads;
+  for (const auto& response : events.responses()) {
+    if (response.payload_case() ==
+        bridge::SolverBridgeResponse::kEventPayload) {
+      callback_payloads.push_back(response.event_payload());
+    }
+  }
+  ExpectEq(callback_payloads,
+           std::vector<std::string>({"event-one", "event-two"}),
+           "submission cursor does not skip fast solver callbacks");
 }
 
 void EventStreamEndsWithSequencedResultAndResumes() {
@@ -469,13 +498,87 @@ void RunningJobsDoNotExpire() {
   WaitForResult(&service, submitted.job_id());
 }
 
+void DestructionDrainsSchedulerBeforeDestroyingExecutors() {
+  JobScheduler scheduler({1, 8});
+  auto service =
+      std::make_unique<SolverJobService>(scheduler, kTestCompletedJobRetention);
+  ManualEvent started;
+  ManualEvent release;
+  std::atomic<int> executions = 0;
+  service->Register(std::make_unique<FakeExecutor>(
+      [&](const SolverExecutorRequest&, const JobContext&,
+          const SolverEventSink&) {
+        ++executions;
+        started.Set();
+        release.Wait();
+        return SolverExecutorResult{true, "result-one", {}};
+      }));
+
+  SubmitJob(service.get());
+  Expect(started.WaitFor(2s), "fake executor starts");
+  const auto queued = service->Submit(SubmitRequest(9));
+  ExpectEq(queued.status, 202, "second job is accepted while executor is active");
+
+  auto destruction = std::async(std::launch::async, [&] { service.reset(); });
+  const auto destruction_before_release = destruction.wait_for(50ms);
+
+  const auto shutdown_deadline = std::chrono::steady_clock::now() + 2s;
+  while (std::chrono::steady_clock::now() < shutdown_deadline &&
+         scheduler.Stats().queued_jobs != 0) {
+    std::this_thread::sleep_for(10ms);
+  }
+  const int queued_jobs_during_shutdown = scheduler.Stats().queued_jobs;
+
+  release.Set();
+  ExpectEq(destruction.wait_for(2s), std::future_status::ready,
+           "service destruction finishes after active work exits");
+  destruction.get();
+  ExpectEq(destruction_before_release, std::future_status::timeout,
+           "service destruction waits for active executor work");
+  ExpectEq(queued_jobs_during_shutdown, 0,
+           "service destruction cancels queued work");
+  ExpectEq(executions.load(), 1,
+           "queued work does not run while the service is being destroyed");
+}
+
+void DuplicateRegistrationPreservesExecutor() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&,
+         const SolverEventSink&) {
+        return SolverExecutorResult{true, "original", {}};
+      }));
+  bool rejected = false;
+  try {
+    service.Register(std::make_unique<FakeExecutor>(
+        [](const SolverExecutorRequest&, const JobContext&,
+           const SolverEventSink&) {
+          return SolverExecutorResult{true, "replacement", {}};
+        }));
+  } catch (const std::invalid_argument& error) {
+    rejected = true;
+    ExpectEq(std::string(error.what()),
+             std::string("Solver executor already registered: fake"),
+             "duplicate error identifies the solver");
+  }
+  Expect(rejected, "duplicate registration is rejected");
+  const auto submitted = SubmitJob(&service);
+  const auto result = WaitForResult(&service, submitted.job_id());
+  ExpectEq(result.result_payload(), std::string("original"),
+           "rejected registration preserves the original executor");
+}
+
 using TestFn = void (*)();
 
 int RunAllTests() {
   const std::vector<std::pair<std::string, TestFn>> tests = {
+      {"DuplicateRegistrationPreservesExecutor", DuplicateRegistrationPreservesExecutor},
       {"StatusIsSnapshotAndDoesNotConsumeEvents", StatusIsSnapshotAndDoesNotConsumeEvents},
       {"EventsAreOrderedAndCursorBased", EventsAreOrderedAndCursorBased},
       {"ResultIsIndependentFromEvents", ResultIsIndependentFromEvents},
+      {"FastJobCallbacksRemainAfterSubmissionCursor",
+       FastJobCallbacksRemainAfterSubmissionCursor},
       {"EventStreamEndsWithSequencedResultAndResumes",
        EventStreamEndsWithSequencedResultAndResumes},
       {"QueuedJobsUsePollingInsteadOfHoldingEventStreams",
@@ -488,6 +591,8 @@ int RunAllTests() {
       {"CompletedJobsExpireWithoutExplicitRelease",
        CompletedJobsExpireWithoutExplicitRelease},
       {"RunningJobsDoNotExpire", RunningJobsDoNotExpire},
+      {"DestructionDrainsSchedulerBeforeDestroyingExecutors",
+       DestructionDrainsSchedulerBeforeDestroyingExecutors},
   };
   for (const auto& [name, test] : tests) {
     try {

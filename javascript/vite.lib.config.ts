@@ -120,6 +120,7 @@ export default defineConfig({
     emitWasmSourceMapsPlugin(),
     dts({
       tsconfigPath: path.resolve(packageDir, 'tsconfig.json'),
+      include: [path.join(libRoot, '**/*.ts')],
       entryRoot: libRoot,
     }),
   ],

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "knapsack.pb.h"
+#include "javascript/knapsack_validation.h"
 #include "server/src/job_scheduler.h"
 
 namespace ortools_wasm::server {
@@ -75,11 +76,42 @@ void RejectsMalformedDimensions() {
   Expect(handle.result().get().state == JobState::kSucceeded, "Validation test completes");
 }
 
+void RejectsSolverLimitsWithoutAborting() {
+  KnapsackExecutor executor;
+  JobScheduler scheduler({1, 8});
+  struct Invalid { int type; int items; int dimensions; };
+  for (const auto input : {Invalid{0, 31, 1}, Invalid{1, 65, 1},
+                           Invalid{0, 2, 2}, Invalid{1, 2, 2},
+                           Invalid{2, 2, 2}, Invalid{9, 2, 2}, Invalid{99, 2, 1}}) {
+    bridge::KnapsackBridgeRequest request;
+    request.set_solver_type(input.type);
+    request.set_use_reduction(false);
+    for (int item = 0; item < input.items; ++item) request.add_profits(1);
+    for (int dimension = 0; dimension < input.dimensions; ++dimension) {
+      auto* weights = request.add_weights();
+      for (int item = 0; item < input.items; ++item) weights->add_values(1);
+      request.add_capacities(1);
+    }
+    auto handle = scheduler.Submit(JobSpec{"knapsack", 1}, [&](JobContext& context) {
+      const auto rejected = executor.Execute({1, "knapsack", request.SerializeAsString()}, context, [](std::string) {});
+      Expect(!rejected.ok, "Invalid solver shape is rejected");
+      Expect(rejected.failure_kind == SolverExecutionFailureKind::kInvalidRequest, "Invalid shape has invalid-request status");
+      Expect(executor.Execute(Request(), context, [](std::string) {}).ok, "Valid solve works after rejection");
+      return JobResult::Succeeded();
+    });
+    Expect(handle.result().get().state == JobState::kSucceeded, "Validation leaves the server usable");
+  }
+  Expect(ValidateKnapsackShape(0, 30, 1) == nullptr, "Brute-force limit is inclusive");
+  Expect(ValidateKnapsackShape(1, 64, 1) == nullptr, "64-item limit is inclusive");
+  Expect(ValidateKnapsackShape(5, 65, 2) == nullptr, "Multidimensional branch-and-bound remains unrestricted by these limits");
+}
+
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
       {"SolvesAndSerializesResult", SolvesAndSerializesResult},
       {"ReservesOneThread", ReservesOneThread},
       {"RejectsMalformedDimensions", RejectsMalformedDimensions},
+      {"RejectsSolverLimitsWithoutAborting", RejectsSolverLimitsWithoutAborting},
   };
   for (const auto& [name, test] : tests) {
     try {

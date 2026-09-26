@@ -1,3 +1,4 @@
+import { assertCaseMatrix } from '../../../harness/shared_case.ts';
 import { routingContractCases } from './index.ts';
 import type { ExecutorFixtureMode } from '../../../harness/shared_case.ts';
 import {
@@ -38,19 +39,18 @@ type RoutingAssignmentLike = {
   min(index: unknown): number;
 };
 
+type RoutingResultLike = { status: number; hasSolution: boolean; assignment: RoutingAssignmentLike | null };
+
 type RoutingModelLike = {
   registerTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
   registerTransitMatrix(matrix: number[][]): number;
   registerUnaryTransitCallback(callback: (fromIndex: number) => number): number;
   registerUnaryTransitVector(values: number[]): number;
   setArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
-  solve(options?: unknown): Promise<RoutingAssignmentLike | null>;
+  solve(options?: unknown): Promise<RoutingResultLike>;
   solveWithParameters(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): Promise<RoutingAssignmentLike | null>;
   solveFromAssignmentWithParameters(assignment: RoutingAssignmentLike, parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): Promise<RoutingAssignmentLike | null>;
   readAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): RoutingAssignmentLike;
-  closeModelWithParameters(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): void;
-  getNumberOfDecisionsInFirstSolution(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): number;
-  getNumberOfRejectsInFirstSolution(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): number;
   getAutomaticFirstSolutionStrategy(): number;
   addAtSolutionCallback(callback: (() => void) | { __call__(): void }): void;
   costVar(): { max(): bigint };
@@ -86,7 +86,7 @@ type RoutingModelLike = {
 };
 
 export type RoutingApi = {
-  defaultRoutingSearchParameters(): { firstSolutionStrategy?: number; solutionLimit?: number; localSearchOperators?: Record<string, unknown>; localSearchMetaheuristic?: number };
+  defaultRoutingSearchParameters(): { firstSolutionStrategy?: number; solutionLimit?: number };
   defaultRoutingModelParameters(): {
     solverParameters: {
       copyFrom(value: unknown): void;
@@ -94,7 +94,6 @@ export type RoutingApi = {
       profileLocalSearch: boolean;
     };
   };
-  findErrorInRoutingSearchParameters(parameters: unknown): string;
   FirstSolutionStrategy: {
     PATH_CHEAPEST_ARC: number;
     FIRST_UNBOUND_MIN_VALUE: number;
@@ -153,5 +152,6 @@ export async function runRoutingCases(
       });
     }
   }
+  assertCaseMatrix(results, routingContractCases, modes);
   return results;
 }

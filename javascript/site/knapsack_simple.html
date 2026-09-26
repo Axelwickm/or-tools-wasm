@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Knapsack - Dedicated Solver</title>
     <link rel="stylesheet" href="./example.css">
     <style>
@@ -119,12 +120,12 @@ const solver = new KnapsackSolver(
 );
 solver.init(values, weights, capacities);
 
-const computedValue = await solver.solve({ executor: 'worker' });
+const result = await solver.solve({ executor: 'worker' });
 const packedItems = values
   .map((_, item) => item)
-  .filter((item) => solver.bestSolutionContains(item));
+  .filter((item) => result.contains(item));
 
-console.log(computedValue, packedItems);</code></pre>
+console.log(result.profit, packedItems, result.optimal);</code></pre>
       </details>
     </div>
     <ul class="example-notes">

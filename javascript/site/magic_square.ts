@@ -1,7 +1,8 @@
 import {
   CpSat,
-  type CpModelProto,
-  type CpSatModelInstance,
+  CpModel,
+  type IntVar,
+  sum,
 } from 'or-tools-wasm/cp-sat';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { ActiveSolve, formatJson, requiredElement } from './site_support.js';
@@ -48,58 +49,40 @@ function renderSolution(size: number, values: Array<number | string>) {
   }
 }
 
-function buildMagicSquareModel(size: number): CpModelProto {
+function buildMagicSquareModel(size: number): { model: CpModel; cells: IntVar[] } {
   const numCells = size * size;
-  const variables: NonNullable<CpModelProto['variables']> = Array.from(
+  const model = new CpModel();
+  model.name = `magic_square_${size}`;
+  const cells = Array.from(
     { length: numCells },
-    (_, index) => ({
-      name: `cell_${Math.floor(index / size)}_${index % size}`,
-      domain: [1, numCells],
-    }),
+    (_, index) => model.newIntVar(1, numCells,
+      `cell_${Math.floor(index / size)}_${index % size}`),
   );
-  const constraints: NonNullable<CpModelProto['constraints']> = [{
-    name: 'all_diff',
-    allDiff: {
-      exprs: Array.from({ length: numCells }, (_, index) => ({
-        vars: [index],
-        coeffs: [1],
-        offset: 0,
-      })),
-    },
-  }];
+  model.addAllDifferent(cells);
   const target = (size * (numCells + 1)) / 2;
-  const addSum = (name: string, vars: number[]) => {
-    constraints.push({
-      name,
-      linear: {
-        vars,
-        coeffs: Array(vars.length).fill(1),
-        domain: [target, target],
-      },
-    });
-  };
+  const addSum = (vars: number[]) => model.addEquality(sum(vars.map((index) => cells[index])), target);
 
   for (let row = 0; row < size; row += 1) {
-    addSum(`row_${row}`, Array.from(
+    addSum(Array.from(
       { length: size },
       (_, column) => row * size + column,
     ));
   }
   for (let column = 0; column < size; column += 1) {
-    addSum(`col_${column}`, Array.from(
+    addSum(Array.from(
       { length: size },
       (_, row) => row * size + column,
     ));
   }
-  addSum('diag_main', Array.from(
+  addSum(Array.from(
     { length: size },
     (_, index) => index * size + index,
   ));
-  addSum('diag_anti', Array.from(
+  addSum(Array.from(
     { length: size },
     (_, index) => index * size + size - index - 1,
   ));
-  return { name: `magic_square_${size}`, variables, constraints };
+  return { model, cells };
 }
 
 async function runMagicSquare() {
@@ -112,13 +95,13 @@ async function runMagicSquare() {
   const signal = activeSolve.start();
   setRunning(true);
   statusEl.textContent = '';
-  append(`Building raw model proto (size=${size})…`);
+  append(`Building magic square model (size=${size})…`);
   showSolutionMessage('Solving…');
 
   try {
-    const model: CpSatModelInstance = await CpSat.createModel(buildMagicSquareModel(size));
+    const { model, cells } = buildMagicSquareModel(size);
 
-    const validation = await CpSat.validate(model);
+    const validation = await CpSat.validate(await CpSat.createModel(model.modelProto));
     if (!validation.ok) {
       append(`Model invalid: ${validation.message}`);
       showSolutionMessage('Model invalid.');
@@ -139,11 +122,11 @@ async function runMagicSquare() {
       return;
     }
     statusEl.textContent += `${formatJson(response)}\n`;
-    if (!Array.isArray(response.solution)) {
+    if (!result.hasSolution) {
       showSolutionMessage('No solution entries returned.');
       return;
     }
-    renderSolution(size, response.solution as Array<number | string>);
+    renderSolution(size, cells.map((cell) => result.value(cell).toString()));
   } catch (error) {
     if (signal.aborted) {
       append('Solve cancelled.');

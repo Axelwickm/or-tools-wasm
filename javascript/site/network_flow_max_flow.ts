@@ -130,26 +130,27 @@ async function runMaxFlow() {
     );
 
     appendStatus(`Solving with ${executorSelector.value} executor...`);
-    const status = await maxFlow.solve(0, nodes.length - 1, {
+    const result = await maxFlow.solve({ source: 0, sink: nodes.length - 1,
       executor: readNetworkFlowExecutor(),
     });
-    appendStatus(`Done. Status ${status}.`);
+    appendStatus(`Done. Status ${result.status}.`);
 
     arcs = allArcs.map((arc) => ({
       from: maxFlow.tail(arc),
       to: maxFlow.head(arc),
       capacity: Number(maxFlow.capacity(arc)),
-      flow: Number(maxFlow.flow(arc)),
+      flow: Number(result.flow(arc)),
     }));
     renderGraph(true);
     solutionOutput.innerHTML = `
-        <strong>Optimal flow:</strong> ${maxFlow.optimalFlow()}<br>
-        <strong>Source-side min cut:</strong> ${maxFlow.getSourceSideMinCut().join(', ')}<br>
-        <strong>Sink-side min cut:</strong> ${maxFlow.getSinkSideMinCut().join(', ')}
+        <strong>Optimal flow:</strong> ${result.optimalFlow}<br>
+        <strong>Source-side min cut:</strong> ${result.getSourceSideMinCut().join(', ')}<br>
+        <strong>Sink-side min cut:</strong> ${result.getSinkSideMinCut().join(', ')}
       `;
   } catch (error) {
-    appendStatus(error instanceof Error ? error.message : String(error));
-    throw error;
+    const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
+    appendStatus(message);
+    solutionOutput.textContent = message;
   } finally {
     setRunning(false);
   }

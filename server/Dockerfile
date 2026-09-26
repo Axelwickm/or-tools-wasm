@@ -20,6 +20,7 @@ COPY CMakeLists.txt Version.txt ./
 COPY bridge-types ./bridge-types
 COPY cmake ./cmake
 COPY javascript/generated_proto_schemas.h.in ./javascript/generated_proto_schemas.h.in
+COPY javascript/knapsack_validation.h ./javascript/knapsack_validation.h
 COPY ortools ./ortools
 COPY patches ./patches
 COPY scripts/embed_proto.cmake ./scripts/embed_proto.cmake

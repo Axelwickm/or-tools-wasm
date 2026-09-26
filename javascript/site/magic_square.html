@@ -2,6 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>CP-SAT - Magic Square</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
@@ -37,62 +38,33 @@
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import {
-  CpSat,
-  type CpModelProto,
-} from 'or-tools-wasm/cp-sat';
+				<pre class="code-block"><code data-highlight="ts">import { CpModel, CpSat, sum } from 'or-tools-wasm/cp-sat';
 
 const size = 5;
 const numCells = size * size;
-const variables: NonNullable&lt;CpModelProto['variables']&gt; = Array.from(
-  { length: numCells },
-  (_, index) =&gt; ({
-    name: `cell_${Math.floor(index / size)}_${index % size}`,
-    domain: [1, numCells],
-  }),
-);
-const constraints: NonNullable&lt;CpModelProto['constraints']&gt; = [{
-  name: 'all_diff',
-  allDiff: {
-    exprs: variables.map((_, index) =&gt; ({
-      vars: [index],
-      coeffs: [1],
-      offset: 0,
-    })),
-  },
-}];
+const model = new CpModel();
+const cells = Array.from({ length: numCells }, (_, index) =&gt;
+  model.newIntVar(1, numCells, `cell_${index}`));
+model.addAllDifferent(cells);
 const target = (size * (numCells + 1)) / 2;
-const addSum = (name: string, vars: number[]) =&gt; {
-  constraints.push({
-    name,
-    linear: {
-      vars,
-      coeffs: Array(vars.length).fill(1),
-      domain: [target, target],
-    },
-  });
-};
+const addSum = (indices: number[]) =&gt;
+  model.addEquality(sum(indices.map((index) =&gt; cells[index])), target);
 
 for (let row = 0; row &lt; size; row += 1) {
-  addSum(`row_${row}`, Array.from({ length: size }, (_, column) =&gt; row * size + column));
+  addSum(Array.from({ length: size }, (_, column) =&gt; row * size + column));
 }
 for (let column = 0; column &lt; size; column += 1) {
-  addSum(`col_${column}`, Array.from({ length: size }, (_, row) =&gt; row * size + column));
+  addSum(Array.from({ length: size }, (_, row) =&gt; row * size + column));
 }
-addSum('diag_main', Array.from({ length: size }, (_, index) =&gt; index * size + index));
-addSum('diag_anti', Array.from({ length: size }, (_, index) =&gt; index * size + size - index - 1));
+addSum(Array.from({ length: size }, (_, index) =&gt; index * size + index));
+addSum(Array.from({ length: size }, (_, index) =&gt; index * size + size - index - 1));
 
-const model = await CpSat.createModel({
-  name: `magic_square_${size}`,
-  variables,
-  constraints,
-});
 const result = await CpSat.solve(model, {
   executor: 'worker',
   numWorkers: 4,
   logSearchProgress: true,
 });
-console.log(result.response?.solution);</code></pre>
+if (result.hasSolution) console.log(cells.map((cell) =&gt; result.value(cell)));</code></pre>
 			</details>
 		</div>
 		<p>This page exercises the <code>cp_sat_api</code>

@@ -1,5 +1,9 @@
 # OR-Tools Benchmarking
 
+The generated results below describe the recorded commit and runtime versions,
+not necessarily the current worktree. They are performance measurements, not
+a substitute for the fixture and site test suites.
+
 Run the benchmark suite:
 
 ```sh

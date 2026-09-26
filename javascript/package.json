@@ -119,6 +119,8 @@
     "build:js": "npm run gen:sat-parameters && npm run gen:bridge-types && tsc --project tsconfig.json && vite build --config vite.lib.config.ts && node ../scripts/build_browser_sources.mjs && node ../scripts/build_node_sources.mjs",
     "build:lib": "npm run build:wasm && npm run patch:wasm-runtime && npm run build:js",
     "typecheck:site": "tsc --project tsconfig.site.json",
+    "test:site": "npm run typecheck:site && node --experimental-strip-types --test site/*.test.ts site/models/*.test.ts",
+    "test:site:browser": "npm run build:site && playwright test --config tests/playwright.site.config.ts",
     "build:site": "npm run typecheck:site && vite build --config vite.site.config.ts",
     "build": "npm run build:lib && npm run build:site",
     "dev": "npm run build:lib && vite --config vite.site.config.ts dev --host",
@@ -170,7 +172,7 @@
   "devDependencies": {
     "@bufbuild/buf": "^1.72.0",
     "@bufbuild/protoc-gen-es": "^2.14.0",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.4.0",
     "@typescript/typescript6": "^6.0.2",
     "esbuild": "^0.27.7",

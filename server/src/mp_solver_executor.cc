@@ -91,7 +91,16 @@ SolverExecutorResult Solve(const bridge::MpSolverSolveRequest& solve_request,
   if (!rejected) {
     auto cancellation = context.OnCancellation([&solver] { solver.InterruptSolve(); });
     if (context.cancellation_requested()) return Error("MP Solver solve was cancelled before it started.", SolverExecutionFailureKind::kCancelled);
-    solver.Solve();
+    operations_research::MPSolverParameters parameters;
+    for (const auto& [key, value] : solve_request.parameters().double_params()) {
+      parameters.SetDoubleParam(
+          static_cast<operations_research::MPSolverParameters::DoubleParam>(key), value);
+    }
+    for (const auto& [key, value] : solve_request.parameters().integer_params()) {
+      parameters.SetIntegerParam(
+          static_cast<operations_research::MPSolverParameters::IntegerParam>(key), value);
+    }
+    solver.Solve(parameters);
     solver.FillSolutionResponseProto(&solution);
   }
 

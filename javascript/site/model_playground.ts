@@ -164,7 +164,7 @@ async function solveModel() {
     const modelBytes = await buildModelBytes();
     const params = parseParams();
     setStatus('Solving...');
-    const result = await CpSat.solve(modelBytes, {
+    const result = await CpSat.solveProto(modelBytes, {
       ...params,
       executor: selectedExecutor(),
       eventMask: selectedEventMask(),

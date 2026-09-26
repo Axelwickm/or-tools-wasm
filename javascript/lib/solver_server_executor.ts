@@ -34,6 +34,19 @@ class RemoteSolverError extends Error {
   }
 }
 
+class ServerConnectionError extends Error {
+  constructor(readonly cause: unknown) {
+    const error = cause;
+    super(error instanceof Error ? error.message : String(error));
+    this.name = error instanceof Error ? error.name : 'Error';
+    if (error instanceof Error) this.stack = error.stack;
+  }
+}
+
+class ServerHttpError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 type StreamResult<Response> =
   | { complete: true; result: Response }
   | { complete: false; sequenceId: bigint };
@@ -121,13 +134,21 @@ implements SolverExecutor<Request, Response, Event> {
   }
 
   async load(): Promise<void> {
-    const response = await this.fetchImpl(new URL('healthz', this.baseUrl), { headers: this.headers });
+    const response = await this.fetch(new URL('healthz', this.baseUrl), { headers: this.headers });
     if (!response.ok) {
       throw new Error(`${this.codec.label} server health check failed (${response.status} ${response.statusText}).`);
     }
   }
 
   terminate(_reason?: string): void {}
+
+  private async fetch(input: URL, init?: RequestInit): Promise<globalThis.Response> {
+    try {
+      return await this.fetchImpl(input, init);
+    } catch (error) {
+      throw new ServerConnectionError(error);
+    }
+  }
 
   private async submit(
     requestId: number,
@@ -140,7 +161,7 @@ implements SolverExecutor<Request, Response, Event> {
       payload: this.codec.encodeRequest(request),
       resources,
     });
-    const response = await this.fetchImpl(new URL('jobs', this.baseUrl), {
+    const response = await this.fetch(new URL('jobs', this.baseUrl), {
       method: 'POST',
       headers: { accept: PROTOBUF_CONTENT_TYPE, 'content-type': PROTOBUF_CONTENT_TYPE, ...this.headers },
       body: bytesBody(bytes),
@@ -171,13 +192,26 @@ implements SolverExecutor<Request, Response, Event> {
         if (!error.emitted) await options.onEvent({ type: 'failure', failure: error.failure });
         throw error;
       }
+      let kind = SolverFailureKind.EXECUTOR_ERROR;
+      let retryable = false;
+      if (error instanceof ServerConnectionError) {
+        kind = error.name === 'TimeoutError' ? SolverFailureKind.TIMEOUT
+          : error.name === 'AbortError' ? SolverFailureKind.CANCELLED : SolverFailureKind.SERVER_DISCONNECTED;
+        retryable = kind !== SolverFailureKind.CANCELLED;
+      } else if (error instanceof ServerHttpError) {
+        if (error.status === 401 || error.status === 403) kind = SolverFailureKind.UNAUTHENTICATED;
+        else if (error.status === 408 || error.status === 504) kind = SolverFailureKind.TIMEOUT;
+        else if (error.status === 429) kind = SolverFailureKind.QUEUE_FULL;
+        else if (error.status >= 400 && error.status < 500) kind = SolverFailureKind.INVALID_REQUEST;
+        retryable = error.status === 408 || error.status === 429 || error.status >= 500;
+      }
       await options.onEvent(createSolverFailureEvent(
         this.solver,
         requestId,
         error instanceof Error ? error.message : String(error),
-        SolverFailureKind.SERVER_DISCONNECTED,
+        kind,
         error instanceof Error ? error.stack ?? '' : '',
-        true,
+        retryable,
       ));
       throw error;
     }
@@ -191,7 +225,7 @@ implements SolverExecutor<Request, Response, Event> {
     let sequenceId = initialSequenceId;
     let response: globalThis.Response;
     try {
-      response = await this.fetchImpl(
+      response = await this.fetch(
         new URL(`jobs/${jobId}/stream?after=${initialSequenceId}`, this.baseUrl),
         { headers: { accept: EVENT_STREAM_CONTENT_TYPE, ...this.headers } },
       );
@@ -235,7 +269,7 @@ implements SolverExecutor<Request, Response, Event> {
     for (;;) {
       if (!firstRequest) await delay(this.statusIntervalMs);
       firstRequest = false;
-      const eventsResponse = await this.fetchImpl(
+      const eventsResponse = await this.fetch(
         new URL(`jobs/${jobId}/events?after=${sequenceId}`, this.baseUrl),
         { headers: { accept: PROTOBUF_CONTENT_TYPE, ...this.headers } },
       );
@@ -268,14 +302,14 @@ implements SolverExecutor<Request, Response, Event> {
   }
 
   private async release(jobId: bigint): Promise<void> {
-    await this.fetchImpl(new URL(`jobs/${jobId}`, this.baseUrl), {
+    await this.fetch(new URL(`jobs/${jobId}`, this.baseUrl), {
       method: 'DELETE',
       headers: this.headers,
     }).catch(() => undefined);
   }
 
   private async fetchJob(url: URL, operation: string): Promise<SolverBridgeResponse | null> {
-    const response = await this.fetchImpl(url, {
+    const response = await this.fetch(url, {
       headers: { accept: PROTOBUF_CONTENT_TYPE, ...this.headers },
     });
     if (response.status === JOB_NOT_READY_STATUS) return null;
@@ -319,7 +353,7 @@ implements SolverExecutor<Request, Response, Event> {
     const accepted = await submitted;
     if (accepted.jobId === 0n) throw new Error(`${this.codec.label} server did not return a job id.`);
     const bytes = encodeSolverBridgeCancelRequest(this.nextRequestId++, this.solver, targetRequestId);
-    const response = await this.fetchImpl(new URL(`jobs/${accepted.jobId}/cancel`, this.baseUrl), {
+    const response = await this.fetch(new URL(`jobs/${accepted.jobId}/cancel`, this.baseUrl), {
       method: 'POST',
       headers: { accept: PROTOBUF_CONTENT_TYPE, 'content-type': PROTOBUF_CONTENT_TYPE, ...this.headers },
       body: bytesBody(bytes),
@@ -347,9 +381,10 @@ implements SolverExecutor<Request, Response, Event> {
       }
     }
     const detail = await response.text().catch(() => '');
-    throw new Error(
+    throw new ServerHttpError(
       `${this.codec.label} server job ${operation} failed ` +
       `(${response.status} ${response.statusText}): ${detail}`,
+      response.status,
     );
   }
 }

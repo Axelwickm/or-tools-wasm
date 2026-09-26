@@ -166,10 +166,10 @@ class EventLog {
     return result;
   }
 
-  std::optional<bridge::SolverBridgeResponse> Last() const {
+  std::optional<bridge::SolverBridgeResponse> First() const {
     std::lock_guard lock(mutex_);
     if (responses_.empty()) return std::nullopt;
-    return responses_.back();
+    return responses_.front();
   }
 
   struct ReadResult {
@@ -239,12 +239,19 @@ SolverJobService::~SolverJobService() {
   }
   cleanup_cv_.notify_one();
   if (cleanup_thread_.joinable()) cleanup_thread_.join();
+
+  // Submitted jobs call executors owned by this service. Drain the scheduler
+  // before member destruction so no worker can outlive the executor registry.
+  scheduler_.Shutdown();
 }
 
 void SolverJobService::Register(std::unique_ptr<SolverExecutor> executor) {
   if (!executor) throw std::invalid_argument("SolverJobService::Register requires an executor.");
+  const std::string solver = executor->solver();
   std::lock_guard lock(mutex_);
-  executors_[executor->solver()] = std::move(executor);
+  if (!executors_.try_emplace(solver, std::move(executor)).second) {
+    throw std::invalid_argument("Solver executor already registered: " + solver);
+  }
 }
 
 HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
@@ -327,7 +334,9 @@ HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
     std::lock_guard lock(mutex_);
     jobs_[entry->handle.job_id()] = entry;
   }
-  if (auto response = entry->output->events.Last()) {
+  // The client resumes event delivery after this response's sequence. Return
+  // the first event so callbacks produced by a fast job remain after its cursor.
+  if (auto response = entry->output->events.First()) {
     return ProtoResponse(kJobAccepted, *response);
   }
   return StatusResponse(entry->request_id, entry->handle.status(), kJobAccepted);

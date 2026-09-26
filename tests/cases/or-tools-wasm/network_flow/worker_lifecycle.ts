@@ -1,10 +1,12 @@
 type NetworkFlowWorkerApi = {
   SimpleMaxFlow: new () => {
     addArcWithCapacity(tail: number, head: number, capacity: number): number;
-    solve(source: number, sink: number, options: {
+    solve(options: {
+      source: number;
+      sink: number;
       executor: 'worker';
       signal?: AbortSignal;
-    }): Promise<number>;
+    }): Promise<unknown>;
   };
 };
 
@@ -17,14 +19,14 @@ function createFlow(api: NetworkFlowWorkerApi) {
 
 export async function runNetworkFlowWorkerLifecycleCase(api: NetworkFlowWorkerApi) {
   const controller = new AbortController();
-  const activeSolve = createFlow(api).solve(0, 2, {
+  const activeSolve = createFlow(api).solve({ source: 0, sink: 2,
     executor: 'worker',
     signal: controller.signal,
   });
 
   let busyError: unknown;
   try {
-    await createFlow(api).solve(0, 2, { executor: 'worker' });
+    await createFlow(api).solve({ source: 0, sink: 2, executor: 'worker' });
   } catch (error) {
     busyError = error;
   }
@@ -43,7 +45,7 @@ export async function runNetworkFlowWorkerLifecycleCase(api: NetworkFlowWorkerAp
     throw new Error(`expected AbortError, got ${String(cancellationError)}`);
   }
 
-  await createFlow(api).solve(0, 2, { executor: 'worker' });
+  await createFlow(api).solve({ source: 0, sink: 2, executor: 'worker' });
   return {
     id: 'network_flow.worker.lifecycle' as const,
     name: 'Network Flow worker cancels and recovers' as const,

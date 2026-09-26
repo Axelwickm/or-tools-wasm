@@ -1,5 +1,14 @@
 # Known bugs
 
+This file records integration reports from 0.9.1 and proposed diagnostics, not
+a verified list of failures in the current worktree. The current API reference
+is [docs/api.md](docs/api.md). Old worker-toggle and `CpSat.cancelSolve()`
+examples below are historical: current cancellation uses a per-solve
+`AbortSignal`. CP-SAT now exports parameter and decision-strategy enums and
+uses numeric enum values in the high-level API. The runtime-inspection methods
+proposed below are not public APIs. Remaining diagnostic reports need targeted
+reproduction before being treated as current release blockers.
+
 ## CP-SAT cancellation fails in a JSPI worker
 
 In `or-tools-wasm` 0.9.1, cancelling an active CP-SAT solve from the browser worker can fail with:

@@ -128,7 +128,7 @@ const webRuntimeReplacements = [
 for (const runtimeName of runtimeNames) {
   const runtimeFileName = `${runtimeName}.js`;
   const workerExpression =
-    `(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;import("+JSON.stringify(new URL("${runtimeFileName}",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("${runtimeFileName}"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))`;
+    `(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;await import("+JSON.stringify(new URL("${runtimeFileName}",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("${runtimeFileName}"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))`;
   webRuntimeReplacements.push(
     [
       `new Worker(new URL("${runtimeFileName}",import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})`,
@@ -155,6 +155,9 @@ for (const webRuntimePath of webRuntimePaths) {
     'Module["PThread"]=PThread;PThread.init();FS.createPreloadedFile=FS_createPreloadedFile;',
   );
   runtime = patchJspiAsyncCtors(runtime);
+  // Wait for the runtime to install its message handler before the worker is ready.
+  runtime = runtime.replaceAll('globalThis.__ORTOOLS_WASM_PTHREAD=true;import(',
+    'globalThis.__ORTOOLS_WASM_PTHREAD=true;await import(');
   runtime = patchJspiInvokeTableEntries(runtime);
 
   if (!runtime.includes('var ORTOOLS_WASM_WEB_HOST=')) {

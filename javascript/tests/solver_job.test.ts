@@ -22,8 +22,6 @@ function executorWith(
   };
 }
 
-const abortError = (signal: AbortSignal) => signal.reason;
-
 test('does not start a job for an already-aborted signal', async () => {
   const controller = new AbortController();
   const reason = new Error('already aborted');
@@ -37,7 +35,6 @@ test('does not start a job for an already-aborted signal', async () => {
   await assert.rejects(
     executeSolverJob(executor, 'request', {
       signal: controller.signal,
-      abortError,
     }),
     reason,
   );
@@ -59,7 +56,6 @@ test('preserves falsy callback failures and suppresses later callbacks', async (
   let rejected = false;
   try {
     await executeSolverJob(executor, 'request', {
-      abortError,
       onSuccess: () => { successCommitted = true; },
       onEvent: () => {
         callbacks += 1;
@@ -96,7 +92,6 @@ test('serializes asynchronous callbacks and retains the first failure', async ()
 
   await assert.rejects(
     executeSolverJob(executor, 'request', {
-      abortError,
       onEvent: async (event) => {
         if (event.type !== 'test') return;
         order.push(`start ${event.sequence}`);
@@ -129,7 +124,6 @@ test('catches an abort raised while the executor is starting', async () => {
   await assert.rejects(
     executeSolverJob(executor, 'request', {
       signal: controller.signal,
-      abortError,
       onEvent: () => controller.abort(reason),
     }),
     reason,
@@ -153,7 +147,6 @@ test('waits for the job to settle after requesting cancellation', async () => {
   let settled = false;
   const execution = executeSolverJob(executor, 'request', {
     signal: controller.signal,
-    abortError,
   }).finally(() => { settled = true; });
   controller.abort(reason);
   await Promise.resolve();
@@ -175,7 +168,6 @@ test('gives a callback failure precedence over abort after a successful job', as
   await assert.rejects(
     executeSolverJob(executor, 'request', {
       signal: controller.signal,
-      abortError,
       onEvent: () => {
         controller.abort(new Error('aborted'));
         throw callbackError;
@@ -202,7 +194,6 @@ test('removes the abort listener after completion', async () => {
 
   assert.equal(await executeSolverJob(executor, 'request', {
     signal,
-    abortError,
   }), 1);
   assert.equal(removals, 1);
 });
@@ -222,7 +213,6 @@ test('gives a job rejection precedence over callback and abort failures', async 
   await assert.rejects(
     executeSolverJob(executor, 'request', {
       signal: controller.signal,
-      abortError,
       onEvent: () => { throw new Error('callback failed'); },
     }),
     jobError,

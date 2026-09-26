@@ -5,7 +5,6 @@ import {
   isJspiSupported,
   RUNTIME_ARTIFACTS,
   type RuntimeModuleFactory,
-  type RuntimeName,
 } from './runtime_loader_core.js';
 
 async function loadFactory(runtimeUrl: string): Promise<RuntimeModuleFactory> {
@@ -21,18 +20,9 @@ function locateWebRuntimeFile(fileName: string) {
   return new URL(`../wasm/${fileName}`, import.meta.url).href;
 }
 
-const bunWebAssetRuntimes = new Set<RuntimeName>([
-  'cp_sat_runtime',
-  'routing_runtime',
-  'mp_solver_runtime',
-  'mathopt_runtime',
-]);
-
-function shouldUseWebRuntimeAssets(runtimeName: RuntimeName) {
+function shouldUseWebRuntimeAssets() {
   const hostState = globalThis as { Bun?: unknown; Deno?: unknown };
-  if (typeof hostState.Deno !== 'undefined') return true;
-  if (typeof hostState.Bun !== 'undefined') return bunWebAssetRuntimes.has(runtimeName);
-  return false;
+  return typeof hostState.Deno !== 'undefined' || typeof hostState.Bun !== 'undefined';
 }
 
 function bunWebRuntimeGlobalCleanup() {
@@ -53,7 +43,7 @@ const loader = createRuntimeLoader({
   loadFactory,
   async resolveAsset(runtimeName, flavor) {
     const artifact = RUNTIME_ARTIFACTS[runtimeName][flavor];
-    if (shouldUseWebRuntimeAssets(runtimeName)) {
+    if (shouldUseWebRuntimeAssets()) {
       const wasmUrl = new URL(`../wasm/${artifact.wasm}`, import.meta.url);
       return {
         jsUrl: new URL(`../wasm/${artifact.webJs}`, import.meta.url).href,

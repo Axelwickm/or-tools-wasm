@@ -7,6 +7,8 @@ export {
   LazyElementDegreeSolutionGenerator,
   RandomSolutionGenerator,
   RuntimeError,
+  SetCover,
+  SetCoverResult,
   SetCoverDecision,
   SetCoverInvariant,
   SetCoverModel,
@@ -19,6 +21,7 @@ export type {
   SetCoverEvent,
   SetCoverModelProto,
   SetCoverSolveOptions,
+  SetCoverOneShotOptions,
   SetCoverSolutionResponse,
 } from './set_cover/api.js';
 export { CloudExecutorUnavailableError } from './cloud_executor.js';

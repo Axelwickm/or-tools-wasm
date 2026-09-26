@@ -88,8 +88,15 @@ void ResolvesThreadsWithoutChangingSolverParameters() {
   const auto request = SolveRequest(2, false, false);
   ExpectEq(executor.RequestedThreads(request, 2, 8), 2,
            "explicit CP-SAT worker count determines scheduler reservation");
-  ExpectEq(executor.RequestedThreads(SolveRequest(0, false, false, 2), 2, 8), 2,
-           "deprecated CP-SAT worker count determines scheduler reservation");
+  bool deprecated_workers_rejected = false;
+  try {
+    executor.RequestedThreads(SolveRequest(0, false, false, 2), 2, 8);
+  } catch (const std::invalid_argument& error) {
+    deprecated_workers_rejected =
+        std::string(error.what()).find("use num_workers") != std::string::npos;
+  }
+  Expect(deprecated_workers_rejected,
+         "deprecated worker count is rejected with the supported replacement");
 
   bool mismatch_rejected = false;
   try {

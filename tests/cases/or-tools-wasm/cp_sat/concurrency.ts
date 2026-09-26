@@ -1,7 +1,7 @@
 type CpSatConcurrencyApi = {
   CpSat: {
     createModel(model: object): Promise<Uint8Array>;
-    solve(
+    solveProto(
       model: Uint8Array,
       options: { executor: 'direct' },
     ): Promise<{ bytes: Uint8Array }>;
@@ -45,14 +45,14 @@ export async function runCpSatConcurrencyCase(
   api: CpSatConcurrencyApi,
 ): Promise<CpSatConcurrencyResult> {
   const modelBytes = await api.CpSat.createModel({ name: 'direct_concurrency' });
-  const directSolve = api.CpSat.solve(modelBytes, { executor: 'direct' });
+  const directSolve = api.CpSat.solveProto(modelBytes, { executor: 'direct' });
   await expectError(
-    api.CpSat.solve(modelBytes, { executor: 'direct' }),
+    api.CpSat.solveProto(modelBytes, { executor: 'direct' }),
     'SolverExecutorBusyError',
     'concurrent direct solve',
   );
   await directSolve;
-  const directRecovery = await api.CpSat.solve(modelBytes, { executor: 'direct' });
+  const directRecovery = await api.CpSat.solveProto(modelBytes, { executor: 'direct' });
   assert(directRecovery.bytes.length > 0, 'direct executor must recover after its active solve');
 
   const solver = new api.CpSolver();

@@ -20,6 +20,7 @@
 #endif
 #include "generated_proto_schemas.h"
 #include "ortools/algorithms/knapsack_solver.h"
+#include "knapsack_validation.h"
 #include "ortools/linear_solver/linear_solver.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
 #include "ortools/linear_solver/solve_mp_model.h"
@@ -166,7 +167,8 @@ uint8_t* CopyStringToBuffer(const std::string& data, size_t* out_len) {
 
 uint8_t* SolveModelRequestWithThreads(
     const MPModelRequest& request, int num_threads,
-    std::atomic<bool>* interrupt, size_t* out_len) {
+    std::atomic<bool>* interrupt, size_t* out_len,
+    const MPSolverParameters* parameters = nullptr) {
   MPSolutionResponse response;
   if (!request.has_model()) {
     response.set_status(operations_research::MPSOLVER_MODEL_INVALID);
@@ -245,7 +247,11 @@ uint8_t* SolveModelRequestWithThreads(
       }
     });
   }
-  solver.Solve();
+  if (parameters != nullptr) {
+    solver.Solve(*parameters);
+  } else {
+    solver.Solve();
+  }
   solve_finished.store(true);
   if (interrupt_thread.joinable()) interrupt_thread.join();
   solver.FillSolutionResponseProto(&response);
@@ -284,6 +290,9 @@ EMSCRIPTEN_KEEPALIVE uint8_t* knapsack_solve_serialized(
         "dimensions.\"}", out_len);
   }
 
+  if (const char* error = ortools_wasm::ValidateKnapsackShape(solver_type, num_items, num_dimensions)) {
+    return CopyStringToBuffer("{\"ok\":false,\"error\":\"" + JsonEscape(error) + "\"}", out_len);
+  }
   std::vector<int64_t> profits(profits_data, profits_data + num_items);
 
   std::vector<std::vector<int64_t>> weights(num_dimensions,
@@ -767,6 +776,26 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request_with_threads(
       request, num_threads,
       enable_interrupt ? &g_mp_solver_interrupt_requested : nullptr,
       out_len);
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_model_request_with_parameters(
+    const uint8_t* request_data, size_t request_len, int num_threads,
+    int parameters_handle, int enable_interrupt, size_t* out_len) {
+  if (out_len == nullptr) return nullptr;
+  const ResetMpSolverInterruptOnExit reset_interrupt;
+  MPModelRequest request;
+  MPSolutionResponse response;
+  const MPSolverParameters* parameters = GetParameters(parameters_handle);
+  if (parameters == nullptr || request_data == nullptr ||
+      !request.ParseFromArray(request_data, static_cast<int>(request_len))) {
+    response.set_status(operations_research::MPSOLVER_MODEL_INVALID);
+    response.set_status_str("MPSolver: invalid model request or parameters handle.");
+    return CopyProtoToBuffer(response, out_len);
+  }
+  return SolveModelRequestWithThreads(
+      request, num_threads,
+      enable_interrupt ? &g_mp_solver_interrupt_requested : nullptr,
+      out_len, parameters);
 }
 
 EMSCRIPTEN_KEEPALIVE int mp_solver_load_solution_proto(

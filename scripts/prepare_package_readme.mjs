@@ -38,6 +38,8 @@ readme = readme
   .replaceAll('src="docs/media/', `src="${rawBase}/docs/media/`)
   .replaceAll('(docs/api.md)', `(${repoBlobBase}/docs/api.md)`)
   .replaceAll('(docs/bundlers.md)', `(${repoBlobBase}/docs/bundlers.md)`)
+  .replaceAll('(docs/testing.md)', `(${repoBlobBase}/docs/testing.md)`)
+  .replaceAll('(server/README.md)', `(${repoBlobBase}/server/README.md)`)
   .replaceAll('(benchmarking/)', `(${repoTreeBase}/benchmarking)`);
 
 mkdirSync(packageDir, { recursive: true });
