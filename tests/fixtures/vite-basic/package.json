@@ -12,7 +12,7 @@
     "vite": "^8.2.2"
   },
   "dependencies": {
-    "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-0.9.1.tgz",
+    "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-1.0.0.tgz",
     "protobufjs": "^8.8.0"
   }
 }
