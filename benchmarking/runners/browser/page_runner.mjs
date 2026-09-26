@@ -2,7 +2,6 @@ import {
   CpModel,
   CpSolver,
   CpSolverStatus,
-  setWorkerBridgeEnabled as setCpSatWorkerBridgeEnabled,
   terminateLoadedRuntimeThreads,
   weightedSum,
 } from 'or-tools-wasm/cp-sat';
@@ -11,15 +10,12 @@ import {
   FirstSolutionStrategy,
   RoutingIndexManager,
   RoutingModel,
-  setWorkerBridgeEnabled as setRoutingWorkerBridgeEnabled,
 } from 'or-tools-wasm/routing';
 import {
   MPSolver,
 } from 'or-tools-wasm/mp-solver';
 import {
-  initMathOpt,
   MathOpt,
-  setWorkerBridgeEnabled as setMathOptWorkerBridgeEnabled,
 } from 'or-tools-wasm/mathopt';
 import {
   KnapsackSolver,
@@ -85,12 +81,12 @@ async function solveCpSat(problem, threads) {
 
   const solver = new CpSolver();
   solver.parameters.maxTimeInSeconds = Number(problem.timeLimitSeconds ?? 5);
-  solver.parameters.numSearchWorkers = threads;
-  const status = await solver.solve(model);
+  solver.parameters.numWorkers = threads;
+  const status = await solver.solve(model, { executor: 'direct' });
   const name = statusName(status, CpSolverStatus);
   let objective = '';
   if (name === 'OPTIMAL' || name === 'FEASIBLE') {
-    objective = String(solver.objectiveValue());
+    objective = String(solver.objectiveValue);
   }
   return [name, objective];
 }
@@ -140,6 +136,7 @@ async function solveMpsolver(problem, threads) {
 
   const result = await solver.solveWithProto({
     ...execution,
+    numThreads: threads,
     timeLimitSeconds: Number(problem.timeLimitSeconds ?? 5),
     solverSpecificParameters: `num_workers: ${threads}`,
   });
@@ -150,7 +147,6 @@ async function solveMpsolver(problem, threads) {
 }
 
 async function solveMathOpt(problem, threads) {
-  await initMathOpt();
   const variableCount = Number(problem.variables);
   const constraintCount = Number(problem.constraints);
   const model = MathOpt.Model(problem.problem);
@@ -173,6 +169,7 @@ async function solveMathOpt(problem, threads) {
     coefficient: deterministicValue(column, 97, 1),
   })));
   const result = await MathOpt.solve(model, {
+    executor: 'direct',
     solverType: MathOpt.SolverType.GLOP,
     threads,
     timeLimitSeconds: Number(problem.timeLimitSeconds ?? 5),
@@ -254,16 +251,6 @@ const SOLVERS = {
   max_flow: solveMaxFlow,
 };
 
-function configureWorkerBridges() {
-  for (const setEnabled of [
-    setCpSatWorkerBridgeEnabled,
-    setRoutingWorkerBridgeEnabled,
-    setMathOptWorkerBridgeEnabled,
-  ]) {
-    setEnabled(false);
-  }
-}
-
 async function runProblem(problem, threads) {
   const start = performance.now();
   try {
@@ -284,7 +271,6 @@ export async function runBenchmarks({
   implementation = 'web-chromium',
   environment = 'chromium-headless-main-thread',
 }) {
-  configureWorkerBridges();
   const rows = [];
   try {
     for (const problem of config.problems) {

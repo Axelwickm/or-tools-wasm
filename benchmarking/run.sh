@@ -20,6 +20,9 @@ mkdir -p "${NPM_CACHE_DIR}"
 export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-${NPM_CACHE_DIR}}"
 
 GIT_SHA="$(git -C "${ROOT}" rev-parse --short HEAD 2>/dev/null || printf unknown)"
+if [[ -n "$(git -C "${ROOT}" status --porcelain --untracked-files=no)" ]]; then
+  GIT_SHA="${GIT_SHA}-dirty"
+fi
 PYTHON_IMAGE="ortools-wasm-bench-native-python"
 NODE_IMAGE="ortools-wasm-bench-wasm-node"
 DENO_IMAGE="ortools-wasm-bench-wasm-deno"
@@ -87,7 +90,7 @@ done
 
 printf 'Packing local npm package into %s\n' "${PACKAGE_DIR}"
 rm -f "${PACKAGE_DIR}"/or-tools-wasm-*.tgz "${PACKAGE_TARBALL}"
-(cd "${ROOT}/package" && npm pack --pack-destination "${PACKAGE_DIR}")
+(cd "${ROOT}/javascript" && npm pack --pack-destination "${PACKAGE_DIR}")
 packed_tarballs=("${PACKAGE_DIR}"/or-tools-wasm-*.tgz)
 if [[ ${#packed_tarballs[@]} -ne 1 ]]; then
   fail "Expected exactly one packed tarball in ${PACKAGE_DIR}, found ${#packed_tarballs[@]}."

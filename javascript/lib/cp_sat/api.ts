@@ -292,6 +292,7 @@ async function executeSolve(
       log: Boolean(eventMask.log),
     },
   }, {
+    showCloudNotice: !(executor instanceof SolverServerExecutor),
     resources: options.resources,
     onEvent,
     signal: options.signal,

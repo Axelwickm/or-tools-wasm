@@ -2023,6 +2023,16 @@ Cancellation of queued server work is immediate; interruption of running work
 depends on the native solver. Cloud execution is reserved and currently reports
 unavailability rather than solving.
 
+Local solves print an informational cloud notice once per JavaScript context,
+shared across solver imports. Printing the notice makes no network request.
+Call `setCloudNoticeEnabled(false)` before solving to suppress it; this function
+is exported from `or-tools-wasm` and each solver subpath. Alternatively set
+`ORTOOLS_WASM_CLOUD_NOTICE=0` in the environment. An explicit function call takes
+precedence over the environment setting. Re-enabling the notice does not print
+it again if it has already appeared. Separate pages, processes, and independent
+workers have separate in-memory flags. This setting does not suppress responses
+from explicitly selecting `executor: 'cloud'`.
+
 ## Generated Protobuf Types
 
 The package exports generated CP-SAT model and response types from

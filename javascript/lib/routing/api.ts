@@ -503,6 +503,7 @@ export class RoutingModel {
       executor,
       { type: 'solve', request, interruptible: Boolean(options.signal) },
       {
+        showCloudNotice: !(executor instanceof SolverServerExecutor),
         onEvent: options.onEvent,
         signal: options.signal,
       },

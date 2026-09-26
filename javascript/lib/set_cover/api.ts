@@ -163,6 +163,7 @@ function deciles(values: number[]) {
 async function runNativeSetCover(operation: SetCoverOperation, options: SetCoverSolveOptions = {}) {
   const executor = createSetCoverExecutor(options.executor);
   return executeSolverJob(executor, operation, {
+    showCloudNotice: !(executor instanceof SolverServerExecutor),
     signal: options.signal,
     onEvent: options.onEvent,
   });

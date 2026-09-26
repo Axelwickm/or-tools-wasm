@@ -20,14 +20,14 @@ const publicEntryNames = [
   'rcpsp',
 ];
 const solverBuilds = [
-  { directory: 'cp_sat', publicEntries: ['cp-sat', 'rcpsp'], label: 'CP-SAT', preserveGlobalMessaging: true },
-  { directory: 'knapsack', publicEntries: ['knapsack'], label: 'Knapsack', preserveGlobalMessaging: true },
-  { directory: 'mathopt', publicEntries: ['mathopt'], label: 'MathOpt', preserveGlobalMessaging: true },
-  { directory: 'mp_solver', publicEntries: ['mp-solver'], label: 'MP Solver', preserveGlobalMessaging: true },
-  { directory: 'network_flow', publicEntries: ['network-flow'], label: 'Network Flow', preserveGlobalMessaging: true },
-  { directory: 'pdlp', publicEntries: ['pdlp'], label: 'PDLP', preserveGlobalMessaging: true },
-  { directory: 'routing', publicEntries: ['routing'], label: 'Routing', preserveGlobalMessaging: true },
-  { directory: 'set_cover', publicEntries: ['set-cover'], label: 'Set Cover', preserveGlobalMessaging: true },
+  { directory: 'cp_sat', publicEntries: ['cp-sat', 'rcpsp'], label: 'CP-SAT' },
+  { directory: 'knapsack', publicEntries: ['knapsack'], label: 'Knapsack' },
+  { directory: 'mathopt', publicEntries: ['mathopt'], label: 'MathOpt' },
+  { directory: 'mp_solver', publicEntries: ['mp-solver'], label: 'MP Solver' },
+  { directory: 'network_flow', publicEntries: ['network-flow'], label: 'Network Flow' },
+  { directory: 'pdlp', publicEntries: ['pdlp'], label: 'PDLP' },
+  { directory: 'routing', publicEntries: ['routing'], label: 'Routing' },
+  { directory: 'set_cover', publicEntries: ['set-cover'], label: 'Set Cover' },
 ];
 
 function externalSharedRuntimePlugin(name, sharedImportPrefix) {
@@ -128,43 +128,18 @@ await build({
   outfile: path.join(outDir, 'runtime_loader.js'),
 });
 
-function nodeWorkerBridgeSource(label, preserveGlobalMessaging) {
-  if (preserveGlobalMessaging) {
-    return `import { parentPort } from 'node:worker_threads';
-
-if (!parentPort) {
-  throw new Error('${label} worker bridge must run inside a Node worker thread.');
-}
-
-const postToParent = parentPort.postMessage.bind(parentPort);
-const hasWorkerGlobalMessaging = typeof globalThis.postMessage === 'function' && 'onmessage' in globalThis;
-
-Object.assign(globalThis, { self: globalThis });
-
-if (!hasWorkerGlobalMessaging) {
-  Object.assign(globalThis, {
-    postMessage: (message, transfer) => postToParent(message, transfer),
-  });
-
-  parentPort.on('message', (message) => {
-    globalThis.onmessage?.({ data: message });
-  });
-}
-
-await import('./worker_runtime.js');
-`;
-  }
+function nodeWorkerBridgeSource(label) {
   return `import { parentPort } from 'node:worker_threads';
 
 if (!parentPort) {
   throw new Error('${label} worker bridge must run inside a Node worker thread.');
 }
 
-const postToParent = parentPort.postMessage.bind(parentPort);
-Object.assign(globalThis, {
-  self: globalThis,
-  postMessage: (message, transfer) => postToParent(message, transfer),
-});
+Object.assign(globalThis, { self: globalThis });
+
+if (typeof globalThis.postMessage !== 'function') {
+  globalThis.postMessage = parentPort.postMessage.bind(parentPort);
+}
 parentPort.on('message', (message) => {
   globalThis.onmessage?.({ data: message });
 });
@@ -173,10 +148,10 @@ await import('./worker_runtime.js');
 `;
 }
 
-for (const { directory, label, preserveGlobalMessaging } of solverBuilds) {
+for (const { directory, label } of solverBuilds) {
   await writeFile(
     path.join(outDir, directory, 'worker.js'),
-    nodeWorkerBridgeSource(label, preserveGlobalMessaging),
+    nodeWorkerBridgeSource(label),
   );
 }
 

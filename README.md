@@ -97,6 +97,27 @@ docker compose -f server/docker-compose.yml up --build
 Solve calls share execution controls: `executor` selects where to run,
 `onEvent` reports progress, and `signal` requests cancellation.
 
+### Managed cloud
+
+**Build your app. Let us run the solvers.** Send optimization jobs through an API.
+We handle the compute, queues, and scaling.
+[Explore cloud / early access](https://or-tools-wasm-api.axelwickman.com/info).
+Cloud execution currently checks service status and reports unavailability;
+it does not upload or solve models.
+
+After the first completed local solve, the library prints a cloud notice with
+`console.info`, once per JavaScript context (page, process, or independent worker).
+The notice makes no network request. To suppress it before solving:
+
+```ts
+import { setCloudNoticeEnabled } from 'or-tools-wasm';
+setCloudNoticeEnabled(false);
+```
+
+The setting is also exported by every solver subpath. Command-line applications
+can instead set `ORTOOLS_WASM_CLOUD_NOTICE=0`. Explicit cloud status messages are
+unaffected.
+
 To explore locally, see the [example site guide](docs/testing.md) and
 [native server setup](server/README.md).
 

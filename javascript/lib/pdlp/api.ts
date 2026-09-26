@@ -381,6 +381,7 @@ async function execute(
 ): Promise<PdlpResult> {
   const executor = createPdlpExecutor(options.executor);
   return executeSolverJob(executor, request, {
+    showCloudNotice: !(executor instanceof SolverServerExecutor) && request.type === 'solve',
     onEvent: options.onEvent,
     resources,
     signal: options.signal,

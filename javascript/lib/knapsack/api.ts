@@ -159,6 +159,7 @@ export class KnapsackSolver {
       capacities: [...this.capacities],
     };
     return executeSolverJob(executor, operation, {
+      showCloudNotice: !(executor instanceof SolverServerExecutor),
       signal: options.signal,
       onEvent: options.onEvent,
     });

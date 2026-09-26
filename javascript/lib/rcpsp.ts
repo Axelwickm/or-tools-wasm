@@ -12,3 +12,4 @@ export type {
   ServerExecutorConfiguration,
   WorkerExecutorConfiguration,
 } from './executor_configuration.js';
+export { setCloudNoticeEnabled } from './cloud_notice.js';

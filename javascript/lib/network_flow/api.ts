@@ -146,6 +146,7 @@ async function solveNetworkFlow(
 ): Promise<NetworkFlowResult> {
   const executor = createNetworkFlowExecutor(options.executor);
   return executeSolverJob(executor, operation, {
+    showCloudNotice: !(executor instanceof SolverServerExecutor),
     signal: options.signal,
     onEvent: options.onEvent,
   });

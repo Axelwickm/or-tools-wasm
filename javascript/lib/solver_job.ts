@@ -1,3 +1,4 @@
+import { printCloudNotice } from './cloud_notice.js';
 import type {
   SolverExecutor,
   SolverExecutorEventHandler,
@@ -6,6 +7,7 @@ import type {
 } from './solver_executor.js';
 
 export type ExecuteSolverJobOptions<Response, Event> = {
+  showCloudNotice?: boolean;
   resources?: SolverResourceRequest;
   onEvent?: SolverExecutorEventHandler<SolverJobEvent | Event>;
   // Commit solver-specific state before deferred callback or abort failures escape.
@@ -68,6 +70,7 @@ export async function executeSolverJob<Request, Response, Event>(
     await options.onSuccess?.(response);
     if (callbackFailure) throw callbackFailure.error;
     if (abortFailure) throw abortFailure.error;
+    if (options.showCloudNotice) printCloudNotice();
     return response;
   } finally {
     options.signal?.removeEventListener('abort', onAbort);

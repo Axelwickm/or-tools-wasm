@@ -273,6 +273,7 @@ async function solveModelRequestBytes(
       parameters: options.parameters ? solverParameterState(options.parameters).snapshot() : undefined,
     },
     {
+      showCloudNotice: !(executor instanceof SolverServerExecutor),
       resources: { threads: numThreads },
       onEvent: options.onEvent,
       signal: options.signal,

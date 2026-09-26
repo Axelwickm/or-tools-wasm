@@ -1,5 +1,6 @@
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { initializeBunPthread } from './bun_pthread_bootstrap.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const packageBuildRoot = path.join(repoRoot, 'javascript/build/javascript');
@@ -127,9 +128,14 @@ const webRuntimeReplacements = [
 
 for (const runtimeName of runtimeNames) {
   const runtimeFileName = `${runtimeName}.js`;
-  const workerExpression =
+  const previousWorkerExpression =
     `(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob(["globalThis.__ORTOOLS_WASM_PTHREAD=true;await import("+JSON.stringify(new URL("${runtimeFileName}",import.meta.url).href)+");"],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("${runtimeFileName}"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))`;
+  const bootstrapStart = JSON.stringify(`await (${initializeBunPthread.toString()})(()=>import(`);
+  const bootstrapEnd = JSON.stringify('));');
+  const workerExpression =
+    `(typeof Bun!=="undefined"?new Worker(URL.createObjectURL(new Blob([${bootstrapStart}+JSON.stringify(new URL("${runtimeFileName}",import.meta.url).href)+${bootstrapEnd}],{type:"text/javascript"})),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}):new Worker(new URL("${runtimeFileName}"+"?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID}))`;
   webRuntimeReplacements.push(
+    [previousWorkerExpression, workerExpression],
     [
       `new Worker(new URL("${runtimeFileName}",import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})`,
       workerExpression,

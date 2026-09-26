@@ -10,8 +10,18 @@ export type WorkerExecutorConfiguration = {
   type: 'worker';
 };
 
+/**
+ * OR-Tools WASM Cloud: Build your app. Let us run the solvers.
+ * Send optimization jobs through an API.
+ * We handle the compute, queues, and scaling.
+ *
+ * Early access: currently checks service status and throws
+ * CloudExecutorUnavailableError. Models are not uploaded or solved.
+ * @see https://or-tools-wasm-api.axelwickman.com/info
+ */
 export type CloudExecutorConfiguration = {
   type: 'cloud';
+  /** Adds test: true to the status request; does not mock or skip the request. */
   test?: boolean;
 };
 

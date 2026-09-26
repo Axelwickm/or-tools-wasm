@@ -1,4 +1,4 @@
-FROM node:26.8.1-trixie-slim AS deps
+FROM node:26.10.0-trixie-slim AS deps
 
 WORKDIR /bench
 
@@ -6,7 +6,7 @@ COPY benchmarking/package/or-tools-wasm-local.tgz /tmp/or-tools-wasm-local.tgz
 RUN npm init -y \
   && npm install --omit=dev --no-audit --no-fund /tmp/or-tools-wasm-local.tgz
 
-FROM denoland/deno:2.9.5
+FROM denoland/deno:2.9.7
 
 USER root
 WORKDIR /bench
@@ -18,7 +18,7 @@ COPY Version.txt ./Version.txt
 COPY benchmarking ./benchmarking
 
 ENV BENCH_IMPLEMENTATION=wasm-deno
-ENV BENCH_ENVIRONMENT=deno-2.9.5
+ENV BENCH_ENVIRONMENT=deno-2.9.7
 ENV DENO_NO_UPDATE_CHECK=1
 
 ENTRYPOINT ["deno", "run", "--allow-read=/bench,/results", "--allow-write=/results", "--allow-env", "--allow-sys", "--node-modules-dir=manual", "/bench/benchmarking/runners/node/run.mjs"]

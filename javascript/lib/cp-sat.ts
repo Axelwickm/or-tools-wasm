@@ -65,3 +65,4 @@ export {
 } from './generated/cp_model.js';
 export * from './generated/cp_model.js';
 export type { SatParameters } from './generated/sat_parameters.js';
+export { setCloudNoticeEnabled } from './cloud_notice.js';

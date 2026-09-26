@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createAbortError } from '../lib/solver_job.ts';
+import { build } from 'esbuild';
+import { fileURLToPath } from 'node:url';
+const bundled = await build({
+  entryPoints: [fileURLToPath(new URL('../lib/solver_job.ts', import.meta.url))],
+  bundle: true, write: false, platform: 'node', format: 'esm',
+});
+const { createAbortError }: typeof import('../lib/solver_job.ts') =
+  await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 
 test('abort errors preserve Error reasons and name other reasons AbortError', () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'DOMException')!;

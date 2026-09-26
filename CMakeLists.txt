@@ -316,6 +316,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-fexceptions"
     "-sDISABLE_EXCEPTION_CATCHING=0"
     "-sALLOW_MEMORY_GROWTH=1"
+    # Avoid a shared allocator lock bottleneck across solver threads.
+    "-sMALLOC=mimalloc"
     "-sWASM_BIGINT=1"
     "--bind"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free']"

@@ -1,4 +1,4 @@
-FROM node:26.8.1-trixie-slim
+FROM node:26.10.0-trixie-slim
 
 WORKDIR /bench
 
@@ -9,6 +9,6 @@ RUN npm init -y \
 COPY Version.txt ./Version.txt
 COPY benchmarking ./benchmarking
 
-ENV BENCH_ENVIRONMENT=node-26.8.1
+ENV BENCH_ENVIRONMENT=node-26.10.0
 
 ENTRYPOINT ["node", "/bench/benchmarking/runners/node/run.mjs"]

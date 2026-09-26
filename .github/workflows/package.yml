@@ -55,9 +55,9 @@ jobs:
             emsdk/.emscripten
             build
             javascript/build
-          key: wasm-build-${{ runner.os }}-${{ steps.emsdk-revision.outputs.sha }}-${{ hashFiles('javascript/package-lock.json', 'CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/**/*.txt', 'patches/**', 'scripts/ensure-emsdk.sh', 'scripts/embed_proto.cmake', 'javascript/cp_sat_api.cc') }}
+          key: wasm-build-${{ runner.os }}-${{ steps.emsdk-revision.outputs.sha }}-${{ hashFiles('scripts/ensure-emsdk.sh') }}-${{ hashFiles('javascript/package-lock.json', 'CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/**/*.txt', 'patches/**', 'scripts/embed_proto.cmake', 'javascript/cp_sat_api.cc') }}
           restore-keys: |
-            wasm-build-${{ runner.os }}-${{ steps.emsdk-revision.outputs.sha }}-
+            wasm-build-${{ runner.os }}-${{ steps.emsdk-revision.outputs.sha }}-${{ hashFiles('scripts/ensure-emsdk.sh') }}-
 
       - name: Install dependencies
         if: ${{ !env.ACT }}

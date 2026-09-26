@@ -2510,6 +2510,8 @@ async function executeMathOptRequest(
       : 1,
   };
   const response = await executeSolverJob(executor, operation, {
+    showCloudNotice: !(executor instanceof SolverServerExecutor)
+      && (operation.type === 'solve' || operation.type === 'incrementalSolve'),
     resources,
     onEvent: options.onEvent,
     onSuccess: (response) => onSuccess?.(response.response),
