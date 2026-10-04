@@ -312,7 +312,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
     "-sEXPORT_NAME=cpSatModule"
-    "-sASSERTIONS=1"
+    "-sASSERTIONS=$<IF:$<CONFIG:Debug>,1,0>"
     "-fexceptions"
     "-sDISABLE_EXCEPTION_CATCHING=0"
     "-sALLOW_MEMORY_GROWTH=1"

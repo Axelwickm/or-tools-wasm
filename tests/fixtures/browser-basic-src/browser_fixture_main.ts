@@ -197,6 +197,7 @@ function installWorkerSpy() {
   const terminations: Array<{ id: number; executor?: string; pthread: boolean }> = [];
   const executorRequests: string[] = [];
   let nextWorkerId = 1;
+  const isPthread = (name?: string) => name === 'em-pthread' || name?.startsWith('em-pthread-') === true;
 
   window.Worker = function WorkerSpy(scriptURL: string | URL, options?: WorkerOptions) {
     const worker = new originalWorker(scriptURL, options);
@@ -220,7 +221,7 @@ function installWorkerSpy() {
     }) as Worker['postMessage'];
     const originalTerminate = worker.terminate.bind(worker);
     worker.terminate = (() => {
-      terminations.push({ id, executor, pthread: name?.startsWith('em-pthread-') === true });
+      terminations.push({ id, executor, pthread: isPthread(name) });
       return originalTerminate();
     }) as Worker['terminate'];
     return worker;
@@ -246,8 +247,8 @@ function installWorkerSpy() {
       ]));
       return {
         total: creations.length,
-        pthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length,
-        activePthread: creations.filter((creation) => creation.name?.startsWith('em-pthread-')).length
+        pthread: creations.filter((creation) => isPthread(creation.name)).length,
+        activePthread: creations.filter((creation) => isPthread(creation.name)).length
           - terminations.filter((termination) => termination.pthread).length,
         executorWorkers,
         activeExecutorWorkers,

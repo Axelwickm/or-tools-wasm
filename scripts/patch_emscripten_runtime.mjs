@@ -126,6 +126,23 @@ const webRuntimeReplacements = [
   ],
 ];
 
+// Optimized glue omits the debug environment checks and uses a shorter thread
+// name. Keep the same Deno/Bun host detection for this release form.
+webRuntimeReplacements.push(
+  [
+    'var ENVIRONMENT_IS_WEB=!!globalThis.window;var ENVIRONMENT_IS_WORKER=!!globalThis.WorkerGlobalScope;var ENVIRONMENT_IS_NODE=globalThis.process?.versions?.node&&globalThis.process?.type!="renderer";var ENVIRONMENT_IS_PTHREAD=ENVIRONMENT_IS_WORKER&&globalThis.name=="em-pthread";',
+    webRuntimeReplacements[0][1],
+  ],
+  [
+    'var isPthread=globalThis.name=="em-pthread";isPthread&&cpSatModule();',
+    'var isPthread=globalThis.name?.startsWith("em-pthread")||import.meta.url.includes("?em-pthread=")||globalThis.__ORTOOLS_WASM_PTHREAD===true;isPthread&&cpSatModule();',
+  ],
+  [
+    'PThread.unusedWorkers.push(worker);return worker}',
+    'worker.unref?.();PThread.unusedWorkers.push(worker);return worker}',
+  ],
+);
+
 for (const runtimeName of runtimeNames) {
   const runtimeFileName = `${runtimeName}.js`;
   const previousWorkerExpression =
@@ -144,6 +161,10 @@ for (const runtimeName of runtimeNames) {
       `new Worker(new URL("${runtimeFileName}?em-pthread="+PThread.nextWorkerID,import.meta.url),{type:"module",name:"em-pthread-"+PThread.nextWorkerID})`,
       workerExpression,
     ],
+    [
+      `new Worker(new URL("${runtimeFileName}",import.meta.url),{type:"module",name:"em-pthread"})`,
+      workerExpression.replaceAll('PThread.nextWorkerID', '1'),
+    ],
   );
 }
 
@@ -156,6 +177,7 @@ for (const webRuntimePath of webRuntimePaths) {
     runtime = runtime.replaceAll(from, to);
   }
   runtime = runtime.replace(/(?:worker\.unref\?\.\(\);)+worker\.workerID/g, 'worker.unref?.();worker.workerID');
+  runtime = runtime.replace(/(?:worker\.unref\?\.\(\);)+PThread\.unusedWorkers/g, 'worker.unref?.();PThread.unusedWorkers');
   runtime = runtime.replace(
     /(?:Module\["PThread"\]=PThread;)+PThread\.init\(\);FS\.createPreloadedFile=FS_createPreloadedFile;/g,
     'Module["PThread"]=PThread;PThread.init();FS.createPreloadedFile=FS_createPreloadedFile;',
@@ -179,16 +201,17 @@ for (const webRuntimePath of webRuntimePaths) {
 function patchJspiAsyncCtors(runtime) {
   if (!runtime.includes('WebAssembly.promising')) return runtime;
 
-  const initRuntime =
-    'function initRuntime(){assert(!runtimeInitialized);runtimeInitialized=true;if(ENVIRONMENT_IS_PTHREAD)return startWorker();checkStackCookie();if(!Module["noFSInit"]&&!FS.initialized)FS.init();TTY.init();wasmExports["__wasm_call_ctors"]();FS.ignorePermissions=false}';
-  const asyncInitRuntime =
-    'async function initRuntime(){assert(!runtimeInitialized);runtimeInitialized=true;if(ENVIRONMENT_IS_PTHREAD)return startWorker();checkStackCookie();if(!Module["noFSInit"]&&!FS.initialized)FS.init();TTY.init();await wasmExports["__wasm_call_ctors"]();FS.ignorePermissions=false}';
-
-  if (runtime.includes(asyncInitRuntime)) return runtime;
+  if (runtime.includes('async function initRuntime()')) return runtime;
 
   return runtime
-    .replace(initRuntime, asyncInitRuntime)
-    .replaceAll('initRuntime();readyPromiseResolve?.(Module);', 'await initRuntime();readyPromiseResolve?.(Module);');
+    // Release builds omit assertions, stack cookies and the debug worker hook.
+    .replace(
+      /function initRuntime\(\)\{([^{}]*?)wasmExports\["__wasm_call_ctors"\]\(\);([^{}]*)\}/,
+      'async function initRuntime(){$1await wasmExports["__wasm_call_ctors"]();$2}',
+    )
+    .replaceAll('initRuntime();readyPromiseResolve?.(Module);', 'await initRuntime();readyPromiseResolve?.(Module);')
+    .replaceAll('initRuntime();postRun()', 'await initRuntime();postRun()')
+    .replaceAll('if(ENVIRONMENT_IS_PTHREAD){initRuntime();return}', 'if(ENVIRONMENT_IS_PTHREAD){await initRuntime();return}');
 }
 
 function patchJspiInvokeTableEntries(runtime) {

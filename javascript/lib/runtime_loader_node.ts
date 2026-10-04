@@ -13,6 +13,10 @@ async function loadFactory(runtimeUrl: string): Promise<RuntimeModuleFactory> {
 }
 
 function locateNodeRuntimeFile(fileName: string) {
+  if (fileName.endsWith('.wasm')) {
+    const sharedFileName = fileName.replace(/_node(?=_asyncify\.wasm$|\.wasm$)/, '');
+    return fileURLToPath(new URL(`../wasm/${sharedFileName}`, import.meta.url));
+  }
   return fileURLToPath(new URL(`../node-wasm/${fileName}`, import.meta.url));
 }
 

@@ -109,11 +109,10 @@ const loader = createRuntimeLoader({
   loadFactory,
   async resolveAsset(runtimeName, flavor) {
     const asset = runtimeAssets[runtimeName][flavor];
-    const wasmBinary = new Uint8Array(await (await fetch(asset.wasmUrl)).arrayBuffer());
+    // Let Emscripten compile the response as it streams instead of buffering it.
     return {
       jsUrl: asset.jsUrl,
       locateFile: locateRuntimeFile,
-      wasmBinary,
       mainScriptUrlOrBlob: asset.jsUrl,
     };
   },
