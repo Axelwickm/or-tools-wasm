@@ -13,6 +13,10 @@ import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/wo
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
 import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
+import { runCpSatStatisticsCases } from '../../cases/or-tools-wasm/cp_sat/statistics.ts';
+import { runCpSatModelExportCases } from '../../cases/or-tools-wasm/cp_sat/model_export.ts';
+import { runCpSatMutationCases } from '../../cases/or-tools-wasm/cp_sat/mutation.ts';
+import { runCpSatExpressionHelperCases } from '../../cases/or-tools-wasm/cp_sat/expression_helpers.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
@@ -38,6 +42,10 @@ await runBunFixture(async () => {
   const highLevelCpSatResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
   assertAllCases('bun high-level CP-SAT', highLevelCpSatResults);
 
+  await runCpSatStatisticsCases(CpSatApi as never);
+  await runCpSatModelExportCases(CpSatApi as never);
+  await runCpSatMutationCases(CpSatApi as never);
+  await runCpSatExpressionHelperCases(CpSatApi as never);
   const highLevelContractResults = await runCpSatHighLevelContractCases(CpSatApi as never);
   assertAllCases('bun high-level CP-SAT contract', highLevelContractResults);
 

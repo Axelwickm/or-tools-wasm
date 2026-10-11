@@ -10,12 +10,11 @@ type MathOptApi = {
     BoundedExpression: abstract new (...args: never[]) => MathOptBoundedExpressionLike<unknown>;
     LowerBoundedExpression: abstract new (...args: never[]) => MathOptLowerBoundedExpressionLike<unknown>;
     UpperBoundedExpression: abstract new (...args: never[]) => MathOptUpperBoundedExpressionLike<unknown>;
-    VarEqVar: abstract new (...args: never[]) => MathOptVarEqVarLike;
     Model(name?: string): MathOptModelLike;
     solve(model: MathOptModelLike, options?: { solverType?: number; threads?: number }): Promise<{
       terminationReason: string;
       objectiveValue: number | null;
-      variableValues: Record<string, number>;
+      variableValuesById: Record<number, number>;
     }>;
     linearTerm(variable: MathOptVariableLike, coefficient?: number): MathOptLinearTermLike;
     quadraticTerm(firstVariable: MathOptVariableLike, secondVariable: MathOptVariableLike, coefficient?: number): MathOptQuadraticTermLike;
@@ -28,9 +27,6 @@ type MathOptApi = {
     lowerBoundedExpression<T>(lowerBound: number, expression: T): MathOptLowerBoundedExpressionLike<T>;
     upperBoundedExpression<T>(expression: T, upperBound: number): MathOptUpperBoundedExpressionLike<T>;
     eq(lhs: MathOptExpressionInput, rhs: MathOptExpressionInput): MathOptBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike>;
-    ne(lhs: MathOptExpressionInput, rhs: MathOptExpressionInput): never;
-    variableEq(lhs: MathOptVariableLike, rhs: MathOptVariableLike): boolean | MathOptVarEqVarLike;
-    variableNe(lhs: MathOptVariableLike, rhs: MathOptVariableLike): boolean;
     le(lhs: MathOptExpressionInput, rhs: MathOptExpressionInput): MathOptUpperBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike> | MathOptLowerBoundedExpressionLike<MathOptQuadraticExpressionLike> | MathOptBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike>;
     ge(lhs: MathOptExpressionInput, rhs: MathOptExpressionInput): MathOptLowerBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike> | MathOptUpperBoundedExpressionLike<MathOptQuadraticExpressionLike> | MathOptBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike>;
     completeUpperBound<T>(lowerBounded: MathOptLowerBoundedExpressionLike<T>, upperBound: number): MathOptBoundedExpressionLike<T>;
@@ -55,14 +51,9 @@ type MathOptModelLike = {
 };
 
 type MathOptVariableLike = {
+  equals(other: MathOptVariableLike): boolean;
   readonly id: number;
   readonly name: string;
-};
-
-type MathOptVarEqVarLike = {
-  firstVariable: MathOptVariableLike;
-  secondVariable: MathOptVariableLike;
-  assertNotBoolean(): never;
 };
 
 type MathOptLinearTermLike = {
@@ -113,7 +104,6 @@ type MathOptBoundedExpressionLike<T> = {
   lowerBound: number;
   expression: T;
   upperBound: number;
-  assertNotBoolean(): never;
   toString(): string;
 };
 
@@ -122,7 +112,6 @@ type MathOptLowerBoundedExpressionLike<T> = {
   expression: T;
   upperBound: number;
   toBoundedExpression(upperBound: number): MathOptBoundedExpressionLike<T>;
-  assertNotBoolean(): never;
   toString(): string;
 };
 
@@ -131,7 +120,6 @@ type MathOptUpperBoundedExpressionLike<T> = {
   expression: T;
   upperBound: number;
   toBoundedExpression(lowerBound: number): MathOptBoundedExpressionLike<T>;
-  assertNotBoolean(): never;
   toString(): string;
 };
 
@@ -326,19 +314,19 @@ function linearBaseExpression(api: MathOptApi, x: MathOptVariableLike, y: MathOp
   return api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]);
 }
 
-function newLinearExpression(api: MathOptApi, input?: MathOptExpressionInput | Iterable<MathOptLinearTermLike>): MathOptLinearExpressionLike {
+function newLinearExpression(api: MathOptApi, input?: Iterable<MathOptLinearTermLike>): MathOptLinearExpressionLike {
   const LinearExpression = api.MathOpt.LinearExpression as unknown as new (
-    input?: MathOptExpressionInput | Iterable<MathOptLinearTermLike>,
+    input?: Iterable<MathOptLinearTermLike>,
   ) => MathOptLinearExpressionLike;
   return new LinearExpression(input);
 }
 
 function newQuadraticExpression(
   api: MathOptApi,
-  input?: MathOptExpressionInput | Iterable<MathOptLinearTermLike>,
+  input?: Iterable<MathOptLinearTermLike>,
 ): MathOptQuadraticExpressionLike {
   const QuadraticExpression = api.MathOpt.QuadraticExpression as unknown as new (
-    input?: MathOptExpressionInput | Iterable<MathOptLinearTermLike>,
+    input?: Iterable<MathOptLinearTermLike>,
   ) => MathOptQuadraticExpressionLike;
   return new QuadraticExpression(input);
 }
@@ -661,84 +649,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     },
   },
   {
-    name: 'BoundedLinearExprTest.test_var_eq_var',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_expression_var_eq_var');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const alsoX = x;
-      const boundedExpression = api.MathOpt.variableEq(x, y);
-      assert(boundedExpression instanceof api.MathOpt.VarEqVar, 'test_var_eq_var expected VarEqVar');
-      assert(boundedExpression.firstVariable === x, 'test_var_eq_var expected first variable x');
-      assert(boundedExpression.secondVariable === y, 'test_var_eq_var expected second variable y');
-
-      const secondModel = api.MathOpt.Model('mathopt_expression_var_eq_var_second');
-      const secondX = secondModel.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      assert(api.MathOpt.variableEq(x, alsoX) === true, 'test_var_eq_var expected x equal to also_x');
-      assert(api.MathOpt.variableEq(x, y) !== true, 'test_var_eq_var expected x not bool-equal to y');
-      assert(x.id === secondX.id, `test_var_eq_var expected matching ids, got ${x.id} and ${secondX.id}`);
-      assert(api.MathOpt.variableEq(x, secondX) === false, 'test_var_eq_var expected x not equal to second model x');
-      return 'BoundedLinearExprTest.test_var_eq_var PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprTest.test_var_eq_var_explicit',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_expression_var_eq_var_explicit');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const alsoX = x;
-      const boundedExpression = api.MathOpt.variableEq(x, y);
-      assert(boundedExpression instanceof api.MathOpt.VarEqVar, 'test_var_eq_var_explicit expected VarEqVar');
-      assert(boundedExpression.firstVariable === x, 'test_var_eq_var_explicit expected first variable x');
-      assert(boundedExpression.secondVariable === y, 'test_var_eq_var_explicit expected second variable y');
-
-      const secondModel = api.MathOpt.Model('mathopt_expression_var_eq_var_explicit_second');
-      const secondX = secondModel.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      assert(api.MathOpt.variableEq(x, alsoX) === true, 'test_var_eq_var_explicit expected x equal to also_x');
-      assert(api.MathOpt.variableEq(x, y) !== true, 'test_var_eq_var_explicit expected x not bool-equal to y');
-      assert(x.id === secondX.id, `test_var_eq_var_explicit expected matching ids, got ${x.id} and ${secondX.id}`);
-      assert(api.MathOpt.variableEq(x, secondX) === false, 'test_var_eq_var_explicit expected x not equal to second model x');
-      return 'BoundedLinearExprTest.test_var_eq_var_explicit PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprTest.test_var_neq_var',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_expression_var_neq_var');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const alsoX = x;
-      const secondModel = api.MathOpt.Model('mathopt_expression_var_neq_var_second');
-      const secondX = secondModel.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      assert(api.MathOpt.variableNe(x, alsoX) === false, 'test_var_neq_var expected x not unequal to also_x');
-      assert(api.MathOpt.variableNe(x, y) === true, 'test_var_neq_var expected x unequal to y');
-      assert(x.id === secondX.id, `test_var_neq_var expected matching ids, got ${x.id} and ${secondX.id}`);
-      assert(api.MathOpt.variableNe(x, secondX) === true, 'test_var_neq_var expected x unequal to second model x');
-      return 'BoundedLinearExprTest.test_var_neq_var PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprTest.test_var_neq_var_explicit',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_expression_var_neq_var_explicit');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const alsoX = x;
-      const secondModel = api.MathOpt.Model('mathopt_expression_var_neq_var_explicit_second');
-      const secondX = secondModel.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      assert(api.MathOpt.variableNe(x, alsoX) === false, 'test_var_neq_var_explicit expected x not unequal to also_x');
-      assert(api.MathOpt.variableNe(x, y) === true, 'test_var_neq_var_explicit expected x unequal to y');
-      assert(x.id === secondX.id, `test_var_neq_var_explicit expected matching ids, got ${x.id} and ${secondX.id}`);
-      assert(api.MathOpt.variableNe(x, secondX) === true, 'test_var_neq_var_explicit expected x unequal to second model x');
-      return 'BoundedLinearExprTest.test_var_neq_var_explicit PASS';
-    },
-  },
-  {
     name: 'BoundedLinearExprTest.test_var_dict',
     source: LINEAR_SOURCE,
     async run(api) {
@@ -748,27 +658,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const varDict = new Map<MathOptVariableLike, number>([[x, 1.0], [y, 2.0]]);
       assert(varDict.get(x) === 1.0, 'test_var_dict expected x lookup to return 1');
       assert(varDict.get(y) === 2.0, 'test_var_dict expected y lookup to return 2');
-      assert(api.MathOpt.variableEq(x, y) !== true, 'test_var_dict expected x and y not to compare equal');
+      assert(!x.equals(y), 'test_var_dict expected x and y not to compare equal');
       return 'BoundedLinearExprTest.test_var_dict PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprErrorTest.test_ne',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_expression_error_ne');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const yMinusX = api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -1)]);
-      const xPlusY = api.MathOpt.fastSum([x, y]);
-      const message = '!= constraints are not supported';
-      assertThrowsWithMessage(() => api.MathOpt.ne(x, yMinusX), TypeError, message, 'test_ne x != y - x');
-      assertThrowsWithMessage(() => api.MathOpt.ne(x, yMinusX), TypeError, message, 'test_ne x.__ne__(y - x)');
-      assertThrowsWithMessage(() => api.MathOpt.ne(yMinusX, x), TypeError, message, 'test_ne y - x != x');
-      assertThrowsWithMessage(() => api.MathOpt.ne(yMinusX, x), TypeError, message, 'test_ne (y - x).__ne__(x)');
-      assertThrowsWithMessage(() => api.MathOpt.ne(yMinusX, xPlusY), TypeError, message, 'test_ne y - x != x + y');
-      assertThrowsWithMessage(() => api.MathOpt.ne(yMinusX, xPlusY), TypeError, message, 'test_ne (y - x).__ne__(x + y)');
-      return 'BoundedLinearExprErrorTest.test_ne PASS';
     },
   },
   {
@@ -782,78 +673,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assertThrowsWithMessage(() => api.MathOpt.eq(x, invalid), TypeError, message, 'test_eq x == "x"');
       assertThrowsWithMessage(() => api.MathOpt.eq(x, invalid), TypeError, message, 'test_eq x.__eq__("x")');
       return 'BoundedLinearExprErrorTest.test_eq PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprErrorTest.test_float_le_expr_le_float',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_float_le_expr_le_float');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const lower = api.MathOpt.le(0.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
-      assert(lower instanceof api.MathOpt.LowerBoundedExpression, 'test_float_le_expr_le_float expected LowerBoundedExpression');
-      assertThrowsWithMessage(
-        () => lower.assertNotBoolean(),
-        TypeError,
-        '__bool__ is unsupported for two-sided or ranged linear inequality.',
-        'test_float_le_expr_le_float',
-      );
-      return 'BoundedLinearExprErrorTest.test_float_le_expr_le_float PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprErrorTest.test_float_ge_expr_ge_float',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_float_ge_expr_ge_float');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const upper = api.MathOpt.ge(2.0, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
-      assert(upper instanceof api.MathOpt.UpperBoundedExpression, 'test_float_ge_expr_ge_float expected UpperBoundedExpression');
-      assertThrowsWithMessage(
-        () => upper.assertNotBoolean(),
-        TypeError,
-        '__bool__ is unsupported for two-sided or ranged linear inequality.',
-        'test_float_ge_expr_ge_float',
-      );
-      return 'BoundedLinearExprErrorTest.test_float_ge_expr_ge_float PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprErrorTest.test_expr_le_expr_le_float',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_expr_le_expr_le_float');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const bounded = api.MathOpt.le(x, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
-      assert(bounded instanceof api.MathOpt.BoundedExpression, 'test_expr_le_expr_le_float expected BoundedExpression');
-      assertThrowsWithMessage(
-        () => bounded.assertNotBoolean(),
-        TypeError,
-        '__bool__ is unsupported for two-sided or ranged linear inequality.',
-        'test_expr_le_expr_le_float',
-      );
-      return 'BoundedLinearExprErrorTest.test_expr_le_expr_le_float PASS';
-    },
-  },
-  {
-    name: 'BoundedLinearExprErrorTest.test_expr_ge_expr_ge_float',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_expr_ge_expr_ge_float');
-      const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
-      const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const bounded = api.MathOpt.ge(x, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, 2), 1.0]));
-      assert(bounded instanceof api.MathOpt.BoundedExpression, 'test_expr_ge_expr_ge_float expected BoundedExpression');
-      assertThrowsWithMessage(
-        () => bounded.assertNotBoolean(),
-        TypeError,
-        '__bool__ is unsupported for two-sided or ranged linear inequality.',
-        'test_expr_ge_expr_ge_float',
-      );
-      return 'BoundedLinearExprErrorTest.test_expr_ge_expr_ge_float PASS';
     },
   },
   {
@@ -1113,21 +932,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         'test_quad_eq_str_raises_error',
       );
       return 'BoundedQuadraticExpressionTest.test_quad_eq_str_raises_error PASS';
-    },
-  },
-  {
-    name: 'BoundedQuadraticExpressionTest.test_quad_ne_raises_error',
-    source: LINEAR_SOURCE,
-    async run(api) {
-      const model = api.MathOpt.Model('mathopt_quad_ne');
-      const x = model.addVariable();
-      assertThrowsWithMessage(
-        () => api.MathOpt.ne(api.MathOpt.quadraticTerm(x, x), 1.0),
-        TypeError,
-        '!= constraints are not supported',
-        'test_quad_ne_raises_error',
-      );
-      return 'BoundedQuadraticExpressionTest.test_quad_ne_raises_error PASS';
     },
   },
   {
@@ -1509,12 +1313,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assert(bounded.upperBound === 4.5, `expected upperBound 4.5, got ${bounded.upperBound}`);
       assert(bounded.expression === 'e123', `expected expression e123, got ${bounded.expression}`);
       assert(String(bounded) === '-3.0 <= e123 <= 4.5', `unexpected bounded string ${String(bounded)}`);
-      try {
-        bounded.assertNotBoolean();
-        throw new Error('expected assertNotBoolean to throw');
-      } catch (error) {
-        assert(error instanceof TypeError && /two-sided or ranged/.test(error.message), `unexpected bool error ${String(error)}`);
-      }
       return 'BoundedExpressionTest.test_bounded_expression_read PASS';
     },
   },
@@ -1528,12 +1326,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assert(bounded.upperBound === Number.POSITIVE_INFINITY, `expected upper bound inf, got ${bounded.upperBound}`);
       assert(bounded.expression === 'e123', `expected expression e123, got ${bounded.expression}`);
       assert(String(bounded) === 'e123 >= -3.0', `unexpected lower bounded string ${String(bounded)}`);
-      try {
-        bounded.assertNotBoolean();
-        throw new Error('expected assertNotBoolean to throw');
-      } catch (error) {
-        assert(error instanceof TypeError && /two-sided or ranged/.test(error.message), `unexpected bool error ${String(error)}`);
-      }
       return 'BoundedExpressionTest.test_lowerBounded_expression_read PASS';
     },
   },
@@ -1547,12 +1339,6 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       assert(bounded.upperBound === 4.5, `expected upper bound 4.5, got ${bounded.upperBound}`);
       assert(bounded.expression === 'e123', `expected expression e123, got ${bounded.expression}`);
       assert(String(bounded) === 'e123 <= 4.5', `unexpected upper bounded string ${String(bounded)}`);
-      try {
-        bounded.assertNotBoolean();
-        throw new Error('expected assertNotBoolean to throw');
-      } catch (error) {
-        assert(error instanceof TypeError && /two-sided or ranged/.test(error.message), `unexpected bool error ${String(error)}`);
-      }
       return 'BoundedExpressionTest.test_upperBounded_expression_read PASS';
     },
   },
@@ -1977,7 +1763,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
           { label: 'LinearTerm', linear: api.MathOpt.linearTerm(x, 2), expectedOffset: 0.0, expectedTerms: [{ variable: x, coefficient: 2 * constant }] },
           {
             label: 'LinearExpression',
-            linear: newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 3])),
+            linear: api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 3])),
             expectedOffset: 3 * constant,
             expectedTerms: [{ variable: x, coefficient: constant }, { variable: y, coefficient: -2 * constant }],
           },
@@ -2015,7 +1801,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
           { label: 'LinearTerm', linear: api.MathOpt.linearTerm(x, 2), expectedOffset: 0.0, expectedTerms: [{ variable: x, coefficient: 2 / constant }] },
           {
             label: 'LinearExpression',
-            linear: newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 3])),
+            linear: api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 3])),
             expectedOffset: 3 / constant,
             expectedTerms: [{ variable: x, coefficient: 1 / constant }, { variable: y, coefficient: -2 / constant }],
           },
@@ -2053,7 +1839,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
           { label: 'LinearTerm', linear: api.MathOpt.linearTerm(x, 2), expectedOffset: constant, expectedTerms: [{ variable: x, coefficient: 2.0 }] },
           {
             label: 'LinearExpression',
-            linear: newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 1])),
+            linear: api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 1])),
             expectedOffset: constant + 1,
             expectedTerms: [{ variable: x, coefficient: 1.0 }, { variable: y, coefficient: -2.0 }],
           },
@@ -2089,7 +1875,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         }> = [
           { label: 'Variable', linear: x, baseOffset: 0.0, baseTerms: [{ variable: x, coefficient: 1.0 }] },
           { label: 'LinearTerm', linear: api.MathOpt.linearTerm(x, 2), baseOffset: 0.0, baseTerms: [{ variable: x, coefficient: 2.0 }] },
-          { label: 'LinearExpression', linear: newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 3])), baseOffset: 3.0, baseTerms: [{ variable: x, coefficient: 1.0 }, { variable: y, coefficient: -2.0 }] },
+          { label: 'LinearExpression', linear: api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 3])), baseOffset: 3.0, baseTerms: [{ variable: x, coefficient: 1.0 }, { variable: y, coefficient: -2.0 }] },
           { label: 'LinearSum', linear: api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2), 3]), baseOffset: 3.0, baseTerms: [{ variable: x, coefficient: 1.0 }, { variable: y, coefficient: -2.0 }] },
           { label: 'LinearProduct', linear: api.MathOpt.asFlatLinearExpression(x).multiply(2), baseOffset: 0.0, baseTerms: [{ variable: x, coefficient: 2.0 }] },
         ];
@@ -2131,7 +1917,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
           },
           {
             label: 'QuadraticExpression',
-            quadratic: newQuadraticExpression(api, api.MathOpt.fastSum([
+            quadratic: api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
               api.MathOpt.quadraticTerm(x, x),
               api.MathOpt.quadraticTerm(x, y, -2.0),
               api.MathOpt.linearTerm(x, -1.0),
@@ -2201,7 +1987,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
           },
           {
             label: 'QuadraticExpression',
-            quadratic: newQuadraticExpression(api, api.MathOpt.fastSum([
+            quadratic: api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
               api.MathOpt.quadraticTerm(x, x),
               api.MathOpt.quadraticTerm(x, y, -2.0),
               api.MathOpt.linearTerm(x, -1.0),
@@ -2271,7 +2057,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
           },
           {
             label: 'QuadraticExpression',
-            quadratic: newQuadraticExpression(api, api.MathOpt.fastSum([
+            quadratic: api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
               api.MathOpt.quadraticTerm(x, x),
               api.MathOpt.quadraticTerm(x, y, -2.0),
               api.MathOpt.linearTerm(x, -1.0),
@@ -2341,7 +2127,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
           },
           {
             label: 'QuadraticExpression',
-            quadratic: newQuadraticExpression(api, api.MathOpt.fastSum([
+            quadratic: api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
               api.MathOpt.quadraticTerm(x, x),
               api.MathOpt.quadraticTerm(x, y, -2.0),
               api.MathOpt.linearTerm(x, -1.0),
@@ -2415,7 +2201,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
         if (kind === 'LinearTerm') return { expression: api.MathOpt.linearTerm(primary, 2.0), offset: 0.0, primaryCoefficient: 2.0, secondaryCoefficient: 0.0 };
         if (kind === 'LinearExpression') {
           return {
-            expression: newLinearExpression(api, api.MathOpt.fastSum([primary, api.MathOpt.linearTerm(secondary, -2.0), 1.0])),
+            expression: api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([primary, api.MathOpt.linearTerm(secondary, -2.0), 1.0])),
             offset: 1.0,
             primaryCoefficient: 1.0,
             secondaryCoefficient: -2.0,
@@ -2505,7 +2291,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
                 xCoefficient += 1.0;
                 yCoefficient += -2.0;
                 expectedOffset += 1.0;
-                return newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 1.0]));
+                return api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 1.0]));
               }
               if (lhsType === 'LinearSum') {
                 xCoefficient += 1.0;
@@ -2527,7 +2313,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
                 expectedOffset += 1.0;
                 xxCoefficient += 3.0;
                 xyCoefficient += -4.0;
-                return newQuadraticExpression(api, api.MathOpt.fastSum([
+                return api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
                   x,
                   api.MathOpt.linearTerm(y, -2.0),
                   1.0,
@@ -2575,7 +2361,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
                 xCoefficient += -2.0 * sign;
                 yCoefficient += 1.0 * sign;
                 expectedOffset += 1.0 * sign;
-                return newLinearExpression(api, api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2.0), 1.0]));
+                return api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2.0), 1.0]));
               }
               if (rhsType === 'LinearSum') {
                 xCoefficient += -2.0 * sign;
@@ -2597,7 +2383,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
                 expectedOffset += 1.0 * sign;
                 xyCoefficient += 3.0 * sign;
                 yyCoefficient += -4.0 * sign;
-                return newQuadraticExpression(api, api.MathOpt.fastSum([
+                return api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
                   x,
                   api.MathOpt.linearTerm(y, -2.0),
                   1.0,
@@ -2680,8 +2466,8 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_mul_expr_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const expr1 = newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 3.0]));
-      const expr2 = newLinearExpression(api, api.MathOpt.fastSum([api.MathOpt.linearTerm(x, -1.0), y, 1.0]));
+      const expr1 = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 3.0]));
+      const expr2 = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([api.MathOpt.linearTerm(x, -1.0), y, 1.0]));
       for (const [lhs, rhs, label] of [[expr1, expr2, 'expr1_first'], [expr2, expr1, 'expr2_first']] as const) {
         assertLinearProduct(api, lhs, rhs, 3.0, [
           { variable: x, coefficient: -2.0 },
@@ -2755,7 +2541,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_mul_var_expr');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const expr = newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 3.0]));
+      const expr = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 3.0]));
       assertLinearProduct(api, x, expr, 0.0, [{ variable: x, coefficient: 3.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 1.0 },
         { firstVariable: x, secondVariable: y, coefficient: -2.0 },
@@ -2807,7 +2593,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const term = api.MathOpt.linearTerm(x, 2.0);
-      const expr = newLinearExpression(api, api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 3.0]));
+      const expr = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 3.0]));
       assertLinearProduct(api, term, expr, 0.0, [{ variable: x, coefficient: 6.0 }], [
         { firstVariable: x, secondVariable: x, coefficient: 2.0 },
         { firstVariable: x, secondVariable: y, coefficient: -4.0 },
@@ -2860,7 +2646,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_mul_expr_sum');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const expr = newLinearExpression(api, api.MathOpt.fastSum([api.MathOpt.linearTerm(x, -1.0), y, 1.0]));
+      const expr = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([api.MathOpt.linearTerm(x, -1.0), y, 1.0]));
       const sum = api.MathOpt.fastSum([x, api.MathOpt.linearTerm(y, -2.0), 3.0]);
       for (const [lhs, rhs, label] of [[expr, sum, 'expr_first'], [sum, expr, 'sum_first']] as const) {
         assertLinearProduct(api, lhs, rhs, 3.0, [
@@ -2882,7 +2668,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_mul_expr_prod');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const expr = newLinearExpression(api, api.MathOpt.fastSum([api.MathOpt.linearTerm(x, -1.0), y, 1.0]));
+      const expr = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([api.MathOpt.linearTerm(x, -1.0), y, 1.0]));
       const prod = api.MathOpt.asFlatLinearExpression(y).multiply(2.0);
       assertLinearProduct(api, expr, prod, 0.0, [{ variable: y, coefficient: 2.0 }], [
         { firstVariable: x, secondVariable: y, coefficient: -2.0 },
@@ -2942,7 +2728,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_negate_linear_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const expression = newLinearExpression(api, api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2.0), 1.0]));
+      const expression = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2.0), 1.0]));
       assertFlatLinearExpression(expression.multiply(-1.0), -1.0, [{ variable: x, coefficient: 2.0 }, { variable: y, coefficient: -1.0 }], 'negate_linear_expression');
       return 'NegateTest.test_negate_linear_expression PASS';
     },
@@ -2989,7 +2775,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_negate_quadratic_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const expression = newQuadraticExpression(api, api.MathOpt.fastSum([
+      const expression = api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
         y,
         api.MathOpt.linearTerm(x, -2.0),
         1.0,
@@ -3387,11 +3173,11 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_linear_terms_read_only');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const expression = newLinearExpression(api, api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2), 1]));
-      assertThrowsWithMessage(
+      const expression = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2), 1]));
+      assertThrowsContaining(
         () => (expression.terms as Map<MathOptVariableLike, number>).set(x, (expression.terms.get(x) ?? 0) + 1),
         TypeError,
-        'ReadonlyMap does not support item assignment',
+        'is not a function',
         'LinearExpressionTest.test_terms_read_only',
       );
       return 'LinearExpressionTest.test_terms_read_only PASS';
@@ -3404,7 +3190,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_no_copy_linear_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const expression = newLinearExpression(api, api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2), 1]));
+      const expression = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([y, api.MathOpt.linearTerm(x, -2), 1]));
       assert(api.MathOpt.asFlatLinearExpression(expression) === expression, 'LinearExpressionTest.test_no_copy_of_linear_expression expected same object');
       return 'LinearExpressionTest.test_no_copy_of_linear_expression PASS';
     },
@@ -3413,7 +3199,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'LinearExpressionTest.test_number_as_flat_linear_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      const expression = newLinearExpression(api, 2.0);
+      const expression = api.MathOpt.asFlatLinearExpression(2.0);
       assert(expression.terms.size === 0, `LinearExpressionTest.test_number_as_flat_linear_expression expected no terms, got ${expression.terms.size}`);
       assert(expression.offset === 2.0, `LinearExpressionTest.test_number_as_flat_linear_expression expected offset 2, got ${expression.offset}`);
       return 'LinearExpressionTest.test_number_as_flat_linear_expression PASS';
@@ -3426,7 +3212,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_linear_expression_evaluate');
       const x = model.addVariable();
       const y = model.addVariable();
-      const expression = newLinearExpression(api, api.MathOpt.fastSum([api.MathOpt.linearTerm(x, 3), y, 2.0]));
+      const expression = api.MathOpt.asFlatLinearExpression(api.MathOpt.fastSum([api.MathOpt.linearTerm(x, 3), y, 2.0]));
       const value = expression.evaluate(new Map([[x, 4.0], [y, 3.0]]));
       assert(value === 17.0, `LinearExpressionTest.test_evaluate expected 17, got ${value}`);
       return 'LinearExpressionTest.test_evaluate PASS';
@@ -3439,18 +3225,18 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_quadratic_terms_read_only');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const expression = newQuadraticExpression(api, api.MathOpt.fastSum([api.MathOpt.quadraticTerm(y, y), api.MathOpt.linearTerm(x, -2), 1]));
-      assertThrowsWithMessage(
+      const expression = api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([api.MathOpt.quadraticTerm(y, y), api.MathOpt.linearTerm(x, -2), 1]));
+      assertThrowsContaining(
         () => (expression.linearTerms as Map<MathOptVariableLike, number>).set(x, (expression.linearTerms.get(x) ?? 0) + 1),
         TypeError,
-        'ReadonlyMap does not support item assignment',
+        'is not a function',
         'QuadraticExpressionTest.test_terms_read_only linear',
       );
       const quadraticKey = [...expression.quadraticTerms.keys()][0];
-      assertThrowsWithMessage(
+      assertThrowsContaining(
         () => (expression.quadraticTerms as Map<unknown, number>).set(quadraticKey, (expression.quadraticTerms.get(quadraticKey) ?? 0) + 1),
         TypeError,
-        'ReadonlyMap does not support item assignment',
+        'is not a function',
         'QuadraticExpressionTest.test_terms_read_only quadratic',
       );
       return 'QuadraticExpressionTest.test_terms_read_only PASS';
@@ -3463,7 +3249,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_no_copy_quadratic_expression');
       const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
       const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-      const expression = newQuadraticExpression(api, api.MathOpt.fastSum([api.MathOpt.quadraticTerm(y, y), api.MathOpt.linearTerm(x, -2), 1]));
+      const expression = api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([api.MathOpt.quadraticTerm(y, y), api.MathOpt.linearTerm(x, -2), 1]));
       assert(api.MathOpt.asFlatQuadraticExpression(expression) === expression, 'QuadraticExpressionTest.test_no_copy_of_quadratic_expression expected same object');
       return 'QuadraticExpressionTest.test_no_copy_of_quadratic_expression PASS';
     },
@@ -3472,7 +3258,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
     name: 'QuadraticExpressionTest.test_number_as_flat_quadratic_expression',
     source: LINEAR_SOURCE,
     async run(api) {
-      const expression = newQuadraticExpression(api, 2.0);
+      const expression = api.MathOpt.asFlatQuadraticExpression(2.0);
       assert(expression.linearTerms.size === 0, `QuadraticExpressionTest.test_number_as_flat_quadratic_expression expected no linear terms, got ${expression.linearTerms.size}`);
       assert(expression.quadraticTerms.size === 0, `QuadraticExpressionTest.test_number_as_flat_quadratic_expression expected no quadratic terms, got ${expression.quadraticTerms.size}`);
       assert(expression.offset === 2.0, `QuadraticExpressionTest.test_number_as_flat_quadratic_expression expected offset 2, got ${expression.offset}`);
@@ -3486,7 +3272,7 @@ export const mathOptExpressionContractCases: MathOptExpressionContractCase[] = [
       const model = api.MathOpt.Model('mathopt_quadratic_expression_evaluate');
       const x = model.addVariable();
       const y = model.addVariable();
-      const expression = newQuadraticExpression(api, api.MathOpt.fastSum([
+      const expression = api.MathOpt.asFlatQuadraticExpression(api.MathOpt.fastSum([
         api.MathOpt.quadraticTerm(x, x),
         api.MathOpt.quadraticTerm(x, y, 2),
         api.MathOpt.linearTerm(y, 4),

@@ -15,6 +15,7 @@ import type {
   SolverJobEvent,
 } from './solver_executor.js';
 import { SolverFailureKind, SolverJobFailureSchema } from './generated/bridge/job_pb.js';
+import { SolverCallbackTransportError } from './solver_executor.js';
 
 type SolverWorkerScope = {
   onmessage: ((event: MessageEvent<Uint8Array>) => void) | null;
@@ -27,7 +28,12 @@ export type SolverWorkerCancellationMessage = {
   byteOffset: number;
 };
 
-export type SolverWorkerMessage = Uint8Array | SolverWorkerCancellationMessage;
+export type SolverWorkerCallbackMessage = {
+  type: 'callback'; requestId: number; payload: Uint8Array; reply: SharedArrayBuffer;
+};
+export const WORKER_CALLBACK_REPLY_CHUNK_SIZE = 65536;
+export const CALLBACK_REPLY_TIMEOUT_MS = 30000;
+export type SolverWorkerMessage = Uint8Array | SolverWorkerCancellationMessage | SolverWorkerCallbackMessage;
 
 export type SolverWorkerOptions = {
   cancellation?: () => Promise<Omit<SolverWorkerCancellationMessage, 'type'>>;
@@ -68,6 +74,30 @@ export function installSolverWorker<Request, Response, Event>(
       }
 
       const job = executor.execute(codec.decodeRequest(outer.operation.value), {
+        onCallback: payload => {
+          const reply = new SharedArrayBuffer(12 + WORKER_CALLBACK_REPLY_CHUNK_SIZE);
+          const control = new Int32Array(reply, 0, 3);
+          scope.postMessage({ type: 'callback', requestId, payload, reply }, []);
+          let bytes: Uint8Array | undefined;
+          let offset = 0;
+          do {
+            if (Atomics.wait(control, 0, 0, CALLBACK_REPLY_TIMEOUT_MS) === 'timed-out') {
+              // Close the transfer even if a chunk was published at the deadline.
+              Atomics.store(control, 0, -2);
+              Atomics.notify(control, 0);
+              throw new SolverCallbackTransportError('Solver callback reply timed out.');
+            }
+            if (Atomics.load(control, 0) === -2) throw new SolverCallbackTransportError('Solver callback transport failed or was terminated.');
+            if (Atomics.load(control, 0) !== 1) throw new Error('Solver callback handler failed.');
+            bytes ??= new Uint8Array(Atomics.load(control, 2));
+            const count = Atomics.load(control, 1);
+            bytes.set(new Uint8Array(reply, 12, count), offset);
+            offset += count;
+            Atomics.store(control, 0, offset === bytes.length ? 2 : 0);
+            Atomics.notify(control, 0);
+          } while (offset < bytes.length);
+          return bytes;
+        },
         onEvent: async (event) => {
           if (isJobEvent(event)) {
             if (event.type === 'status') {

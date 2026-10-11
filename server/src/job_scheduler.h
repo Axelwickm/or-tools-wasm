@@ -97,6 +97,8 @@ class JobContext {
   int requested_threads() const { return requested_threads_; }
   int allocated_threads() const { return allocated_threads_; }
   bool cancellation_requested() const;
+  bool interruption_requested() const;
+  CancellationRegistration OnInterruption(std::function<void()> handler) const;
   CancellationRegistration OnCancellation(std::function<void()> handler) const;
 
  private:
@@ -104,13 +106,15 @@ class JobContext {
 
   JobContext(uint64_t job_id, std::string solver, int requested_threads,
              int allocated_threads,
-             std::shared_ptr<JobCancellationState> cancellation);
+             std::shared_ptr<JobCancellationState> cancellation,
+             std::shared_ptr<JobCancellationState> interruption);
 
   uint64_t job_id_;
   std::string solver_;
   int requested_threads_;
   int allocated_threads_;
   std::shared_ptr<JobCancellationState> cancellation_;
+  std::shared_ptr<JobCancellationState> interruption_;
 };
 
 class JobScheduler;
@@ -123,17 +127,20 @@ class JobHandle {
   std::shared_future<JobResult> result() const;
   JobStatus status() const;
   bool Cancel();
+  bool Interrupt();
 
  private:
   friend class JobScheduler;
 
   JobHandle(uint64_t job_id, std::shared_future<JobResult> result,
-            std::function<JobStatus()> status, std::function<bool()> cancel);
+            std::function<JobStatus()> status, std::function<bool()> cancel,
+            std::function<bool()> interrupt);
 
   uint64_t job_id_ = 0;
   std::shared_future<JobResult> result_;
   std::function<JobStatus()> status_;
   std::function<bool()> cancel_;
+  std::function<bool()> interrupt_;
 };
 
 class JobScheduler {

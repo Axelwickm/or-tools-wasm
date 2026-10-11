@@ -3,6 +3,9 @@ import {
   SolverBridgeRequestSchema,
   SolverBridgeResponseSchema,
   SolverCancelRequestSchema,
+  SolverInterruptRequestSchema,
+  SolverCallbackReplySchema,
+  SolverCallbackRequestSchema,
   SolverResourceRequestSchema,
   SolverJobCancelledSchema,
   SolverWorkerReadySchema,
@@ -57,8 +60,31 @@ export function encodeSolverBridgeCancelRequest(
   }));
 }
 
+export function encodeSolverBridgeInterruptRequest(requestId: number, solver: string,
+  targetRequestId: number): Uint8Array {
+  return toBinary(SolverBridgeRequestSchema, create(SolverBridgeRequestSchema, {
+    requestId, solver, operation: { case: 'interrupt',
+      value: create(SolverInterruptRequestSchema, { targetRequestId }) },
+  }));
+}
+
 export function decodeSolverBridgeRequest(bytes: Uint8Array): SolverBridgeRequest {
   return fromBinary(SolverBridgeRequestSchema, bytes);
+}
+
+export function encodeSolverBridgeCallbackReply(requestId: number, solver: string, callbackId: bigint,
+  payload: Uint8Array, error = ''): Uint8Array {
+  return toBinary(SolverBridgeRequestSchema, create(SolverBridgeRequestSchema, {
+    requestId, solver, operation: { case: 'callbackReply', value: create(SolverCallbackReplySchema, { callbackId, payload, error }) },
+  }));
+}
+
+export function encodeSolverBridgeCallbackRequest(requestId: number, solver: string, callbackId: bigint,
+  payload: Uint8Array, jobId = 0n, sequenceId = 0n): Uint8Array {
+  return toBinary(SolverBridgeResponseSchema, create(SolverBridgeResponseSchema, {
+    requestId, solver, jobId, sequenceId,
+    payload: { case: 'callbackRequest', value: create(SolverCallbackRequestSchema, { callbackId, payload }) },
+  }));
 }
 
 export function encodeSolverBridgeEvent(

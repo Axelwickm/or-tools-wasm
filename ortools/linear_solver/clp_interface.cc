@@ -18,10 +18,12 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
+#include "absl/cleanup/cleanup.h"
 #include "absl/strings/str_format.h"
 #include "ortools/base/logging.h"
 #include "ortools/base/timer.h"
 #include "ortools/linear_solver/linear_solver.h"
+#include "ortools/linear_solver/coin_message_callback.h"
 
 #undef PACKAGE
 #undef VERSION
@@ -44,6 +46,7 @@ class CLPInterface : public MPSolverInterface {
   // ----- Solve -----
   // Solve the problem using the parameter values specified.
   MPSolver::ResultStatus Solve(const MPSolverParameters& param) override;
+  bool SupportsMessageCallbacks() const override { return true; }
 
   // ----- Model modifications and extraction -----
   // Resets extracted model
@@ -403,8 +406,13 @@ MPSolver::ResultStatus CLPInterface::Solve(const MPSolverParameters& param) {
     }
 
     // Set log level.
-    CoinMessageHandler message_handler;
-    clp_->passInMessageHandler(&message_handler);
+    CoinMessageCallback message_handler(message_callback_);
+    bool previous_default;
+    CoinMessageHandler* const previous_handler =
+        clp_->pushMessageHandler(&message_handler, previous_default);
+    const absl::Cleanup restore_messages = [&] {
+      clp_->popMessageHandler(previous_handler, previous_default);
+    };
     if (quiet_) {
       message_handler.setLogLevel(1, 0);
       clp_->setLogLevel(0);

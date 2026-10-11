@@ -30,6 +30,10 @@ test('MPSolver schema failures are retryable and decoded responses round-trip', 
             contents: `export class DirectMpSolverExecutor {
               execute(operation) {
                 if (operation.type === 'solve') throw new Error('solve parameters: ' + JSON.stringify(operation.parameters));
+                if (operation.type === 'importModel') return { result: (async () => {
+                  await Promise.resolve();
+                  return { type: 'importModel', status: 0x61, error: '', model: operation.model };
+                })() };
                 if (operation.type !== 'schema') throw new Error('Unexpected solver execution');
                 return { result: Promise.resolve(${JSON.stringify({ type: 'schema', linearSolverProtoSchema, optionalBooleanProtoSchema })}) };
               }
@@ -83,6 +87,17 @@ test('MPSolver schema failures are retryable and decoded responses round-trip', 
     await MPSolver.createModelRequest({}, options);
     await MPSolver.createSolutionResponse({}, options);
     await solver.exportModelProto(options);
+    const importSource = new MPSolver('source', MPSolver.GLOP_LINEAR_PROGRAMMING);
+    importSource.addNumVariable(0, 10, 'imported');
+    const importBytes = await importSource.exportModelProto(options);
+    for (const input of [new Uint8Array(importBytes), Buffer.from(importBytes)]) {
+      const destination = new MPSolver('destination', MPSolver.GLOP_LINEAR_PROGRAMMING);
+      const pending = destination.loadModelFromProtoKeepNames(input, options);
+      input.fill(255);
+      assert.equal(await pending, '');
+      assert.equal(destination.numVariables(), 1);
+      assert.equal(destination.lookupVariable('imported')?.upperBound(), 10);
+    }
     const x = solver.addNumVariable(0, 1, 'x');
     const parameters = new MPSolverParameters();
     parameters.setDoubleParam(DoubleParam.PRIMAL_TOLERANCE, 0.001);
@@ -102,7 +117,7 @@ test('MPSolver schema failures are retryable and decoded responses round-trip', 
     await assert.rejects(solver.solve({ ...options, parameters }), {
       message: 'solve parameters: ' + JSON.stringify({ doubleParams: {}, integerParams: {} }),
     });
-    await assert.rejects(solver.solve(options), { message: 'solve parameters: undefined' });
+    await assert.rejects(solver.solve(options), { message: 'solve parameters: ' + JSON.stringify({ doubleParams: {}, integerParams: {} }) });
     const other = new MPSolver('other', MPSolver.GLOP_LINEAR_PROGRAMMING);
     const foreign = other.addNumVariable(0, 1, 'foreign');
     const constraint = solver.addConstraint(0, 1, 'constraint');
@@ -117,26 +132,7 @@ test('MPSolver schema failures are retryable and decoded responses round-trip', 
     assert.equal(constraint.getCoefficient(x), 0);
     solver.objective().setCoefficient(x, 2);
     solver.objective().setOffset(1);
-    const solution = { status: 0, variableValue: [0.5], objectiveValue: 2 };
-    assert.equal(await solver.loadSolutionFromProto(solution, 1e-7), true);
-    assert.equal(solver.verifySolution(1e-7, false), true);
-    for (const variableValue of [[], [0.5, 0.5], [2], [NaN]]) {
-      assert.equal(await solver.loadSolutionFromProto({ ...solution, variableValue }, 1e-7), false);
-      assert.equal(x.solutionValue(), 0.5, 'invalid imports preserve the previous solution');
-    }
-    assert.equal(await solver.loadSolutionFromProto({ ...solution, status: 2 }, 1e-7), false);
-    assert.equal(await solver.loadSolutionFromProto({ ...solution, variableValue: [1 + 1e-8], objectiveValue: 3 + 2e-8 }, 1e-7), true);
-    assert.equal(solver.verifySolution(1e-7, false), true);
-    assert.equal(await solver.loadSolutionFromProto({ ...solution, variableValue: [2] }, Infinity), true);
-    assert.equal(solver.verifySolution(1e-7, false), false);
-    for (const objectiveValue of [999, NaN]) {
-      assert.equal(await solver.loadSolutionFromProto({ ...solution, objectiveValue }, 1e-7), true);
-      assert.equal(solver.verifySolution(1e-7, false), false);
-    }
-    assert.equal(await solver.loadSolutionFromProto({ ...solution, objectiveValue: 2 + 1e-8 }, 1e-7), true);
-    assert.equal(solver.verifySolution(1e-7, false), true);
-    const invalidBytes = await MPSolver.createSolutionResponse({ ...solution, variableValue: [] }, options);
-    assert.equal(await solver.loadSolutionFromProto(invalidBytes, 1e-7, options), false);
+    // Native solution loading/validation is exercised by shared model-query cases.
     const bytes = await MPSolver.createSolutionResponse({
       status: 0,
       statusStr: 'optimal',

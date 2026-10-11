@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file job.proto.
  */
 export const file_job: GenFile = /*@__PURE__*/
-  fileDesc("Cglqb2IucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi4gEKE1NvbHZlckJyaWRnZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSQAoJcmVzb3VyY2VzGAMgASgLMi0ub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJSZXNvdXJjZVJlcXVlc3QSGQoPZXhlY3V0ZV9wYXlsb2FkGAogASgMSAASPQoGY2FuY2VsGAsgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJDYW5jZWxSZXF1ZXN0SABCCwoJb3BlcmF0aW9uIigKFVNvbHZlclJlc291cmNlUmVxdWVzdBIPCgd0aHJlYWRzGAEgASgNIjAKE1NvbHZlckNhbmNlbFJlcXVlc3QSGQoRdGFyZ2V0X3JlcXVlc3RfaWQYASABKA0ikgMKFFNvbHZlckJyaWRnZVJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKA0SDgoGc29sdmVyGAIgASgJEg4KBmpvYl9pZBgDIAEoBBITCgtzZXF1ZW5jZV9pZBgEIAEoBBI5CgZzdGF0dXMYCiABKAsyJy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckpvYlN0YXR1c0gAEjsKB2ZhaWx1cmUYCyABKAsyKC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckpvYkZhaWx1cmVIABIXCg1ldmVudF9wYXlsb2FkGAwgASgMSAASGAoOcmVzdWx0X3BheWxvYWQYDSABKAxIABI/CgljYW5jZWxsZWQYDiABKAsyKi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckpvYkNhbmNlbGxlZEgAEjoKBXJlYWR5GA8gASgLMikub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJXb3JrZXJSZWFkeUgAQgkKB3BheWxvYWQiEwoRU29sdmVyV29ya2VyUmVhZHkiLwoSU29sdmVySm9iQ2FuY2VsbGVkEhkKEXRhcmdldF9yZXF1ZXN0X2lkGAEgASgNIlMKEFNvbHZlckV2ZW50QmF0Y2gSPwoJcmVzcG9uc2VzGAEgAygLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJCcmlkZ2VSZXNwb25zZSLNAQoPU29sdmVySm9iU3RhdHVzEhIKCnJlcXVlc3RfaWQYASABKA0SDgoGc29sdmVyGAIgASgJEjUKBXN0YXRlGAMgASgOMiYub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJKb2JTdGF0ZRIVCg1jcmVhdGVkX2F0X21zGAQgASgEEhUKDXN0YXJ0ZWRfYXRfbXMYBSABKAQSGQoRYWxsb2NhdGVkX3RocmVhZHMYBiABKA0SFgoOcXVldWVfcG9zaXRpb24YByABKA0iogEKEFNvbHZlckpvYkZhaWx1cmUSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSNwoEa2luZBgDIAEoDjIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyRmFpbHVyZUtpbmQSDwoHbWVzc2FnZRgEIAEoCRINCgV0cmFjZRgFIAEoCRIRCglyZXRyeWFibGUYBiABKAgqigIKDlNvbHZlckpvYlN0YXRlEiAKHFNPTFZFUl9KT0JfU1RBVEVfVU5TUEVDSUZJRUQQABIbChdTT0xWRVJfSk9CX1NUQVRFX1FVRVVFRBABEh0KGVNPTFZFUl9KT0JfU1RBVEVfU1RBUlRJTkcQAhIcChhTT0xWRVJfSk9CX1NUQVRFX1JVTk5JTkcQAxIfChtTT0xWRVJfSk9CX1NUQVRFX0NBTkNFTExJTkcQBBIeChpTT0xWRVJfSk9CX1NUQVRFX0NBTkNFTExFRBAFEh4KGlNPTFZFUl9KT0JfU1RBVEVfU1VDQ0VFREVEEAYSGwoXU09MVkVSX0pPQl9TVEFURV9GQUlMRUQQByrnAwoRU29sdmVyRmFpbHVyZUtpbmQSIwofU09MVkVSX0ZBSUxVUkVfS0lORF9VTlNQRUNJRklFRBAAEiYKIlNPTFZFUl9GQUlMVVJFX0tJTkRfRVhFQ1VUT1JfRVJST1IQARIqCiZTT0xWRVJfRkFJTFVSRV9LSU5EX1JVTlRJTUVfTE9BRF9FUlJPUhACEiQKIFNPTFZFUl9GQUlMVVJFX0tJTkRfV09SS0VSX0NSQVNIEAMSKwonU09MVkVSX0ZBSUxVUkVfS0lORF9TRVJWRVJfRElTQ09OTkVDVEVEEAQSHwobU09MVkVSX0ZBSUxVUkVfS0lORF9USU1FT1VUEAUSIQodU09MVkVSX0ZBSUxVUkVfS0lORF9DQU5DRUxMRUQQBhIgChxTT0xWRVJfRkFJTFVSRV9LSU5EX0lOVEVSTkFMEAcSJwojU09MVkVSX0ZBSUxVUkVfS0lORF9JTlZBTElEX1JFUVVFU1QQCBInCiNTT0xWRVJfRkFJTFVSRV9LSU5EX1VOQVVUSEVOVElDQVRFRBAJEiIKHlNPTFZFUl9GQUlMVVJFX0tJTkRfUVVFVUVfRlVMTBAKEioKJlNPTFZFUl9GQUlMVVJFX0tJTkRfVU5TVVBQT1JURURfU09MVkVSEAtiBnByb3RvMw");
+  fileDesc("Cglqb2IucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi7gIKE1NvbHZlckJyaWRnZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSQAoJcmVzb3VyY2VzGAMgASgLMi0ub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJSZXNvdXJjZVJlcXVlc3QSGQoPZXhlY3V0ZV9wYXlsb2FkGAogASgMSAASPQoGY2FuY2VsGAsgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJDYW5jZWxSZXF1ZXN0SAASQwoJaW50ZXJydXB0GAwgASgLMi4ub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJJbnRlcnJ1cHRSZXF1ZXN0SAASRQoOY2FsbGJhY2tfcmVwbHkYDSABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckNhbGxiYWNrUmVwbHlIAEILCglvcGVyYXRpb24iKAoVU29sdmVyUmVzb3VyY2VSZXF1ZXN0Eg8KB3RocmVhZHMYASABKA0iMAoTU29sdmVyQ2FuY2VsUmVxdWVzdBIZChF0YXJnZXRfcmVxdWVzdF9pZBgBIAEoDSIzChZTb2x2ZXJJbnRlcnJ1cHRSZXF1ZXN0EhkKEXRhcmdldF9yZXF1ZXN0X2lkGAEgASgNIjEKFFNvbHZlckpvYkludGVycnVwdGVkEhkKEXRhcmdldF9yZXF1ZXN0X2lkGAEgASgNIj0KFVNvbHZlckNhbGxiYWNrUmVxdWVzdBITCgtjYWxsYmFja19pZBgBIAEoBBIPCgdwYXlsb2FkGAIgASgMIkoKE1NvbHZlckNhbGxiYWNrUmVwbHkSEwoLY2FsbGJhY2tfaWQYASABKAQSDwoHcGF5bG9hZBgCIAEoDBINCgVlcnJvchgDIAEoCSKiBAoUU29sdmVyQnJpZGdlUmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSDgoGam9iX2lkGAMgASgEEhMKC3NlcXVlbmNlX2lkGAQgASgEEjkKBnN0YXR1cxgKIAEoCzInLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVySm9iU3RhdHVzSAASOwoHZmFpbHVyZRgLIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVySm9iRmFpbHVyZUgAEhcKDWV2ZW50X3BheWxvYWQYDCABKAxIABIYCg5yZXN1bHRfcGF5bG9hZBgNIAEoDEgAEj8KCWNhbmNlbGxlZBgOIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVySm9iQ2FuY2VsbGVkSAASOgoFcmVhZHkYDyABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlcldvcmtlclJlYWR5SAASQwoLaW50ZXJydXB0ZWQYECABKAsyLC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckpvYkludGVycnVwdGVkSAASSQoQY2FsbGJhY2tfcmVxdWVzdBgRIAEoCzItLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU29sdmVyQ2FsbGJhY2tSZXF1ZXN0SABCCQoHcGF5bG9hZCITChFTb2x2ZXJXb3JrZXJSZWFkeSIvChJTb2x2ZXJKb2JDYW5jZWxsZWQSGQoRdGFyZ2V0X3JlcXVlc3RfaWQYASABKA0iUwoQU29sdmVyRXZlbnRCYXRjaBI/CglyZXNwb25zZXMYASADKAsyLC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckJyaWRnZVJlc3BvbnNlIs0BCg9Tb2x2ZXJKb2JTdGF0dXMSEgoKcmVxdWVzdF9pZBgBIAEoDRIOCgZzb2x2ZXIYAiABKAkSNQoFc3RhdGUYAyABKA4yJi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNvbHZlckpvYlN0YXRlEhUKDWNyZWF0ZWRfYXRfbXMYBCABKAQSFQoNc3RhcnRlZF9hdF9tcxgFIAEoBBIZChFhbGxvY2F0ZWRfdGhyZWFkcxgGIAEoDRIWCg5xdWV1ZV9wb3NpdGlvbhgHIAEoDSKiAQoQU29sdmVySm9iRmFpbHVyZRISCgpyZXF1ZXN0X2lkGAEgASgNEg4KBnNvbHZlchgCIAEoCRI3CgRraW5kGAMgASgOMikub3J0b29sc193YXNtLmJyaWRnZS52MS5Tb2x2ZXJGYWlsdXJlS2luZBIPCgdtZXNzYWdlGAQgASgJEg0KBXRyYWNlGAUgASgJEhEKCXJldHJ5YWJsZRgGIAEoCCqKAgoOU29sdmVySm9iU3RhdGUSIAocU09MVkVSX0pPQl9TVEFURV9VTlNQRUNJRklFRBAAEhsKF1NPTFZFUl9KT0JfU1RBVEVfUVVFVUVEEAESHQoZU09MVkVSX0pPQl9TVEFURV9TVEFSVElORxACEhwKGFNPTFZFUl9KT0JfU1RBVEVfUlVOTklORxADEh8KG1NPTFZFUl9KT0JfU1RBVEVfQ0FOQ0VMTElORxAEEh4KGlNPTFZFUl9KT0JfU1RBVEVfQ0FOQ0VMTEVEEAUSHgoaU09MVkVSX0pPQl9TVEFURV9TVUNDRUVERUQQBhIbChdTT0xWRVJfSk9CX1NUQVRFX0ZBSUxFRBAHKucDChFTb2x2ZXJGYWlsdXJlS2luZBIjCh9TT0xWRVJfRkFJTFVSRV9LSU5EX1VOU1BFQ0lGSUVEEAASJgoiU09MVkVSX0ZBSUxVUkVfS0lORF9FWEVDVVRPUl9FUlJPUhABEioKJlNPTFZFUl9GQUlMVVJFX0tJTkRfUlVOVElNRV9MT0FEX0VSUk9SEAISJAogU09MVkVSX0ZBSUxVUkVfS0lORF9XT1JLRVJfQ1JBU0gQAxIrCidTT0xWRVJfRkFJTFVSRV9LSU5EX1NFUlZFUl9ESVNDT05ORUNURUQQBBIfChtTT0xWRVJfRkFJTFVSRV9LSU5EX1RJTUVPVVQQBRIhCh1TT0xWRVJfRkFJTFVSRV9LSU5EX0NBTkNFTExFRBAGEiAKHFNPTFZFUl9GQUlMVVJFX0tJTkRfSU5URVJOQUwQBxInCiNTT0xWRVJfRkFJTFVSRV9LSU5EX0lOVkFMSURfUkVRVUVTVBAIEicKI1NPTFZFUl9GQUlMVVJFX0tJTkRfVU5BVVRIRU5USUNBVEVEEAkSIgoeU09MVkVSX0ZBSUxVUkVfS0lORF9RVUVVRV9GVUxMEAoSKgomU09MVkVSX0ZBSUxVUkVfS0lORF9VTlNVUFBPUlRFRF9TT0xWRVIQC2IGcHJvdG8z");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverBridgeRequest
@@ -46,6 +46,18 @@ export type SolverBridgeRequest = Message<"ortools_wasm.bridge.v1.SolverBridgeRe
      */
     value: SolverCancelRequest;
     case: "cancel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.SolverInterruptRequest interrupt = 12;
+     */
+    value: SolverInterruptRequest;
+    case: "interrupt";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.SolverCallbackReply callback_reply = 13;
+     */
+    value: SolverCallbackReply;
+    case: "callbackReply";
   } | { case: undefined; value?: undefined };
 };
 
@@ -77,6 +89,16 @@ export type SolverBridgeRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.SolverCancelRequest cancel = 11;
    */
   cancel?: SolverCancelRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SolverInterruptRequest interrupt = 12;
+   */
+  interrupt?: SolverInterruptRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SolverCallbackReply callback_reply = 13;
+   */
+  callbackReply?: SolverCallbackReplyJson;
 };
 
 export type SolverBridgeRequestValid = SolverBridgeRequest;
@@ -151,6 +173,152 @@ export const SolverCancelRequestSchema: GenMessage<SolverCancelRequest, {jsonTyp
   messageDesc(file_job, 2);
 
 /**
+ * @generated from message ortools_wasm.bridge.v1.SolverInterruptRequest
+ */
+export type SolverInterruptRequest = Message<"ortools_wasm.bridge.v1.SolverInterruptRequest"> & {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverInterruptRequest
+ */
+export type SolverInterruptRequestJson = {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId?: number;
+};
+
+export type SolverInterruptRequestValid = SolverInterruptRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverInterruptRequest.
+ * Use `create(SolverInterruptRequestSchema)` to create a new message.
+ */
+export const SolverInterruptRequestSchema: GenMessage<SolverInterruptRequest, {jsonType: SolverInterruptRequestJson, validType: SolverInterruptRequestValid}> = /*@__PURE__*/
+  messageDesc(file_job, 3);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverJobInterrupted
+ */
+export type SolverJobInterrupted = Message<"ortools_wasm.bridge.v1.SolverJobInterrupted"> & {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverJobInterrupted
+ */
+export type SolverJobInterruptedJson = {
+  /**
+   * @generated from field: uint32 target_request_id = 1;
+   */
+  targetRequestId?: number;
+};
+
+export type SolverJobInterruptedValid = SolverJobInterrupted;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverJobInterrupted.
+ * Use `create(SolverJobInterruptedSchema)` to create a new message.
+ */
+export const SolverJobInterruptedSchema: GenMessage<SolverJobInterrupted, {jsonType: SolverJobInterruptedJson, validType: SolverJobInterruptedValid}> = /*@__PURE__*/
+  messageDesc(file_job, 4);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverCallbackRequest
+ */
+export type SolverCallbackRequest = Message<"ortools_wasm.bridge.v1.SolverCallbackRequest"> & {
+  /**
+   * @generated from field: uint64 callback_id = 1;
+   */
+  callbackId: bigint;
+
+  /**
+   * @generated from field: bytes payload = 2;
+   */
+  payload: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverCallbackRequest
+ */
+export type SolverCallbackRequestJson = {
+  /**
+   * @generated from field: uint64 callback_id = 1;
+   */
+  callbackId?: string;
+
+  /**
+   * @generated from field: bytes payload = 2;
+   */
+  payload?: string;
+};
+
+export type SolverCallbackRequestValid = SolverCallbackRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverCallbackRequest.
+ * Use `create(SolverCallbackRequestSchema)` to create a new message.
+ */
+export const SolverCallbackRequestSchema: GenMessage<SolverCallbackRequest, {jsonType: SolverCallbackRequestJson, validType: SolverCallbackRequestValid}> = /*@__PURE__*/
+  messageDesc(file_job, 5);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverCallbackReply
+ */
+export type SolverCallbackReply = Message<"ortools_wasm.bridge.v1.SolverCallbackReply"> & {
+  /**
+   * @generated from field: uint64 callback_id = 1;
+   */
+  callbackId: bigint;
+
+  /**
+   * @generated from field: bytes payload = 2;
+   */
+  payload: Uint8Array;
+
+  /**
+   * @generated from field: string error = 3;
+   */
+  error: string;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SolverCallbackReply
+ */
+export type SolverCallbackReplyJson = {
+  /**
+   * @generated from field: uint64 callback_id = 1;
+   */
+  callbackId?: string;
+
+  /**
+   * @generated from field: bytes payload = 2;
+   */
+  payload?: string;
+
+  /**
+   * @generated from field: string error = 3;
+   */
+  error?: string;
+};
+
+export type SolverCallbackReplyValid = SolverCallbackReply;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SolverCallbackReply.
+ * Use `create(SolverCallbackReplySchema)` to create a new message.
+ */
+export const SolverCallbackReplySchema: GenMessage<SolverCallbackReply, {jsonType: SolverCallbackReplyJson, validType: SolverCallbackReplyValid}> = /*@__PURE__*/
+  messageDesc(file_job, 6);
+
+/**
  * @generated from message ortools_wasm.bridge.v1.SolverBridgeResponse
  */
 export type SolverBridgeResponse = Message<"ortools_wasm.bridge.v1.SolverBridgeResponse"> & {
@@ -218,6 +386,18 @@ export type SolverBridgeResponse = Message<"ortools_wasm.bridge.v1.SolverBridgeR
      */
     value: SolverWorkerReady;
     case: "ready";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.SolverJobInterrupted interrupted = 16;
+     */
+    value: SolverJobInterrupted;
+    case: "interrupted";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.SolverCallbackRequest callback_request = 17;
+     */
+    value: SolverCallbackRequest;
+    case: "callbackRequest";
   } | { case: undefined; value?: undefined };
 };
 
@@ -279,6 +459,16 @@ export type SolverBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.SolverWorkerReady ready = 15;
    */
   ready?: SolverWorkerReadyJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SolverJobInterrupted interrupted = 16;
+   */
+  interrupted?: SolverJobInterruptedJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SolverCallbackRequest callback_request = 17;
+   */
+  callbackRequest?: SolverCallbackRequestJson;
 };
 
 export type SolverBridgeResponseValid = SolverBridgeResponse;
@@ -288,7 +478,7 @@ export type SolverBridgeResponseValid = SolverBridgeResponse;
  * Use `create(SolverBridgeResponseSchema)` to create a new message.
  */
 export const SolverBridgeResponseSchema: GenMessage<SolverBridgeResponse, {jsonType: SolverBridgeResponseJson, validType: SolverBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_job, 3);
+  messageDesc(file_job, 7);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverWorkerReady
@@ -309,7 +499,7 @@ export type SolverWorkerReadyValid = SolverWorkerReady;
  * Use `create(SolverWorkerReadySchema)` to create a new message.
  */
 export const SolverWorkerReadySchema: GenMessage<SolverWorkerReady, {jsonType: SolverWorkerReadyJson, validType: SolverWorkerReadyValid}> = /*@__PURE__*/
-  messageDesc(file_job, 4);
+  messageDesc(file_job, 8);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobCancelled
@@ -338,7 +528,7 @@ export type SolverJobCancelledValid = SolverJobCancelled;
  * Use `create(SolverJobCancelledSchema)` to create a new message.
  */
 export const SolverJobCancelledSchema: GenMessage<SolverJobCancelled, {jsonType: SolverJobCancelledJson, validType: SolverJobCancelledValid}> = /*@__PURE__*/
-  messageDesc(file_job, 5);
+  messageDesc(file_job, 9);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverEventBatch
@@ -367,7 +557,7 @@ export type SolverEventBatchValid = SolverEventBatch;
  * Use `create(SolverEventBatchSchema)` to create a new message.
  */
 export const SolverEventBatchSchema: GenMessage<SolverEventBatch, {jsonType: SolverEventBatchJson, validType: SolverEventBatchValid}> = /*@__PURE__*/
-  messageDesc(file_job, 6);
+  messageDesc(file_job, 10);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobStatus
@@ -456,7 +646,7 @@ export type SolverJobStatusValid = SolverJobStatus;
  * Use `create(SolverJobStatusSchema)` to create a new message.
  */
 export const SolverJobStatusSchema: GenMessage<SolverJobStatus, {jsonType: SolverJobStatusJson, validType: SolverJobStatusValid}> = /*@__PURE__*/
-  messageDesc(file_job, 7);
+  messageDesc(file_job, 11);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SolverJobFailure
@@ -535,7 +725,7 @@ export type SolverJobFailureValid = SolverJobFailure;
  * Use `create(SolverJobFailureSchema)` to create a new message.
  */
 export const SolverJobFailureSchema: GenMessage<SolverJobFailure, {jsonType: SolverJobFailureJson, validType: SolverJobFailureValid}> = /*@__PURE__*/
-  messageDesc(file_job, 8);
+  messageDesc(file_job, 12);
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SolverJobState

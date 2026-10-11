@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
+#include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "ortools/base/logging.h"
 #include "ortools/glop/lp_solver.h"
@@ -40,6 +41,7 @@ class GLOPInterface : public MPSolverInterface {
 
   // ----- Solve -----
   MPSolver::ResultStatus Solve(const MPSolverParameters& param) override;
+  bool SupportsMessageCallbacks() const override { return true; }
   bool InterruptSolve() override;
 
   // ----- Directly solve proto is supported ---
@@ -142,7 +144,13 @@ MPSolver::ResultStatus GLOPInterface::Solve(const MPSolverParameters& param) {
 
   solver_->SetSolverSpecificParametersAsString(
       solver_->solver_specific_parameter_string_);
+  if (message_callback_) parameters_.set_log_to_stdout(false);
   lp_solver_.SetParameters(parameters_);
+  auto& logger = lp_solver_.GetSolverLogger();
+  if (message_callback_) logger.AddInfoLoggingCallback(message_callback_);
+  const absl::Cleanup clear_messages = [&] {
+    if (message_callback_) logger.ClearInfoLoggingCallbacks();
+  };
   std::unique_ptr<TimeLimit> time_limit =
       TimeLimit::FromParameters(lp_solver_.GetParameters());
   time_limit->RegisterExternalBooleanAsLimit(&interrupt_solver_);

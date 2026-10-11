@@ -1759,6 +1759,26 @@ void MPSolver::GenerateConstraintNameIndex() const {
 
 bool MPSolver::NextSolution() { return interface_->NextSolution(); }
 
+bool MPSolver::SetMessageCallback(
+    std::function<void(const std::string&)> callback) {
+  if (callback && !interface_->SupportsMessageCallbacks()) return false;
+  interface_->message_callback_ = std::move(callback);
+  return true;
+}
+
+bool MPSolver::SupportsMessageCallbacks() const {
+  return interface_->SupportsMessageCallbacks();
+}
+
+absl::StatusOr<MPSolver::InfeasibleSubsystem>
+MPSolver::ComputeIrreducibleInfeasibleSubset(
+    const std::atomic<bool>* interrupt,
+    std::optional<double> time_limit_seconds,
+    std::optional<int64_t> node_limit) {
+  return interface_->ComputeIrreducibleInfeasibleSubset(
+      interrupt, time_limit_seconds, node_limit);
+}
+
 void MPSolver::SetCallback(MPCallback* mp_callback) {
   interface_->SetCallback(mp_callback);
 }

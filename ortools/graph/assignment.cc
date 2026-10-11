@@ -68,7 +68,8 @@ SimpleLinearSumAssignment::Status SimpleLinearSumAssignment::Solve() {
   const CostValue max_supported_arc_cost =
       std::numeric_limits<CostValue>::max() / (NumNodes() + 1);
   for (const CostValue unscaled_arc_cost : arc_cost_) {
-    if (unscaled_arc_cost > max_supported_arc_cost) return POSSIBLE_OVERFLOW;
+    if (unscaled_arc_cost > max_supported_arc_cost ||
+        unscaled_arc_cost < -max_supported_arc_cost) return POSSIBLE_OVERFLOW;
   }
 
   const ArcIndex num_arcs = arc_cost_.size();

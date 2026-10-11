@@ -131,6 +131,7 @@ add_custom_command(
 add_custom_target(server_proto_schemas DEPENDS "${PROTO_SCHEMA_HEADER}")
 
 add_library(server_ortools_link_shims OBJECT
+  "${REPO_ROOT}/ortools/linear_solver/pdlp_interface.cc"
   "${REPO_ROOT}/ortools/linear_solver/knapsack_interface.cc"
   "${REPO_ROOT}/ortools/linear_solver/proto_solver/glop_proto_solver.cc"
   "${REPO_ROOT}/ortools/linear_solver/proto_solver/pdlp_proto_solver.cc"
@@ -304,6 +305,42 @@ target_link_libraries(server_routing_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
+add_executable(server_routing_dimension_controls_test
+  src/job_scheduler.cc
+  src/routing_executor.cc
+  src/routing_dimension_controls_test.cc)
+target_include_directories(server_routing_dimension_controls_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_routing_dimension_controls_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
+add_executable(server_routing_vehicle_costs_test
+  src/job_scheduler.cc
+  src/routing_executor.cc
+  src/routing_vehicle_costs_test.cc)
+target_include_directories(server_routing_vehicle_costs_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_routing_vehicle_costs_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
+add_executable(server_routing_group_controls_test
+  src/job_scheduler.cc
+  src/routing_executor.cc
+  src/routing_group_controls_test.cc)
+target_include_directories(server_routing_group_controls_test PRIVATE
+  "${REPO_ROOT}"
+  "${BRIDGE_PROTO_OUT_DIR}")
+target_link_libraries(server_routing_group_controls_test PRIVATE
+  ortools::ortools
+  server_bridge_proto
+  server_ortools_link_shims)
+
 if(BUILD_TESTING)
   add_test(NAME server_job_scheduler_test COMMAND server_job_scheduler_test)
   add_test(NAME server_config_test COMMAND server_config_test)
@@ -317,4 +354,7 @@ if(BUILD_TESTING)
   add_test(NAME server_set_cover_executor_test COMMAND server_set_cover_executor_test)
   add_test(NAME server_pdlp_executor_test COMMAND server_pdlp_executor_test)
   add_test(NAME server_routing_executor_test COMMAND server_routing_executor_test)
+  add_test(NAME server_routing_dimension_controls_test COMMAND server_routing_dimension_controls_test)
+  add_test(NAME server_routing_vehicle_costs_test COMMAND server_routing_vehicle_costs_test)
+  add_test(NAME server_routing_group_controls_test COMMAND server_routing_group_controls_test)
 endif()

@@ -6,6 +6,8 @@
 #include <utility>
 
 #include "cp_sat.pb.h"
+#include "javascript/cp_sat_statistics.h"
+#include "javascript/cp_sat_model_export.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_checker.h"
 #include "ortools/sat/cp_model_solver.h"
@@ -132,6 +134,7 @@ SolverExecutorResult Solve(const bridge::CpSatSolveRequest& request,
   bridge::CpSatBridgeResponse response;
   response.mutable_solve_result()->set_cp_solver_response_proto(
       solver_response.SerializeAsString());
+  response.mutable_solve_result()->set_response_statistics(sat::CpSolverResponseStats(solver_response));
   return Response(response);
 }
 
@@ -201,6 +204,21 @@ SolverExecutorResult CpSatExecutor::Execute(const SolverExecutorRequest& request
       return Solve(cp_sat_request.solve(), context, emit_event);
     case bridge::CpSatBridgeRequest::kValidate:
       return Validate(cp_sat_request.validate());
+    case bridge::CpSatBridgeRequest::kExportModelText: {
+      const auto exported = ortools_wasm::ExportCpSatModelText(cp_sat_request.export_model_text());
+      if (!exported.error.empty()) return Error(exported.error);
+      bridge::CpSatBridgeResponse response;
+      response.set_model_text(exported.text);
+      return Response(response);
+    }
+    case bridge::CpSatBridgeRequest::kModelStats:
+    case bridge::CpSatBridgeRequest::kResponseStats: {
+      const bool is_response = cp_sat_request.payload_case() == bridge::CpSatBridgeRequest::kResponseStats;
+      const auto statistics = ortools_wasm::CpSatStatistics(is_response ? cp_sat_request.response_stats() : cp_sat_request.model_stats(), is_response);
+      if (!statistics.error.empty()) return Error(statistics.error);
+      bridge::CpSatBridgeResponse response; response.set_statistics(statistics.report);
+      return Response(response);
+    }
     default:
       return Error("Unsupported CP-SAT server request payload.");
   }

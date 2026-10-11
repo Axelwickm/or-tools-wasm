@@ -35,7 +35,8 @@ namespace operations_research {
 
 absl::StatusOr<MPSolutionResponse> PdlpSolveProto(
     LazyMutableCopy<MPModelRequest> request, const bool relax_integer_variables,
-    const std::atomic<bool>* interrupt_solve) {
+    const std::atomic<bool>* interrupt_solve,
+    std::function<void(const std::string&)> logging_callback) {
   pdlp::PrimalDualHybridGradientParams params;
   if (request->enable_internal_solver_output()) {
     params.set_verbosity_level(3);
@@ -73,7 +74,8 @@ absl::StatusOr<MPSolutionResponse> PdlpSolveProto(
 
   const double objective_scaling_factor = qp.objective_scaling_factor;
   pdlp::SolverResult pdhg_result =
-      pdlp::PrimalDualHybridGradient(std::move(qp), params, interrupt_solve);
+      pdlp::PrimalDualHybridGradient(std::move(qp), params, interrupt_solve,
+                                    std::move(logging_callback));
 
   // PDLP's statuses don't map very cleanly to MPSolver statuses. Do the best
   // we can for now.

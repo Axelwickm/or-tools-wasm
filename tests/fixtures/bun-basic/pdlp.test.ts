@@ -1,3 +1,4 @@
+import { runPdlpControlCases } from '../../cases/or-tools-wasm/pdlp/controls.ts';
 import {
   terminateLoadedRuntimeThreads,
 } from 'or-tools-wasm/pdlp';
@@ -6,6 +7,7 @@ import { runPdlpCases } from '../../cases/python-parity/pdlp/index.ts';
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
+  await runPdlpControlCases(PdlpApi as never);
   const pdlpResults = await runPdlpCases(PdlpApi);
   assertAllCases('bun PDLP', pdlpResults);
   console.log(`bun ran ${pdlpResults.length} PDLP cases`);

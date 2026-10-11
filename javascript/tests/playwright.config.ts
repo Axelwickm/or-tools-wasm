@@ -48,7 +48,9 @@ const webServers = [
 
 export default defineConfig({
   testDir: './specs',
-  timeout: fixtureTimeout,
+  // Each profile runs every solver group and executor mode in one test.
+  timeout: 600_000,
+  workers: 2,
   expect: {
     timeout: fixtureTimeout,
   },

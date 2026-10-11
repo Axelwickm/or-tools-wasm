@@ -3134,10 +3134,22 @@ SolverResult PrimalDualHybridGradient(
     return ErrorSolverResult(TERMINATION_REASON_INVALID_PROBLEM,
                              dimensions_status.ToString(), logger);
   }
-  if (qp.objective_scaling_factor == 0) {
+  if (!std::isfinite(qp.objective_scaling_factor) || qp.objective_scaling_factor == 0) {
     return ErrorSolverResult(TERMINATION_REASON_INVALID_PROBLEM,
-                             "The objective scaling factor cannot be zero.",
+                             "The objective scaling factor must be finite and nonzero.",
                              logger);
+  }
+  // Problem statistics deliberately exclude infinite entries. Reject these
+  // coefficients before rescaling, where they can produce invalid scale vectors.
+  if (!qp.objective_vector.allFinite() ||
+      (qp.objective_matrix && !qp.objective_matrix->diagonal().allFinite())) {
+    return ErrorSolverResult(TERMINATION_REASON_INVALID_PROBLEM,
+                             "Objective coefficients must be finite.", logger);
+  }
+  for (int64_t i = 0; i < qp.constraint_matrix.nonZeros(); ++i) {
+    if (!std::isfinite(qp.constraint_matrix.valuePtr()[i]))
+      return ErrorSolverResult(TERMINATION_REASON_INVALID_PROBLEM,
+                               "Constraint matrix coefficients must be finite.", logger);
   }
   if (params.use_feasibility_polishing() && !IsLinearProgram(qp)) {
     return ErrorSolverResult(

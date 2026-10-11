@@ -1,3 +1,4 @@
+import { searchParametersContractCases } from './search_parameters_contract.ts';
 import { basicContractCases } from './basic_contract.ts';
 import { dimensionDisjunctionContractCases } from './dimension_disjunction_contract.ts';
 import { searchDimensionMiscContractCases } from './search_dimension_misc_contract.ts';
@@ -8,6 +9,7 @@ export const routingContractCases = [
   ...transitContractCases,
   ...dimensionDisjunctionContractCases,
   ...searchDimensionMiscContractCases,
+  ...searchParametersContractCases,
 ].map((testCase) => ({
   ...testCase,
   id: `routing.${testCase.name

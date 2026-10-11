@@ -161,24 +161,29 @@ export function createRuntimeLoader(adapter: RuntimeLoaderAdapter) {
     const key: RuntimeKey = `${runtimeName}:${flavor}`;
     modulePromises[key] ??= (async () => {
       const asset = await adapter.resolveAsset(runtimeName, flavor);
-      const createModule = await adapter.loadFactory(asset.jsUrl);
-      const moduleOverrides: Record<string, unknown> = {
-        locateFile: asset.locateFile,
-        noExitRuntime: true,
-      };
-      if (asset.wasmBinary) {
-        moduleOverrides.wasmBinary = asset.wasmBinary;
-      }
-      if (asset.mainScriptUrlOrBlob) {
-        moduleOverrides.mainScriptUrlOrBlob = asset.mainScriptUrlOrBlob;
-      }
       try {
+        const createModule = await adapter.loadFactory(asset.jsUrl);
+        const moduleOverrides: Record<string, unknown> = {
+          locateFile: asset.locateFile,
+          noExitRuntime: true,
+        };
+        if (asset.wasmBinary) {
+          moduleOverrides.wasmBinary = asset.wasmBinary;
+        }
+        if (asset.mainScriptUrlOrBlob) {
+          moduleOverrides.mainScriptUrlOrBlob = asset.mainScriptUrlOrBlob;
+        }
         return await createModule(moduleOverrides);
       } finally {
         asset.cleanupGlobalState?.();
       }
     })();
-    return modulePromises[key];
+    const loading = modulePromises[key];
+    try { return await loading; }
+    catch (error) {
+      if (modulePromises[key] === loading) delete modulePromises[key];
+      throw error;
+    }
   }
 
   async function terminateLoadedRuntimeThreads(): Promise<void> {
@@ -197,8 +202,8 @@ export function createRuntimeLoader(adapter: RuntimeLoaderAdapter) {
         }
       }
     } finally {
-      for (const [key] of loadedModules) {
-        delete modulePromises[key as RuntimeKey];
+      for (const [key, loading] of loadedModules) {
+        if (modulePromises[key as RuntimeKey] === loading) delete modulePromises[key as RuntimeKey];
       }
     }
   }

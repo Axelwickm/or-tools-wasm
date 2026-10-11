@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Set Cover - Greedy Heuristic</title>
+    <title>Set Cover - Covering Heuristics</title>
     <link rel="stylesheet" href="./example.css">
     <style>
       .example-notes {
@@ -141,13 +141,14 @@
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
-    <h1>Set Cover - greedy heuristic</h1>
+    <h1>Set Cover - covering heuristics</h1>
     <p><em>Problem: choose a minimum-cost collection of subsets whose union covers every required element.</em></p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import {
   GreedySolutionGenerator,
+  GuidedTabuSearch,
   SetCoverInvariant,
   SetCoverModel,
 } from 'or-tools-wasm/set-cover';
@@ -163,10 +164,25 @@ model.addElementToLastSubset(1);
 
 const inv = new SetCoverInvariant(model);
 const greedy = new GreedySolutionGenerator(inv);
-const hasFound = await greedy.nextSolution(undefined, { executor: 'worker' });
+await greedy.nextSolution(undefined, { executor: 'worker' });
+const hasFound = await inv.numUncoveredElements({ executor: 'worker' }) === 0;
+await inv.compressTrace({ executor: 'worker' });
 
 if (hasFound) {
-  const solution = inv.exportSolutionAsProto();
+  const search = new GuidedTabuSearch(inv);
+  search.setPenaltyFactor(0.5);
+  search.setEpsilon(1e-6);
+  search.setTabuListSize(9);
+  search.setMaxIterations(40);
+  try {
+    await search.initialize({ executor: 'worker' });
+    for (let pass = 0; pass &lt; 5; pass++) {
+      await search.nextSolution();
+    }
+  } finally {
+    await search.close();
+  }
+  const solution = await inv.exportSolutionAsProto();
   console.log(solution.cost, solution.subset);
 }</code></pre>
       </details>
@@ -175,10 +191,16 @@ if (hasFound) {
       <li>Elements are the things that must be covered.</li>
       <li>Each colored region is a subset with a cost and a fixed list of covered elements.</li>
       <li>The greedy heuristic chooses subsets until every element is covered, while trying to keep cost low.</li>
+      <li>Optional guided tabu search explores changes to the greedy cover. Penalty factor controls how often-used regions become less attractive; epsilon groups similar penalty scores, and tabu-list size controls how many recent moves are remembered.</li>
+      <li>Five guided passes continue the same search state. The example closes the search after the final pass.</li>
       <li>After solving, chosen subsets and covered elements are highlighted.</li>
     </ul>
     <div class="controls">
       <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+      <label><input id="guided-tabu" type="checkbox"> Run guided tabu search</label>
+      <label>Penalty factor <input id="penalty-factor" class="short-number" type="number" value="0.3" step="0.1" disabled></label>
+      <label>Epsilon <input id="epsilon" class="short-number" type="number" value="0.000001" step="0.000001" disabled></label>
+      <label>Tabu-list size <input id="tabu-size" class="short-number" type="number" value="17" min="1" step="1" disabled></label>
       <button id="run" data-idle-label="Solve Set Cover">Solve Set Cover</button>
       <button id="clear" type="button">Clear</button>
     </div>

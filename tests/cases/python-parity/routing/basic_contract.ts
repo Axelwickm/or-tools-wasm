@@ -29,7 +29,7 @@ type RoutingModelLike = {
   end(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): Promise<bigint>;
   status(): number;
 };
 
@@ -71,13 +71,13 @@ function distance(manager: { indexToNode(index: number): number }, fromIndex: nu
   return manager.indexToNode(fromIndex) + manager.indexToNode(toIndex);
 }
 
-function inspectRoute(
+async function inspectRoute(
   manager: { indexToNode(index: number): number },
   routing: {
     start(vehicle: number): number;
     isEnd(index: number): boolean;
     nextVar(index: number): number;
-    getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
+    getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): Promise<bigint>;
   },
   assignment: { value(index: number): number },
 ) {
@@ -87,7 +87,7 @@ function inspectRoute(
   while (!routing.isEnd(index)) {
     const nextIndex = assignment.value(routing.nextVar(index));
     route.push(manager.indexToNode(nextIndex));
-    routeDistance += routing.getArcCostForVehicle(index, nextIndex, 0);
+    routeDistance += await routing.getArcCostForVehicle(index, nextIndex, 0);
     index = nextIndex;
   }
   return { route, routeDistance };
@@ -263,7 +263,7 @@ export const basicContractCases: RoutingCase[] = [
       assert(assignment !== null, `${caseName} did not return a solution`);
       assertNumber(routing.status(), ROUTING_SUCCESS, `${caseName} final status`);
 
-      const { route, routeDistance } = inspectRoute(manager, routing, assignment);
+      const { route, routeDistance } = await inspectRoute(manager, routing, assignment);
       assertArrayEquals(route, [1, 2, 3, 4, 5, 6, 7, 8, 9, 0], `${caseName} route`);
       assertNumber(routeDistance, EXPECTED_TSP_OBJECTIVE, `${caseName} route distance`);
       assertNumber(assignment.objectiveValue(), EXPECTED_TSP_OBJECTIVE, `${caseName} objectiveValue`);

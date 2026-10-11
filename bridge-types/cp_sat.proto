@@ -22,6 +22,9 @@ message CpSatBridgeRequest {
   oneof payload {
     CpSatSolveRequest solve = 10;
     CpSatValidateRequest validate = 11;
+    bytes model_stats = 12;
+    bytes response_stats = 13;
+    bytes export_model_text = 14;
   }
 }
 
@@ -30,6 +33,8 @@ message CpSatBridgeResponse {
     CpSatSolveResult solve_result = 10;
     CpSatSolveEvent solve_event = 11;
     CpSatValidateResult validate_result = 12;
+    string statistics = 13;
+    string model_text = 14;
   }
 }
 
@@ -47,6 +52,7 @@ message CpSatCallbackMask {
 
 message CpSatSolveResult {
   bytes cp_solver_response_proto = 1;
+  optional string response_statistics = 2;
 }
 
 message CpSatSolveEvent {

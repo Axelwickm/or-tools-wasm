@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mathopt.proto.
  */
 export const file_mathopt: GenFile = /*@__PURE__*/
-  fileDesc("Cg1tYXRob3B0LnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxImcKE01hdGhPcHRTb2x2ZVJlcXVlc3QSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgBIAEoDBIXCg91c2VfaW50ZXJydXB0ZXIYAiABKAgSGgoSaW50ZXJydXB0X2F0X3N0YXJ0GAMgASgIIj4KH01hdGhPcHRJbmNyZW1lbnRhbENyZWF0ZVJlcXVlc3QSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgBIAEoDCK6AQoeTWF0aE9wdEluY3JlbWVudGFsU29sdmVSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoBBIbChNzb2x2ZV9yZXF1ZXN0X3Byb3RvGAIgASgMEh8KEm1vZGVsX3VwZGF0ZV9wcm90bxgDIAEoDEgAiAEBEhcKD3VzZV9pbnRlcnJ1cHRlchgEIAEoCBIaChJpbnRlcnJ1cHRfYXRfc3RhcnQYBSABKAhCFQoTX21vZGVsX3VwZGF0ZV9wcm90byIxCh9NYXRoT3B0SW5jcmVtZW50YWxEZWxldGVSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoBCLiAgoUTWF0aE9wdEJyaWRnZVJlcXVlc3QSPAoFc29sdmUYASABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRTb2x2ZVJlcXVlc3RIABJVChJpbmNyZW1lbnRhbF9jcmVhdGUYAiABKAsyNy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRJbmNyZW1lbnRhbENyZWF0ZVJlcXVlc3RIABJTChFpbmNyZW1lbnRhbF9zb2x2ZRgDIAEoCzI2Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdEluY3JlbWVudGFsU29sdmVSZXF1ZXN0SAASVQoSaW5jcmVtZW50YWxfZGVsZXRlGAQgASgLMjcub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0SW5jcmVtZW50YWxEZWxldGVSZXF1ZXN0SABCCQoHcGF5bG9hZCI1ChVNYXRoT3B0QnJpZGdlUmVzcG9uc2USHAoUc29sdmVfcmVzcG9uc2VfcHJvdG8YASABKAxiBnByb3RvMw");
+  fileDesc("Cg1tYXRob3B0LnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIsoBChNNYXRoT3B0U29sdmVSZXF1ZXN0EhsKE3NvbHZlX3JlcXVlc3RfcHJvdG8YASABKAwSFwoPdXNlX2ludGVycnVwdGVyGAIgASgIEhoKEmludGVycnVwdF9hdF9zdGFydBgDIAEoCBIoChtjYWxsYmFja19yZWdpc3RyYXRpb25fcHJvdG8YBCABKAxIAIgBARIXCg9zdHJlYW1fbWVzc2FnZXMYBSABKAhCHgocX2NhbGxiYWNrX3JlZ2lzdHJhdGlvbl9wcm90byI+Ch9NYXRoT3B0SW5jcmVtZW50YWxDcmVhdGVSZXF1ZXN0EhsKE3NvbHZlX3JlcXVlc3RfcHJvdG8YASABKAwinQIKHk1hdGhPcHRJbmNyZW1lbnRhbFNvbHZlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgCIAEoDBIfChJtb2RlbF91cGRhdGVfcHJvdG8YAyABKAxIAIgBARIXCg91c2VfaW50ZXJydXB0ZXIYBCABKAgSGgoSaW50ZXJydXB0X2F0X3N0YXJ0GAUgASgIEigKG2NhbGxiYWNrX3JlZ2lzdHJhdGlvbl9wcm90bxgGIAEoDEgBiAEBEhcKD3N0cmVhbV9tZXNzYWdlcxgHIAEoCEIVChNfbW9kZWxfdXBkYXRlX3Byb3RvQh4KHF9jYWxsYmFja19yZWdpc3RyYXRpb25fcHJvdG8iMQofTWF0aE9wdEluY3JlbWVudGFsRGVsZXRlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQiTQofTWF0aE9wdEluY3JlbWVudGFsVXBkYXRlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQSGgoSbW9kZWxfdXBkYXRlX3Byb3RvGAIgASgMIlEKHE1hdGhPcHRWYWxpZGF0ZVJlc3VsdFJlcXVlc3QSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgBIAEoDBIUCgxyZXN1bHRfcHJvdG8YAiABKAwiVQobTWF0aE9wdENvbnZlcnRSZXN1bHRSZXF1ZXN0EgwKBGtpbmQYASABKAUSEwoLbW9kZWxfcHJvdG8YAiABKAwSEwoLaW5wdXRfcHJvdG8YAyABKAwirwUKFE1hdGhPcHRCcmlkZ2VSZXF1ZXN0EjwKBXNvbHZlGAEgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0U29sdmVSZXF1ZXN0SAASVQoSaW5jcmVtZW50YWxfY3JlYXRlGAIgASgLMjcub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0SW5jcmVtZW50YWxDcmVhdGVSZXF1ZXN0SAASUwoRaW5jcmVtZW50YWxfc29sdmUYAyABKAsyNi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRJbmNyZW1lbnRhbFNvbHZlUmVxdWVzdEgAElUKEmluY3JlbWVudGFsX2RlbGV0ZRgEIAEoCzI3Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdEluY3JlbWVudGFsRGVsZXRlUmVxdWVzdEgAEhwKEm1vZGVsX3Byb3RvX3RvX21wcxgFIAEoDEgAEhwKEm1wc190b19tb2RlbF9wcm90bxgGIAEoCUgAEhgKDnZhbGlkYXRlX21vZGVsGAcgASgMSAASTwoPdmFsaWRhdGVfcmVzdWx0GAggASgLMjQub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0VmFsaWRhdGVSZXN1bHRSZXF1ZXN0SAASVQoSaW5jcmVtZW50YWxfdXBkYXRlGAkgASgLMjcub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0SW5jcmVtZW50YWxVcGRhdGVSZXF1ZXN0SAASTQoOY29udmVydF9yZXN1bHQYCiABKAsyMy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRDb252ZXJ0UmVzdWx0UmVxdWVzdEgAQgkKB3BheWxvYWQiyAEKFU1hdGhPcHRCcmlkZ2VSZXNwb25zZRIcChRzb2x2ZV9yZXNwb25zZV9wcm90bxgBIAEoDBINCgNtcHMYAiABKAlIABIVCgttb2RlbF9wcm90bxgDIAEoDEgAEhoKEHZhbGlkYXRpb25fZXJyb3IYBCABKAlIABIgChZ2YWxpZGF0ZWRfcmVzdWx0X3Byb3RvGAUgASgMSAASGAoOdXBkYXRlX2FwcGxpZWQYBiABKAhIAEITChFjb252ZXJzaW9uX3Jlc3VsdCIjCg9NYXRoT3B0TG9nRXZlbnQSEAoIbWVzc2FnZXMYAiADKAliBnByb3RvMw");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MathOptSolveRequest
@@ -30,6 +30,16 @@ export type MathOptSolveRequest = Message<"ortools_wasm.bridge.v1.MathOptSolveRe
    * @generated from field: bool interrupt_at_start = 3;
    */
   interruptAtStart: boolean;
+
+  /**
+   * @generated from field: optional bytes callback_registration_proto = 4;
+   */
+  callbackRegistrationProto?: Uint8Array | undefined;
+
+  /**
+   * @generated from field: bool stream_messages = 5;
+   */
+  streamMessages: boolean;
 };
 
 /**
@@ -50,6 +60,16 @@ export type MathOptSolveRequestJson = {
    * @generated from field: bool interrupt_at_start = 3;
    */
   interruptAtStart?: boolean;
+
+  /**
+   * @generated from field: optional bytes callback_registration_proto = 4;
+   */
+  callbackRegistrationProto?: string;
+
+  /**
+   * @generated from field: bool stream_messages = 5;
+   */
+  streamMessages?: boolean;
 };
 
 export type MathOptSolveRequestValid = MathOptSolveRequest;
@@ -118,6 +138,16 @@ export type MathOptIncrementalSolveRequest = Message<"ortools_wasm.bridge.v1.Mat
    * @generated from field: bool interrupt_at_start = 5;
    */
   interruptAtStart: boolean;
+
+  /**
+   * @generated from field: optional bytes callback_registration_proto = 6;
+   */
+  callbackRegistrationProto?: Uint8Array | undefined;
+
+  /**
+   * @generated from field: bool stream_messages = 7;
+   */
+  streamMessages: boolean;
 };
 
 /**
@@ -148,6 +178,16 @@ export type MathOptIncrementalSolveRequestJson = {
    * @generated from field: bool interrupt_at_start = 5;
    */
   interruptAtStart?: boolean;
+
+  /**
+   * @generated from field: optional bytes callback_registration_proto = 6;
+   */
+  callbackRegistrationProto?: string;
+
+  /**
+   * @generated from field: bool stream_messages = 7;
+   */
+  streamMessages?: boolean;
 };
 
 export type MathOptIncrementalSolveRequestValid = MathOptIncrementalSolveRequest;
@@ -189,6 +229,139 @@ export const MathOptIncrementalDeleteRequestSchema: GenMessage<MathOptIncrementa
   messageDesc(file_mathopt, 3);
 
 /**
+ * @generated from message ortools_wasm.bridge.v1.MathOptIncrementalUpdateRequest
+ */
+export type MathOptIncrementalUpdateRequest = Message<"ortools_wasm.bridge.v1.MathOptIncrementalUpdateRequest"> & {
+  /**
+   * @generated from field: uint64 handle = 1;
+   */
+  handle: bigint;
+
+  /**
+   * @generated from field: bytes model_update_proto = 2;
+   */
+  modelUpdateProto: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptIncrementalUpdateRequest
+ */
+export type MathOptIncrementalUpdateRequestJson = {
+  /**
+   * @generated from field: uint64 handle = 1;
+   */
+  handle?: string;
+
+  /**
+   * @generated from field: bytes model_update_proto = 2;
+   */
+  modelUpdateProto?: string;
+};
+
+export type MathOptIncrementalUpdateRequestValid = MathOptIncrementalUpdateRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MathOptIncrementalUpdateRequest.
+ * Use `create(MathOptIncrementalUpdateRequestSchema)` to create a new message.
+ */
+export const MathOptIncrementalUpdateRequestSchema: GenMessage<MathOptIncrementalUpdateRequest, {jsonType: MathOptIncrementalUpdateRequestJson, validType: MathOptIncrementalUpdateRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mathopt, 4);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptValidateResultRequest
+ */
+export type MathOptValidateResultRequest = Message<"ortools_wasm.bridge.v1.MathOptValidateResultRequest"> & {
+  /**
+   * @generated from field: bytes solve_request_proto = 1;
+   */
+  solveRequestProto: Uint8Array;
+
+  /**
+   * @generated from field: bytes result_proto = 2;
+   */
+  resultProto: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptValidateResultRequest
+ */
+export type MathOptValidateResultRequestJson = {
+  /**
+   * @generated from field: bytes solve_request_proto = 1;
+   */
+  solveRequestProto?: string;
+
+  /**
+   * @generated from field: bytes result_proto = 2;
+   */
+  resultProto?: string;
+};
+
+export type MathOptValidateResultRequestValid = MathOptValidateResultRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MathOptValidateResultRequest.
+ * Use `create(MathOptValidateResultRequestSchema)` to create a new message.
+ */
+export const MathOptValidateResultRequestSchema: GenMessage<MathOptValidateResultRequest, {jsonType: MathOptValidateResultRequestJson, validType: MathOptValidateResultRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mathopt, 5);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptConvertResultRequest
+ */
+export type MathOptConvertResultRequest = Message<"ortools_wasm.bridge.v1.MathOptConvertResultRequest"> & {
+  /**
+   * Native PrimalSolution, DualSolution, Basis, PrimalRay, DualRay, Solution,
+   * ProblemStatus, ObjectiveBounds, SolveStats and Termination, respectively.
+   *
+   * @generated from field: int32 kind = 1;
+   */
+  kind: number;
+
+  /**
+   * @generated from field: bytes model_proto = 2;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: bytes input_proto = 3;
+   */
+  inputProto: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptConvertResultRequest
+ */
+export type MathOptConvertResultRequestJson = {
+  /**
+   * Native PrimalSolution, DualSolution, Basis, PrimalRay, DualRay, Solution,
+   * ProblemStatus, ObjectiveBounds, SolveStats and Termination, respectively.
+   *
+   * @generated from field: int32 kind = 1;
+   */
+  kind?: number;
+
+  /**
+   * @generated from field: bytes model_proto = 2;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: bytes input_proto = 3;
+   */
+  inputProto?: string;
+};
+
+export type MathOptConvertResultRequestValid = MathOptConvertResultRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MathOptConvertResultRequest.
+ * Use `create(MathOptConvertResultRequestSchema)` to create a new message.
+ */
+export const MathOptConvertResultRequestSchema: GenMessage<MathOptConvertResultRequest, {jsonType: MathOptConvertResultRequestJson, validType: MathOptConvertResultRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mathopt, 6);
+
+/**
  * @generated from message ortools_wasm.bridge.v1.MathOptBridgeRequest
  */
 export type MathOptBridgeRequest = Message<"ortools_wasm.bridge.v1.MathOptBridgeRequest"> & {
@@ -219,6 +392,42 @@ export type MathOptBridgeRequest = Message<"ortools_wasm.bridge.v1.MathOptBridge
      */
     value: MathOptIncrementalDeleteRequest;
     case: "incrementalDelete";
+  } | {
+    /**
+     * @generated from field: bytes model_proto_to_mps = 5;
+     */
+    value: Uint8Array;
+    case: "modelProtoToMps";
+  } | {
+    /**
+     * @generated from field: string mps_to_model_proto = 6;
+     */
+    value: string;
+    case: "mpsToModelProto";
+  } | {
+    /**
+     * @generated from field: bytes validate_model = 7;
+     */
+    value: Uint8Array;
+    case: "validateModel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MathOptValidateResultRequest validate_result = 8;
+     */
+    value: MathOptValidateResultRequest;
+    case: "validateResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MathOptIncrementalUpdateRequest incremental_update = 9;
+     */
+    value: MathOptIncrementalUpdateRequest;
+    case: "incrementalUpdate";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MathOptConvertResultRequest convert_result = 10;
+     */
+    value: MathOptConvertResultRequest;
+    case: "convertResult";
   } | { case: undefined; value?: undefined };
 };
 
@@ -245,6 +454,36 @@ export type MathOptBridgeRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.MathOptIncrementalDeleteRequest incremental_delete = 4;
    */
   incrementalDelete?: MathOptIncrementalDeleteRequestJson;
+
+  /**
+   * @generated from field: bytes model_proto_to_mps = 5;
+   */
+  modelProtoToMps?: string;
+
+  /**
+   * @generated from field: string mps_to_model_proto = 6;
+   */
+  mpsToModelProto?: string;
+
+  /**
+   * @generated from field: bytes validate_model = 7;
+   */
+  validateModel?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MathOptValidateResultRequest validate_result = 8;
+   */
+  validateResult?: MathOptValidateResultRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MathOptIncrementalUpdateRequest incremental_update = 9;
+   */
+  incrementalUpdate?: MathOptIncrementalUpdateRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MathOptConvertResultRequest convert_result = 10;
+   */
+  convertResult?: MathOptConvertResultRequestJson;
 };
 
 export type MathOptBridgeRequestValid = MathOptBridgeRequest;
@@ -254,7 +493,7 @@ export type MathOptBridgeRequestValid = MathOptBridgeRequest;
  * Use `create(MathOptBridgeRequestSchema)` to create a new message.
  */
 export const MathOptBridgeRequestSchema: GenMessage<MathOptBridgeRequest, {jsonType: MathOptBridgeRequestJson, validType: MathOptBridgeRequestValid}> = /*@__PURE__*/
-  messageDesc(file_mathopt, 4);
+  messageDesc(file_mathopt, 7);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MathOptBridgeResponse
@@ -264,6 +503,41 @@ export type MathOptBridgeResponse = Message<"ortools_wasm.bridge.v1.MathOptBridg
    * @generated from field: bytes solve_response_proto = 1;
    */
   solveResponseProto: Uint8Array;
+
+  /**
+   * @generated from oneof ortools_wasm.bridge.v1.MathOptBridgeResponse.conversion_result
+   */
+  conversionResult: {
+    /**
+     * @generated from field: string mps = 2;
+     */
+    value: string;
+    case: "mps";
+  } | {
+    /**
+     * @generated from field: bytes model_proto = 3;
+     */
+    value: Uint8Array;
+    case: "modelProto";
+  } | {
+    /**
+     * @generated from field: string validation_error = 4;
+     */
+    value: string;
+    case: "validationError";
+  } | {
+    /**
+     * @generated from field: bytes validated_result_proto = 5;
+     */
+    value: Uint8Array;
+    case: "validatedResultProto";
+  } | {
+    /**
+     * @generated from field: bool update_applied = 6;
+     */
+    value: boolean;
+    case: "updateApplied";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -274,6 +548,31 @@ export type MathOptBridgeResponseJson = {
    * @generated from field: bytes solve_response_proto = 1;
    */
   solveResponseProto?: string;
+
+  /**
+   * @generated from field: string mps = 2;
+   */
+  mps?: string;
+
+  /**
+   * @generated from field: bytes model_proto = 3;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: string validation_error = 4;
+   */
+  validationError?: string;
+
+  /**
+   * @generated from field: bytes validated_result_proto = 5;
+   */
+  validatedResultProto?: string;
+
+  /**
+   * @generated from field: bool update_applied = 6;
+   */
+  updateApplied?: boolean;
 };
 
 export type MathOptBridgeResponseValid = MathOptBridgeResponse;
@@ -283,5 +582,38 @@ export type MathOptBridgeResponseValid = MathOptBridgeResponse;
  * Use `create(MathOptBridgeResponseSchema)` to create a new message.
  */
 export const MathOptBridgeResponseSchema: GenMessage<MathOptBridgeResponse, {jsonType: MathOptBridgeResponseJson, validType: MathOptBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_mathopt, 5);
+  messageDesc(file_mathopt, 8);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptLogEvent
+ */
+export type MathOptLogEvent = Message<"ortools_wasm.bridge.v1.MathOptLogEvent"> & {
+  /**
+   * Matches SolveResponse.messages so WASM can serialize native log-only batches.
+   *
+   * @generated from field: repeated string messages = 2;
+   */
+  messages: string[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptLogEvent
+ */
+export type MathOptLogEventJson = {
+  /**
+   * Matches SolveResponse.messages so WASM can serialize native log-only batches.
+   *
+   * @generated from field: repeated string messages = 2;
+   */
+  messages?: string[];
+};
+
+export type MathOptLogEventValid = MathOptLogEvent;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MathOptLogEvent.
+ * Use `create(MathOptLogEventSchema)` to create a new message.
+ */
+export const MathOptLogEventSchema: GenMessage<MathOptLogEvent, {jsonType: MathOptLogEventJson, validType: MathOptLogEventValid}> = /*@__PURE__*/
+  messageDesc(file_mathopt, 9);
 

@@ -82,6 +82,7 @@ bool ContainsState(const std::vector<JobStatus>& statuses, JobState state) {
 }
 
 void RunsSingleJobAndReportsLifecycle() {
+  ManualEvent succeeded;
   JobScheduler scheduler({1, 8});
   std::vector<JobStatus> statuses;
   std::mutex statuses_mutex;
@@ -96,11 +97,14 @@ void RunsSingleJobAndReportsLifecycle() {
       [&](const JobStatus& status) {
         std::lock_guard lock(statuses_mutex);
         statuses.push_back(status);
+        if (status.state == JobState::kSucceeded) succeeded.Set();
       });
 
   const JobResult result = handle.result().get();
   ExpectEq(result.state, JobState::kSucceeded, "single job result state");
   ExpectEq(handle.status().state, JobState::kSucceeded, "single job final handle status");
+  // Completion publishes the result before delivering the status observer.
+  Expect(succeeded.WaitFor(1s), "single job delivers terminal status");
 
   std::lock_guard lock(statuses_mutex);
   Expect(ContainsState(statuses, JobState::kQueued), "single job reports queued");
@@ -284,9 +288,14 @@ void InvokesScopedCancellationHandler() {
   ManualEvent interrupted;
 
   auto handle = scheduler.Submit(Spec(), [&](JobContext& context) {
-    auto registration = context.OnCancellation([&] { interrupted.Set(); });
+    std::atomic<int> removed_calls = 0;
+    { auto removed = context.OnCancellation([&] { ++removed_calls; }); }
+    std::atomic<int> calls = 0;
+    auto first = context.OnCancellation([&] { ++calls; });
+    auto registration = context.OnCancellation([&] { ++calls; interrupted.Set(); });
     handler_registered.Set();
     interrupted.Wait();
+    Expect(calls == 2 && removed_calls == 0, "Scoped cancellation delivers to both live registrations only");
     return JobResult::Cancelled("interrupted");
   });
 
@@ -456,9 +465,32 @@ struct TestCase {
   void (*run)();
 };
 
+void NativeInterruptionRetainsResultAndReleasesCapacity() {
+  JobScheduler scheduler({2, 8});
+  std::promise<void> entered, interrupted;
+  auto entered_future = entered.get_future();
+  auto interrupted_future = interrupted.get_future();
+  auto handle = scheduler.Submit(JobSpec{"mathopt", 1}, [&](JobContext& context) {
+    auto registration = context.OnInterruption([&] { interrupted.set_value(); });
+    entered.set_value();
+    interrupted_future.wait();
+    Expect(context.interruption_requested(), "native interruption is visible");
+    Expect(!context.cancellation_requested(), "native interruption does not cancel the job");
+    return JobResult::Succeeded("retained stopped result");
+  });
+  entered_future.wait();
+  Expect(handle.Interrupt(), "running native interruption accepted");
+  const auto result = handle.result().get();
+  Expect(result.state == JobState::kSucceeded && result.message == "retained stopped result",
+         "interruption retains the executor result");
+  Expect(scheduler.Stats().available_threads == 2, "native interruption releases resource tokens");
+  Expect(!handle.Interrupt(), "terminal native interruption is a no-op");
+}
+
 int RunAllTests() {
   const TestCase tests[] = {
       {"RunsSingleJobAndReportsLifecycle", RunsSingleJobAndReportsLifecycle},
+      {"NativeInterruptionRetainsResultAndReleasesCapacity", NativeInterruptionRetainsResultAndReleasesCapacity},
       {"QueuesWhenThreadBudgetIsExhausted", QueuesWhenThreadBudgetIsExhausted},
       {"RunsJobsConcurrentlyWhenTokensAreAvailable", RunsJobsConcurrentlyWhenTokensAreAvailable},
       {"LargerJobWaitsForEnoughTokens", LargerJobWaitsForEnoughTokens},

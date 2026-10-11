@@ -25,6 +25,7 @@ export type {
   CpSatSchemas,
   CpSatSolveOptions,
   CpSatSolveResult,
+  CpSatValidateOptions,
   CpSatSolverParameters,
 } from './cp_sat/api.js';
 export type { SolverJobEvent } from './solver_executor.js';
@@ -51,6 +52,7 @@ export {
   IntervalVar,
   LinearExpr,
   NotBoolVar,
+  rebuildFromLinearExpressionProto,
   sum,
   term,
   weightedSum,

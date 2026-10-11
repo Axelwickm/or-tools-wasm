@@ -124,3 +124,4 @@ MODULE.bazel.lock
 /.playwright-mcp/
 /javascript/README.md
 /javascript/LICENSE
+/javascript/tests/.mathopt-lifecycle-*/

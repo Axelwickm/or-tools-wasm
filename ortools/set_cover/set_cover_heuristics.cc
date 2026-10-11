@@ -111,7 +111,8 @@ bool GreedySolutionGenerator::NextSolution(
   SubsetBoolVector subset_seen(num_subsets, false);
   std::vector<SubsetIndex> subsets_to_remove;
   subsets_to_remove.reserve(focus.size());
-  while (!pq.IsEmpty() || inv()->num_uncovered_elements() > 0) {
+  // A restricted focus can exhaust the queue before covering all elements.
+  while (!pq.IsEmpty()) {
     VLOG_EVERY_N_SEC(1, 5) << "Queue size: " << pq.heap_size()
                            << ", #uncovered elements: "
                            << inv()->num_uncovered_elements();
@@ -463,7 +464,11 @@ bool LazyElementDegreeSolutionGenerator::NextSolution(
         best_subset_num_free_elts = num_free_elements;
       }
     }
-    DCHECK_NE(best_subset, SubsetIndex(-1));
+    if (best_subset == SubsetIndex(-1)) {
+      LOG(WARNING) << "Best subset not found. Algorithmic error or invalid "
+                      "input.";
+      continue;
+    }
     inv()->Select(best_subset, CL::kCostAndCoverage);
     DVLOG(1) << "Cost = " << inv()->cost()
              << " num_uncovered_elements = " << inv()->num_uncovered_elements();
@@ -504,7 +509,7 @@ bool SteepestSearch::NextSolution(const SubsetBoolVector& in_focus) {
   DVLOG(1) << "subset_priorities.size(): " << subset_priorities.size();
   AdjustableKAryHeap<float, SubsetIndex::ValueType, 16, true> pq(
       subset_priorities, model()->num_subsets());
-  for (int iteration = 0; iteration < num_iterations && !pq.IsEmpty();
+  for (int64_t iteration = 0; iteration < num_iterations && !pq.IsEmpty();
        ++iteration) {
     const SubsetIndex best_subset(pq.TopIndex());
     pq.Pop();
@@ -637,7 +642,7 @@ bool GuidedTabuSearch::NextSolution(absl::Span<const SubsetIndex> focus) {
   Cost augmented_cost =
       std::accumulate(augmented_costs_.begin(), augmented_costs_.end(), 0.0);
   BaseInt trace_size = inv()->trace().size();
-  for (int iteration = 0; iteration < num_iterations; ++iteration) {
+  for (int64_t iteration = 0; iteration < num_iterations; ++iteration) {
     if (inv()->trace().size() > 2 * trace_size) {
       inv()->CompressTrace();
       trace_size = inv()->trace().size();
@@ -749,7 +754,7 @@ bool GuidedLocalSearch::NextSolution(absl::Span<const SubsetIndex> focus) {
     }
   }
 
-  for (int iteration = 0;
+  for (int64_t iteration = 0;
        !priority_heap_.IsEmpty() && iteration < num_iterations; ++iteration) {
     // Improve current solution respective to the current penalties by flipping
     // the best subset.

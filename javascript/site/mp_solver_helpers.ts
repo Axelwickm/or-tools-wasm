@@ -14,9 +14,14 @@ export type SimpleMpConfig = {
   expectedObjective: number;
   workerCount?: number;
   solverThreads?: number;
+  solverSpecificParameters?: string;
+  incremental?: boolean;
+  messageCallback?: (messages: string[]) => void;
 };
 
 type SimpleMpResult = {
+  incremental?: boolean;
+  verified?: boolean;
   status: number | string;
   objective: number;
   x: number;
@@ -24,8 +29,8 @@ type SimpleMpResult = {
   variables: number;
   constraints: number;
   wallTime: number;
-  iterations?: number;
-  nodes?: number;
+  iterations?: number | bigint;
+  nodes?: number | bigint;
   executor: 'direct' | 'worker' | 'server';
   workerCount?: number;
   solverThreads?: number;
@@ -94,11 +99,15 @@ function supportsNodeCount(solverId: SimpleMpConfig['solverId']): boolean {
 }
 
 export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<SimpleMpResult> {
-  const executionOptions = currentMPSolverExecutionOptions();
+  const executionOptions = { ...currentMPSolverExecutionOptions(), messageCallback: config.messageCallback };
 
   const solver = MPSolver.createSolver(config.solverId);
   if (!solver) {
     throw new Error(`${config.solverId} is not available in this build.`);
+  }
+
+  if (config.solverSpecificParameters && !await solver.setSolverSpecificParametersAsString(config.solverSpecificParameters, executionOptions)) {
+    throw new Error(`${config.solverId} rejected the solver-specific parameters.`);
   }
 
   {
@@ -125,10 +134,19 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       ? Math.floor(solverThreads)
       : undefined;
     let status: number | string = MPSolver.OPTIMAL;
-    if (config.solverId === 'SAT') {
+    if (config.incremental) {
+      const session = new MPSolver.IncrementalSolver(solver, executionOptions);
+      try {
+        status = await session.solve();
+        if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
+        x.setUpperBound(0);
+        status = await session.solve();
+        if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
+      } finally { await session.close(); }
+    } else if (config.solverId === 'SAT') {
       const protoResult = await solver.solveWithProto({
         ...executionOptions,
-        solverSpecificParameters: workerCount ? `num_workers: ${workerCount}` : undefined,
+        solverSpecificParameters: config.solverSpecificParameters || (workerCount ? `num_workers: ${workerCount}` : undefined),
       });
       if (!protoResult.loaded) {
         throw new Error('Solver returned a solution response that could not be loaded.');
@@ -141,7 +159,11 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
       status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
     }
+    const verified = await solver.verifySolution(1e-7, true, executionOptions);
+    if (!verified) throw new Error('Native solution verification failed.');
     const result = {
+      incremental: config.incremental,
+      verified,
       status,
       objective: objective.value(),
       x: x.solutionValue(),
@@ -171,6 +193,8 @@ export function renderSimpleMpResult(element: HTMLElement | null, result: Simple
     <table>
       <tbody>
         <tr><th>Status</th><td>${status}</td></tr>
+        ${result.incremental ? '<tr><th>Native session</th><td>Retained solver; updated x upper bound to 0</td></tr>' : ''}
+        ${result.verified !== undefined ? `<tr><th>Native verification</th><td>${result.verified ? 'passed' : 'failed'}</td></tr>` : ''}
         <tr><th>Executor</th><td>${result.executor}</td></tr>
         ${result.solverThreads ? `<tr><th>Requested solver threads</th><td>${result.solverThreads}</td></tr>` : ''}
         ${result.solverThreadsAccepted !== undefined ? `<tr><th>Thread request accepted</th><td>${result.solverThreadsAccepted ? 'yes' : 'no'}</td></tr>` : ''}

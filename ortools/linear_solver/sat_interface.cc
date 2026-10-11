@@ -38,6 +38,7 @@ class SatInterface : public MPSolverInterface {
 
   // ----- Solve -----
   MPSolver::ResultStatus Solve(const MPSolverParameters& param) override;
+  bool SupportsMessageCallbacks() const override { return true; }
   bool InterruptSolve() override;
 
   // ----- Directly solve proto is supported ---
@@ -137,11 +138,12 @@ MPSolver::ResultStatus SatInterface::Solve(const MPSolverParameters& param) {
 
   MPModelRequest request;
   solver_->ExportModelToProto(request.mutable_model());
+  if (message_callback_) parameters_.set_log_to_stdout(false);
   request.set_solver_specific_parameters(EncodeParametersAsString(parameters_));
   request.set_enable_internal_solver_output(!quiet_);
 
   const MPSolutionResponse response =
-      SatSolveProto(std::move(request), &interrupt_solve_);
+      SatSolveProto(std::move(request), &interrupt_solve_, message_callback_);
 
   // The solution must be marked as synchronized even when no solution exists.
   sync_status_ = SOLUTION_SYNCHRONIZED;

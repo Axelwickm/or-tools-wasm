@@ -30,8 +30,7 @@ type MathOptVariableLike = {
   lowerBound?: number;
   upperBound?: number;
   integer?: boolean;
-  isInteger?: boolean;
-  equals?(other: MathOptVariableLike): boolean;
+  equals(other: MathOptVariableLike): boolean;
   toString(): string;
 };
 
@@ -84,12 +83,6 @@ type MathOptQuadraticExpressionLike = {
   evaluate(values: Map<MathOptVariableLike, number> | Record<string | number, number>): number;
 };
 
-type MathOptVarEqVarLike = {
-  firstVariable: MathOptVariableLike;
-  secondVariable: MathOptVariableLike;
-  assertNotBoolean(): never;
-};
-
 type MathOptExpressionInput =
   | number
   | MathOptVariableLike
@@ -102,7 +95,6 @@ type MathOptBoundedExpressionLike<T> = {
   lowerBound: number;
   expression: T;
   upperBound: number;
-  assertNotBoolean(): never;
   toString(): string;
 };
 
@@ -111,7 +103,6 @@ type MathOptLowerBoundedExpressionLike<T> = {
   expression: T;
   upperBound: number;
   toBoundedExpression(upperBound: number): MathOptBoundedExpressionLike<T>;
-  assertNotBoolean(): never;
   toString(): string;
 };
 
@@ -120,7 +111,6 @@ type MathOptUpperBoundedExpressionLike<T> = {
   expression: T;
   upperBound: number;
   toBoundedExpression(lowerBound: number): MathOptBoundedExpressionLike<T>;
-  assertNotBoolean(): never;
   toString(): string;
 };
 
@@ -128,9 +118,6 @@ type MathOptModelLike = {
   readonly name: string;
   readonly objective?: MathOptObjectiveLike;
   addVariable(options?: {
-    lb?: number;
-    ub?: number;
-    isInteger?: boolean;
     lowerBound?: number;
     upperBound?: number;
     integer?: boolean;
@@ -145,9 +132,6 @@ type MathOptModelLike = {
     name?: string;
   }): MathOptVariableLike;
   addLinearConstraint(options?: {
-    lb?: number;
-    ub?: number;
-    expr?: unknown;
     lowerBound?: number;
     upperBound?: number;
     terms?: Array<{ variable: MathOptVariableLike; coefficient: number }>;
@@ -165,13 +149,13 @@ type MathOptModelLike = {
     name?: string;
   }): unknown;
   variables?(): MathOptVariableLike[];
-  getVariable?(id: number, validate?: boolean): MathOptVariableLike | undefined;
+  getVariable?(id: number): MathOptVariableLike | undefined;
   hasVariable?(id: number): boolean;
   getNumVariables?(): number;
   getNextVariableId?(): number;
   ensureNextVariableIdAtLeast?(id: number): void;
   linearConstraints?(): MathOptLinearConstraintLike[];
-  getLinearConstraint?(id: number, validate?: boolean): MathOptLinearConstraintLike | undefined;
+  getLinearConstraint?(id: number): MathOptLinearConstraintLike | undefined;
   hasLinearConstraint?(id: number): boolean;
   getNumLinearConstraints?(): number;
   getNextLinearConstraintId?(): number;
@@ -189,7 +173,6 @@ type MathOptModelLike = {
   minimizeLinearObjective?(terms: unknown, offset?: number): void;
   setLinearObjective?(terms: unknown, isMaximize: boolean, offset?: number): void;
   setObjective?(terms: unknown, isMaximize: boolean, offset?: number): void;
-  setQuadraticObjective?(terms: unknown, isMaximize: boolean, offset?: number): void;
   maximize(terms: unknown, offset?: number): void;
   minimize(terms: unknown, offset?: number): void;
 };
@@ -246,7 +229,6 @@ export type MathOptApi = {
     LinearExpression: abstract new (...args: never[]) => MathOptLinearExpressionLike;
     QuadraticExpression: abstract new (...args: never[]) => MathOptQuadraticExpressionLike;
     QuadraticTermKey: abstract new (...args: never[]) => MathOptQuadraticTermKeyLike;
-    VarEqVar: abstract new (...args: never[]) => MathOptVarEqVarLike;
     BoundedExpression: abstract new (...args: never[]) => MathOptBoundedExpressionLike<unknown>;
     LowerBoundedExpression: abstract new (...args: never[]) => MathOptLowerBoundedExpressionLike<unknown>;
     UpperBoundedExpression: abstract new (...args: never[]) => MathOptUpperBoundedExpressionLike<unknown>;
@@ -257,14 +239,11 @@ export type MathOptApi = {
     asFlatLinearExpression(input: unknown): MathOptLinearExpressionLike;
     asFlatQuadraticExpression(input: unknown): MathOptQuadraticExpressionLike;
     multiplyLinearExpressions(lhs: unknown, rhs: unknown): MathOptQuadraticExpressionLike;
-    evaluateExpression(input: unknown, values: Map<unknown, number> | Record<string | number, number>): number;
+    evaluateExpression(input: unknown, values: Map<MathOptVariableLike, number> | Record<string | number, number>): number;
     boundedExpression<T>(lowerBound: number, expression: T, upperBound: number): MathOptBoundedExpressionLike<T>;
     lowerBoundedExpression<T>(lowerBound: number, expression: T): MathOptLowerBoundedExpressionLike<T>;
     upperBoundedExpression<T>(expression: T, upperBound: number): MathOptUpperBoundedExpressionLike<T>;
     eq(lhs: unknown, rhs: unknown): MathOptBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike>;
-    ne(lhs: unknown, rhs: unknown): never;
-    variableEq(lhs: MathOptVariableLike, rhs: MathOptVariableLike): boolean | MathOptVarEqVarLike;
-    variableNe(lhs: MathOptVariableLike, rhs: MathOptVariableLike): boolean;
     le(lhs: unknown, rhs: unknown): MathOptUpperBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike> | MathOptLowerBoundedExpressionLike<MathOptQuadraticExpressionLike> | MathOptBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike>;
     ge(lhs: unknown, rhs: unknown): MathOptLowerBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike> | MathOptUpperBoundedExpressionLike<MathOptQuadraticExpressionLike> | MathOptBoundedExpressionLike<MathOptLinearExpressionLike | MathOptQuadraticExpressionLike>;
     completeUpperBound<T>(lowerBounded: MathOptLowerBoundedExpressionLike<T>, upperBound: number): MathOptBoundedExpressionLike<T>;
@@ -272,12 +251,17 @@ export type MathOptApi = {
     solve(model: MathOptModelLike, options?: {
       solverType?: number | string;
       threads?: number;
-      iterationLimit?: number;
+      iterationLimit?: number | bigint;
       interrupter?: { readonly interrupted?: boolean; isInterrupted?(): boolean };
       messageCallback?: (messages: string[]) => void;
       [key: string]: unknown;
     }): Promise<{
       terminationReason: string;
+      terminationDetail: string;
+      solveStats: { simplexIterations: bigint; barrierIterations: bigint; firstOrderIterations: bigint; nodeCount: bigint };
+      gscipSpecificOutput: { status?: string | number; stats?: { nodeCount?: bigint | number } } | null;
+      pdlpSpecificOutput: { convergenceInformation?: { primalObjective?: number } } | null;
+      osqpSpecificOutput: unknown | null;
       terminationLimit: string | null;
       primalBound: number | null;
       dualBound: number | null;
@@ -286,38 +270,29 @@ export type MathOptApi = {
       dualStatus?: string | null;
       primalOrDualInfeasible?: boolean;
       objectiveValue: number | null;
-      variableValues: Record<string, number>;
       variableValuesById: Record<number, number>;
       solutions: Array<{
         primalSolution: {
           objectiveValue: number | null;
-          variableValues: Record<string, number>;
           variableValuesById: Record<number, number>;
           feasibilityStatus?: string;
         } | null;
         dualSolution: {
           objectiveValue: number | null;
-          dualValues: Record<string, number>;
           dualValuesById: Record<number, number>;
-          reducedCosts: Record<string, number>;
           reducedCostsById: Record<number, number>;
           feasibilityStatus?: string;
         } | null;
         basis?: {
-          variableStatus: Record<string, string>;
           variableStatusById: Record<number, string>;
-          constraintStatus: Record<string, string>;
           constraintStatusById: Record<number, string>;
         } | null;
       }>;
       primalRays?: Array<{
-        variableValues: Record<string, number>;
         variableValuesById: Record<number, number>;
       }>;
       dualRays?: Array<{
-        dualValues: Record<string, number>;
         dualValuesById: Record<number, number>;
-        reducedCosts: Record<string, number>;
         reducedCostsById: Record<number, number>;
       }>;
       messages: string[];
@@ -326,7 +301,7 @@ export type MathOptApi = {
     encodeSolveRequest(model: MathOptModelLike, options?: {
       solverType?: number | string;
       threads?: number;
-      iterationLimit?: number;
+      iterationLimit?: number | bigint;
       [key: string]: unknown;
     }): Uint8Array;
   };
@@ -411,6 +386,9 @@ function withMathOptMetadata(
 }
 
 const activeSolveResultContractNames = new Set([
+  'SolveTest/full_native_backend_limits',
+  'SolveStatsTest/native_backend_statistics_and_outputs',
+  'QuadraticConstraintTest/native_qcqp_miqcp_and_incremental_lifecycle',
   'SolveTest/test_solve_error',
   'SolveTest/test_lp_solve',
   'SolveTest/test_cp_sat_mip_like',
@@ -465,8 +443,8 @@ async function runGlopLp(api: MathOptApi, mode: ExecutorFixtureMode, threads: nu
   const result = await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLOP, threads });
   assertOptimal('MathOpt GLOP LP', result);
   assert(near(result.objectiveValue, 56), `MathOpt GLOP LP: expected objective 56, got ${result.objectiveValue}`);
-  assert(near(result.variableValues.x, 0), `MathOpt GLOP LP: expected x=0, got ${result.variableValues.x}`);
-  assert(near(result.variableValues.y, 14), `MathOpt GLOP LP: expected y=14, got ${result.variableValues.y}`);
+  assert(near(result.variableValuesById[x.id], 0), `MathOpt GLOP LP: expected x=0, got ${result.variableValuesById[x.id]}`);
+  assert(near(result.variableValuesById[y.id], 14), `MathOpt GLOP LP: expected y=14, got ${result.variableValuesById[y.id]}`);
   return withMathOptMetadata({
     name: 'MathOpt.testGlopLinearProgram',
     mode,
@@ -474,7 +452,7 @@ async function runGlopLp(api: MathOptApi, mode: ExecutorFixtureMode, threads: nu
     ok: true,
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
-    values: result.variableValues,
+    values: Object.fromEntries(model.variables!().map(variable => [variable.name, result.variableValuesById[variable.id]])),
   }, {
     id: 'mathopt.backend.glop_linear_program',
     tags: ['backend', 'glop', mode, `${threads}-threads`],
@@ -506,8 +484,8 @@ async function runCpSatMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: 
   const result = await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.CP_SAT, threads });
   assertOptimal('MathOpt CP-SAT MIP', result);
   assert(near(result.objectiveValue, 8), `MathOpt CP-SAT MIP: expected objective 8, got ${result.objectiveValue}`);
-  assert(near(result.variableValues.x, 0), `MathOpt CP-SAT MIP: expected x=0, got ${result.variableValues.x}`);
-  assert(near(result.variableValues.y, 4), `MathOpt CP-SAT MIP: expected y=4, got ${result.variableValues.y}`);
+  assert(near(result.variableValuesById[x.id], 0), `MathOpt CP-SAT MIP: expected x=0, got ${result.variableValuesById[x.id]}`);
+  assert(near(result.variableValuesById[y.id], 4), `MathOpt CP-SAT MIP: expected y=4, got ${result.variableValuesById[y.id]}`);
   return withMathOptMetadata({
     name: 'MathOpt.testCpSatIntegerProgram',
     mode,
@@ -515,7 +493,7 @@ async function runCpSatMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: 
     ok: true,
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
-    values: result.variableValues,
+    values: Object.fromEntries(model.variables!().map(variable => [variable.name, result.variableValuesById[variable.id]])),
   }, {
     id: 'mathopt.backend.cp_sat_integer_program',
     tags: ['backend', 'cp-sat', mode, `${threads}-threads`],
@@ -550,8 +528,8 @@ async function runGScipMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: 
   });
   assertOptimal('MathOpt GSCIP MIP', result);
   assert(near(result.objectiveValue, 8), `MathOpt GSCIP MIP: expected objective 8, got ${result.objectiveValue}`);
-  assert(near(result.variableValues.x, 0), `MathOpt GSCIP MIP: expected x=0, got ${result.variableValues.x}`);
-  assert(near(result.variableValues.y, 4), `MathOpt GSCIP MIP: expected y=4, got ${result.variableValues.y}`);
+  assert(near(result.variableValuesById[x.id], 0), `MathOpt GSCIP MIP: expected x=0, got ${result.variableValuesById[x.id]}`);
+  assert(near(result.variableValuesById[y.id], 4), `MathOpt GSCIP MIP: expected y=4, got ${result.variableValuesById[y.id]}`);
   return withMathOptMetadata({
     name: 'MathOpt.testGScipIntegerProgram',
     mode,
@@ -559,7 +537,7 @@ async function runGScipMip(api: MathOptApi, mode: ExecutorFixtureMode, threads: 
     ok: true,
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
-    values: result.variableValues,
+    values: Object.fromEntries(model.variables!().map(variable => [variable.name, result.variableValuesById[variable.id]])),
   }, {
     id: 'mathopt.backend.gscip_integer_program',
     tags: ['backend', 'gscip', ...(threads > 1 ? ['execution-semantics', 'concurrent'] : []), mode, `${threads}-threads`],
@@ -611,7 +589,7 @@ async function runPdlpLp(api: MathOptApi, mode: ExecutorFixtureMode, threads: nu
     ok: true,
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
-    values: result.variableValues,
+    values: Object.fromEntries(model.variables!().map(variable => [variable.name, result.variableValuesById[variable.id]])),
   }, {
     id: 'mathopt.backend.pdlp_linear_program',
     tags: ['backend', 'pdlp', 'execution-semantics', mode, `${threads}-threads`],
@@ -649,8 +627,8 @@ async function runGlpkLp(api: MathOptApi, mode: ExecutorFixtureMode): Promise<Ma
   const result = await api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLPK, threads: 1, glpk });
   assertOptimal('MathOpt GLPK LP', result);
   assert(near(result.objectiveValue, 56), `MathOpt GLPK LP: expected objective 56, got ${result.objectiveValue}`);
-  assert(near(result.variableValues.x, 0), `MathOpt GLPK LP: expected x=0, got ${result.variableValues.x}`);
-  assert(near(result.variableValues.y, 14), `MathOpt GLPK LP: expected y=14, got ${result.variableValues.y}`);
+  assert(near(result.variableValuesById[x.id], 0), `MathOpt GLPK LP: expected x=0, got ${result.variableValuesById[x.id]}`);
+  assert(near(result.variableValuesById[y.id], 14), `MathOpt GLPK LP: expected y=14, got ${result.variableValuesById[y.id]}`);
 
   await assertRejectsContaining(
     () => api.MathOpt.solve(model, { solverType: api.MathOpt.SolverType.GLPK, threads: 4 }),
@@ -665,7 +643,7 @@ async function runGlpkLp(api: MathOptApi, mode: ExecutorFixtureMode): Promise<Ma
     ok: true,
     terminationReason: result.terminationReason,
     objectiveValue: result.objectiveValue,
-    values: result.variableValues,
+    values: Object.fromEntries(model.variables!().map(variable => [variable.name, result.variableValuesById[variable.id]])),
   }, {
     id: 'mathopt.backend.glpk_linear_program',
     tags: ['backend', 'glpk', mode, '1-threads'],

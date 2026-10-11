@@ -1,8 +1,8 @@
+import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import { loadMPSolverRuntime } from '../runtime_loader.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,
-  SolverCancellationUnsupportedError,
   SolverExecutorBusyError,
   SolverFailureKind,
   SolverJobState,
@@ -12,16 +12,18 @@ import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
 import type {
   MpSolverExecutor,
+  MpSolverLogEvent,
   MpSolverJob,
   MpSolverOperation,
   MpSolverResult,
 } from './protocol.js';
+import { mpSolverProtocol } from './protocol.js';
 
 export class DirectMpSolverExecutor implements MpSolverExecutor {
   readonly solver = 'mp-solver';
 
   private nextRequestId = 1;
-  private activeJob: object | null = null;
+  private activeJob: { cancelled: boolean; nativeRunning: boolean; interruptible: boolean } | null = null;
 
   constructor(
     private readonly loadModuleImpl: () => Promise<OrToolsWasmModule> = loadMPSolverRuntime,
@@ -35,20 +37,26 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
 
   execute(
     operation: MpSolverOperation,
-    options: SolverExecutionOptions<never>,
+    options: SolverExecutionOptions<MpSolverLogEvent>,
   ): MpSolverJob {
     if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextRequestId++;
-    const state = {};
+    const state = { cancelled: false, nativeRunning: false, interruptible: (operation.type === 'solve' || operation.type === 'sessionRun' || operation.type === 'iis') && operation.interruptible };
     this.activeJob = state;
     return {
       requestId,
       result: this.run(requestId, operation, options).finally(() => {
         if (this.activeJob === state) this.activeJob = null;
       }),
-      cancel: () => Promise.reject(
-        new SolverCancellationUnsupportedError(this.solver),
-      ),
+      cancel: async () => {
+        state.cancelled = true;
+        const module = await this.module();
+        if (this.activeJob === state && state.nativeRunning && state.interruptible) {
+          const address = module._mp_solver_interrupt_address ?? module.mp_solver_interrupt_address;
+          if (typeof address !== 'function') throw new Error('MPSolver interrupt address export unavailable.');
+          Atomics.store(module.HEAPU8, address() as number, 1);
+        }
+      },
     };
   }
 
@@ -59,7 +67,7 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
   private async run(
     requestId: number,
     operation: MpSolverOperation,
-    options: SolverExecutionOptions<never>,
+    options: SolverExecutionOptions<MpSolverLogEvent>,
   ): Promise<MpSolverResult> {
     const createdAt = BigInt(Date.now());
     try {
@@ -77,7 +85,17 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
         createdAt,
         BigInt(Date.now()),
       ));
-      const result = await this.executeNative(module, operation);
+      const result = await withWasmRuntimeLock(module, async () => {
+        options.onDispatch?.(module);
+        const state = this.activeJob!;
+        if (state.cancelled) throw Object.assign(new Error('MPSolver solve was cancelled.'), { name: 'AbortError' });
+        state.nativeRunning = operation.type === 'solve' || operation.type === 'iis' || (operation.type === 'sessionRun' && operation.action === 0);
+        const messages: Map<number, (payload: Uint8Array) => void> = module.__mpSolverMessages ??= new Map();
+        if ((operation.type === 'solve' || operation.type === 'sessionRun') && operation.streamMessages)
+          messages.set(requestId, payload => { void options.onEvent(mpSolverProtocol.decodeEvent!(payload)!); });
+        try { return await this.executeNative(module, operation, requestId); }
+        finally { messages.delete(requestId); state.nativeRunning = false; }
+      });
       await options.onEvent(createSolverJobStatusEvent(
         this.solver,
         requestId,
@@ -106,10 +124,30 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
   private async executeNative(
     module: OrToolsWasmModule,
     operation: MpSolverOperation,
+    requestId: number,
   ): Promise<MpSolverResult> {
+    if (operation.type === 'loadSolution' || operation.type === 'exportModel' || operation.type === 'activities' || operation.type === 'iis' || operation.type === 'sessionCreate' || operation.type === 'sessionRun' || operation.type === 'sessionClose' || (operation.type === 'solve' && (operation.streamMessages || operation.editableSnapshot))) {
+      const bytes = mpSolverProtocol.encodeRequest(operation);
+      const pointer = allocateWasmBytes(module, bytes);
+      try {
+        const response = await readWasmResult(module, async length => {
+          const query = operation.type === 'loadSolution' || operation.type === 'exportModel' || operation.type === 'activities';
+          const entrypoint = query ? 'mp_solver_model_query_request' : operation.type === 'iis' ? 'mp_solver_compute_iis_request'
+            : operation.type === 'solve' ? 'mp_solver_solve_bridge_request' : 'mp_solver_session_request';
+          const arguments_ = [pointer, bytes.length, length];
+          if (!query && operation.type !== 'iis') arguments_.push(requestId);
+          const result = await module.ccall(entrypoint, 'number',
+            arguments_.map(() => 'number'), arguments_, { async: true }) as number;
+          if (!result) throw new Error(module.ccall('mp_solver_bridge_error', 'string', [], []) as string);
+          return result;
+        });
+        return mpSolverProtocol.decodeResult(response);
+      } finally { module._free(pointer); }
+    }
     if (operation.type === 'schema') {
       return {
         type: 'schema',
+        backendVersions: JSON.parse(module.ccall('mp_solver_backend_versions', 'string', [], []) as string),
         linearSolverProtoSchema: module.ccall(
           'get_linear_solver_schema',
           'string',
@@ -125,6 +163,52 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
       };
     }
 
+    if (operation.type === 'verifySolution') {
+      const modelPointer = allocateWasmBytes(module, operation.model);
+      let solutionPointer = 0;
+      try {
+        solutionPointer = allocateWasmBytes(module, operation.solution);
+        const verified = await module.ccall('mp_solver_verify_solution_proto', 'number',
+          ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+          [modelPointer, operation.model.length, solutionPointer, operation.solution.length,
+            operation.solverType, operation.tolerance, operation.logErrors ? 1 : 0], { async: true }) as number;
+        if (verified < 0) throw new Error(module.ccall('mp_solver_last_verification_error', 'string', [], []) as string);
+        return { type: 'verifySolution', verified: verified === 1 };
+      } finally {
+        module._free(modelPointer);
+        if (solutionPointer) module._free(solutionPointer);
+      }
+    }
+
+    if (operation.type === 'validateParameters') {
+      const bytes = new TextEncoder().encode(operation.parameters);
+      const pointer = allocateWasmBytes(module, bytes);
+      try {
+        const accepted = await module.ccall('mp_solver_validate_solver_specific_parameters', 'number',
+          ['number', 'number', 'number'], [operation.solverType, pointer, bytes.length], { async: true }) as number;
+        if (accepted < 0) throw new Error('MPSolver parameter validation backend is unavailable.');
+        return { type: 'validateParameters', accepted: accepted === 1 };
+      } finally { module._free(pointer); }
+    }
+
+    if (operation.type === 'validateModel') {
+      const pointer = allocateWasmBytes(module, operation.model);
+      try {
+        return { type: 'validateModel', error: module.ccall('mp_solver_find_error_in_model_proto', 'string',
+          ['number', 'number'], [pointer, operation.model.length]) as string };
+      } finally { module._free(pointer); }
+    }
+    if (operation.type === 'importModel') {
+      const pointer = allocateWasmBytes(module, operation.model);
+      try {
+        const model = await readWasmResult(module, async length => await module.ccall('mp_solver_import_model', 'number',
+          ['number', 'number', 'number', 'string', 'number', 'number'],
+          [pointer, operation.model.length, operation.solverType, operation.name, operation.keepNames ? 1 : 0, length], { async: true }) as number);
+        return { type: 'importModel', model,
+          status: module.ccall('mp_solver_last_import_status', 'number', [], []) as number,
+          error: module.ccall('mp_solver_last_import_error', 'string', [], []) as string };
+      } finally { module._free(pointer); }
+    }
     const requestPointer = allocateWasmBytes(module, operation.request);
     let parametersHandle = 0;
     try {
@@ -171,7 +255,9 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
           ],
         { async: true },
       ) as number);
-      return { type: 'solve', response };
+      const native = parametersHandle ? JSON.parse(module.ccall('mp_solver_last_solve_metadata', 'string', [], []) as string) : {};
+      const metadata = native.solverVersion ? { ...native, iterations: BigInt(native.iterations), nodes: BigInt(native.nodes), exactConditionNumber: native.exactConditionNumber === undefined ? undefined : Number(native.exactConditionNumber) } : undefined;
+      return { type: 'solve', response, metadata };
     } finally {
       if (parametersHandle) module.ccall('mp_solver_parameters_delete', null, ['number'], [parametersHandle]);
       if (requestPointer) module._free(requestPointer);

@@ -1,3 +1,21 @@
+import { runMathOptCallbackCases } from '../../cases/or-tools-wasm/mathopt/callbacks.ts';
+import { runMathOptModelImportCases } from '../../cases/or-tools-wasm/mathopt/model_import.ts';
+import { runMathOptMpsCases } from '../../cases/or-tools-wasm/mathopt/mps.ts';
+import { runMathOptIndicatorCases } from '../../cases/or-tools-wasm/mathopt/indicators.ts';
+import { runMathOptAdmissionCases } from '../../cases/or-tools-wasm/mathopt/admission.ts';
+import * as MathOptControlApi from 'or-tools-wasm/mathopt';
+import { runMathOptCancellationCases } from '../../cases/or-tools-wasm/mathopt/cancellation.ts';
+import * as MPSolverControlApi from 'or-tools-wasm/mp-solver';
+import { runMpSolverCancellationCases } from '../../cases/or-tools-wasm/mp_solver/cancellation.ts';
+import { runMpSolverModelImportCases } from '../../cases/or-tools-wasm/mp_solver/model_import.ts';
+import { runMpSolverModelValidationCases } from '../../cases/or-tools-wasm/mp_solver/model_validation.ts';
+import { runMpSolverModelReuseCases } from '../../cases/or-tools-wasm/mp_solver/model_reuse.ts';
+import * as RcpspControlApi from 'or-tools-wasm/rcpsp';
+import { runRcpspModelCorrectnessCases } from '../../cases/or-tools-wasm/rcpsp/model_correctness.ts';
+import * as RoutingApi from 'or-tools-wasm/routing';
+import { runRoutingControlCases } from '../../cases/or-tools-wasm/routing/controls.ts';
+import { runPdlpControlCases } from '../../cases/or-tools-wasm/pdlp/controls.ts';
+import { runMpSolverProtoValidationCases } from '../../cases/or-tools-wasm/mp_solver/proto_validation.ts';
 import {
   CpSat,
 } from 'or-tools-wasm/cp-sat';
@@ -40,6 +58,10 @@ import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parit
 import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
+import { runCpSatStatisticsCases } from '../../cases/or-tools-wasm/cp_sat/statistics.ts';
+import { runCpSatModelExportCases } from '../../cases/or-tools-wasm/cp_sat/model_export.ts';
+import { runCpSatMutationCases } from '../../cases/or-tools-wasm/cp_sat/mutation.ts';
+import { runCpSatExpressionHelperCases } from '../../cases/or-tools-wasm/cp_sat/expression_helpers.ts';
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
@@ -166,6 +188,10 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   const highLevelResults = await runCpSatHighLevelParityCasesForPackage(CpSatApi as never);
   await assertCaseSteps(t, 'deno high-level CP-SAT', highLevelResults);
 
+  await runCpSatStatisticsCases(CpSatApi as never);
+  await runCpSatModelExportCases(CpSatApi as never);
+  await runCpSatMutationCases(CpSatApi as never);
+  await runCpSatExpressionHelperCases(CpSatApi as never);
   const highLevelContractResults = await runCpSatHighLevelContractCases(CpSatApi as never);
   await assertCaseSteps(t, 'deno high-level CP-SAT contract', highLevelContractResults);
 
@@ -177,6 +203,7 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     await assertCaseSteps(t, `deno CP-SAT ${result.mode}/${result.workerProfile}`, result.cases);
   }
 
+  await runRoutingControlCases(RoutingApi as never);
   const routingResults = await runRoutingCases({
     BOOL_FALSE,
     BOOL_UNSPECIFIED,
@@ -194,6 +221,11 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
     MPSolver,
     MPSolverParameters,
   }, { modes: executorFixtureModes });
+  await runMpSolverProtoValidationCases({ MPSolver } as never);
+  await runMpSolverCancellationCases(MPSolverControlApi as never);
+  await runMpSolverModelReuseCases(MPSolverControlApi as never);
+  await runMpSolverModelImportCases(MPSolverControlApi as never);
+  await runMpSolverModelValidationCases(MPSolverControlApi as never);
   await assertCaseSteps(t, 'deno MPSolver', mpSolverResults);
 
   const knapsackResults = await runKnapsackCases({
@@ -224,17 +256,25 @@ Deno.test('runs the shared solver fixture cases in Deno', async (t) => {
   await runSetCoverWorkerLifecycleCase(SetCoverApi);
   await runSetCoverEventHandlerCase(SetCoverApi);
 
+  await runRcpspModelCorrectnessCases(RcpspControlApi as never);
   const rcpspResults = await runRcpspCases(RcpspApi);
   await assertCaseSteps(t, 'deno RCPSP', rcpspResults);
   await runRcpspConcurrencyCase(RcpspApi);
   await runRcpspWorkerLifecycleCase(RcpspApi);
   await runRcpspEventHandlerCase(RcpspApi);
 
+  await runMathOptIndicatorCases(MathOptControlApi as never);
+  await runMathOptCallbackCases(MathOptControlApi as never);
+  await runMathOptModelImportCases(MathOptControlApi as never);
+  await runMathOptMpsCases(MathOptControlApi as never);
+  await runMathOptAdmissionCases(MathOptControlApi as never);
+  await runMathOptCancellationCases(MathOptControlApi as never);
   const mathOptResults = await runMathOptCases({
     MathOpt,
-  }, { modes: executorFixtureModes });
+  } as never, { modes: executorFixtureModes });
   await assertCaseSteps(t, 'deno MathOpt', mathOptResults);
 
+  await runPdlpControlCases(PdlpApi as never);
   const pdlpResults = await runPdlpCases(PdlpApi);
   await assertCaseSteps(t, 'deno PDLP', pdlpResults);
 });

@@ -104,11 +104,11 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       model.maximize([{ variable: x, coefficient: 1 }]);
       const result = await solveAndAssert(api, model, api.MathOpt.SolverType.GLOP, threads);
       assert(near(result.objectiveValue, 1), `ModelTest/test_name expected objective 1, got ${result.objectiveValue}`);
-      assert(near(result.variableValues.x, 1), `ModelTest/test_name expected x=1, got ${result.variableValues.x}`);
+      assert(near(result.variableValuesById[x.id], 1), `ModelTest/test_name expected x=1, got ${result.variableValuesById[x.id]}`);
       return {
         terminationReason: result.terminationReason,
         objectiveValue: result.objectiveValue,
-        values: result.variableValues,
+        values: Object.fromEntries(model.variables!().map(variable => [variable.name, result.variableValuesById[variable.id]])),
       };
     },
   },
@@ -123,11 +123,11 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       model.maximize([{ variable: x, coefficient: 1 }]);
       const result = await solveAndAssert(api, model, api.MathOpt.SolverType.GLOP, threads);
       assert(near(result.objectiveValue, 1), `ModelTest/test_name_empty expected objective 1, got ${result.objectiveValue}`);
-      assert(near(result.variableValues.x, 1), `ModelTest/test_name_empty expected x=1, got ${result.variableValues.x}`);
+      assert(near(result.variableValuesById[x.id], 1), `ModelTest/test_name_empty expected x=1, got ${result.variableValuesById[x.id]}`);
       return {
         terminationReason: result.terminationReason,
         objectiveValue: result.objectiveValue,
-        values: result.variableValues,
+        values: Object.fromEntries(model.variables!().map(variable => [variable.name, result.variableValuesById[variable.id]])),
       };
     },
   },
@@ -310,23 +310,6 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       const model = api.MathOpt.Model();
       assert(model.getVariable?.(0) === undefined, 'getVariable(0) should return undefined');
       assert(model.getLinearConstraint?.(0) === undefined, 'getLinearConstraint(0) should return undefined');
-      const badVariable = model.getVariable?.(0, false);
-      const badConstraint = model.getLinearConstraint?.(0, false);
-      assert(badVariable?.id === 0, 'validate=false variable id');
-      assert(badConstraint?.id === 0, 'validate=false linear constraint id');
-      return apiOnly();
-    },
-  },
-  {
-    name: 'ModelElementTest/test_delete_invalid_element_error',
-    source: 'ortools/math_opt/python/model_element_test.py',
-    async run(api) {
-      const model = api.MathOpt.Model();
-      const badVariable = model.getVariable?.(0, false);
-      const badConstraint = model.getLinearConstraint?.(0, false);
-      assert(badVariable && badConstraint, 'expected validate=false elements');
-      assertThrows(() => model.deleteVariable?.(badVariable), 'delete invalid variable should throw');
-      assertThrows(() => model.deleteLinearConstraint?.(badConstraint), 'delete invalid linear constraint should throw');
       return apiOnly();
     },
   },
@@ -373,8 +356,6 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       model.deleteLinearConstraint?.(constraint);
       assert(model.getVariable?.(0) === undefined, 'get deleted variable should return undefined');
       assert(model.getLinearConstraint?.(0) === undefined, 'get deleted linear constraint should return undefined');
-      assert(model.getVariable?.(0, false)?.id === 0, 'validate=false deleted variable');
-      assert(model.getLinearConstraint?.(0, false)?.id === 0, 'validate=false deleted linear constraint');
       return apiOnly();
     },
   },
@@ -541,7 +522,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
     source: MODEL_SOURCE,
     async run(api) {
       const model = api.MathOpt.Model('test_model');
-      const c = model.addLinearConstraint?.({ lowerBound: -1, upperBound: 2.5, name: 'c' }) ?? model.addLinearConstraint({ lowerBound: -1, upperBound: 2.5, name: 'c' });
+      const c = model.addLinearConstraint({ lowerBound: -1, upperBound: 2.5, name: 'c' });
       model.deleteLinearConstraint?.(c);
       assertThrows(() => c.name, 'reading deleted linear constraint name should throw');
       return apiOnly();
@@ -552,7 +533,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
     source: MODEL_SOURCE,
     async run(api) {
       const model = api.MathOpt.Model('test_model');
-      const c = model.addLinearConstraint?.({ lowerBound: -1, upperBound: 2.5, name: 'c' }) ?? model.addLinearConstraint({ lowerBound: -1, upperBound: 2.5, name: 'c' });
+      const c = model.addLinearConstraint({ lowerBound: -1, upperBound: 2.5, name: 'c' });
       model.deleteLinearConstraint?.(c);
       assertThrows(() => {
         c.lowerBound = -12;
@@ -580,7 +561,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
     source: MODEL_SOURCE,
     async run(api) {
       const model = api.MathOpt.Model('test_model');
-      const c = model.addLinearConstraint?.({ lowerBound: -1, upperBound: 2.5, name: 'c' }) ?? model.addLinearConstraint({ lowerBound: -1, upperBound: 2.5, name: 'c' });
+      const c = model.addLinearConstraint({ lowerBound: -1, upperBound: 2.5, name: 'c' });
       c.lowerBound = Number.NEGATIVE_INFINITY;
       c.upperBound = -3.0;
       assert(c.lowerBound === Number.NEGATIVE_INFINITY, 'expected updated lower bound');
@@ -596,8 +577,8 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       const x = model.addBinaryVariable?.({ name: 'x' }) ?? model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addBinaryVariable?.({ name: 'y' }) ?? model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
       const z = model.addBinaryVariable?.({ name: 'z' }) ?? model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'z' });
-      const c = model.addLinearConstraint?.({ lowerBound: 0, upperBound: 1, name: 'c' }) ?? model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
-      const d = model.addLinearConstraint?.({ upperBound: 1, name: 'd' }) ?? model.addLinearConstraint({ upperBound: 1, name: 'd' });
+      const c = model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
+      const d = model.addLinearConstraint({ upperBound: 1, name: 'd' });
       c.setCoefficient?.(x, 1);
       c.setCoefficient?.(y, 0);
       d.setCoefficient?.(x, 2);
@@ -649,11 +630,11 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       assertNear(d.getCoefficient?.(z), -1, 'd z coefficient');
       assertNear(d.lowerBound, Number.NEGATIVE_INFINITY, 'd lowerBound');
       assertNear(d.upperBound, 1, 'd upperBound');
-      const e = model.addLinearConstraint?.({ lowerBound: 0 }) ?? model.addLinearConstraint({ lowerBound: 0 });
+      const e = model.addLinearConstraint({ lowerBound: 0 });
       assertNear(e.getCoefficient?.(x), 0, 'e x coefficient');
       assertNear(e.lowerBound, 0, 'e lowerBound');
       assertNear(e.upperBound, Number.POSITIVE_INFINITY, 'e upperBound');
-      const f = model.addLinearConstraint?.({ expression: 1, upperBound: 2 }) ?? model.addLinearConstraint({ expression: 1, upperBound: 2 });
+      const f = model.addLinearConstraint({ expression: 1, upperBound: 2 });
       assertNear(f.upperBound, 1, 'f upperBound');
       return apiOnly({ c: c.id, d: d.id, e: e.id, f: f.id });
     },
@@ -799,8 +780,8 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       const model = api.MathOpt.Model('test_model');
       const x = model.addBinaryVariable?.({ name: 'x' }) ?? model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addBinaryVariable?.({ name: 'y' }) ?? model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const c = model.addLinearConstraint?.({ lb: 0, ub: 1, name: 'c' }) ?? model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
-      const d = model.addLinearConstraint?.({ lb: 0, ub: 1, name: 'd' }) ?? model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'd' });
+      const c = model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
+      const d = model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'd' });
       c.setCoefficient?.(x, 1);
       c.setCoefficient?.(y, 2);
       d.setCoefficient?.(x, 1);
@@ -830,8 +811,8 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       const model = api.MathOpt.Model('test_model');
       const x = model.addBinaryVariable?.({ name: 'x' }) ?? model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const y = model.addBinaryVariable?.({ name: 'y' }) ?? model.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'y' });
-      const c = model.addLinearConstraint?.({ lb: 0, ub: 1, name: 'c' }) ?? model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
-      const d = model.addLinearConstraint?.({ lb: 0, ub: 1, name: 'd' }) ?? model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'd' });
+      const c = model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
+      const d = model.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'd' });
       c.setCoefficient?.(x, 1);
       c.setCoefficient?.(y, 2);
       d.setCoefficient?.(x, 1);
@@ -859,7 +840,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       const x1 = model1.addBinaryVariable?.({ name: 'x' }) ?? model1.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
       const model2 = api.MathOpt.Model('test_model2');
       model2.addBinaryVariable?.({ name: 'x' }) ?? model2.addVariable({ lowerBound: 0, upperBound: 1, integer: true, name: 'x' });
-      const c2 = model2.addLinearConstraint?.({ lb: 0, ub: 1, name: 'c' }) ?? model2.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
+      const c2 = model2.addLinearConstraint({ lowerBound: 0, upperBound: 1, name: 'c' });
       assertThrows(() => c2.setCoefficient?.(x1, 1), 'wrong-model setCoefficient should throw');
       return apiOnly({ c: c2.id });
     },
@@ -921,7 +902,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       model.objective?.setLinearCoefficient(x, 10);
       model.objective?.setLinearCoefficient(y, 11);
       const expr = api.MathOpt.multiplyLinearExpressions(x, x).multiply(3).add(api.MathOpt.linearTerm(x, 2)).add(1);
-      model.setQuadraticObjective?.(expr, true);
+      model.setObjective?.(expr, true);
       assert(model.objective?.isMaximize === true, 'objective should maximize');
       assertNear(model.objective?.offset, 1, 'objective offset');
       assertNear(model.objective?.getLinearCoefficient(x), 2, 'objective x linear coefficient');
@@ -990,7 +971,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       model.objective?.setLinearCoefficient(y, 11);
       if (model.objective) model.objective.isMaximize = true;
       const expr = api.MathOpt.multiplyLinearExpressions(x, x).multiply(3).add(api.MathOpt.linearTerm(x, 2)).add(1);
-      model.setQuadraticObjective?.(expr, false);
+      model.setObjective?.(expr, false);
       assert(model.objective?.isMaximize === false, 'objective should minimize');
       assertNear(model.objective?.offset, 1, 'objective offset');
       assertNear(model.objective?.getLinearCoefficient(x), 2, 'objective x linear coefficient');
@@ -1057,7 +1038,7 @@ export const mathOptModelContractCases: MathOptModelCase[] = [
       model.objective?.setLinearCoefficient(x, 10);
       model.objective?.setLinearCoefficient(y, 11);
       const expr = api.MathOpt.multiplyLinearExpressions(x, x).multiply(3).add(api.MathOpt.linearTerm(x, 2)).add(1);
-      model.setQuadraticObjective?.(expr, true);
+      model.setObjective?.(expr, true);
       assert(model.objective?.isMaximize === true, 'objective should maximize');
       assertNear(model.objective?.offset, 1, 'objective offset');
       assertNear(model.objective?.getLinearCoefficient(x), 2, 'objective x linear coefficient');

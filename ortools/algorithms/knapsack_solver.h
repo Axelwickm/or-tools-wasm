@@ -201,6 +201,10 @@ class KnapsackSolver {
   /// Solves the problem and returns the profit of the optimal solution.
   int64_t Solve();
 
+  /// Sets the CP-SAT backend worker count. Other algorithms accept only one.
+  /// Returns false for unsupported counts; leaves settings unchanged on failure.
+  bool set_num_workers(int num_workers);
+
   /// Returns true if the item 'item_id' is packed in the optimal knapsack.
   bool BestSolutionContains(int item_id) const;
   /// Returns true if the solution was proven optimal.
@@ -579,6 +583,8 @@ class BaseKnapsackSolver {
   explicit BaseKnapsackSolver(absl::string_view solver_name)
       : solver_name_(solver_name) {}
   virtual ~BaseKnapsackSolver() = default;
+
+  virtual bool SetNumWorkers(int num_workers) { return num_workers == 1; }
 
   /// Initializes the solver and enters the problem to be solved.
   virtual void Init(const std::vector<int64_t>& profits,

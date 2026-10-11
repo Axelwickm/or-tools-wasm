@@ -36,16 +36,75 @@ model.maximize([
   { variable: y, coefficient: 1 },
 ]);
 
+console.log(await model.exportMps({ executor: 'worker' }));
+
 const result = await MathOpt.solve(model, {
   executor: 'worker',
   solverType: MathOpt.SolverType.GLOP,
   timeLimitSeconds: 5,
+  messageCallback: messages => console.log(messages.join('\n')),
   glop: new MathOpt.GlopParameters({
     usePreprocessing: true,
     useScaling: true,
   }),
 });
-console.log(result.objectiveValue, result.variableValues);</code></pre>
+const restored = await MathOpt.parseSolveResult(result.toProtoBytes(), model, { executor: 'worker' });
+console.log(restored.objectiveValue, restored.variableValuesById);
+// Standalone native conversion for saving a solution separately.
+const savedPrimal = await MathOpt.convertSolutionProto('primalSolution', {
+  variableValues: { ids: [x.id, y.id], values: [result.value(x), result.value(y)] },
+  objectiveValue: result.objectiveValue!, feasibilityStatus: 'SOLUTION_STATUS_FEASIBLE',
+}, model, { executor: 'worker' });
+console.log(savedPrimal.bytes);</code></pre>
+      </details>
+      <details>
+        <summary>Show serialized-model solve</summary>
+        <pre class="code-block"><code data-highlight="ts">// You can also supply a typed ModelProto object from another tool.
+const { bytes, response } = await MathOpt.solveProto(model.encodeModelProto(), {
+  executor: 'worker',
+  solverType: MathOpt.SolverType.GLOP,
+});
+console.log(response.termination, response.solutions);
+// bytes contains the native SolveResultProto for saving or importing.</code></pre>
+      </details>
+      <details>
+        <summary>Show native incremental update</summary>
+        <pre class="code-block"><code data-highlight="ts">const solver = new MathOpt.ProtoIncrementalSolver(
+  model.encodeModelProto(), MathOpt.SolverType.GLOP, { executor: 'worker' });
+try {
+  console.log((await solver.solve()).response.termination);
+  const applied = await solver.update({
+    variableUpdates: { upperBounds: { ids: [x.id], values: [0] } },
+  });
+  if (applied) console.log((await solver.solve()).response.solutions);
+  // A false update leaves the native solver unusable; close and recreate it.
+} finally {
+  await solver.close();
+}</code></pre>
+      </details>
+      <details>
+        <summary>Show SCIP lazy constraint callback</summary>
+        <pre class="code-block"><code data-highlight="ts">const model = MathOpt.Model('lazy capacity');
+const x = model.addBinaryVariable({ name: 'x' });
+const y = model.addBinaryVariable({ name: 'y' });
+model.maximize([{ variable: x, coefficient: 2 }, { variable: y, coefficient: 1 }]);
+
+const result = await MathOpt.solve(model, {
+  executor: 'worker',
+  solverType: MathOpt.SolverType.GSCIP,
+  callbackRegistration: {
+    requestRegistration: [MathOptCallbackEventProto.CALLBACK_EVENT_MIP_SOLUTION],
+    addLazyConstraints: true,
+  },
+  callback: data => {
+    const sum = (data.primalSolutionVector?.values ?? []).reduce((a, b) => a + b, 0);
+    if (sum > 1 + 1e-6) return { cuts: [{
+      linearExpression: { ids: [x.id, y.id], values: [1, 1] },
+      lowerBound: -Infinity, upperBound: 1, isLazy: true,
+    }] };
+  },
+});
+console.log(result.objectiveValue, result.variableValuesById);</code></pre>
       </details>
     </div>
     <p>
@@ -57,9 +116,15 @@ console.log(result.objectiveValue, result.variableValues);</code></pre>
       <h2>Model</h2>
       <ul>
         <li>The model has two variables, one capacity constraint, and one linear objective.</li>
+        <li>Objective names and exact priorities are model metadata. Auxiliary objectives can be built and serialized; the bundled backends do not support solving them.</li>
         <li>The backend selector sends the same MathOpt model to different solver backends.</li>
         <li>Integer-capable backends use binary variables; LP backends use continuous variables between 0 and 1.</li>
         <li>The solution table shows how the selected backend values the same small model.</li>
+        <li>CP-SAT and SCIP report incumbent solutions and can stop after the first one.</li>
+        <li>SCIP can enforce the capacity constraint lazily by returning it from a solution callback.</li>
+        <li>Live solver logs show native message batches as the solve runs.</li>
+        <li>Serialized-model solving sends protobuf bytes directly to the same backend, with the same callbacks and solve settings.</li>
+        <li>The native update option sets x's upper bound to zero and solves again in the same solver. The backend returns whether it supports that update.</li>
       </ul>
     </div>
     <div class="controls">
@@ -74,6 +139,11 @@ console.log(result.objectiveValue, result.variableValues);</code></pre>
       </label>
       <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
       <label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>
+      <label><input id="stop-after-solution" type="checkbox"> Stop after the first incumbent (CP-SAT / SCIP)</label>
+      <label><input id="lazy-constraint" type="checkbox"> Add capacity constraint from a callback (SCIP)</label>
+      <label><input id="live-logs" type="checkbox"> Show live solver logs</label>
+      <label><input id="raw-proto" type="checkbox"> Solve serialized model</label>
+      <label><input id="raw-incremental" type="checkbox" disabled> Apply native bound update (x = 0)</label>
       <button id="run" data-idle-label="Solve model">Solve model</button>
     </div>
     <div id="solution-output">Run the solver to view the solution.</div>

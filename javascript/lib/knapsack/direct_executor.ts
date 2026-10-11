@@ -1,4 +1,5 @@
 import { loadMPSolverRuntime } from '../runtime_loader.js';
+import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,
@@ -68,16 +69,17 @@ export class DirectKnapsackExecutor implements KnapsackExecutor {
       await options.onEvent(createSolverJobStatusEvent(
         this.solver, requestId, SolverJobState.RUNNING, createdAt, BigInt(Date.now()),
       ));
-      const result = await executeKnapsackWithModule(
+      const result = await withWasmRuntimeLock(module, () => executeKnapsackWithModule(
         module,
         operation.solverType,
         operation.name,
         operation.useReduction,
         operation.timeLimitSeconds,
+        operation.numWorkers ?? 1,
         operation.profits,
         operation.weights,
         operation.capacities,
-      );
+      ));
       await options.onEvent(createSolverJobStatusEvent(
         this.solver, requestId, SolverJobState.SUCCEEDED, createdAt,
       ));

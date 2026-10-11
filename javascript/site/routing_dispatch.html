@@ -129,7 +129,10 @@ console.log(result.status, result.assignment?.objectiveValue());</code></pre>
 			<li>Each delivery has a random pallet demand and priority.</li>
 			<li>Delivery border color shows priority: gray is standard, amber is express, and red is critical.</li>
 			<li>Each truck has the same pallet capacity and a route distance cap.</li>
+			<li>An optional delivery choice requires at least one of the first two deliveries to be served.</li>
+			<li>Optional resource slots limit how many trucks can serve deliveries; each used truck needs its own slot.</li>
 			<li>Drop penalties allow impossible or inefficient deliveries to be left unserved, with critical stops penalized most.</li>
+			<li>Results show the longest planned route alongside the total fleet distance.</li>
 			<li>Before solving, the map shows generated depots and deliveries; after solving, each color is one truck route.</li>
 		</ul>
 		<div class="controls">
@@ -138,6 +141,10 @@ console.log(result.status, result.assignment?.objectiveValue());</code></pre>
 			<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
 			<label>Capacity <input id="vehicle-capacity" class="short-number" type="number" min="1" value="100"></label>
 			<label>Distance cap <input id="distance-cap" class="short-number" type="number" min="1" value="1600"></label>
+			<label><input id="use-resources" type="checkbox"> Assign used trucks to resource slots</label>
+            <label>Resource slots <input id="resource-slots" class="short-number" type="number" value="2" min="1" max="8"></label>
+            <label><input id="delivery-choice" type="checkbox"> Serve at least one of the first two deliveries</label>
+            <label><input id="delivery-order" type="checkbox"> Deliver 1 before 2 when both use the same truck</label>
 			<button id="randomize" type="button">Randomize</button>
 			<button id="run">Plan dispatch</button>
 		</div>

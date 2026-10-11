@@ -5,6 +5,7 @@ import { cpModelProtoSchema, satParametersProtoSchema } from '../lib/generated/c
 import {
   decodeProtobufWithExactLongs,
   encodeProtobufBigInts,
+  omitAbsentProtobufMessages,
 } from '../lib/protobufjs_helpers.ts';
 
 const int64Min = -(1n << 63n);
@@ -131,4 +132,77 @@ test('safe integer boundaries and floating-point fields round-trip without narro
   assert.equal(decodedParams.maxNumberOfConflicts, BigInt(Number.MAX_SAFE_INTEGER));
   assert.equal(decodedParams.maxTimeInSeconds, 2 ** 64);
   assert.equal(decodedParams.relativeGapLimit, 0.5);
+});
+
+test('unsigned integer fields preserve uint64 boundaries and reject narrowing', async () => {
+  const type = protobufModule.parse('syntax="proto2"; message Limits { optional uint64 count = 1; optional uint32 index = 2; }').root.lookupType('Limits');
+  const maximum = (1n << 64n) - 1n;
+  const converted = encodeProtobufBigInts({ count: maximum, index: 4294967295 }, type) as Record<string, unknown>;
+  assert.equal(type.verify(converted), null);
+  const restored = decodeProtobufWithExactLongs<{count: bigint; index: number}>(type, type.encode(type.create(converted)).finish());
+  assert.equal(restored.count, maximum);
+  assert.equal(restored.index, 4294967295);
+  for (const count of [-1n, 1n << 64n, -1, Number.MAX_SAFE_INTEGER + 1]) assert.throws(() => encodeProtobufBigInts({count}, type), RangeError);
+  for (const index of [-1, 4294967296, 0.5]) assert.throws(() => encodeProtobufBigInts({index}, type), RangeError);
+});
+
+test('strict protobuf normalization rejects dropped nested fields and keeps optional messages absent', async () => {
+  const { normalizeProtobufInput } = await import('../lib/protobufjs_helpers.ts');
+  const type = protobufModule.parse('syntax="proto2"; message Inner { optional int32 var_index = 1; } message Outer { optional Inner constraint = 1; repeated Inner constraints = 2; }').root.lookupType('Outer');
+  assert.throws(() => normalizeProtobufInput({ constraint: { varIndex: 0, droppedConstraint: true } }, type), /Unknown protobuf field Outer.constraint.droppedConstraint/);
+  assert.throws(() => normalizeProtobufInput({ constraints: [{ varIndex: 0, extra: true }] }, type), /constraints\[0\].extra/);
+  assert.deepEqual(normalizeProtobufInput({ constraint: null, constraints: [] }, type), { constraints: [] });
+  const normalized = normalizeProtobufInput({ constraint: { varIndex: 0 } }, type);
+  assert.deepEqual(normalized, { constraint: { varIndex: 0 } });
+  assert.deepEqual(normalizeProtobufInput({ constraint: { var_index: 0 } }, type), normalized);
+  assert.throws(() => normalizeProtobufInput({ constraint: { var_index: 0, varIndex: 1 } }, type), /Duplicate protobuf field/);
+});
+
+test('protobuf normalization reuses schema aliases across repeated messages without sharing message data', async () => {
+  const { normalizeProtobufInput } = await import('../lib/protobufjs_helpers.ts');
+  const type = protobufModule.parse('syntax="proto3"; message Item { int32 item_id = 1; } message Batch { repeated Item items = 1; }').root.lookupType('Batch');
+  const itemType = type.fields.items.resolve().resolvedType as protobufModule.Type;
+  const fields = itemType.fieldsArray;
+  let metadataReads = 0;
+  Object.defineProperty(itemType, 'fieldsArray', { get() { ++metadataReads; return fields; } });
+  const input = { items: Array.from({ length: 1000 }, (_, index) => ({ item_id: index })) };
+  const output = normalizeProtobufInput(input, type) as { items: Array<{ itemId: number }> };
+  assert.equal(metadataReads, 1);
+  assert.equal(output.items[999].itemId, 999);
+  input.items[0].item_id = 99;
+  assert.equal(output.items[0].itemId, 0);
+  assert.deepEqual(normalizeProtobufInput({ items: [{ itemId: 7 }] }, type), { items: [{ itemId: 7 }] });
+  assert.equal(metadataReads, 1);
+  assert.throws(() => normalizeProtobufInput({ items: [{ itemId: 0, item_id: 1 }] }, type), /Duplicate protobuf field/);
+  assert.throws(() => normalizeProtobufInput({ items: [{ missing: 1 }] }, type), /Unknown protobuf field/);
+  const other = protobufModule.parse('syntax="proto3"; message Item { int32 other_id = 1; }').root.lookupType('Item');
+  assert.deepEqual(normalizeProtobufInput({ other_id: 3 }, other), { otherId: 3 });
+  assert.throws(() => normalizeProtobufInput({ itemId: 3 }, other), /Unknown protobuf field/);
+});
+
+
+test('typed Long objects reject narrowing and signedness overflow', () => {
+  const type = protobufModule.parse('syntax="proto2"; message Limits { optional int64 signed_count = 1; optional uint64 unsigned_count = 2; }').root.lookupType('Limits');
+  for (const bits of [0.5, NaN, Infinity, 4294967296, -2147483649]) {
+    assert.throws(() => encodeProtobufBigInts({ signedCount: { low: bits, high: 0, unsigned: false } }, type), RangeError);
+    assert.throws(() => encodeProtobufBigInts({ signedCount: { low: 0, high: bits, unsigned: false } }, type), RangeError);
+  }
+  assert.throws(() => encodeProtobufBigInts({ signedCount: { low: -1, high: -1, unsigned: true } }, type), /signed 64-bit/);
+  assert.throws(() => encodeProtobufBigInts({ unsignedCount: { low: -1, high: -1, unsigned: false } }, type), /unsigned 64-bit/);
+  const encoded = encodeProtobufBigInts({ signedCount: { low: 0, high: 2147483648, unsigned: false }, unsignedCount: { low: -1, high: -1, unsigned: true } }, type) as Record<string, unknown>;
+  assert.equal(type.verify(encoded), null);
+  const decoded = decodeProtobufWithExactLongs<{signedCount: bigint; unsignedCount: bigint}>(type, type.encode(encoded).finish());
+  assert.equal(decoded.signedCount, -(1n << 63n));
+  assert.equal(decoded.unsignedCount, (1n << 64n) - 1n);
+});
+
+test('absent message cleanup preserves scalar defaults, exact integers and bytes', () => {
+  const bytes = new Uint8Array([0, 255]);
+  const value = { absent: null, count: 0n, enabled: false, text: '', bytes,
+    children: [{ absent: null, value: 0 }], nested: { absent: null, count: 7n } };
+  const cleaned = omitAbsentProtobufMessages(value);
+  assert.deepEqual(cleaned, { count: 0n, enabled: false, text: '', bytes,
+    children: [{ value: 0 }], nested: { count: 7n } });
+  assert.equal(cleaned.bytes, bytes);
+  assert.equal(value.absent, null);
 });

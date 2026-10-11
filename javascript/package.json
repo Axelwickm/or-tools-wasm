@@ -114,9 +114,14 @@
     "build:wasm": "bash ../scripts/build_wasm.sh",
     "build:wasm:clean": "ORTOOLS_WASM_CLEAN=1 bash ../scripts/build_wasm.sh",
     "gen:sat-parameters": "node ../scripts/generate_sat_parameters_types.mjs",
+    "gen:pdlp-types": "node ../scripts/generate_pdlp_types.mjs",
+    "gen:mathopt-result-types": "node ../scripts/generate_mathopt_result_types.mjs",
+    "gen:mathopt-callback-types": "node ../scripts/generate_mathopt_callback_types.mjs",
+    "gen:mathopt-model-types": "node ../scripts/generate_mathopt_model_types.mjs",
+    "gen:routing-parameters": "node ../scripts/generate_routing_parameters.mjs",
     "gen:bridge-types": "BUF_CACHE_DIR=../build/buf-cache buf generate ../bridge-types --template ../bridge-types/buf.gen.yaml",
     "patch:wasm-runtime": "node ../scripts/patch_emscripten_runtime.mjs",
-    "build:js": "npm run gen:sat-parameters && npm run gen:bridge-types && tsc --project tsconfig.json && vite build --config vite.lib.config.ts && node ../scripts/build_browser_sources.mjs && node ../scripts/build_node_sources.mjs",
+    "build:js": "npm run gen:sat-parameters && npm run gen:routing-parameters && npm run gen:pdlp-types && npm run gen:mathopt-model-types && npm run gen:mathopt-callback-types && npm run gen:mathopt-result-types && npm run gen:mp-solver-types && npm run gen:bridge-types && tsc --project tsconfig.json && vite build --config vite.lib.config.ts && node ../scripts/build_browser_sources.mjs && node ../scripts/build_node_sources.mjs",
     "build:lib": "npm run build:wasm && npm run patch:wasm-runtime && npm run build:js",
     "typecheck:site": "tsc --project tsconfig.site.json",
     "test:site": "npm run typecheck:site && node --experimental-strip-types --test site/*.test.ts site/models/*.test.ts",
@@ -155,7 +160,8 @@
     "test:fixtures:browser": "npm run test:fixture:vite && npm run test:fixture:webpack && npm run test:fixture:rollup",
     "test:fixtures:runtime": "npm run test:fixture:deno && npm run test:fixture:node && npm run test:fixture:bun",
     "test:fixtures:full": "npm run test:fixtures:browser && npm run test:fixtures:runtime",
-    "test:fixtures": "npm run test:fixtures:full"
+    "test:fixtures": "npm run test:fixtures:full",
+    "gen:mp-solver-types": "node ../scripts/generate_mp_solver_types.mjs"
   },
   "files": [
     "build/javascript/lib/**/*.d.ts",

@@ -521,7 +521,7 @@ async function replanAfterFactoryStateChanges(openBreadOrders: number, freeMixer
 
   const result = await solver.solve();
 
-  if ((result.variableValues.start_bread_now ?? 0) > 0.5) {
+  if (result.value(startBreadNow) > 0.5) {
     startBreadJob();
   }
 

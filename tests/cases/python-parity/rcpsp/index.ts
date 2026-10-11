@@ -33,11 +33,6 @@ type RcpspProblemProtoLike = {
   horizon?: number;
 };
 
-type RcpspParserLike = {
-  parseString(text: string): boolean;
-  problem(): RcpspProblemProtoLike;
-};
-
 type RcpspProblemLike = {
   exportModelAsProto(): RcpspProblemProtoLike;
   toCpSatModel(): { readonly modelProto: { constraints?: unknown[] } };
@@ -54,7 +49,7 @@ type RcpspProblemLike = {
   }): Promise<{
     makespan: bigint | null;
     statusName: string;
-    tasks: Array<{ name: string; start: bigint; end: bigint; demands: number[]; successors: number[] }>;
+    tasks: Array<{ name: string; start: bigint; end: bigint; demands: number[]; successors: number[]; selectedRecipe: number }>;
   }>;
 };
 
@@ -65,7 +60,6 @@ type RcpspModelBuilderLike = {
 };
 
 export type RcpspApi = {
-  RcpspParser: { new(): RcpspParserLike };
   RcpspProblem: {
     fromPsplib(text: string): RcpspProblemLike;
     fromProto(proto: RcpspProblemProtoLike): RcpspProblemLike;
@@ -172,12 +166,9 @@ RESOURCEAVAILABILITIES:
 ************************************************************************`;
 
 async function runParserParity(api: RcpspApi): Promise<{ makespan: null }> {
-  // TEMP: parity - mirrors ortools/scheduling/python/rcpsp_test.py
-  // RcpspTest.testParseAndAccess assertion-by-assertion, using parseString()
-  // because browser fixtures do not expose Python's filesystem parse_file path.
-  const parser = new api.RcpspParser();
-  assert(parser.parseString(J301_1_SM), 'RcpspTest.testParseAndAccess parseString');
-  const problem = parser.problem();
+  // TEMP: binding variant - retains parsed resources/tasks assertions;
+  // native filesystem parse_file and its boolean return are excluded.
+  const problem = api.RcpspProblem.fromPsplib(J301_1_SM).exportModelAsProto();
   assert(problem.resources?.length === 4, 'RcpspTest.testParseAndAccess resources length');
   assert(problem.tasks?.length === 32, 'RcpspTest.testParseAndAccess tasks length');
   return { makespan: null };
@@ -237,6 +228,44 @@ async function runCpSatBackedSchedule(api: RcpspApi, mode: ExecutorFixtureMode):
 
 type RcpspCase = SharedCase<RcpspApi, { makespan: number | null; statusName?: string }, ExecutorFixtureMode>;
 
+async function runNonrenewableBudget(api: RcpspApi, mode: ExecutorFixtureMode): Promise<{ makespan: number | null; statusName: string }> {
+  // Aggregate consumption is independent of activity overlap: two sequential
+  // activities each using three units cannot fit a five-unit project budget.
+  const overBudget = new api.RcpspModelBuilder('over_budget')
+    .addResource({ name: 'material', capacity: 5, renewable: false })
+    .addActivity({ name: 'first', duration: 1, demands: { material: 3 }, successors: ['second'] })
+    .addActivity({ name: 'second', duration: 1, demands: { material: 3 } })
+    .build();
+  const rejected = await overBudget.solve({ executor: mode === 'server' ? serverExecutorConfiguration() : mode, numWorkers: 1 });
+  assert(rejected.statusName === 'INFEASIBLE', `nonrenewable total budget (${mode}): ${rejected.statusName}`);
+  assert(rejected.makespan === null && rejected.tasks.length === 0, 'infeasible budget has no schedule');
+
+  // The faster recipe exceeds the budget by itself. Only the selected recipe
+  // counts; summing both alternative demands would also incorrectly reject it.
+  const alternatives = api.RcpspProblem.fromProto({
+    horizon: 10,
+    resources: [
+      { name: 'crew', maxCapacity: 1, renewable: true },
+      { name: 'material', maxCapacity: 5, renewable: false },
+    ],
+    tasks: [
+      { name: 'source', successors: [1], recipes: [{ duration: 0 }] },
+      { name: 'choice', successors: [2], recipes: [
+        { duration: 1, demands: [1, 7], resources: [0, 1] },
+        { duration: 3, demands: [1, 2], resources: [0, 1] },
+      ] },
+      { name: 'finish', successors: [3], recipes: [{ duration: 1, demands: [3], resources: [1] }] },
+      { name: 'sink', recipes: [{ duration: 0 }] },
+    ],
+  });
+  const selected = await alternatives.solve({ executor: mode === 'server' ? serverExecutorConfiguration() : mode, numWorkers: 1 });
+  assert(selected.statusName === 'OPTIMAL', `nonrenewable recipe selection (${mode}): ${selected.statusName}`);
+  assert(selected.makespan === 4n, `budget forces the slower recipe (${mode})`);
+  assert(selected.tasks[1].selectedRecipe === 1, 'the affordable recipe is selected');
+  assert(selected.tasks.reduce((total, task) => total + task.demands[1], 0) === 5, 'selected recipes use exactly the available budget');
+  return { makespan: Number(selected.makespan), statusName: selected.statusName };
+}
+
 export const rcpspCases: RcpspCase[] = [
   {
     id: 'rcpsp.rcpsp_test.test_parse_and_access',
@@ -254,6 +283,13 @@ export const rcpspCases: RcpspCase[] = [
     tags: ['contract', 'cp-sat-backed', 'events'],
     run: (api, context) => runCpSatBackedSchedule(api, context.mode ?? 'direct'),
   },
+  {
+    id: 'rcpsp.contract.nonrenewable_budget',
+    name: 'RcpspContract.nonrenewable_budget',
+    solver: 'rcpsp',
+    tags: ['contract', 'cp-sat-backed', 'nonrenewable', 'multimode'],
+    run: (api, context) => runNonrenewableBudget(api, context.mode ?? 'direct'),
+  },
 ];
 
 export async function runRcpspCases(
@@ -265,11 +301,12 @@ export async function runRcpspCases(
   results.push(passedCase(parserCase, {}, await parserCase.run(api, {})));
   const modes = options.modes ?? executorFixtureModes;
   if (modes.includes('server')) await assertServerExecutorIsRunning();
-  const solveCase = rcpspCases[1];
-  for (const mode of modes) {
-    const context = { mode };
-    const result = await solveCase.run(api, context);
-    results.push(passedCase({ ...solveCase, name: `${solveCase.name} (${mode})` }, context, result));
+  for (const solveCase of rcpspCases.slice(1)) {
+    for (const mode of modes) {
+      const context = { mode };
+      const result = await solveCase.run(api, context);
+      results.push(passedCase({ ...solveCase, name: `${solveCase.name} (${mode})` }, context, result));
+    }
   }
   return results;
 }

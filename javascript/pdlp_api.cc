@@ -1,4 +1,7 @@
 // Minimal C API surface for PDLP over WASM.
+#include <atomic>
+#include <functional>
+#include <thread>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -6,6 +9,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -15,11 +19,16 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
+#include "pdlp_model_import.h"
 #include "ortools/pdlp/primal_dual_hybrid_gradient.h"
 #include "ortools/pdlp/quadratic_program.h"
 #include "ortools/pdlp/solvers.pb.h"
 
+
 namespace {
+
+std::atomic<bool> interrupt_requested = false;
+using operations_research::pdlp::IterationCallbackInfo;
 
 using operations_research::MPModelProto;
 using operations_research::pdlp::IsLinearProgram;
@@ -157,6 +166,57 @@ class Writer {
   std::string data_;
 };
 
+EM_JS(int, PdlpWorkerCapacity, (), {
+  return PThread.unusedWorkers.length;
+});
+
+void EmitPdlpEvent(int callback_id, int type, const std::string& payload) {
+  MAIN_THREAD_EM_ASM({
+    const sink = Module.__ortoolsPdlpCallbacks?.sinks.get($0);
+    if (sink) sink($1, HEAPU8.slice($2, $2 + $3));
+  }, callback_id, type, payload.data(), payload.size());
+}
+void EmitIteration(int callback_id, const IterationCallbackInfo& info) {
+  Writer writer;
+  writer.U32(static_cast<uint32_t>(info.iteration_type));
+  writer.String(info.iteration_stats.SerializeAsString());
+  writer.String(info.termination_criteria.SerializeAsString());
+  writer.Double(info.bound_norms.l2_norm_primal_linear_objective);
+  writer.Double(info.bound_norms.l2_norm_constraint_bounds);
+  writer.Double(info.bound_norms.l_inf_norm_primal_linear_objective);
+  writer.Double(info.bound_norms.l_inf_norm_constraint_bounds);
+  size_t length;
+  auto* data = writer.Copy(&length);
+  if (data != nullptr) {
+    EmitPdlpEvent(callback_id, 2, std::string(reinterpret_cast<char*>(data), length));
+    std::free(data);
+  }
+}
+
+SolverResult SolveNative(
+    QuadraticProgram qp, const PrimalDualHybridGradientParams& params,
+    std::optional<PrimalAndDualSolution> initial, int flags, int callback_id) noexcept {
+  SolverResult result;
+  if (PdlpWorkerCapacity() < 1 || params.num_threads() > PdlpWorkerCapacity()) {
+    result.solve_log.set_termination_reason(
+        operations_research::pdlp::TERMINATION_REASON_INVALID_PARAMETER);
+    result.solve_log.set_termination_string("PDLP requests more threads than the WASM runtime capacity.");
+    return result;
+  }
+  try {
+    std::function<void(const std::string&)> log;
+    std::function<void(const IterationCallbackInfo&)> iteration;
+    if (flags & 1) log = [callback_id](const auto& message) { EmitPdlpEvent(callback_id, 1, message); };
+    if (flags & 2) iteration = [callback_id](const auto& info) { EmitIteration(callback_id, info); };
+    result = PrimalDualHybridGradient(std::move(qp), params, std::move(initial),
+        &interrupt_requested, std::move(log), std::move(iteration));
+  } catch (...) {
+    result.solve_log.set_termination_reason(operations_research::pdlp::TERMINATION_REASON_OTHER);
+    result.solve_log.set_termination_string("Native PDLP search threw an exception.");
+  }
+  return result;
+}
+
 uint8_t* CopyStringToBuffer(const std::string& value, size_t* out_len) {
   if (out_len == nullptr) return nullptr;
   *out_len = value.size();
@@ -237,8 +297,9 @@ bool DecodeQuadraticProgram(Reader* reader, QuadraticProgram* qp) {
   return reader->ok();
 }
 
-uint8_t* EncodeQuadraticProgram(const QuadraticProgram& qp, size_t* out_len) {
+uint8_t* EncodeQuadraticProgram(const QuadraticProgram& qp, size_t* out_len, bool include_status = false) {
   Writer writer;
+  if (include_status) writer.U8(1);
   writer.U32(static_cast<uint32_t>(qp.objective_vector.size()));
   writer.U32(static_cast<uint32_t>(qp.constraint_lower_bounds.size()));
   writer.String(qp.problem_name.value_or(""));
@@ -271,9 +332,17 @@ uint8_t* EncodeQuadraticProgram(const QuadraticProgram& qp, size_t* out_len) {
   return writer.Copy(out_len);
 }
 
-PrimalDualHybridGradientParams DecodeParams(Reader* reader) {
+PrimalDualHybridGradientParams DecodeParams(Reader* reader, bool* full_proto) {
   PrimalDualHybridGradientParams params;
-  if (reader->ReadU8()) {
+  const uint8_t first = reader->ReadU8();
+  *full_proto = first == 255;
+  if (*full_proto) {
+    if (!params.ParseFromString(reader->ReadString())) {
+      throw std::invalid_argument("Could not parse PDLP parameters.");
+    }
+    return params;
+  }
+  if (first) {
     params.mutable_termination_criteria()->set_iteration_limit(reader->ReadI32());
   }
   if (reader->ReadU8()) {
@@ -309,7 +378,7 @@ std::optional<PrimalAndDualSolution> DecodeInitialSolution(Reader* reader) {
   return solution;
 }
 
-uint8_t* EncodeSolverResult(const SolverResult& result, size_t* out_len) {
+uint8_t* EncodeSolverResult(const SolverResult& result, size_t* out_len, bool full_proto) {
   Writer writer;
   writer.U8(1);
   writer.Doubles(result.primal_solution);
@@ -317,6 +386,7 @@ uint8_t* EncodeSolverResult(const SolverResult& result, size_t* out_len) {
   writer.Doubles(result.reduced_costs);
   writer.U32(static_cast<uint32_t>(result.solve_log.termination_reason()));
   writer.U32(static_cast<uint32_t>(result.solve_log.iteration_count()));
+  if (full_proto) writer.String(result.solve_log.SerializeAsString());
   return writer.Copy(out_len);
 }
 
@@ -371,6 +441,20 @@ uint8_t* pdlp_qp_from_mpmodel_proto(const uint8_t* proto_data, size_t proto_len,
 }
 
 EMSCRIPTEN_KEEPALIVE
+uint8_t* pdlp_read_quadratic_program(const uint8_t* data, size_t length, int format,
+                                   int relax_integer_variables, int include_names, size_t* out_len) {
+  try {
+    if (length > 0 && data == nullptr) return CopyStringToBuffer(std::string(1, '\0') + "Invalid PDLP input buffer.", out_len);
+    const std::string input(length ? reinterpret_cast<const char*>(data) : "", length);
+    auto qp = ortools_wasm::ReadPdlpQuadraticProgram(input, format, relax_integer_variables != 0, include_names != 0);
+    if (!qp.ok()) return CopyStringToBuffer(std::string(1, '\0') + qp.status().ToString(), out_len);
+    return EncodeQuadraticProgram(*qp, out_len, true);
+  } catch (const std::exception& error) {
+    return CopyStringToBuffer(std::string(1, '\0') + error.what(), out_len);
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE
 uint8_t* pdlp_qp_to_mpmodel_proto(const uint8_t* qp_data, size_t qp_len,
                                   size_t* out_len) {
   Reader reader(qp_data, qp_len);
@@ -384,27 +468,37 @@ uint8_t* pdlp_qp_to_mpmodel_proto(const uint8_t* qp_data, size_t qp_len,
 }
 
 EMSCRIPTEN_KEEPALIVE
-uint8_t* pdlp_primal_dual_hybrid_gradient(const uint8_t* request_data,
+uint8_t* pdlp_primal_dual_hybrid_gradient_with_callbacks(const uint8_t* request_data,
                                           size_t request_len,
-                                          size_t* out_len) {
+                                          int flags, int callback_id, size_t* out_len) {
+  struct Reset { ~Reset() { interrupt_requested.store(false); } } reset;
   try {
     Reader reader(request_data, request_len);
     QuadraticProgram qp;
     const bool parsed_qp = DecodeQuadraticProgram(&reader, &qp);
-    PrimalDualHybridGradientParams params = DecodeParams(&reader);
+    bool full_proto = false;
+    PrimalDualHybridGradientParams params = DecodeParams(&reader, &full_proto);
     std::optional<PrimalAndDualSolution> initial_solution =
         DecodeInitialSolution(&reader);
     if (!reader.ok() || !parsed_qp) {
       return CopyStringToBuffer("", out_len);
     }
-    SolverResult result = PrimalDualHybridGradient(
-        std::move(qp), std::move(params), std::move(initial_solution));
-    return EncodeSolverResult(result, out_len);
+    SolverResult result = SolveNative(
+        std::move(qp), params, std::move(initial_solution), flags, callback_id);
+    return EncodeSolverResult(result, out_len, full_proto);
   } catch (const std::exception& e) {
     return EncodeSolverError(e.what(), out_len);
   } catch (...) {
     return EncodeSolverError("Unknown PDLP solve failure.", out_len);
   }
+}
+
+EMSCRIPTEN_KEEPALIVE uintptr_t pdlp_interrupt_address() {
+  return reinterpret_cast<uintptr_t>(&interrupt_requested);
+}
+EMSCRIPTEN_KEEPALIVE uint8_t* pdlp_primal_dual_hybrid_gradient(
+    const uint8_t* request_data, size_t request_len, size_t* out_len) {
+  return pdlp_primal_dual_hybrid_gradient_with_callbacks(request_data, request_len, 0, 0, out_len);
 }
 
 }  // extern "C"

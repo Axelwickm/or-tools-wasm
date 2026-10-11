@@ -1,5 +1,4 @@
 export {
-  ConsistencyLevel,
   ElementDegreeSolutionGenerator,
   GreedySolutionGenerator,
   GuidedLocalSearch,
@@ -14,10 +13,10 @@ export {
   SetCoverModel,
   SetCoverModelStats,
   SteepestSearch,
-  TabuList,
   TrivialSolutionGenerator,
 } from './set_cover/api.js';
 export type {
+  SetCoverInspection,
   SetCoverEvent,
   SetCoverModelProto,
   SetCoverSolveOptions,

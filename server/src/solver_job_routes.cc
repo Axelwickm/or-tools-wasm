@@ -26,6 +26,10 @@ void AddSolverJobRoutes(HttpServer& server, SolverJobService& job_service) {
                      [&job_service](const HttpBinaryRequest& request) {
                        return job_service.Result(request);
                      });
+  server.AddPostRoute(R"(/jobs/(\d+)/interrupt)",
+                      [&job_service](const HttpBinaryRequest& request) { return job_service.Interrupt(request); });
+  server.AddPostRoute(R"(/jobs/(\d+)/callback)",
+                      [&job_service](const HttpBinaryRequest& request) { return job_service.Callback(request); });
   server.AddPostRoute(R"(/jobs/(\d+)/cancel)",
                       [&job_service](const HttpBinaryRequest& request) {
                         return job_service.Cancel(request);

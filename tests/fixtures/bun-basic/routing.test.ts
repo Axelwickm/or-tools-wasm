@@ -1,3 +1,5 @@
+import * as RoutingApi from 'or-tools-wasm/routing';
+import { runRoutingControlCases } from '../../cases/or-tools-wasm/routing/controls.ts';
 import {
   BOOL_FALSE,
   BOOL_UNSPECIFIED,
@@ -19,6 +21,7 @@ import { assertAllCases, runBunFixture } from './shared.ts';
 await runBunFixture(async () => {
   await runRoutingWorkerLifecycleCase({ RoutingIndexManager, RoutingModel } as never);
   await runRoutingConcurrencyCase({ RoutingIndexManager, RoutingModel } as never);
+  await runRoutingControlCases(RoutingApi as never);
   const routingResults = await runRoutingCases({
     BOOL_FALSE,
     BOOL_UNSPECIFIED,

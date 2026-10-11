@@ -9,6 +9,7 @@ import {
 
 export type KnapsackOperation = {
   solverType: number;
+  numWorkers?: number;
   name: string;
   useReduction: boolean;
   timeLimitSeconds: number;
@@ -29,6 +30,7 @@ export type KnapsackJob = SolverJob<KnapsackResult>;
 function encodeOperation(operation: KnapsackOperation): Uint8Array {
   return toBinary(KnapsackBridgeRequestSchema, create(KnapsackBridgeRequestSchema, {
     solverType: operation.solverType,
+    numWorkers: operation.numWorkers,
     name: operation.name,
     useReduction: operation.useReduction,
     timeLimitSeconds: operation.timeLimitSeconds,
@@ -42,6 +44,7 @@ function decodeOperation(payload: Uint8Array): KnapsackOperation {
   const request = fromBinary(KnapsackBridgeRequestSchema, payload);
   return {
     solverType: request.solverType,
+    ...(request.numWorkers !== undefined ? { numWorkers: request.numWorkers } : {}),
     name: request.name,
     useReduction: request.useReduction,
     timeLimitSeconds: request.timeLimitSeconds,

@@ -2,6 +2,7 @@
 #define ORTOOLS_WASM_SERVER_MP_SOLVER_EXECUTOR_H_
 
 #include "server/src/solver_executor.h"
+#include "javascript/mp_solver_session.h"
 
 namespace ortools_wasm::server {
 
@@ -14,6 +15,8 @@ class MpSolverExecutor final : public SolverExecutor {
   SolverExecutorResult Execute(const SolverExecutorRequest& request,
                                const JobContext& context,
                                const SolverEventSink& emit_event) override;
+ private:
+  ortools_wasm::mp_session::Registry sessions_{true};
 };
 
 }  // namespace ortools_wasm::server

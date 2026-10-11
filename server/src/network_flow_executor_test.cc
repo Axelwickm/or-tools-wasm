@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -110,6 +111,106 @@ void RejectsMismatchedArrays() {
   Expect(!result.ok, "Mismatched arrays produce execution failure");
 }
 
+void RejectsUnsafeEndpointsAndRecovers() {
+  const int32_t maximum = std::numeric_limits<int32_t>::max();
+  for (int operation : {0, 1, 2}) {
+    const int32_t first_invalid = operation == 0 ? maximum - 1
+        : operation == 1 ? maximum - 3 : maximum / 2;
+    for (int32_t invalid : {-1, first_invalid, maximum}) {
+      for (bool invalid_tail : {false, true}) {
+        bridge::NetworkFlowBridgeRequest request;
+        if (operation == 0) {
+          auto* flow = request.mutable_max_flow();
+          flow->add_tails(invalid_tail ? invalid : 0);
+          flow->add_heads(invalid_tail ? 1 : invalid);
+          flow->add_capacities(2); flow->set_source(0); flow->set_sink(1);
+        } else if (operation == 1) {
+          auto* flow = request.mutable_min_cost_flow();
+          flow->add_tails(invalid_tail ? invalid : 0);
+          flow->add_heads(invalid_tail ? 1 : invalid);
+          flow->add_capacities(2); flow->add_unit_costs(3);
+        } else {
+          auto* assignment = request.mutable_linear_sum_assignment();
+          assignment->add_left_nodes(invalid_tail ? invalid : 0);
+          assignment->add_right_nodes(invalid_tail ? 0 : invalid);
+          assignment->add_costs(2);
+        }
+        const auto result = Execute(Wrap(request));
+        Expect(!result.ok && result.failure_kind == SolverExecutionFailureKind::kInvalidRequest,
+               "Unsafe raw endpoints reject before native graph construction");
+      }
+    }
+  }
+  SolvesMaxFlow(); SolvesMinCostFlow(); SolvesAssignment();
+}
+
+void MinCostRangeFailuresAndRecovery() {
+  const int64_t maximum = std::numeric_limits<int64_t>::max();
+  const int64_t minimum = std::numeric_limits<int64_t>::min();
+  bridge::NetworkFlowBridgeRequest request;
+  auto* flow = request.mutable_min_cost_flow();
+  flow->add_tails(0); flow->add_heads(1);
+  flow->add_capacities(3); flow->add_unit_costs(2);
+  for (const auto& supplies : std::vector<std::pair<int64_t, int64_t>>{
+           {maximum, 1}, {-maximum, -1}, {0, minimum}}) {
+    flow->clear_supplies(); flow->add_supplies(supplies.first); flow->add_supplies(supplies.second);
+    for (bool adjust : {false, true}) {
+      flow->set_solve_max_flow_with_min_cost(adjust);
+      const auto result = Parse(Execute(Wrap(request)));
+      Expect(result.status() == 7 && result.flows_size() == 0,
+             "Supply arithmetic rejects with native BAD_CAPACITY_RANGE");
+    }
+  }
+  flow->set_solve_max_flow_with_min_cost(false);
+  flow->clear_supplies(); flow->add_supplies(3); flow->add_supplies(-3);
+  const auto recovered = Parse(Execute(Wrap(request)));
+  Expect(recovered.status() == 1 && recovered.optimal_cost() == 6 && recovered.flows(0) == 3,
+         "Native min-cost flow recovers after unsafe supplies");
+  for (int64_t cost : {minimum, maximum}) {
+    flow->set_unit_costs(0, cost);
+    Expect(Parse(Execute(Wrap(request))).status() == 6,
+           "Unsafe cost reports native BAD_COST_RANGE");
+  }
+}
+
+void AssignmentSignedScalingAndExactCost() {
+  const int64_t maximum = std::numeric_limits<int64_t>::max();
+  bridge::NetworkFlowBridgeRequest request;
+  auto* assignment = request.mutable_linear_sum_assignment();
+  assignment->add_left_nodes(0); assignment->add_right_nodes(0); assignment->add_costs(0);
+  for (int64_t cost : {std::numeric_limits<int64_t>::min(), -maximum, -(maximum / 2) - 1, maximum}) {
+    assignment->set_costs(0, cost);
+    const auto result = Parse(Execute(Wrap(request)));
+    Expect(result.status() == 2 && result.right_mates_size() == 0,
+           "Both signs of unsafe scaling report POSSIBLE_OVERFLOW");
+  }
+  assignment->set_costs(0, -9007199254740993LL);
+  const auto result = Parse(Execute(Wrap(request)));
+  Expect(result.status() == 0 && result.optimal_cost() == -9007199254740993LL && result.right_mates(0) == 0,
+         "Safe negative costs retain exact int64 optimization");
+}
+
+void MaxFlowInt64AndStatusBoundaries() {
+  bridge::NetworkFlowBridgeRequest request;
+  auto* flow = request.mutable_max_flow();
+  flow->add_tails(0); flow->add_heads(1);
+  flow->add_capacities(std::numeric_limits<int64_t>::max());
+  flow->set_source(0); flow->set_sink(1);
+  const auto exact = Parse(Execute(Wrap(request)));
+  Expect(exact.status() == 0 && exact.optimal_flow() == std::numeric_limits<int64_t>::max(),
+         "Full int64 capacity is preserved");
+  flow->add_tails(0); flow->add_heads(1); flow->add_capacities(1);
+  Expect(Parse(Execute(Wrap(request))).status() == 1, "Overflow remains native status");
+  flow->set_sink(0);
+  Expect(Parse(Execute(Wrap(request))).status() == 2, "Equal endpoints remain native BAD_INPUT");
+  flow->set_source(std::numeric_limits<int32_t>::max()); flow->set_sink(1);
+  const auto outside = Parse(Execute(Wrap(request)));
+  Expect(outside.status() == 0 && outside.optimal_flow() == 0 && outside.flows_size() == 2,
+         "Out-of-graph source remains native optimal zero");
+  flow->set_source(-1);
+  Expect(Parse(Execute(Wrap(request))).status() == 2, "Raw negative source remains native BAD_INPUT");
+}
+
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
       {"SolvesMaxFlow", SolvesMaxFlow},
@@ -118,6 +219,10 @@ int RunAllTests() {
       {"ReservesOneThread", ReservesOneThread},
       {"RejectsMalformedRequest", RejectsMalformedRequest},
       {"RejectsMismatchedArrays", RejectsMismatchedArrays},
+      {"RejectsUnsafeEndpointsAndRecovers", RejectsUnsafeEndpointsAndRecovers},
+      {"MinCostRangeFailuresAndRecovery", MinCostRangeFailuresAndRecovery},
+      {"AssignmentSignedScalingAndExactCost", AssignmentSignedScalingAndExactCost},
+      {"MaxFlowInt64AndStatusBoundaries", MaxFlowInt64AndStatusBoundaries},
   };
   for (const auto& [name, test] : tests) {
     try {

@@ -3,6 +3,8 @@ import type { ServerExecutorConfiguration } from './executor_configuration.js';
 import {
   decodeSolverBridgeResponse,
   encodeSolverBridgeCancelRequest,
+  encodeSolverBridgeInterruptRequest,
+  encodeSolverBridgeCallbackReply,
   encodeSolverBridgeRequest,
   type SolverBridgeCodec,
 } from './solver_bridge.js';
@@ -26,10 +28,14 @@ const EVENT_STREAM_CONTENT_TYPE = 'text/event-stream';
 const JOB_ACCEPTED_STATUS = 202;
 const JOB_NOT_READY_STATUS = 204;
 const JOB_STREAM_NOT_READY_STATUS = 409;
+const CALLBACK_POLL_INTERVAL_MS = 20;
+const CALLBACK_REPLY_TIMEOUT_MS = 30_000;
+const JOB_RELEASE_TIMEOUT_MS = 1_000;
 
 class RemoteSolverError extends Error {
   constructor(readonly failure: SolverJobFailure, readonly emitted = false) {
     super(failure.message);
+    this.name = failure.kind === SolverFailureKind.CANCELLED ? 'AbortError' : 'RemoteSolverError';
     if (failure.trace) this.stack = failure.trace;
   }
 }
@@ -47,6 +53,10 @@ class ServerHttpError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
 }
 
+class CallbackTransportError extends Error {
+  constructor(readonly cause: unknown) { super(cause instanceof Error ? cause.message : String(cause)); }
+}
+
 type StreamResult<Response> =
   | { complete: true; result: Response }
   | { complete: false; sequenceId: bigint };
@@ -59,6 +69,29 @@ function bytesBody(bytes: Uint8Array): ArrayBuffer {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRequestDeadline<T>(
+  timeoutMs: number,
+  message: string,
+  request: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      request(controller.signal),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          const reason = new Error(message);
+          reason.name = 'TimeoutError';
+          // Reject explicitly as custom fetch implementations may ignore abort.
+          reject(new ServerConnectionError(reason));
+          controller.abort(reason);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally { clearTimeout(timeout); }
 }
 
 function decodeBase64Bytes(value: string): Uint8Array {
@@ -78,7 +111,7 @@ async function* serverSentEventData(
   let buffer = '';
   try {
     for (;;) {
-      const chunk = await reader.read();
+      const chunk = await reader.read().catch(error => { throw new ServerConnectionError(error); });
       buffer += decoder.decode(chunk.value, { stream: !chunk.done });
       buffer = buffer.replace(/\r\n/g, '\n');
       let separator = buffer.indexOf('\n\n');
@@ -125,11 +158,33 @@ implements SolverExecutor<Request, Response, Event> {
 
   execute(request: Request, options: SolverExecutionOptions<Event>): SolverJob<Response> {
     const requestId = this.nextRequestId++;
-    const submitted = this.submit(requestId, request, options.resources);
+    const controller = new AbortController();
+    let submissionSettled = false;
+    let rejectSubmission!: (error: Error) => void;
+    const submissionCancelled = new Promise<never>((_, reject) => { rejectSubmission = reject; });
+    const submission = this.submit(requestId, request, options.resources, controller.signal).then(accepted => {
+      submissionSettled = true;
+      // Custom fetch implementations may deliver acceptance after cancellation.
+      // Stop that late job without delaying the cancelled caller.
+      if (controller.signal.aborted && accepted.jobId !== 0n) {
+        void this.cancel(requestId, Promise.resolve(accepted), this.codec.solver === 'mathopt').catch(() => {});
+      }
+      return accepted;
+    }, error => { submissionSettled = true; throw error; });
+    const submitted = Promise.race([submission, submissionCancelled]);
+    const cancel = () => {
+      if (submissionSettled) return this.cancel(requestId, submitted, this.codec.solver === 'mathopt');
+      const reason = new Error(`${this.codec.label} server submission was cancelled.`);
+      reason.name = 'AbortError';
+      rejectSubmission(new ServerConnectionError(reason));
+      controller.abort(reason);
+      return Promise.resolve();
+    };
     return {
       requestId,
       result: this.run(requestId, submitted, options),
-      cancel: () => this.cancel(requestId, submitted),
+      cancel,
+      interrupt: this.codec.solver === 'mathopt' ? cancel : undefined,
     };
   }
 
@@ -154,6 +209,7 @@ implements SolverExecutor<Request, Response, Event> {
     requestId: number,
     request: Request,
     resources?: SolverResourceRequest,
+    signal?: AbortSignal,
   ): Promise<SolverBridgeResponse> {
     const bytes = encodeSolverBridgeRequest({
       requestId,
@@ -165,6 +221,7 @@ implements SolverExecutor<Request, Response, Event> {
       method: 'POST',
       headers: { accept: PROTOBUF_CONTENT_TYPE, 'content-type': PROTOBUF_CONTENT_TYPE, ...this.headers },
       body: bytesBody(bytes),
+      signal,
     });
     if (!response.ok) await this.throwHttpError('submission', response);
     return decodeSolverBridgeResponse(new Uint8Array(await response.arrayBuffer()));
@@ -180,6 +237,9 @@ implements SolverExecutor<Request, Response, Event> {
       const immediate = await this.handleResponse(accepted, options);
       if (immediate !== null) return immediate;
       if (accepted.jobId === 0n) throw new Error(`${this.codec.label} server did not return a job id.`);
+      // HTTP/1.1 streams can occupy every browser connection to this origin,
+      // leaving callback POSTs queued while native search waits for their replies.
+      if (options.onCallback) return await this.pollResult(accepted.jobId, accepted.sequenceId, options);
       const streamed = await this.streamResult(
         accepted.jobId,
         accepted.sequenceId,
@@ -188,6 +248,10 @@ implements SolverExecutor<Request, Response, Event> {
       if (streamed.complete) return streamed.result;
       return await this.pollResult(accepted.jobId, streamed.sequenceId, options);
     } catch (error) {
+      if (error instanceof CallbackTransportError) {
+        void this.cancel(requestId, submitted).catch(() => undefined);
+        error = error.cause;
+      }
       if (error instanceof RemoteSolverError) {
         if (!error.emitted) await options.onEvent({ type: 'failure', failure: error.failure });
         throw error;
@@ -253,8 +317,8 @@ implements SolverExecutor<Request, Response, Event> {
         }
       }
     } catch (error) {
-      if (error instanceof RemoteSolverError) throw error;
-      return { complete: false, sequenceId };
+      if (error instanceof ServerConnectionError) return { complete: false, sequenceId };
+      throw error;
     }
     return { complete: false, sequenceId };
   }
@@ -265,10 +329,13 @@ implements SolverExecutor<Request, Response, Event> {
     options: SolverExecutionOptions<Event>,
   ): Promise<Response> {
     let sequenceId = initialSequenceId;
-    let firstRequest = true;
+    const pollIntervalMs = options.onCallback
+      ? Math.min(this.statusIntervalMs, CALLBACK_POLL_INTERVAL_MS)
+      : this.statusIntervalMs;
+    let pollImmediately = true;
     for (;;) {
-      if (!firstRequest) await delay(this.statusIntervalMs);
-      firstRequest = false;
+      if (!pollImmediately) await delay(pollIntervalMs);
+      pollImmediately = false;
       const eventsResponse = await this.fetch(
         new URL(`jobs/${jobId}/events?after=${sequenceId}`, this.baseUrl),
         { headers: { accept: PROTOBUF_CONTENT_TYPE, ...this.headers } },
@@ -283,12 +350,16 @@ implements SolverExecutor<Request, Response, Event> {
           try {
             const result = await this.handleResponse(outer, options);
             if (result !== null) return result;
+            if (outer.payload.case === 'callbackRequest') pollImmediately = true;
           } finally {
             if (terminal) await this.release(jobId);
           }
         }
       }
 
+      // Replying can unblock the next native callback immediately. Read events
+      // again without a status delay or an intervening result request.
+      if (pollImmediately) continue;
       const outer = await this.fetchJob(new URL(`jobs/${jobId}/result`, this.baseUrl), 'result');
       if (!outer) continue;
       const terminal = outer.payload.case === 'resultPayload' || outer.payload.case === 'failure';
@@ -302,9 +373,12 @@ implements SolverExecutor<Request, Response, Event> {
   }
 
   private async release(jobId: bigint): Promise<void> {
-    await this.fetch(new URL(`jobs/${jobId}`, this.baseUrl), {
-      method: 'DELETE',
-      headers: this.headers,
+    // Cleanup is best effort; completed results must not wait for network recovery.
+    await withRequestDeadline(JOB_RELEASE_TIMEOUT_MS, 'Solver job cleanup timed out.', async signal => {
+      const response = await this.fetch(new URL(`jobs/${jobId}`, this.baseUrl), {
+        method: 'DELETE', headers: this.headers, signal,
+      });
+      await response.arrayBuffer();
     }).catch(() => undefined);
   }
 
@@ -328,6 +402,28 @@ implements SolverExecutor<Request, Response, Event> {
       throw new Error(`${this.codec.label} server returned response for solver ${outer.solver}.`);
     }
     switch (outer.payload.case) {
+      case 'callbackRequest': {
+        const request = outer.payload.value;
+        if (!options.onCallback) throw new CallbackTransportError(new Error('No solver callback handler registered.'));
+        let payload: Uint8Array = new Uint8Array();
+        let error = '';
+        try {
+          payload = options.onCallback(request.payload);
+        } catch (caught) { error = (caught instanceof Error ? caught.message : String(caught)) || 'Solver callback failed.'; }
+        const bytes = encodeSolverBridgeCallbackReply(outer.requestId, this.solver, request.callbackId, payload, error);
+        try {
+          await withRequestDeadline(CALLBACK_REPLY_TIMEOUT_MS, 'Solver callback reply timed out.', async signal => {
+            const reply = await this.fetch(new URL(`jobs/${outer.jobId}/callback`, this.baseUrl), {
+              method: 'POST', headers: { 'content-type': PROTOBUF_CONTENT_TYPE, ...this.headers },
+              body: bytesBody(bytes), signal,
+            });
+            // A closed callback wait settles through the job's terminal response.
+            if (!reply.ok && reply.status !== 409) await this.throwHttpError('callback reply', reply);
+            await reply.arrayBuffer();
+          });
+        } catch (cause) { throw new CallbackTransportError(cause); }
+        return null;
+      }
       case 'failure':
         await options.onEvent({ type: 'failure', failure: outer.payload.value });
         throw new RemoteSolverError(outer.payload.value, true);
@@ -349,11 +445,13 @@ implements SolverExecutor<Request, Response, Event> {
   private async cancel(
     targetRequestId: number,
     submitted: Promise<SolverBridgeResponse>,
+    nativeInterruption = false,
   ): Promise<void> {
     const accepted = await submitted;
     if (accepted.jobId === 0n) throw new Error(`${this.codec.label} server did not return a job id.`);
-    const bytes = encodeSolverBridgeCancelRequest(this.nextRequestId++, this.solver, targetRequestId);
-    const response = await this.fetch(new URL(`jobs/${accepted.jobId}/cancel`, this.baseUrl), {
+    const bytes = (nativeInterruption ? encodeSolverBridgeInterruptRequest : encodeSolverBridgeCancelRequest)(this.nextRequestId++, this.solver, targetRequestId);
+    const operation = nativeInterruption ? 'interrupt' : 'cancel';
+    const response = await this.fetch(new URL(`jobs/${accepted.jobId}/${operation}`, this.baseUrl), {
       method: 'POST',
       headers: { accept: PROTOBUF_CONTENT_TYPE, 'content-type': PROTOBUF_CONTENT_TYPE, ...this.headers },
       body: bytesBody(bytes),
@@ -365,7 +463,8 @@ implements SolverExecutor<Request, Response, Event> {
     if (acknowledgement.payload.case === 'failure') {
       throw new RemoteSolverError(acknowledgement.payload.value);
     }
-    if (acknowledgement.payload.case !== 'cancelled' ||
+    if ((acknowledgement.payload.case !== 'interrupted' && acknowledgement.payload.case !== 'cancelled') ||
+        nativeInterruption !== (acknowledgement.payload.case === 'interrupted') ||
         acknowledgement.payload.value.targetRequestId !== targetRequestId) {
       throw new Error(`${this.codec.label} server returned an invalid cancellation acknowledgement.`);
     }

@@ -34,12 +34,14 @@ type RoutingIndexManagerLike = {
 };
 
 type RoutingAssignmentLike = {
+  localSearchProfile: string | null;
+  automaticFirstSolutionStrategy: number | null;
   objectiveValue(): bigint;
   value(index: unknown): number;
   min(index: unknown): number;
 };
 
-type RoutingResultLike = { status: number; hasSolution: boolean; assignment: RoutingAssignmentLike | null };
+type RoutingResultLike = { localSearchProfile: string | null; status: number; hasSolution: boolean; assignment: RoutingAssignmentLike | null };
 
 type RoutingModelLike = {
   registerTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
@@ -50,10 +52,8 @@ type RoutingModelLike = {
   solve(options?: unknown): Promise<RoutingResultLike>;
   solveWithParameters(parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): Promise<RoutingAssignmentLike | null>;
   solveFromAssignmentWithParameters(assignment: RoutingAssignmentLike, parameters: { firstSolutionStrategy?: number; solutionLimit?: number }): Promise<RoutingAssignmentLike | null>;
-  readAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean): RoutingAssignmentLike;
-  getAutomaticFirstSolutionStrategy(): number;
-  addAtSolutionCallback(callback: (() => void) | { __call__(): void }): void;
-  costVar(): { max(): bigint };
+  readAssignmentFromRoutes(routes: number[][], ignoreInactiveIndices: boolean, options?: unknown): Promise<RoutingAssignmentLike | null>;
+  addAtSolutionCallback(callback: (event: { objectiveValue: bigint }) => void): void;
   addDimension(transitIndex: number, slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
   addDimensionWithVehicleCapacity(transitIndex: number, slackMax: number, capacities: number[], fixStartCumulToZero: boolean, name: string): boolean;
   addDimensionWithVehicleTransits(transitIndices: number[], slackMax: number, capacity: number, fixStartCumulToZero: boolean, name: string): boolean;
@@ -75,23 +75,18 @@ type RoutingModelLike = {
   end(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): Promise<bigint>;
   status(): number;
   vehicles(): number;
-  solver(): {
-    parameters(): { tracePropagation: boolean };
-    localSearchProfile(): string;
-    add(...constraints: unknown[]): void;
-  };
+  getModelParameters(): { solverParameters?: { tracePropagation?: boolean } };
 };
 
 export type RoutingApi = {
-  defaultRoutingSearchParameters(): { firstSolutionStrategy?: number; solutionLimit?: number };
+  defaultRoutingSearchParameters(): { firstSolutionStrategy?: number | string; solutionLimit?: number | bigint };
   defaultRoutingModelParameters(): {
-    solverParameters: {
-      copyFrom(value: unknown): void;
-      tracePropagation: boolean;
-      profileLocalSearch: boolean;
+    solverParameters?: {
+      tracePropagation?: boolean;
+      profileLocalSearch?: boolean;
     };
   };
   FirstSolutionStrategy: {

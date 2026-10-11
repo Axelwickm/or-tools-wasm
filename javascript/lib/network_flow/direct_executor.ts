@@ -1,4 +1,5 @@
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
+import { withWasmAllocations, type WasmByteAllocator } from '../wasm_memory.js';
 import { loadGraphRuntime } from '../runtime_loader.js';
 import {
   createSolverFailureEvent,
@@ -33,20 +34,14 @@ type NativeResult =
     assignmentCosts?: string[];
   };
 
-function copyInt32ToHeap(module: OrToolsWasmModule, values: number[]) {
-  if (!values.length) return 0;
+function copyInt32ToHeap(allocate: WasmByteAllocator, values: number[]) {
   const array = new Int32Array(values);
-  const ptr = module._malloc(array.byteLength);
-  module.HEAPU8.set(new Uint8Array(array.buffer), ptr);
-  return ptr;
+  return allocate(new Uint8Array(array.buffer));
 }
 
-function copyInt64ToHeap(module: OrToolsWasmModule, values: bigint[]) {
-  if (!values.length) return 0;
+function copyInt64ToHeap(allocate: WasmByteAllocator, values: bigint[]) {
   const array = BigInt64Array.from(values);
-  const ptr = module._malloc(array.byteLength);
-  module.HEAPU8.set(new Uint8Array(array.buffer), ptr);
-  return ptr;
+  return allocate(new Uint8Array(array.buffer));
 }
 
 function parseResult(value: string): NetworkFlowResult {
@@ -138,28 +133,24 @@ export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
     module: OrToolsWasmModule,
     operation: NetworkFlowOperation,
   ): Promise<NetworkFlowResult> {
-    if (operation.type === 'maxFlow') {
-      const tails = copyInt32ToHeap(module, operation.tails);
-      const heads = copyInt32ToHeap(module, operation.heads);
-      const capacities = copyInt64ToHeap(module, operation.capacities);
-      try {
+    return withWasmAllocations(module, async allocate => {
+      if (operation.type === 'maxFlow') {
+        const tails = copyInt32ToHeap(allocate, operation.tails);
+        const heads = copyInt32ToHeap(allocate, operation.heads);
+        const capacities = copyInt64ToHeap(allocate, operation.capacities);
         return parseResult(await module.ccall(
           'graph_max_flow_solve_serialized', 'string',
           ['number', 'number', 'number', 'number', 'number', 'number'],
           [tails, heads, capacities, operation.tails.length, operation.source, operation.sink],
           { async: true },
         ) as string);
-      } finally {
-        for (const ptr of [tails, heads, capacities]) if (ptr) module._free(ptr);
       }
-    }
-    if (operation.type === 'minCostFlow') {
-      const tails = copyInt32ToHeap(module, operation.tails);
-      const heads = copyInt32ToHeap(module, operation.heads);
-      const capacities = copyInt64ToHeap(module, operation.capacities);
-      const costs = copyInt64ToHeap(module, operation.unitCosts);
-      const supplies = copyInt64ToHeap(module, operation.supplies);
-      try {
+      if (operation.type === 'minCostFlow') {
+        const tails = copyInt32ToHeap(allocate, operation.tails);
+        const heads = copyInt32ToHeap(allocate, operation.heads);
+        const capacities = copyInt64ToHeap(allocate, operation.capacities);
+        const costs = copyInt64ToHeap(allocate, operation.unitCosts);
+        const supplies = copyInt64ToHeap(allocate, operation.supplies);
         return parseResult(await module.ccall(
           'graph_min_cost_flow_solve_serialized', 'string',
           ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
@@ -167,22 +158,16 @@ export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
             operation.solveMaxFlowWithMinCost ? 1 : 0],
           { async: true },
         ) as string);
-      } finally {
-        for (const ptr of [tails, heads, capacities, costs, supplies]) if (ptr) module._free(ptr);
       }
-    }
-    const left = copyInt32ToHeap(module, operation.leftNodes);
-    const right = copyInt32ToHeap(module, operation.rightNodes);
-    const costs = copyInt64ToHeap(module, operation.costs);
-    try {
+      const left = copyInt32ToHeap(allocate, operation.leftNodes);
+      const right = copyInt32ToHeap(allocate, operation.rightNodes);
+      const costs = copyInt64ToHeap(allocate, operation.costs);
       return parseResult(await module.ccall(
         'graph_linear_sum_assignment_solve_serialized', 'string',
         ['number', 'number', 'number', 'number'],
         [left, right, costs, operation.leftNodes.length],
         { async: true },
       ) as string);
-    } finally {
-      for (const ptr of [left, right, costs]) if (ptr) module._free(ptr);
-    }
+    });
   }
 }

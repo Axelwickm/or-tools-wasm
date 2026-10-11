@@ -1,6 +1,7 @@
 import { create } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
+import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import { loadPdlpRuntime } from '../runtime_loader.js';
 import {
   createSolverFailureEvent,
@@ -12,6 +13,7 @@ import {
   type SolverExecutionOptions,
 } from '../solver_executor.js';
 import {
+  PdlpIterationEventSchema,
   PdlpQuadraticProgramSchema,
   PdlpSolverResultSchema,
   type PdlpQuadraticProgram,
@@ -21,41 +23,56 @@ import type {
   PdlpJob,
   PdlpOperation,
   PdlpResult,
+  PdlpSolverEvent,
 } from './protocol.js';
 
 class PdlpWireWriter {
-  private readonly parts: Uint8Array[] = [];
+  private bytes = new Uint8Array(256);
+  private view = new DataView(this.bytes.buffer);
+  private offset = 0;
+
+  private reserve(size: number): number {
+    const start = this.offset;
+    const end = start + size;
+    if (end > this.bytes.length) {
+      const bytes = new Uint8Array(Math.max(end, this.bytes.length * 2));
+      bytes.set(this.bytes.subarray(0, start));
+      this.bytes = bytes;
+      this.view = new DataView(bytes.buffer);
+    }
+    this.offset = end;
+    return start;
+  }
 
   u8(value: number) {
-    this.parts.push(Uint8Array.of(value & 0xff));
+    const offset = this.reserve(1);
+    this.view.setUint8(offset, value);
   }
 
   u32(value: number) {
-    const bytes = new Uint8Array(4);
-    new DataView(bytes.buffer).setUint32(0, value, true);
-    this.parts.push(bytes);
+    const offset = this.reserve(4);
+    this.view.setUint32(offset, value, true);
   }
 
-  i32(value: number) {
-    const bytes = new Uint8Array(4);
-    new DataView(bytes.buffer).setInt32(0, value, true);
-    this.parts.push(bytes);
-  }
   double(value: number) {
-    const bytes = new Uint8Array(8);
-    new DataView(bytes.buffer).setFloat64(0, value, true);
-    this.parts.push(bytes);
+    const offset = this.reserve(8);
+    this.view.setFloat64(offset, value, true);
+  }
+
+  rawBytes(bytes: Uint8Array) {
+    this.u32(bytes.length);
+    const offset = this.reserve(bytes.length);
+    this.bytes.set(bytes, offset);
   }
 
   string(value: string) {
-    const bytes = new TextEncoder().encode(value);
-    this.u32(bytes.length);
-    this.parts.push(bytes);
+    this.rawBytes(new TextEncoder().encode(value));
   }
 
   doubles(values: readonly number[]) {
     this.u32(values.length);
-    for (const value of values) this.double(value);
+    const offset = this.reserve(values.length * 8);
+    for (let index = 0; index < values.length; ++index) this.view.setFloat64(offset + index * 8, values[index], true);
   }
 
   strings(values: readonly string[]) {
@@ -64,13 +81,7 @@ class PdlpWireWriter {
   }
 
   finish() {
-    const output = new Uint8Array(this.parts.reduce((sum, part) => sum + part.length, 0));
-    let offset = 0;
-    for (const part of this.parts) {
-      output.set(part, offset);
-      offset += part.length;
-    }
-    return output;
+    return this.bytes.subarray(0, this.offset);
   }
 }
 
@@ -91,6 +102,10 @@ class PdlpWireReader {
   double() {
     return new DataView(this.take(8).buffer, this.bytes.byteOffset + this.offset - 8, 8)
       .getFloat64(0, true);
+  }
+
+  rawBytes() {
+    return new Uint8Array(this.take(this.u32()));
   }
 
   string() {
@@ -206,34 +221,8 @@ function encodeSolveRequest(request: Extract<PdlpOperation, { type: 'solve' }>) 
   const parameters = request.parameters;
   const initial = request.initialSolution;
   const chunks = [qp];
-  writer.u8(parameters.iterationLimit !== undefined ? 1 : 0);
-  if (parameters.iterationLimit !== undefined) {
-    writer.i32(parameters.iterationLimit);
-  }
-  writer.u8(parameters.terminationCheckFrequency !== undefined ? 1 : 0);
-  if (parameters.terminationCheckFrequency !== undefined) {
-    writer.i32(parameters.terminationCheckFrequency);
-  }
-  writer.u8(parameters.epsOptimalRelative !== undefined ? 1 : 0);
-  if (parameters.epsOptimalRelative !== undefined) {
-    writer.double(parameters.epsOptimalRelative);
-  }
-  writer.u8(parameters.epsOptimalAbsolute !== undefined ? 1 : 0);
-  if (parameters.epsOptimalAbsolute !== undefined) {
-    writer.double(parameters.epsOptimalAbsolute);
-  }
-  writer.u8(parameters.lInfRuizIterations !== undefined ? 1 : 0);
-  if (parameters.lInfRuizIterations !== undefined) {
-    writer.i32(parameters.lInfRuizIterations);
-  }
-  writer.u8(parameters.l2NormRescaling !== undefined ? 1 : 0);
-  if (parameters.l2NormRescaling !== undefined) {
-    writer.u8(parameters.l2NormRescaling ? 1 : 0);
-  }
-  writer.u8(parameters.numThreads !== undefined ? 1 : 0);
-  if (parameters.numThreads !== undefined) {
-    writer.i32(parameters.numThreads);
-  }
+  writer.u8(255);
+  writer.rawBytes(parameters.nativeParameters);
   writer.u8(initial ? 1 : 0);
   if (initial) {
     writer.doubles(initial.primalSolution);
@@ -259,6 +248,7 @@ function decodeSolverResult(bytes: Uint8Array) {
     reducedCosts: reader.doubles(),
     terminationReason: reader.u32(),
     iterationCount: reader.u32(),
+    nativeSolveLog: reader.rawBytes(),
   };
   reader.finish();
   return result;
@@ -268,7 +258,7 @@ export class DirectPdlpExecutor implements PdlpExecutor {
   readonly solver = 'pdlp';
 
   private nextRequestId = 1;
-  private activeJob: object | null = null;
+  private activeJob: { cancelled: boolean; nativeRunning: boolean } | null = null;
 
   constructor(
     private readonly loadModuleImpl: () => Promise<OrToolsWasmModule> = loadPdlpRuntime,
@@ -280,20 +270,31 @@ export class DirectPdlpExecutor implements PdlpExecutor {
 
   terminate(_reason?: string) {}
 
-  execute(request: PdlpOperation, options: SolverExecutionOptions<never>): PdlpJob {
+  execute(request: PdlpOperation, options: SolverExecutionOptions<PdlpSolverEvent>): PdlpJob {
     if (this.activeJob) {
       throw new SolverExecutorBusyError(this.solver);
     }
     const requestId = this.nextRequestId++;
-    const state = {};
+    const state = { cancelled: false, nativeRunning: false };
     this.activeJob = state;
     return {
       requestId,
       result: this.run(requestId, request, options).finally(() => {
         if (this.activeJob === state) this.activeJob = null;
       }),
-      cancel: () => Promise.reject(new SolverCancellationUnsupportedError(this.solver)),
+      cancel: async () => {
+        if (request.type !== 'solve') throw new SolverCancellationUnsupportedError(this.solver);
+        if (this.activeJob !== state) return;
+        state.cancelled = true;
+        const module = await this.module();
+        if (this.activeJob === state && state.nativeRunning) this.interrupt(module);
+      },
     };
+  }
+
+  private interrupt(module: OrToolsWasmModule) {
+    const address = module.ccall('pdlp_interrupt_address', 'number', [], []) as number;
+    Atomics.store(module.HEAPU8, address, 1);
   }
 
   private module() {
@@ -303,7 +304,7 @@ export class DirectPdlpExecutor implements PdlpExecutor {
   private async run(
     requestId: number,
     request: PdlpOperation,
-    options: SolverExecutionOptions<never>,
+    options: SolverExecutionOptions<PdlpSolverEvent>,
   ) {
     const createdAtMs = BigInt(Date.now());
     try {
@@ -321,7 +322,19 @@ export class DirectPdlpExecutor implements PdlpExecutor {
         createdAtMs,
         BigInt(Date.now()),
       ));
-      const response = await this.invoke(module, request);
+      const pendingCallbacks: Promise<void>[] = [];
+      let callbackError: unknown;
+      const response = await withWasmRuntimeLock(module, () => this.invoke(module, request, event => {
+        if (callbackError) return;
+        try {
+          const pending = options.onEvent(event);
+          if (pending) pendingCallbacks.push(Promise.resolve(pending).catch(error => {
+            callbackError ??= error;
+          }));
+        } catch (error) { callbackError ??= error; }
+      }));
+      await Promise.all(pendingCallbacks);
+      if (callbackError) throw callbackError;
       await options.onEvent(createSolverJobStatusEvent(
         this.solver,
         requestId,
@@ -350,12 +363,10 @@ export class DirectPdlpExecutor implements PdlpExecutor {
   private async invoke(
     module: OrToolsWasmModule,
     request: PdlpOperation,
+    onEvent: (event: PdlpSolverEvent) => void,
   ): Promise<PdlpResult> {
-    const qpBytes = request.type === 'fromMpModel'
-      ? new Uint8Array()
-      : encodeQuadraticProgram(request.quadraticProgram);
     const input = request.type === 'fromMpModel' ? request.model
-      : request.type === 'solve' ? encodeSolveRequest(request) : qpBytes;
+      : request.type === 'solve' ? encodeSolveRequest(request) : encodeQuadraticProgram(request.quadraticProgram);
     const ptr = allocateWasmBytes(module, input);
     try {
       switch (request.type) {
@@ -392,12 +403,13 @@ export class DirectPdlpExecutor implements PdlpExecutor {
           const bytes = await readWasmResult(
             module,
             async (lengthPointer) => await module.ccall(
-              'pdlp_qp_from_mpmodel_proto',
+              'pdlp_read_quadratic_program',
               'number',
-              ['number', 'number', 'number', 'number', 'number'],
+              ['number', 'number', 'number', 'number', 'number', 'number'],
               [
                 ptr,
                 input.length,
+                request.inputFormat ?? 0,
                 request.relaxIntegerVariables ? 1 : 0,
                 request.includeNames ? 1 : 0,
                 lengthPointer,
@@ -408,12 +420,11 @@ export class DirectPdlpExecutor implements PdlpExecutor {
               'free_buffer', undefined, ['number'], [pointer],
             ),
           );
-          if (!bytes.length) {
-            throw new Error('PDLP could not convert MPModelProto to QuadraticProgram.');
-          }
+          if (!bytes.length) throw new Error('PDLP model import returned no response.');
+          if (bytes[0] !== 1) throw new Error(new TextDecoder().decode(bytes.subarray(1)) || 'PDLP model import failed.');
           return {
             type: 'fromMpModel',
-            quadraticProgram: create(PdlpQuadraticProgramSchema, decodeQuadraticProgram(bytes)),
+            quadraticProgram: create(PdlpQuadraticProgramSchema, decodeQuadraticProgram(bytes.subarray(1))),
           };
         }
         case 'toMpModel': {
@@ -436,19 +447,46 @@ export class DirectPdlpExecutor implements PdlpExecutor {
           return { type: 'toMpModel', model: bytes.slice(1) };
         }
         case 'solve': {
-          const bytes = await readWasmResult(
-            module,
-            async (lengthPointer) => await module.ccall(
-              'pdlp_primal_dual_hybrid_gradient',
-              'number',
-              ['number', 'number', 'number'],
-              [ptr, input.length, lengthPointer],
-              { async: true },
-            ) as number,
-            (pointer) => module.ccall(
-              'free_buffer', undefined, ['number'], [pointer],
-            ),
-          );
+          const state = this.activeJob;
+          if (!state) throw new Error('PDLP solve has no active job.');
+          const registry: { nextId: number; sinks: Map<number, (type: number, bytes: Uint8Array) => void> } =
+            module.__ortoolsPdlpCallbacks ??= { nextId: 1, sinks: new Map() };
+          const callbackId = registry.nextId++;
+          registry.sinks.set(callbackId, (type, bytes) => {
+            if (type === 1) onEvent({ type: 'log', message: new TextDecoder().decode(bytes) });
+            else if (type === 2) {
+              const reader = new PdlpWireReader(bytes);
+              const info = create(PdlpIterationEventSchema, {
+                iterationType: reader.u32(),
+                iterationStats: reader.rawBytes(), terminationCriteria: reader.rawBytes(),
+                l2NormPrimalLinearObjective: reader.double(), l2NormConstraintBounds: reader.double(),
+                lInfNormPrimalLinearObjective: reader.double(), lInfNormConstraintBounds: reader.double(),
+              });
+              reader.finish();
+              onEvent({ type: 'iteration', info });
+            }
+          });
+          state.nativeRunning = true;
+          if (state.cancelled) this.interrupt(module);
+          let bytes: Uint8Array;
+          try {
+            bytes = await readWasmResult(
+              module,
+              async (lengthPointer) => await module.ccall(
+                'pdlp_primal_dual_hybrid_gradient_with_callbacks',
+                'number',
+                ['number', 'number', 'number', 'number', 'number'],
+                [ptr, input.length, request.callbackFlags ?? 0, callbackId, lengthPointer],
+                { async: true },
+              ) as number,
+              (pointer) => module.ccall(
+                'free_buffer', undefined, ['number'], [pointer],
+              ),
+            );
+          } finally {
+            state.nativeRunning = false;
+            registry.sinks.delete(callbackId);
+          }
           if (!bytes.length) {
             throw new Error('PDLP solve failed.');
           }

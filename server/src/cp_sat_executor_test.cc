@@ -11,7 +11,9 @@
 #include <vector>
 
 #include "cp_sat.pb.h"
+#include "google/protobuf/text_format.h"
 #include "ortools/sat/cp_model.pb.h"
+#include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/sat_parameters.pb.h"
 #include "server/src/job_scheduler.h"
 
@@ -191,10 +193,74 @@ void RunningSolveObservesCancellation() {
            "running CP-SAT cancellation is reported truthfully");
 }
 
+SolverExecutorResult DiagnosticRequest(const bridge::CpSatBridgeRequest& request) {
+  JobScheduler scheduler({1, 8}); CpSatExecutor executor;
+  SolverExecutorResult result;
+  auto handle = scheduler.Submit(JobSpec{"cp-sat", 1}, [&](JobContext& context) {
+    result = executor.Execute({1, "cp-sat", request.SerializeAsString()}, context, [](std::string) {});
+    return result.ok ? JobResult::Succeeded() : JobResult::Failed(result.error_message);
+  });
+  handle.result().wait(); return result;
+}
+SolverExecutorResult StatisticsRequest(const std::string& bytes, bool response) {
+  bridge::CpSatBridgeRequest request;
+  if (response) request.set_response_stats(bytes); else request.set_model_stats(bytes);
+  return DiagnosticRequest(request);
+}
+void ExportsCompleteNativeTextIncludingInvalidModels() {
+  sat::CpModelProto model;
+  model.set_name("escaped\"\nname");
+  auto* variable = model.add_variables(); variable->set_name("x");
+  variable->add_domain(-9007199254740993LL); variable->add_domain(9007199254740993LL);
+  auto* row = model.add_constraints()->mutable_linear();
+  row->add_vars(0); row->add_coeffs(7); row->add_domain(0); row->add_domain(7);
+  model.mutable_solution_hint()->add_vars(0); model.mutable_solution_hint()->add_values(1);
+  model.add_assumptions(0);
+  model.mutable_objective()->add_vars(0); model.mutable_objective()->add_coeffs(2);
+  const auto exported = [&](const std::string& bytes) {
+    bridge::CpSatBridgeRequest request; request.set_export_model_text(bytes);
+    return DiagnosticRequest(request);
+  };
+  const auto check = [&]() {
+    const auto result = exported(model.SerializeAsString());
+    bridge::CpSatBridgeResponse response;
+    Expect(result.ok && response.ParseFromString(result.payload) && response.has_model_text(), "Model text response parses");
+    std::string expected;
+    Expect(google::protobuf::TextFormat::PrintToString(model, &expected), "Native text formatter succeeds");
+    ExpectEq(response.model_text(), expected, "Export exactly matches native protobuf text");
+    sat::CpModelProto recovered;
+    Expect(google::protobuf::TextFormat::ParseFromString(response.model_text(), &recovered), "Text parses back into native model");
+    ExpectEq(recovered.SerializeAsString(), model.SerializeAsString(), "Complete native model round trips");
+  };
+  check();
+  variable->clear_domain(); variable->add_domain(0); check();
+  Expect(!exported(std::string(1, static_cast<char>(0xff))).ok, "Malformed bytes reject");
+  const auto empty = exported(""); bridge::CpSatBridgeResponse response;
+  Expect(empty.ok && response.ParseFromString(empty.payload) && response.has_model_text() && response.model_text().empty(), "Empty text response preserves oneof presence and recovers");
+}
+void ReturnsExactNativeStatisticsAndRejectsMalformedInputs() {
+  sat::CpModelProto model; model.set_name("native-statistics");
+  auto* variable = model.add_variables(); variable->add_domain(0); variable->add_domain(4);
+  auto result = StatisticsRequest(model.SerializeAsString(), false); bridge::CpSatBridgeResponse response;
+  Expect(result.ok && response.ParseFromString(result.payload) && response.has_statistics(), "Model statistics response parses");
+  ExpectEq(response.statistics(), sat::CpModelStats(model), "Model report equals native formatter exactly");
+  sat::CpSolverResponse proto; proto.set_status(sat::CpSolverStatus::FEASIBLE); proto.set_num_branches(9007199254740993LL);
+  result = StatisticsRequest(proto.SerializeAsString(), true); response.ParseFromString(result.payload);
+  Expect(result.ok && response.statistics() == sat::CpSolverResponseStats(proto), "Response report preserves native exact int64 formatting");
+  for (bool is_response : {false, true}) {
+    Expect(!StatisticsRequest(std::string(1, static_cast<char>(0xff)), is_response).ok, "Malformed statistics bytes fail safely");
+    Expect(StatisticsRequest("", is_response).ok, "Default protos recover after malformed input");
+  }
+  variable->clear_domain(); variable->add_domain(0);
+  Expect(!StatisticsRequest(model.SerializeAsString(), false).ok, "Malformed domains reject before native formatting");
+}
+
 using TestFn = void (*)();
 
 int RunAllTests() {
   const std::vector<std::pair<std::string, TestFn>> tests = {
+      {"ExportsCompleteNativeTextIncludingInvalidModels", ExportsCompleteNativeTextIncludingInvalidModels},
+      {"ReturnsExactNativeStatisticsAndRejectsMalformedInputs", ReturnsExactNativeStatisticsAndRejectsMalformedInputs},
       {"ResolvesThreadsWithoutChangingSolverParameters",
        ResolvesThreadsWithoutChangingSolverParameters},
       {"AutomaticWorkersReserveServerCapacity",

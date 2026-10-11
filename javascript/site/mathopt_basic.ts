@@ -1,7 +1,16 @@
-import { MathOpt } from 'or-tools-wasm/mathopt';
+import { MathOpt, MathOptCallbackEventProto, type MathOptSolveOptions, type MathOptSolveResult, type MathOptProtoSolveResult } from 'or-tools-wasm/mathopt';
 import { appendStatus, clearStatus, configureMathOptRun, renderRows, runButton, selectedMathOptExecutor, setRunning, workerCountInput } from './mathopt_sample_helpers.js';
 
 const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;
+const stopAfterSolution = document.getElementById('stop-after-solution') as HTMLInputElement;
+const lazyConstraintInput = document.getElementById('lazy-constraint') as HTMLInputElement;
+const liveLogsInput = document.getElementById('live-logs') as HTMLInputElement;
+const rawProtoInput = document.getElementById('raw-proto') as HTMLInputElement;
+const rawIncrementalInput = document.getElementById('raw-incremental') as HTMLInputElement;
+rawProtoInput.addEventListener('change', () => {
+  rawIncrementalInput.disabled = !rawProtoInput.checked;
+  if (!rawProtoInput.checked) rawIncrementalInput.checked = false;
+});
 
 function selectedSolverType(): keyof typeof MathOpt.SolverType {
   const value = solverSelect?.value;
@@ -23,6 +32,8 @@ function addBackendCompatibleBinaryVariable(
 }
 
 function updateThreadControl() {
+  stopAfterSolution.disabled = !['CP_SAT', 'GSCIP'].includes(selectedSolverType());
+  lazyConstraintInput.disabled = selectedSolverType() !== 'GSCIP';
   if (!workerCountInput) return;
   workerCountInput.disabled = selectedSolverType() === 'GLPK';
   if (workerCountInput.disabled) workerCountInput.value = '1';
@@ -36,11 +47,16 @@ async function runMathOptExample() {
   clearStatus();
   try {
     const solverType = selectedSolverType();
+    const lazyConstraint = solverType === 'GSCIP' && lazyConstraintInput.checked;
+    const stopEarly = stopAfterSolution.checked;
+    const showLogs = liveLogsInput.checked;
+    const serialized = rawProtoInput.checked;
+    const incremental = serialized && rawIncrementalInput.checked;
     const threads = solverType === 'GLPK' ? 1 : configureMathOptRun();
-    const model = MathOpt.Model('basics');
+    const model = MathOpt.Model('basics', { primaryObjectiveName: 'profit' });
     const x = addBackendCompatibleBinaryVariable(model, solverType, 'x');
     const y = addBackendCompatibleBinaryVariable(model, solverType, 'y');
-    model.addLinearConstraint({
+    if (!lazyConstraint) model.addLinearConstraint({
       upperBound: 1,
       terms: [
         { variable: x, coefficient: 1 },
@@ -53,10 +69,28 @@ async function runMathOptExample() {
     ]);
 
     appendStatus(`Solving with ${solverType}, threads=${threads}...`);
-    const result = await MathOpt.solve(model, {
+    let incumbents = 0;
+    let lazyConstraints = 0;
+    let logBatches = 0;
+    const callbacks = solverType === 'CP_SAT' || solverType === 'GSCIP';
+    const options: MathOptSolveOptions = {
       executor: selectedMathOptExecutor(),
       solverType: MathOpt.SolverType[solverType],
       threads,
+      messageCallback: showLogs ? messages => { ++logBatches; appendStatus(messages.join('\n')); } : undefined,
+      callbackRegistration: callbacks ? { requestRegistration: [MathOptCallbackEventProto.CALLBACK_EVENT_MIP_SOLUTION],
+        addLazyConstraints: lazyConstraint } : undefined,
+      callback: callbacks ? data => {
+        if (lazyConstraint && (data.primalSolutionVector?.values ?? []).reduce((sum, value) => sum + value, 0) > 1 + 1e-6) {
+          ++lazyConstraints;
+          appendStatus('Adding lazy capacity constraint: x + y <= 1');
+          return { cuts: [{ linearExpression: { ids: [x.id, y.id], values: [1, 1] },
+            lowerBound: -Infinity, upperBound: 1, isLazy: true }] };
+        }
+        ++incumbents;
+        appendStatus(`Incumbent ${incumbents}: objective=${data.mipStats?.primalBound}`);
+        return { terminate: stopEarly };
+      } : undefined,
       timeLimitSeconds: 5,
       relativeGapTolerance: solverType === 'GLOP' || solverType === 'GLPK' ? undefined : 1e-6,
       glop: solverType === 'GLOP'
@@ -67,24 +101,53 @@ async function runMathOptExample() {
         : undefined,
       gscip: solverType === 'GSCIP'
         ? new MathOpt.GScipParameters({
-          silenceOutput: true,
-          presolve: MathOpt.GScipMetaParamValue.FAST,
+          silenceOutput: !showLogs,
+          presolve: lazyConstraint ? MathOpt.GScipMetaParamValue.OFF : MathOpt.GScipMetaParamValue.FAST,
         })
         : undefined,
       cpSat: solverType === 'CP_SAT'
         ? { maxTimeInSeconds: 5 }
         : undefined,
-    });
+    };
+    let solved: MathOptSolveResult | MathOptProtoSolveResult;
+    let nativeUpdateApplied: boolean | undefined;
+    if (incremental) {
+      const solver = new MathOpt.ProtoIncrementalSolver(model.encodeModelProto(), MathOpt.SolverType[solverType], options);
+      try {
+        solved = await solver.solve();
+        nativeUpdateApplied = await solver.update({ variableUpdates: { upperBounds: { ids: [x.id], values: [0] } } });
+        if (nativeUpdateApplied) {
+          x.upperBound = 0;
+          solved = await solver.solve();
+        }
+        appendStatus(`Native bound update applied: ${nativeUpdateApplied}`);
+      } finally { await solver.close(); }
+    } else {
+      solved = serialized
+        ? await MathOpt.solveProto(model.encodeModelProto(), options)
+        : await MathOpt.solve(model, options);
+    }
+    const result = await MathOpt.parseSolveResult('bytes' in solved ? solved.bytes : solved.toProtoBytes(), model, { executor: selectedMathOptExecutor() });
+    const savedPrimal = result.hasSolution ? await MathOpt.convertSolutionProto('primalSolution', {
+      variableValues: { ids: [x.id, y.id], values: [result.value(x), result.value(y)] },
+      objectiveValue: result.objectiveValue!, feasibilityStatus: 'SOLUTION_STATUS_FEASIBLE',
+    }, model, { executor: selectedMathOptExecutor() }) : undefined;
     renderRows([
+      ['Input', serialized ? 'Serialized ModelProto' : 'TypeScript model'],
+      ...(nativeUpdateApplied === undefined ? [] : [['Native update applied', String(nativeUpdateApplied)] as [string, string]]),
       ['Backend', solverType],
       ['Variable domain', solverType === 'CP_SAT' || solverType === 'GSCIP' ? 'binary' : 'continuous [0, 1]'],
       ['Objective', result.objectiveValue],
-      ['x', result.variableValues.x],
-      ['y', result.variableValues.y],
+      ...(savedPrimal ? [['Saved primal bytes', savedPrimal.bytes.length] as [string, number]] : []),
+      ...(callbacks ? [['Incumbent solutions', incumbents] as [string, number]] : []),
+      ...(lazyConstraint ? [['Lazy constraints added', lazyConstraints] as [string, number]] : []),
+      ...(showLogs ? [['Native log batches', logBatches] as [string, number]] : []),
+      ['x', result.value(x)],
+      ['y', result.value(y)],
     ]);
     appendStatus(`Termination: ${result.terminationReason}`);
     appendStatus(`Objective: ${result.objectiveValue}`);
-    appendStatus(`Values: ${JSON.stringify(result.variableValues)}`);
+    appendStatus(`Values: ${JSON.stringify(result.variableValuesById)}`);
   } catch (error) {
     appendStatus(`Solve failed: ${(error as Error).message}`);
   } finally {

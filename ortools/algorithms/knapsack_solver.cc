@@ -1286,6 +1286,12 @@ class KnapsackCpSat : public BaseKnapsackSolver {
  public:
   explicit KnapsackCpSat(absl::string_view solver_name);
 
+  bool SetNumWorkers(int num_workers) override {
+    if (num_workers < 1) return false;
+    num_workers_ = num_workers;
+    return true;
+  }
+
   // Initializes the solver and enters the problem to be solved.
   void Init(const std::vector<int64_t>& profits,
             const std::vector<std::vector<int64_t>>& weights,
@@ -1301,6 +1307,7 @@ class KnapsackCpSat : public BaseKnapsackSolver {
   }
 
  private:
+  int num_workers_ = 0;
   std::vector<int64_t> profits_;
   std::vector<std::vector<int64_t>> weights_;
   std::vector<int64_t> capacities_;
@@ -1359,7 +1366,7 @@ int64_t KnapsackCpSat::Solve(TimeLimit* /*time_limit*/,
   model.Maximize(objective);
 
   sat::SatParameters parameters;
-  parameters.set_num_workers(num_items > 100 ? 16 : 8);
+  parameters.set_num_workers(num_workers_ > 0 ? num_workers_ : num_items > 100 ? 16 : 8);
   parameters.set_max_time_in_seconds(time_limit_in_seconds);
 
   const sat::CpSolverResponse response =
@@ -1620,6 +1627,10 @@ void KnapsackSolver::InitReducedProblem(
     reduced_weights.push_back(std::move(one_dimension_reduced_weights));
   }
   solver_->Init(reduced_profits, reduced_weights, reduced_capacities);
+}
+
+bool KnapsackSolver::set_num_workers(int num_workers) {
+  return solver_->SetNumWorkers(num_workers);
 }
 
 int64_t KnapsackSolver::Solve() {

@@ -463,7 +463,7 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
   expect(directResult?.cases?.length).toBeGreaterThan(0);
   expectStableCaseIds(parsedStatus.highLevelCpSatResults, 'high-level CP-SAT');
   expectStableCaseIds(parsedStatus.highLevelCpSatContractResults, 'high-level CP-SAT contract');
-  expect(parsedStatus.highLevelCpSatContractResults).toHaveLength(includeServer ? 15 : 10);
+  expect(parsedStatus.highLevelCpSatContractResults).toHaveLength(includeServer ? 26 : 17);
   expect(parsedStatus.highLevelCpSatContractResults).toEqual(expect.arrayContaining([
     expect.objectContaining({ id: 'cp_sat.high_level.reservoir', mode: 'direct', solverStatus: 'OPTIMAL', ok: true }),
     expect.objectContaining({ id: 'cp_sat.high_level.reservoir', mode: 'worker', solverStatus: 'OPTIMAL', ok: true }),
@@ -471,7 +471,16 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     expect.objectContaining({ id: 'cp_sat.high_level.solver_results', mode: 'worker', solverStatus: 'OPTIMAL', ok: true }),
     expect.objectContaining({ id: 'cp_sat.high_level.exact_integers', mode: 'direct', solverStatus: 'OPTIMAL', ok: true }),
     expect.objectContaining({ id: 'cp_sat.high_level.exact_integers', mode: 'worker', solverStatus: 'OPTIMAL', ok: true }),
+    ...['direct', 'worker', ...(includeServer ? ['server'] : [])].flatMap((mode) => [
+      expect.objectContaining({ id: 'cp_sat.high_level.sparse_domain_parameters', mode, solverStatus: 'OPTIMAL', ok: true }),
+      expect.objectContaining({ id: 'cp_sat.high_level.model_reuse', mode, solverStatus: 'OPTIMAL', ok: true }),
+      expect.objectContaining({ id: 'cp_sat.high_level.linear_domain', mode, solverStatus: 'INFEASIBLE', ok: true }),
+    ]),
   ]));
+  expect(parsedStatus.highLevelCpSatContractResults).toEqual(expect.arrayContaining(
+    ['worker', ...(includeServer ? ['server'] : [])].map(mode =>
+      expect.objectContaining({ id: 'cp_sat.high_level.abort_and_event_mask', mode, solverStatus: 'OPTIMAL', ok: true })),
+  ));
   for (const result of parsedStatus.results ?? []) {
     expectStableCaseIds(result.cases, `CP-SAT ${result.mode}/${result.workerProfile}`);
     expect(result.cases).toEqual(
@@ -499,7 +508,10 @@ test('runs the shared solver fixture cases across executor modes', async ({ page
     highLevelCpSatProfilesByCase.set(result.id, profiles);
   }
   for (const [caseId, profiles] of highLevelCpSatProfilesByCase) {
-    expect([...profiles].sort(), `high-level CP-SAT executor matrix for ${caseId}`).toEqual(expectedHighLevelCpSatProfiles);
+    const expectedProfiles = caseId === 'cp_sat_high_level.cpsolvertest.callback_stop_search_returns_feasible_and_reuses_solver'
+      ? expectedHighLevelCpSatProfiles.filter(profile => !profile.startsWith('direct/'))
+      : expectedHighLevelCpSatProfiles;
+    expect([...profiles].sort(), `high-level CP-SAT executor matrix for ${caseId}`).toEqual(expectedProfiles);
   }
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.executorWorkerRequests?.['cp-sat']).toBeGreaterThan(0);
   expect(parsedStatus.highLevelCpSatWorkerStatsAfter?.activeExecutorWorkers?.['cp-sat']).toBeGreaterThan(

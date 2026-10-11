@@ -159,11 +159,15 @@ class EventLog {
 
   std::vector<bridge::SolverBridgeResponse> After(uint64_t sequence_id) const {
     std::lock_guard lock(mutex_);
-    std::vector<bridge::SolverBridgeResponse> result;
-    for (const auto& response : responses_) {
-      if (response.sequence_id() > sequence_id) result.push_back(response);
-    }
-    return result;
+    if (sequence_id >= responses_.size()) return {};
+    return {responses_.begin() + sequence_id, responses_.end()};
+  }
+
+  void ReleaseCallbackPayload(uint64_t sequence_id) {
+    std::lock_guard lock(mutex_);
+    // Entries retain their sequence metadata, so old cursors can still advance
+    // without replaying callbacks that have already been answered or closed.
+    responses_.at(sequence_id - 1).clear_payload();
   }
 
   std::optional<bridge::SolverBridgeResponse> First() const {
@@ -181,15 +185,10 @@ class EventLog {
                        std::chrono::milliseconds timeout) const {
     std::unique_lock lock(mutex_);
     changed_.wait_for(lock, timeout, [&] {
-      return closed_at_.has_value() ||
-             (!responses_.empty() &&
-              responses_.back().sequence_id() > sequence_id);
+      return closed_at_.has_value() || sequence_id < responses_.size();
     });
-    for (const auto& response : responses_) {
-      if (response.sequence_id() > sequence_id) {
-        return {response, closed_at_.has_value()};
-      }
-    }
+    if (sequence_id < responses_.size())
+      return {responses_[sequence_id], closed_at_.has_value()};
     return {std::nullopt, closed_at_.has_value()};
   }
 
@@ -206,8 +205,60 @@ class EventLog {
   std::optional<std::chrono::steady_clock::time_point> closed_at_;
 };
 
+struct PendingCallback {
+  std::mutex mutex;
+  std::condition_variable changed;
+  bool done = false;
+  bool received = false;
+  uint64_t sequence_id = 0;
+  std::optional<std::string> reply;
+};
 struct JobOutput {
   EventLog events;
+  std::mutex callbacks_mutex;
+  uint64_t next_callback = 1;
+  std::unordered_map<uint64_t, std::shared_ptr<PendingCallback>> callbacks;
+  std::string callback_transport_error;
+
+  std::optional<std::string> Call(const SolverExecutorRequest& request, const JobContext& context, const std::string& payload) {
+    auto pending = std::make_shared<PendingCallback>();
+    uint64_t id;
+    {
+      std::lock_guard lock(callbacks_mutex);
+      id = next_callback++;
+      callbacks.emplace(id, pending);
+    }
+    const auto stop = [pending] {
+      { std::lock_guard lock(pending->mutex); pending->done = true; }
+      pending->changed.notify_all();
+    };
+    auto cancellation = context.OnCancellation(stop);
+    auto interruption = context.OnInterruption(stop);
+    bridge::SolverBridgeResponse event;
+    event.set_request_id(request.request_id); event.set_solver(request.solver); event.set_job_id(context.job_id());
+    event.mutable_callback_request()->set_callback_id(id);
+    event.mutable_callback_request()->set_payload(payload);
+    {
+      std::lock_guard lock(pending->mutex);
+      pending->sequence_id = events.Append(std::move(event)).sequence_id();
+    }
+    std::optional<std::string> reply;
+    bool received;
+    {
+      std::unique_lock lock(pending->mutex);
+      if (!pending->changed.wait_for(lock, std::chrono::seconds(30), [&] { return pending->done; })) pending->done = true;
+      reply = pending->reply;
+      received = pending->received;
+    }
+    events.ReleaseCallbackPayload(pending->sequence_id);
+    {
+      std::lock_guard lock(callbacks_mutex);
+      callbacks.erase(id);
+      if (!received && !context.cancellation_requested() && !context.interruption_requested())
+        callback_transport_error = "Solver callback reply timed out or the client disconnected.";
+    }
+    return reply;
+  }
   SolverExecutorResult execution;
 };
 
@@ -299,14 +350,26 @@ HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
         JobSpec{bridge_request.solver(), requested_threads},
         [executor, executor_request = std::move(executor_request),
          output](JobContext& context) {
+          auto callback_request = executor_request;
+          callback_request.callback = [output, &context, &executor_request](const std::string& payload) {
+            return output->Call(executor_request, context, payload);
+          };
           output->execution = executor->Execute(
-              executor_request, context,
+              callback_request, context,
               [output, request_id = executor_request.request_id,
                solver = executor_request.solver,
                job_id = context.job_id()](std::string payload) {
                 output->events.Append(EventBridgeResponse(
                     request_id, solver, job_id, std::move(payload)));
               });
+          {
+            std::lock_guard lock(output->callbacks_mutex);
+            if (!output->callback_transport_error.empty()) {
+              output->execution.ok = false;
+              output->execution.error_message = output->callback_transport_error;
+              output->execution.failure_kind = SolverExecutionFailureKind::kInternal;
+            }
+          }
           if (!output->execution.ok) {
             return JobResult::Failed(output->execution.error_message);
           }
@@ -464,6 +527,62 @@ HttpBinaryResponse SolverJobService::Cancel(const HttpBinaryRequest& request) {
     response.set_solver(entry->solver);
     response.set_job_id(job_id);
     response.mutable_cancelled()->set_target_request_id(entry->request_id);
+    return ProtoResponse(200, response);
+  } catch (const std::exception& error) {
+    return TextResponse(400, std::string(error.what()) + "\n");
+  }
+}
+
+HttpBinaryResponse SolverJobService::Callback(const HttpBinaryRequest& request) {
+  const auto entry = EntryFor(JobIdFromRequest(request));
+  if (!entry) return FailureResponse(0, {}, 0, "Unknown job.", 404);
+  bridge::SolverBridgeRequest input;
+  if (!input.ParseFromString(request.body) || input.operation_case() != bridge::SolverBridgeRequest::kCallbackReply ||
+      input.request_id() != entry->request_id || input.solver() != entry->solver) {
+    return FailureResponse(entry->request_id, entry->solver, entry->handle.job_id(), "Invalid callback reply.", 400);
+  }
+  std::shared_ptr<PendingCallback> pending;
+  {
+    std::lock_guard lock(entry->output->callbacks_mutex);
+    const auto found = entry->output->callbacks.find(input.callback_reply().callback_id());
+    if (found == entry->output->callbacks.end()) return FailureResponse(entry->request_id, entry->solver, entry->handle.job_id(), "Unknown or expired callback.", 409);
+    pending = found->second;
+  }
+  {
+    std::lock_guard lock(pending->mutex);
+    if (pending->done) return FailureResponse(entry->request_id, entry->solver, entry->handle.job_id(), "Callback already completed.", 409);
+    pending->done = true;
+    pending->received = true;
+    if (input.callback_reply().error().empty()) pending->reply = input.callback_reply().payload();
+    entry->output->events.ReleaseCallbackPayload(pending->sequence_id);
+  }
+  pending->changed.notify_all();
+  return StatusResponse(entry->request_id, entry->handle.status(), 200);
+}
+
+HttpBinaryResponse SolverJobService::Interrupt(const HttpBinaryRequest& request) {
+  try {
+    const uint64_t job_id = JobIdFromRequest(request);
+    const auto entry = EntryFor(job_id);
+    if (!entry) return TextResponse(404, "Job not found.\n");
+    bridge::SolverBridgeRequest control;
+    if (!control.ParseFromString(request.body) ||
+        control.operation_case() != bridge::SolverBridgeRequest::kInterrupt ||
+        control.solver() != entry->solver ||
+        control.interrupt().target_request_id() != entry->request_id) {
+      return FailureResponse(control.request_id(), entry->solver, job_id,
+                             "Interruption target does not match the job.", 400,
+                             bridge::SOLVER_FAILURE_KIND_INVALID_REQUEST);
+    }
+    if (entry->solver != "mathopt") return FailureResponse(control.request_id(), entry->solver, job_id,
+        "Native interruption with a retained result is not supported for this solver.", 400,
+        bridge::SOLVER_FAILURE_KIND_INVALID_REQUEST);
+    entry->handle.Interrupt();
+    bridge::SolverBridgeResponse response;
+    response.set_request_id(control.request_id());
+    response.set_solver(entry->solver);
+    response.set_job_id(job_id);
+    response.mutable_interrupted()->set_target_request_id(entry->request_id);
     return ProtoResponse(200, response);
   } catch (const std::exception& error) {
     return TextResponse(400, std::string(error.what()) + "\n");

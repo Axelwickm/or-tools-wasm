@@ -3,7 +3,16 @@
 
 #include "server/src/solver_executor.h"
 
+namespace operations_research {
+class RoutingSearchParameters;
+}
+
 namespace ortools_wasm::server {
+
+// Bind automatic CP-SAT workers to the capacity actually allocated by the job scheduler.
+void BindRoutingAutomaticWorkerBudget(
+    operations_research::RoutingSearchParameters* parameters,
+    int allocated_threads);
 
 class RoutingExecutor final : public SolverExecutor {
  public:

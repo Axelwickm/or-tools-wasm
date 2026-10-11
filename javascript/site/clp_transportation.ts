@@ -411,9 +411,10 @@ async function runTransportation() {
       }
       objective.setMinimization();
 
-      appendStatus(statusEl, `Solving with ${solver.solverVersion()}, requested solver threads=${solverThreads}...`);
+      appendStatus(statusEl, `Solving with CLP, requested solver threads=${solverThreads}...`);
       const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
+      appendStatus(statusEl, `Solver: ${await solver.solverVersion(executionOptions)}`);
 
       renderTransportationResult(shipments, objective.value(), solver.wallTime(), solver.iterations(), threadConfig);
       appendStatus(statusEl, `Objective: ${formatNumber(objective.value())}`);

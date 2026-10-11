@@ -1,4 +1,8 @@
 #include "server/src/mathopt_executor.h"
+#include "javascript/mathopt_thread_budget.h"
+#include "javascript/mathopt_mps_conversion.h"
+#include "javascript/mathopt_result_validation.h"
+#include "javascript/mathopt_result_conversion.h"
 
 #include <exception>
 #include <mutex>
@@ -49,21 +53,34 @@ void EnsureSolversRegistered() {
 
 math_opt::Solver::SolveArgs SolveArguments(const math_opt::SolveRequest& request,
                                            math_opt::SolveResponse* response,
-                                           const SolveInterrupter* interrupter) {
+                                           const SolveInterrupter* interrupter, const SolverExecutorRequest& outer,
+                                           const std::optional<std::string>& registration,
+                                           const SolverEventSink& emit_event, bool stream_messages) {
   math_opt::Solver::MessageCallback messages = nullptr;
   if (request.parameters().enable_output()) {
-    messages = [response](const std::vector<std::string>& values) {
+    messages = [response, emit_event, stream_messages](const std::vector<std::string>& values) {
       for (const auto& value : values) response->add_messages(value);
+      if (stream_messages && !values.empty()) {
+        bridge::MathOptLogEvent event;
+        for (const auto& value : values) event.add_messages(value);
+        emit_event(event.SerializeAsString());
+      }
     };
   }
   math_opt::Solver::SolveArgs arguments;
   arguments.parameters = request.parameters();
   arguments.model_parameters = request.model_parameters();
   arguments.message_callback = std::move(messages);
-  arguments.callback_registration = math_opt::CallbackRegistrationProto();
-  arguments.user_cb = [](const math_opt::CallbackDataProto&) {
-    return math_opt::CallbackResultProto();
-  };
+  if (registration) {
+    if (!outer.callback || !arguments.callback_registration.ParseFromString(*registration)) throw std::invalid_argument("Invalid MathOpt callback registration or missing callback transport.");
+    arguments.user_cb = [callback = outer.callback](const math_opt::CallbackDataProto& data) -> math_opt::CallbackResultProto {
+      const auto reply = callback(data.SerializeAsString());
+      if (!reply) { math_opt::CallbackResultProto stopped; stopped.set_terminate(true); return stopped; }
+      math_opt::CallbackResultProto result;
+      if (!result.ParseFromString(*reply)) result.set_terminate(true);
+      return result;
+    };
+  }
   arguments.interrupter = interrupter;
   return arguments;
 }
@@ -112,7 +129,7 @@ int MathOptExecutor::RequestedThreads(const SolverExecutorRequest& request,
   if (solve_bytes != nullptr) {
     math_opt::SolveRequest parsed;
     if (!parsed.ParseFromString(*solve_bytes)) throw std::invalid_argument("Failed to parse MathOpt SolveRequest.");
-    if (parsed.parameters().has_threads()) requested = parsed.parameters().threads();
+    requested = ortools_wasm::MathOptThreadRequirement(parsed);
     if (requested > 1 &&
         parsed.solver_type() == math_opt::SOLVER_TYPE_GLPK) {
       throw std::invalid_argument(
@@ -127,24 +144,55 @@ int MathOptExecutor::RequestedThreads(const SolverExecutorRequest& request,
 SolverExecutorResult MathOptExecutor::Execute(const SolverExecutorRequest& request,
                                               const JobContext& context,
                                               const SolverEventSink& emit_event) {
-  (void)emit_event;
   bridge::MathOptBridgeRequest outer;
   if (!outer.ParseFromString(request.payload)) return Error("Failed to parse MathOpt bridge request.");
   EnsureSolversRegistered();
   math_opt::SolveResponse response;
   try {
     switch (outer.payload_case()) {
+      case bridge::MathOptBridgeRequest::kConvertResult: {
+        const auto& input = outer.convert_result();
+        const auto conversion = ortools_wasm::ConvertMathOptResultProto(input.kind(), input.model_proto(), input.input_proto());
+        bridge::MathOptBridgeResponse result;
+        if (conversion.error.empty()) result.set_validated_result_proto(conversion.result);
+        else result.set_validation_error(conversion.error);
+        return SolverExecutorResult{true, result.SerializeAsString(), {}};
+      }
+      case bridge::MathOptBridgeRequest::kValidateResult: {
+        const auto& input = outer.validate_result();
+        const auto validation = ortools_wasm::ValidateMathOptResultBytes(input.solve_request_proto(), input.result_proto());
+        bridge::MathOptBridgeResponse result;
+        if (validation.error.empty()) result.set_validated_result_proto(validation.result);
+        else result.set_validation_error(validation.error);
+        return SolverExecutorResult{true, result.SerializeAsString(), {}};
+      }
+      case bridge::MathOptBridgeRequest::kValidateModel: {
+        bridge::MathOptBridgeResponse result;
+        result.set_validation_error(ortools_wasm::ValidateMathOptModelBytes(outer.validate_model()));
+        return SolverExecutorResult{true, result.SerializeAsString(), {}};
+      }
+      case bridge::MathOptBridgeRequest::kModelProtoToMps:
+      case bridge::MathOptBridgeRequest::kMpsToModelProto: {
+        const bool to_mps = outer.payload_case() == bridge::MathOptBridgeRequest::kModelProtoToMps;
+        const auto converted = ortools_wasm::ConvertMathOptMps(to_mps ? outer.model_proto_to_mps() : outer.mps_to_model_proto(), to_mps);
+        if (!converted.error.empty()) return Error(converted.error);
+        bridge::MathOptBridgeResponse result;
+        if (to_mps) result.set_mps(converted.output); else result.set_model_proto(converted.output);
+        return SolverExecutorResult{true, result.SerializeAsString(), {}};
+      }
       case bridge::MathOptBridgeRequest::kSolve: {
         math_opt::SolveRequest parsed;
         if (!ParseSolveRequest(outer.solve().solve_request_proto(), &parsed, &response)) return OuterResponse(response);
+        ortools_wasm::BindMathOptAutomaticWorkers(&parsed, context.allocated_threads());
         SolveInterrupter interrupter;
-        if (outer.solve().interrupt_at_start() || context.cancellation_requested()) interrupter.Interrupt();
+        if (outer.solve().interrupt_at_start() || (context.cancellation_requested() || context.interruption_requested())) interrupter.Interrupt();
         auto cancellation = context.OnCancellation([&interrupter] { interrupter.Interrupt(); });
+        auto interruption = context.OnInterruption([&interrupter] { interrupter.Interrupt(); });
         math_opt::Solver::InitArgs init_args;
         init_args.streamable = parsed.initializer();
         auto result = math_opt::Solver::NonIncrementalSolve(
             parsed.model(), parsed.solver_type(), init_args,
-            SolveArguments(parsed, &response, &interrupter));
+            SolveArguments(parsed, &response, &interrupter, request, outer.solve().has_callback_registration_proto() ? std::make_optional(outer.solve().callback_registration_proto()) : std::nullopt, emit_event, outer.solve().stream_messages()));
         if (!result.ok()) SetStatus(&response, result.status());
         else *response.mutable_result() = std::move(*result);
         return OuterResponse(response);
@@ -152,20 +200,45 @@ SolverExecutorResult MathOptExecutor::Execute(const SolverExecutorRequest& reque
       case bridge::MathOptBridgeRequest::kIncrementalCreate: {
         math_opt::SolveRequest parsed;
         if (!ParseSolveRequest(outer.incremental_create().solve_request_proto(), &parsed, &response)) return OuterResponse(response);
+        // GLPK destroys its problem objects when their creating thread exits.
+        // Server jobs run on separate threads, so no GLPK session can outlive creation.
+        if (parsed.solver_type() == math_opt::SOLVER_TYPE_GLPK) {
+          SetStatus(&response, absl::UnimplementedError(
+              "MathOpt GLPK incremental sessions require the same execution thread and are not supported by the server executor."));
+          return OuterResponse(response);
+        }
         math_opt::Solver::InitArgs init_args;
         init_args.streamable = parsed.initializer();
         auto solver = math_opt::Solver::New(parsed.solver_type(), parsed.model(), init_args);
         if (!solver.ok()) SetStatus(&response, solver.status());
         else {
-          const uint64_t handle = next_handle_.fetch_add(1);
           auto session = std::make_shared<Session>();
           session->solver = std::move(*solver);
           session->solver_type = parsed.solver_type();
           session->init_args = init_args;
-          { std::lock_guard lock(sessions_mutex_); sessions_.emplace(handle, std::move(session)); }
+          uint64_t handle;
+          {
+            std::lock_guard lock(sessions_mutex_);
+            // Exact JavaScript-number IDs; stale handles must not alias after restart.
+            do { handle = absl::Uniform<uint64_t>(random_, 1, uint64_t{1} << 53); } while (sessions_.count(handle));
+            sessions_.emplace(handle, std::move(session));
+          }
           response.add_messages(std::to_string(handle));
         }
         return OuterResponse(response);
+      }
+      case bridge::MathOptBridgeRequest::kIncrementalUpdate: {
+        const auto& operation = outer.incremental_update();
+        auto session = FindSession(operation.handle());
+        if (!session) return Error("MathOpt IncrementalSolver is closed.");
+        std::lock_guard session_lock(session->mutex);
+        math_opt::ModelUpdateProto update;
+        if (!update.ParseFromString(operation.model_update_proto())) return Error("Could not parse MathOpt ModelUpdateProto.");
+        const auto updated = session->solver->Update(std::move(update));
+        if (!updated.ok()) return Error(updated.status().ToString());
+        bridge::MathOptBridgeResponse result;
+        result.set_update_applied(*updated);
+        return SolverExecutorResult{true, result.SerializeAsString(), {}};
       }
       case bridge::MathOptBridgeRequest::kIncrementalSolve: {
         const auto& operation = outer.incremental_solve();
@@ -191,10 +264,12 @@ SolverExecutorResult MathOptExecutor::Execute(const SolverExecutorRequest& reque
             session->solver = std::move(*replacement);
           }
         }
+        ortools_wasm::BindMathOptAutomaticWorkers(&parsed, context.allocated_threads());
         SolveInterrupter interrupter;
-        if (operation.interrupt_at_start() || context.cancellation_requested()) interrupter.Interrupt();
+        if (operation.interrupt_at_start() || (context.cancellation_requested() || context.interruption_requested())) interrupter.Interrupt();
         auto cancellation = context.OnCancellation([&interrupter] { interrupter.Interrupt(); });
-        auto result = session->solver->Solve(SolveArguments(parsed, &response, &interrupter));
+        auto interruption = context.OnInterruption([&interrupter] { interrupter.Interrupt(); });
+        auto result = session->solver->Solve(SolveArguments(parsed, &response, &interrupter, request, operation.has_callback_registration_proto() ? std::make_optional(operation.callback_registration_proto()) : std::nullopt, emit_event, operation.stream_messages()));
         if (!result.ok()) SetStatus(&response, result.status());
         else *response.mutable_result() = std::move(*result);
         return OuterResponse(response);

@@ -13,7 +13,7 @@ test('MPSolver and Routing reject overlapping instance solves and recover after 
     await build({
       stdin: {
         contents: `export { MPSolver } from './mp_solver/api.ts';
-          export { RoutingModel, RoutingIndexManager } from './routing/api.ts';
+          export { Assignment, RoutingModel, RoutingIndexManager } from './routing/api.ts';
           export { pending } from 'test-executor';`,
         resolveDir: fileURLToPath(new URL('../lib', import.meta.url)),
       },
@@ -32,16 +32,18 @@ test('MPSolver and Routing reject overlapping instance solves and recover after 
         ` }));
       } }],
     });
-    const { MPSolver, RoutingModel, RoutingIndexManager, pending } = await import(outfile);
+    const { Assignment, MPSolver, RoutingModel, RoutingIndexManager, pending } = await import(outfile);
     const options = { executor: 'direct' };
     const mp = new MPSolver('test', MPSolver.GLOP_LINEAR_PROGRAMMING);
     const routing = new RoutingModel(new RoutingIndexManager(3, 1, 0));
     routing.setArcCostEvaluatorOfAllVehicles(routing.registerTransitCallback(() => 1));
-    const assignment = routing.readAssignmentFromRoutes([[1, 2]], true);
+    const assignment = new Assignment(routing, { status: 1, objectiveValue: 3n,
+      nextValues: [1, 2, 3, 3], starts: [0], ends: [3], dimensionCumulValues: {} });
     const variants = [
       [() => mp.solve(options), () => mp.solveWithProto({ ...options, loadSolution: false })],
       [() => routing.solve(options), () => routing.solveWithParameters({}, options),
-        () => routing.solveFromAssignmentWithParameters(assignment, {}, options)],
+        () => routing.solveFromAssignmentWithParameters(assignment, {}, options),
+        () => routing.readAssignmentFromRoutes([[1, 2]], true, options)],
     ];
     const mpBytes = await MPSolver.createSolutionResponse({ status: 0, variableValue: [], objectiveValue: 0 }, options);
     for (const [index, solves] of variants.entries()) {

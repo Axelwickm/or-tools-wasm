@@ -37,6 +37,8 @@ class SolverJobService {
   HttpEventStreamResponse StreamEvents(const HttpBinaryRequest& request);
   HttpBinaryResponse Result(const HttpBinaryRequest& request);
   HttpBinaryResponse Cancel(const HttpBinaryRequest& request);
+  HttpBinaryResponse Interrupt(const HttpBinaryRequest& request);
+  HttpBinaryResponse Callback(const HttpBinaryRequest& request);
   HttpBinaryResponse Release(const HttpBinaryRequest& request);
 
  private:

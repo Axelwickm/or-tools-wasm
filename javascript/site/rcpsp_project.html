@@ -202,6 +202,24 @@ console.log(result.statusName, result.makespan, result.tasks);</code></pre>
     </section>
     <p>Status:</p>
     <pre id="status"></pre>
+    <section class="panel">
+      <h2>Other resource models</h2>
+      <p>Investment buys the least costly crew capacity for two tasks due at time 2.
+        Consumer/producer tracks stock from a production event and a consumption event at least two time units later.</p>
+      <ul>
+        <li>Investment uses variable cumulative capacities and minimizes capacity cost.</li>
+        <li>Consumer/producer uses signed reservoir events and minimizes makespan.</li>
+      </ul>
+      <div class="controls">
+        <label>Model <select id="variant">
+          <option value="investment">Resource investment</option>
+          <option value="consumer">Consumer/producer</option>
+        </select></label>
+        <button id="run-variant">Solve Resource Model</button>
+      </div>
+      <p>Uses the executor and worker count selected above.</p>
+      <pre id="variant-result">Run the solver to view the solution.</pre>
+    </section>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./rcpsp_project.ts"></script>
   </body>

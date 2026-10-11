@@ -10,6 +10,10 @@ message MpSolverSolveRequest {
   int32 num_threads = 2;
   bool interruptible = 3;
   MpSolverParameters parameters = 4;
+  bool stream_messages = 5;
+  // Editable construction preserves free rows and original row indices.
+  // Explicit proto operations retain native import normalization.
+  bool editable_snapshot = 6;
 }
 
 message MpSolverParameters {
@@ -22,18 +26,176 @@ message MpSolverSchemaRequest {}
 message MpSolverSchemaResult {
   string linear_solver_proto_schema = 1;
   string optional_boolean_proto_schema = 2;
+  map<int32, string> backend_versions = 3;
+}
+
+message MpSolverImportModelRequest {
+  bytes model_proto = 1;
+  int32 solver_type = 2;
+  string name = 3;
+  bool keep_names = 4;
+}
+message MpSolverImportModelResult {
+  bytes model_proto = 1;
+  int32 status = 2;
+  string error = 3;
+}
+
+message MpSolverValidateModelRequest {
+  bytes model_proto = 1;
+}
+
+message MpSolverValidateParametersRequest {
+  int32 solver_type = 1;
+  string parameters = 2;
+}
+
+message MpSolverVerifySolutionRequest {
+  bytes model_proto = 1;
+  bytes solution_proto = 2;
+  int32 solver_type = 3;
+  double tolerance = 4;
+  bool log_errors = 5;
+}
+
+message MpSolverExportModelRequest {
+  enum Format { LP = 0; MPS = 1; }
+  bytes model_proto = 1;
+  Format format = 2;
+  bool obfuscate = 3;
+  bool fixed_format = 4;
+}
+
+message MpSolverActivitiesRequest {
+  bytes model_proto = 1;
+  bytes solution_proto = 2;
+  int32 solver_type = 3;
+}
+message MpSolverActivitiesResult { repeated double activities = 1; }
+
+message MpSolverLoadSolutionRequest {
+  bytes model_proto = 1;
+  bytes solution_proto = 2;
+  int32 solver_type = 3;
+  double tolerance = 4;
+}
+message MpSolverLoadSolutionResult {
+  bool loaded = 1;
+  bytes solution_proto = 2;
+}
+
+// Each edit mirrors an existing MPSolver/MPVariable/MPConstraint/MPObjective
+// method. Edits are ordered so Clear and subsequent additions retain semantics.
+message MpSolverEdit {
+  enum Kind {
+    UNSPECIFIED = 0;
+    ADD_VARIABLE = 1;
+    ADD_CONSTRAINT = 2;
+    VARIABLE_BOUNDS = 3;
+    VARIABLE_INTEGER = 4;
+    VARIABLE_PRIORITY = 5;
+    CONSTRAINT_BOUNDS = 6;
+    CONSTRAINT_COEFFICIENT = 7;
+    CONSTRAINT_LAZY = 8;
+    CLEAR_CONSTRAINT = 9;
+    OBJECTIVE_COEFFICIENT = 10;
+    OBJECTIVE_OFFSET = 11;
+    OBJECTIVE_DIRECTION = 12;
+    CLEAR_OBJECTIVE = 13;
+    CLEAR = 14;
+    HINT = 15;
+  }
+  Kind kind = 1;
+  int32 index = 2;
+  int32 variable = 3;
+  double first = 4;
+  double second = 5;
+  bool flag = 6;
+  string name = 7;
+  repeated int32 hint_ids = 8;
+  repeated double hint_values = 9;
+}
+
+message MpSolverSessionCreateRequest { bytes request_proto = 1; }
+message MpSolverSessionRunRequest {
+  enum Action { SOLVE = 0; NEXT_SOLUTION = 1; RESET = 2; }
+  uint64 handle = 1;
+  Action action = 2;
+  MpSolverSolveRequest solve = 3;
+  repeated MpSolverEdit edits = 4;
+}
+message MpSolverSessionCloseRequest { uint64 handle = 1; }
+message MpSolverSessionResult {
+  bool has_solution = 1;
+  bytes response_proto = 2;
+  MpSolverNativeMetadata metadata = 3;
 }
 
 message MpSolverBridgeRequest {
   oneof payload {
     MpSolverSolveRequest solve = 1;
     MpSolverSchemaRequest schema = 2;
+    MpSolverImportModelRequest import_model = 3;
+    MpSolverValidateModelRequest validate_model = 4;
+    MpSolverValidateParametersRequest validate_parameters = 5;
+    MpSolverVerifySolutionRequest verify_solution = 6;
+    MpSolverSessionCreateRequest session_create = 7;
+    MpSolverSessionRunRequest session_run = 8;
+    MpSolverSessionCloseRequest session_close = 9;
+    MpSolverIisRequest iis = 10;
+    MpSolverExportModelRequest export_model = 11;
+    MpSolverActivitiesRequest activities = 12;
+    MpSolverLoadSolutionRequest load_solution = 13;
   }
 }
 
+message MpSolverNativeMetadata {
+  string solver_version = 1;
+  int64 iterations = 2;
+  int64 nodes = 3;
+  repeated int32 variable_basis_status = 4;
+  repeated int32 constraint_basis_status = 5;
+  optional double exact_condition_number = 6;
+}
+
 message MpSolverBridgeResponse {
+  MpSolverNativeMetadata metadata = 3;
   oneof payload {
     bytes response_proto = 1;
     MpSolverSchemaResult schema = 2;
+    MpSolverImportModelResult import_model = 4;
+    string model_validation_error = 5;
+    bool parameters_accepted = 6;
+    bool solution_verified = 7;
+    uint64 session_handle = 8;
+    MpSolverSessionResult session_result = 9;
+    MpSolverIisResult iis = 10;
+    string exported_model = 11;
+    MpSolverActivitiesResult activities = 12;
+    MpSolverLoadSolutionResult load_solution = 13;
   }
+}
+
+message MpSolverLogEvent { repeated string messages = 1; }
+
+message MpSolverIisRequest {
+  bytes model_proto = 1;
+  int32 solver_type = 2;
+  string solver_specific_parameters = 3;
+  optional double time_limit_seconds = 4;
+  optional int64 node_limit = 5;
+  bool interruptible = 6;
+}
+message MpSolverIisVariableBounds {
+  int32 variable_index = 1;
+  bool lower_bound_included = 2;
+  bool upper_bound_included = 3;
+}
+message MpSolverIisResult {
+  bool is_infeasible = 1;
+  bool is_irreducible = 2;
+  double time_seconds = 3;
+  int64 nodes = 4;
+  repeated int32 constraint_indices = 5;
+  repeated MpSolverIisVariableBounds variable_bounds = 6;
 }

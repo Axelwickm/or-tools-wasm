@@ -773,7 +773,7 @@ async function solvePlan(): Promise<void> {
         await disposePlanner(nextPlanner, 'The production planner solve failed.');
         throw error;
       }
-      startDecisions = plannedStartDecisions(result.variableValues, nextPlanner);
+      startDecisions = plannedStartDecisions(result.variableValuesById, nextPlanner);
       desiredStarts = summarizeStartDecisions(startDecisions);
       launched = launchFromPlan(startDecisions);
     }
@@ -1106,7 +1106,7 @@ async function planTrafficDispatches(): Promise<string> {
 
   let plannedCount = 0;
   for (const choices of choicesByRelease.values()) {
-    const selected = choices.find((choice) => (result.variableValues[choice.variable.name] ?? 0) > 0.5);
+    const selected = choices.find((choice) => result.value(choice.variable) > 0.5);
     if (!selected) continue;
     selected.candidate.release.plannedDispatchMinute = shopMinute + selected.tick * trafficTickMinutes();
     plannedCount += 1;
@@ -1271,13 +1271,13 @@ function trafficTickMinutes(): number {
   return 1 / (tokenSpeedCellsPerSecond * realSecondsPerShopMinute);
 }
 
-function plannedStartDecisions(variableValues: Record<string, number>, current: PlannerModel): StartDecision[] {
+function plannedStartDecisions(variableValues: Record<number, number>, current: PlannerModel): StartDecision[] {
   const decisions: StartDecision[] = [];
   const slotLimit = Math.min(prefetchSlotCount, planSlotCount);
   for (const product of productTypes) {
     for (let slot = 0; slot < slotLimit; slot += 1) {
       const variable = current.starts[product][slot];
-      const count = Math.max(0, Math.round(variableValues[variable.name] ?? 0));
+      const count = Math.max(0, Math.round(variableValues[variable.id] ?? 0));
       if (count > 0) decisions.push({ product, slot, count });
     }
   }

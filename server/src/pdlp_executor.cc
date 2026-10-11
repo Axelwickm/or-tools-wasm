@@ -14,6 +14,7 @@
 #include "ortools/pdlp/quadratic_program.h"
 #include "ortools/pdlp/solvers.pb.h"
 #include "pdlp.pb.h"
+#include "javascript/pdlp_model_import.h"
 
 namespace ortools_wasm::server {
 namespace {
@@ -130,6 +131,15 @@ void EncodeQuadraticProgram(const QuadraticProgram& qp,
 PrimalDualHybridGradientParams DecodeParameters(
     const bridge::PdlpSolveParameters& input) {
   PrimalDualHybridGradientParams params;
+  if (!input.native_parameters().empty()) {
+    if (!params.ParseFromString(input.native_parameters())) {
+      throw std::invalid_argument("Could not parse PDLP parameters.");
+    }
+    if (input.has_num_threads() && params.num_threads() != input.num_threads()) {
+      throw std::invalid_argument("PDLP parameters disagree with the bridge thread count.");
+    }
+    return params;
+  }
   if (input.has_iteration_limit()) {
     params.mutable_termination_criteria()->set_iteration_limit(input.iteration_limit());
   }
@@ -194,12 +204,8 @@ SolverExecutorResult IsLinear(const bridge::PdlpIsLinearRequest& request) {
 
 SolverExecutorResult FromMpModel(
     const bridge::PdlpFromMpModelRequest& request) {
-  MPModelProto proto;
-  if (!proto.ParseFromString(request.mp_model_proto())) {
-    return Error("Failed to parse PDLP MPModelProto.");
-  }
-  auto qp = QpFromMpModelProto(proto, request.relax_integer_variables(),
-                               request.include_names());
+  auto qp = ortools_wasm::ReadPdlpQuadraticProgram(request.mp_model_proto(), request.input_format(),
+      request.relax_integer_variables(), request.include_names());
   if (!qp.ok()) return Error(std::string(qp.status().message()));
 
   bridge::PdlpBridgeResponse response;
@@ -227,7 +233,7 @@ SolverExecutorResult ToMpModel(const bridge::PdlpToMpModelRequest& request) {
 }
 
 SolverExecutorResult Solve(const bridge::PdlpSolveRequest& request,
-                           const JobContext& context) {
+                           const JobContext& context, const SolverEventSink& emit_event) {
   if (!request.has_quadratic_program()) {
     return Error("PDLP solve requires a quadratic program.");
   }
@@ -243,9 +249,28 @@ SolverExecutorResult Solve(const bridge::PdlpSolveRequest& request,
   std::atomic<bool> interrupted(context.cancellation_requested());
   auto cancellation =
       context.OnCancellation([&interrupted] { interrupted.store(true); });
+  std::function<void(const std::string&)> log;
+  std::function<void(const operations_research::pdlp::IterationCallbackInfo&)> iteration;
+  if (request.callback_flags() & 1) log = [&](const std::string& message) {
+    bridge::PdlpBridgeResponse event;
+    event.mutable_solve_event()->set_log(message);
+    emit_event(event.SerializeAsString());
+  };
+  if (request.callback_flags() & 2) iteration = [&](const auto& info) {
+    bridge::PdlpBridgeResponse event;
+    auto* output = event.mutable_solve_event()->mutable_iteration();
+    output->set_iteration_type(static_cast<int>(info.iteration_type));
+    output->set_iteration_stats(info.iteration_stats.SerializeAsString());
+    output->set_termination_criteria(info.termination_criteria.SerializeAsString());
+    output->set_l2_norm_primal_linear_objective(info.bound_norms.l2_norm_primal_linear_objective);
+    output->set_l2_norm_constraint_bounds(info.bound_norms.l2_norm_constraint_bounds);
+    output->set_l_inf_norm_primal_linear_objective(info.bound_norms.l_inf_norm_primal_linear_objective);
+    output->set_l_inf_norm_constraint_bounds(info.bound_norms.l_inf_norm_constraint_bounds);
+    emit_event(event.SerializeAsString());
+  };
   const auto result = PrimalDualHybridGradient(
       std::move(*qp), DecodeParameters(request.parameters()),
-      std::move(initial), &interrupted);
+      std::move(initial), &interrupted, std::move(log), std::move(iteration));
 
   bridge::PdlpBridgeResponse response;
   auto* output = response.mutable_solve_result()->mutable_solver_result();
@@ -254,6 +279,7 @@ SolverExecutorResult Solve(const bridge::PdlpSolveRequest& request,
   AddVector(result.reduced_costs, output->mutable_reduced_costs());
   output->set_termination_reason(result.solve_log.termination_reason());
   output->set_iteration_count(result.solve_log.iteration_count());
+  output->set_native_solve_log(result.solve_log.SerializeAsString());
   return Response(response);
 }
 
@@ -269,9 +295,8 @@ int PdlpExecutor::RequestedThreads(const SolverExecutorRequest& request,
     throw std::invalid_argument("Failed to parse PDLP bridge request.");
   }
   const int solver_threads =
-      parsed.payload_case() == bridge::PdlpBridgeRequest::kSolve &&
-              parsed.solve().parameters().has_num_threads()
-          ? parsed.solve().parameters().num_threads()
+      parsed.payload_case() == bridge::PdlpBridgeRequest::kSolve
+          ? DecodeParameters(parsed.solve().parameters()).num_threads()
           : 1;
   if (solver_threads <= 0) {
     throw std::invalid_argument("PDLP num_threads must be positive.");
@@ -291,7 +316,7 @@ int PdlpExecutor::RequestedThreads(const SolverExecutorRequest& request,
 SolverExecutorResult PdlpExecutor::Execute(const SolverExecutorRequest& request,
                                            const JobContext& context,
                                            const SolverEventSink& emit_event) {
-  (void)emit_event;
+
   bridge::PdlpBridgeRequest parsed;
   if (!parsed.ParseFromString(request.payload)) {
     return Error("Failed to parse PDLP bridge request.");
@@ -306,7 +331,7 @@ SolverExecutorResult PdlpExecutor::Execute(const SolverExecutorRequest& request,
     case bridge::PdlpBridgeRequest::kToMpModel:
       return ToMpModel(parsed.to_mp_model());
     case bridge::PdlpBridgeRequest::kSolve:
-      return Solve(parsed.solve(), context);
+      return Solve(parsed.solve(), context, emit_event);
     default:
       return Error("Unsupported PDLP server request payload.");
   }

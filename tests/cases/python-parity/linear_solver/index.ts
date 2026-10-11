@@ -139,7 +139,7 @@ type MPSolverLike = {
     loaded: boolean;
   }>;
   loadSolutionFromProto?(response?: Uint8Array | Record<string, unknown>, tolerance?: number): Promise<boolean>;
-  verifySolution(tolerance: number, logErrors: boolean): boolean;
+  verifySolution(tolerance: number, logErrors: boolean, options?: { executor?: MPSolverExecutor }): Promise<boolean>;
   enableOutput(): void;
   suppressOutput(): void;
   outputIsEnabled(): boolean;
@@ -147,13 +147,13 @@ type MPSolverLike = {
   timeLimit(): number;
   setNumThreads(numThreads: number): boolean;
   getNumThreads(): number;
-  solverVersion(): string;
-  computeConstraintActivities(): number[];
+  solverVersion(options?: { executor?: MPSolverExecutor }): Promise<string>;
+  setSolverSpecificParametersAsString(parameters: string, options?: unknown): Promise<boolean>;
+  computeConstraintActivities(options?: ReturnType<typeof mpSolverExecutionOptions>): Promise<number[]>;
   computeExactConditionNumber(): number;
   setHint(variables: MPVariableLike[], values: number[]): void;
-  nextSolution(): boolean;
-  exportModelAsLpFormat(obfuscate: boolean): string;
-  exportModelAsMpsFormat(fixedFormat: boolean, obfuscate: boolean): string;
+  exportModelAsLpFormat(obfuscate: boolean, options?: ReturnType<typeof mpSolverExecutionOptions>): Promise<string>;
+  exportModelAsMpsFormat(fixedFormat: boolean, obfuscate: boolean, options?: ReturnType<typeof mpSolverExecutionOptions>): Promise<string>;
   numVariables(): number;
   numConstraints(): number;
   wallTime(): number;
@@ -317,6 +317,8 @@ async function runSimpleProgram(
     objective.setCoefficient(y, 10);
     objective.setMaximization();
 
+    if (solverId === 'PDLP') await solver.setSolverSpecificParametersAsString(
+      'termination_criteria { eps_optimal_absolute: 1e-9 eps_optimal_relative: 1e-9 }', mpSolverExecutionOptions());
     const status = await solver.solve(mpSolverExecutionOptions());
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
     const values = {
@@ -368,7 +370,7 @@ async function runMixedIntegerCppStyleBackendCase(
     assert(solver.numConstraints() === 2, `${name}: expected 2 constraints`);
     const status = await solver.solve(mpSolverExecutionOptions());
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
-    assert(solver.verifySolution(1e-7, true), `${name}: verifySolution failed`);
+    assert(await solver.verifySolution(1e-7, true, mpSolverExecutionOptions()), `${name}: verifySolution failed`);
     assert(near(objective.value(), 23), `${name}: objective mismatch ${objective.value()}`);
     assert(near(x1.solutionValue(), 3), `${name}: x1 mismatch`);
     assert(near(x2.solutionValue(), 2), `${name}: x2 mismatch`);
@@ -496,7 +498,7 @@ async function runBopBinaryCase(api: MPSolverApi, mode: ExecutorFixtureMode): Pr
     const solver = createSolver(api, 'BOP', name);
     {
       assert(solver.isMip(), `${name}: BOP should be MIP`);
-      assert(solver.solverVersion().length > 0, `${name}: missing solver version`);
+      assert((await solver.solverVersion(mpSolverExecutionOptions())).length > 0, `${name}: missing solver version`);
       const analytics = solver.addBoolVariable('analytics');
       const dashboard = solver.addBoolVariable('dashboard');
       const alerts = solver.addBoolVariable('alerts');
@@ -519,7 +521,7 @@ async function runBopBinaryCase(api: MPSolverApi, mode: ExecutorFixtureMode): Pr
       assert(near(analytics.solutionValue(), 1), `${name}: analytics mismatch`);
       assert(near(dashboard.solutionValue(), 0), `${name}: dashboard mismatch`);
       assert(near(alerts.solutionValue(), 1), `${name}: alerts mismatch`);
-      assert(solver.verifySolution(1e-7, true), `${name}: verifySolution failed`);
+      assert(await solver.verifySolution(1e-7, true, mpSolverExecutionOptions()), `${name}: verifySolution failed`);
       return {
         name,
         ok: true,
@@ -581,7 +583,7 @@ async function runBopIntegerCase(api: MPSolverApi, mode: ExecutorFixtureMode): P
       assert(near(objective.value(), 19), `${name}: objective mismatch ${objective.value()}`);
       assert(near(x.solutionValue(), 3), `${name}: x mismatch`);
       assert(near(y.solutionValue(), 2), `${name}: y mismatch`);
-      assert(solver.verifySolution(1e-7, true), `${name}: verifySolution failed`);
+      assert(await solver.verifySolution(1e-7, true, mpSolverExecutionOptions()), `${name}: verifySolution failed`);
       return {
         name,
         ok: true,
@@ -677,7 +679,7 @@ async function runKnapsackBackendCase(api: MPSolverApi, mode: ExecutorFixtureMod
       const status = await solver.solve(mpSolverExecutionOptions());
       assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
       assert(near(solver.objective().value(), 34), `${name}: objective mismatch ${solver.objective().value()}`);
-      assert(solver.verifySolution(1e-7, true), `${name}: verifySolution failed`);
+      assert(await solver.verifySolution(1e-7, true, mpSolverExecutionOptions()), `${name}: verifySolution failed`);
       return {
         name,
         ok: true,
@@ -806,15 +808,14 @@ async function runExternalApiCase(api: MPSolverApi, backend: LpBackend): Promise
       status = await solver.solve({ ...mpSolverExecutionOptions(), parameters: params });
     }
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
-    assert(solver.verifySolution(1e-7, true), `${name}: verifySolution failed`);
+    assert(await solver.verifySolution(1e-7, true, mpSolverExecutionOptions()), `${name}: verifySolution failed`);
     assert(near(x1.reducedCost(), 0.0), `${name}: reduced cost mismatch`);
     assert(near(c0.dualValue(), 2 / 3), `${name}: dual value mismatch ${c0.dualValue()}`);
-    assert(solver.computeConstraintActivities().length === solver.numConstraints(), `${name}: activity count mismatch`);
+    assert((await solver.computeConstraintActivities(mpSolverExecutionOptions())).length === solver.numConstraints(), `${name}: activity count mismatch`);
     if (backend.supportsExactConditionNumber) {
       assert(Number.isFinite(solver.computeExactConditionNumber()), `${name}: condition number should be finite`);
     }
-    assert(!solver.nextSolution(), `${name}: ${backend.solverId} should not produce a next solution`);
-    assert(solver.solverVersion().length > 0, `${name}: missing solver version`);
+    assert((await solver.solverVersion(mpSolverExecutionOptions())).length > 0, `${name}: missing solver version`);
 
     return {
       name,
@@ -862,14 +863,14 @@ async function runLinearCppStyleCase(api: MPSolverApi, backend: LpBackend): Prom
     assert(solver.numConstraints() === 3, `${name}: expected 3 constraints`);
     const status = await solver.solve(mpSolverExecutionOptions());
     assert(status === api.MPSolver.OPTIMAL, `${name}: expected OPTIMAL, got ${status}`);
-    assert(solver.verifySolution(1e-7, true), `${name}: verifySolution failed`);
+    assert(await solver.verifySolution(1e-7, true, mpSolverExecutionOptions()), `${name}: verifySolution failed`);
     assert(near(objective.value(), 733.3333333333333, 1e-5), `${name}: objective mismatch ${objective.value()}`);
     assert(near(x1.solutionValue(), 33.3333333333333, 1e-5), `${name}: x1 mismatch`);
     assert(near(x2.solutionValue(), 66.6666666666667, 1e-5), `${name}: x2 mismatch`);
     assert(near(x3.solutionValue(), 0, 1e-7), `${name}: x3 mismatch`);
     assert(near(x1.reducedCost(), 0, 1e-7), `${name}: x1 reduced cost mismatch`);
     assert(near(x3.reducedCost(), backend.x3ReducedCost, 1e-5), `${name}: x3 reduced cost mismatch ${x3.reducedCost()}`);
-    const activities = solver.computeConstraintActivities();
+    const activities = await solver.computeConstraintActivities(mpSolverExecutionOptions());
     assert(near(activities[c0.index()], 100, 1e-5), `${name}: c0 activity mismatch`);
     assert(near(activities[c1.index()], 600, 1e-5), `${name}: c1 activity mismatch`);
     assert(near(activities[c2.index()], 200, 1e-5), `${name}: c2 activity mismatch`);
@@ -951,7 +952,7 @@ async function runExportToMpsCase(api: MPSolverApi): Promise<MpSolverCaseResult>
     c2.setCoefficient(x2, 1);
     c2.setCoefficient(x3, 1);
 
-    const mps = solver.exportModelAsMpsFormat(false, false);
+    const mps = await solver.exportModelAsMpsFormat(false, false, mpSolverExecutionOptions());
     assert(mps.includes('ExportMps'), `${name}: MPS export missing model name`);
 
     return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: 0, values: {} };
@@ -973,7 +974,7 @@ async function runClearSupportCase(api: MPSolverApi): Promise<MpSolverCaseResult
     c.setCoefficient(x, 1);
     c.setCoefficient(y, 1);
 
-    const lp = solver.exportModelAsLpFormat(false);
+    const lp = await solver.exportModelAsLpFormat(false, mpSolverExecutionOptions());
     assert(lp.includes('Maximize'), `${name}: LP export missing Maximize`);
     solver.clear();
     assert(solver.numVariables() === 0, `${name}: clear did not remove variables`);
@@ -1200,6 +1201,23 @@ type MpSolverCase = {
 
 export function mpSolverCases(api: MPSolverApi) {
   const cases: MpSolverCase[] = [
+    { name: 'MPSolver: native degenerate basis and statistics', async run() {
+      const solver = createSolver(api, 'GLOP', 'degenerate_native_basis');
+      await solver.setSolverSpecificParametersAsString('use_preprocessing: false use_dual_simplex: false', mpSolverExecutionOptions());
+      const x = solver.addNumVariable(0, Infinity, 'x');
+      const y = solver.addNumVariable(0, Infinity, 'y');
+      const equality = solver.addConstraint(0, 0, 'equality');
+      equality.setCoefficient(x, 1); equality.setCoefficient(y, 1);
+      solver.objective().setCoefficient(x, 1); solver.objective().setCoefficient(y, 1);
+      const status = await solver.solve(mpSolverExecutionOptions());
+      assert(status === api.MPSolver.OPTIMAL, 'degenerate LP must be optimal');
+      assert([x.basisStatus(), y.basisStatus()].includes(api.MPSolver.BASIC), 'native degenerate basis has a BASIC variable at its lower bound');
+      assert(x.solutionValue() === 0 && y.solutionValue() === 0, 'degenerate variables lie on their bounds');
+      assert((await solver.solverVersion(mpSolverExecutionOptions())).includes('Glop'), 'native version identifies Glop');
+      assert(solver.nodes() === -1, 'native LP node count is unsupported, not fabricated zero');
+      assert(solver.iterations() >= 0, 'native LP iteration count available');
+      return { name: 'MPSolver: native degenerate basis and statistics', ok: true, status, objective: solver.objective().value(), values: { x: x.solutionValue(), y: y.solutionValue() } };
+    } },
     { name: 'MPSolver: solveWithProto loads solution', run: () => runStatefulProtoSolveCase(api) },
     ...[1, 4].map((numWorkers) => ({
       name: `MPSolver: MPModelRequest solve (${numWorkers} worker${numWorkers === 1 ? '' : 's'})`,
@@ -1237,6 +1255,7 @@ export function mpSolverCases(api: MPSolverApi) {
     ['GLOP', 'MPSolver: simple_lp_program.py', false, 1],
     ['CLP', 'MPSolver: CLP simple_lp_program.py', false, 1],
     ['GLPK_LP', 'MPSolver: GLPK_LP simple_lp_program.py', false, 1],
+    ['PDLP', 'MPSolver: PDLP threaded LP solve', false, 2],
     ['SAT', 'MPSolver: simple_mip_program.py', true, 1],
     ['GLPK', 'MPSolver: GLPK simple_mip_program.py', true, 1],
     ['SCIP', 'MPSolver: SCIP simple_mip_program.py', true, 1],

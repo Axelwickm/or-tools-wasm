@@ -89,16 +89,12 @@ async function loadFactory(runtimeUrl: string): Promise<RuntimeModuleFactory> {
   return createModule as RuntimeModuleFactory;
 }
 
-function runtimeAssetName(url: string): string {
-  const fileName = new URL(url).pathname.split('/').pop() ?? '';
-  return fileName.replace(/-[A-Za-z0-9_-]+(?=\.(?:js|wasm)$)/, '');
-}
-
 function locateRuntimeFile(fileName: string) {
-  for (const flavors of Object.values(runtimeAssets)) {
-    for (const asset of Object.values(flavors)) {
-      if (fileName === runtimeAssetName(asset.jsUrl)) return asset.jsUrl;
-      if (fileName === runtimeAssetName(asset.wasmUrl)) return asset.wasmUrl;
+  for (const [runtimeName, flavors] of Object.entries(runtimeAssets)) {
+    for (const [flavor, asset] of Object.entries(flavors)) {
+      const baseName = flavor === 'asyncify' ? `${runtimeName}_asyncify` : runtimeName;
+      if (fileName === `${baseName}.js`) return asset.jsUrl;
+      if (fileName === `${baseName}.wasm`) return asset.wasmUrl;
     }
   }
   return fileName;

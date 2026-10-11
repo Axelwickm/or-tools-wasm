@@ -1,3 +1,9 @@
+import * as MPSolverControlApi from 'or-tools-wasm/mp-solver';
+import { runMpSolverCancellationCases } from '../../cases/or-tools-wasm/mp_solver/cancellation.ts';
+import { runMpSolverModelImportCases } from '../../cases/or-tools-wasm/mp_solver/model_import.ts';
+import { runMpSolverModelValidationCases } from '../../cases/or-tools-wasm/mp_solver/model_validation.ts';
+import { runMpSolverModelReuseCases } from '../../cases/or-tools-wasm/mp_solver/model_reuse.ts';
+import { runMpSolverProtoValidationCases } from '../../cases/or-tools-wasm/mp_solver/proto_validation.ts';
 import {
   MPSolver,
   MPSolverParameters,
@@ -13,6 +19,11 @@ await runBunFixture(async () => {
     MPSolverParameters,
   }, { modes: executorFixtureModes });
   assertAllCases('bun MPSolver', mpSolverResults);
+  await runMpSolverProtoValidationCases({ MPSolver } as never);
+  await runMpSolverCancellationCases(MPSolverControlApi as never);
+  await runMpSolverModelReuseCases(MPSolverControlApi as never);
+  await runMpSolverModelImportCases(MPSolverControlApi as never);
+  await runMpSolverModelValidationCases(MPSolverControlApi as never);
   console.log(`bun ran ${mpSolverResults.length} MPSolver cases`);
 }, async () => {
   await terminateLoadedRuntimeThreads();

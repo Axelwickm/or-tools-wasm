@@ -15,6 +15,8 @@
 #define ORTOOLS_LINEAR_SOLVER_PROTO_SOLVER_PDLP_PROTO_SOLVER_H_
 
 #include <atomic>
+#include <functional>
+#include <string>
 
 #include "absl/status/statusor.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
@@ -32,6 +34,9 @@ namespace operations_research {
 // The optional interrupt_solve can be used to interrupt the solve early. The
 // solver will periodically check its value and stop if it holds true.
 //
+// The optional logging_callback receives native PDLP log messages instead of
+// stdout. Its verbosity is controlled by the request parameters.
+//
 // If relax_integer_variables is true, integrality constraints are relaxed
 // before solving. If false, integrality constraints result in an error. The
 // solver_specific_info field in the MPSolutionResponse contains a serialized
@@ -43,7 +48,8 @@ namespace operations_research {
 absl::StatusOr<MPSolutionResponse> PdlpSolveProto(
     LazyMutableCopy<MPModelRequest> request,
     bool relax_integer_variables = false,
-    const std::atomic<bool>* interrupt_solve = nullptr);
+    const std::atomic<bool>* interrupt_solve = nullptr,
+    std::function<void(const std::string&)> logging_callback = nullptr);
 
 }  // namespace operations_research
 

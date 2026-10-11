@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 
-test('Solver results enforce concurrency, bounds, and defensive copies', async () => {
+test('Solver results validate bounds and preserve owned answers', async () => {
   const directory = await mkdtemp(fileURLToPath(new URL('.result-owned-', import.meta.url)));
   const responses: unknown[] = [];
   (globalThis as Record<string, unknown>).__resultOwnedResponses = responses;
@@ -28,6 +28,18 @@ test('Solver results enforce concurrency, bounds, and defensive copies', async (
       } }],
     });
     const { KnapsackSolver, KnapsackSolverType, SimpleMaxFlow, SimpleMinCostFlow, SimpleLinearSumAssignment } = await import(outfile);
+
+    for (const [Solver, add, update] of [
+      [SimpleMaxFlow, 'addArcWithCapacity', 'setArcsCapacity'],
+      [SimpleMinCostFlow, 'addArcWithCapacityAndUnitCost', 'setArcCapacities'],
+    ]) {
+      const model = new Solver();
+      model[add](0, 1, 7, 0);
+      assert.throws(() => model[update]([0, 1], [9, 10]), /out of range/);
+      assert.equal(model.capacity(0), 7n, 'Batch index validation precedes mutation');
+      model[update]([0, 0], [9n, 10n]);
+      assert.equal(model.capacity(0), 10n, 'Repeated indices retain the last supplied capacity');
+    }
 
     for (const [type, limit] of [[0, 30], [1, 64], [2, Infinity], [9, Infinity]]) {
       const solver = new KnapsackSolver(type, 'limits');
@@ -68,15 +80,19 @@ test('Solver results enforce concurrency, bounds, and defensive copies', async (
     knapsack.init([5, 7], [[2, 3]], [3]);
     responses.push({ profit: 7n, optimal: true, contains: [false, true] });
     const firstSolve = knapsack.solve({ executor: 'direct' });
-    await assert.rejects(knapsack.solve({ executor: 'direct' }), /already in progress/);
     const first = await firstSolve;
     assert.throws(() => first.contains(2), /out of range/);
+    responses.push({ profit: 7n, optimal: true, contains: [true] });
+    await assert.rejects(knapsack.solve({ executor: 'direct' }), /one selection flag per item/);
+    responses.push({ profit: 7n, optimal: true, contains: [false, true] });
+    assert.equal((await knapsack.solve({ executor: 'direct' })).contains(1), true,
+      'Malformed executor results do not fabricate selections or prevent recovery');
+    assert.equal(first.contains(1), true, 'Failed solves do not change earlier results');
 
     const maxFlow = new SimpleMaxFlow();
     maxFlow.addArcWithCapacity(0, 1, 10);
     responses.push({ status: 0, optimalFlow: 4n, flows: [4n], sourceSideMinCut: [0], sinkSideMinCut: [1] });
     const flowSolve = maxFlow.solve({ source: 0, sink: 1, executor: 'direct' });
-    await assert.rejects(maxFlow.solve({ source: 0, sink: 1, executor: 'direct' }), /already in progress/);
     const flow = await flowSolve;
     assert.equal(flow.flow(0), 4n);
     const cut = flow.getSourceSideMinCut();

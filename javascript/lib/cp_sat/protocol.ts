@@ -31,11 +31,16 @@ export type CpSatOperation =
   | {
     type: 'validate';
     model: Uint8Array;
-  };
+  }
+  | { type: 'modelStats'; input: Uint8Array }
+  | { type: 'responseStats'; input: Uint8Array }
+  | { type: 'exportModelText'; input: Uint8Array };
 
 export type CpSatResult =
-  | { type: 'solve'; response: Uint8Array }
-  | { type: 'validate'; ok: boolean; message: string };
+  | { type: 'solve'; response: Uint8Array; statistics?: string }
+  | { type: 'validate'; ok: boolean; message: string }
+  | { type: 'statistics'; report: string }
+  | { type: 'modelText'; text: string };
 
 export type CpSatSolverEvent =
   | { type: 'solution'; response: Uint8Array }
@@ -66,6 +71,9 @@ function decodeRequest(payload: Uint8Array): CpSatOperation {
         },
       };
     }
+    case 'exportModelText': return { type: 'exportModelText', input: request.payload.value };
+    case 'modelStats': return { type: 'modelStats', input: request.payload.value };
+    case 'responseStats': return { type: 'responseStats', input: request.payload.value };
     case 'validate':
       return { type: 'validate', model: request.payload.value.cpModelProto };
     default:
@@ -94,6 +102,8 @@ export const cpSatProtocol: SolverBridgeCodec<
           callbackMask: create(CpSatCallbackMaskSchema, operation.callbacks),
         }),
       }
+      : operation.type === 'modelStats' || operation.type === 'responseStats' || operation.type === 'exportModelText'
+      ? { case: operation.type, value: operation.input }
       : {
         case: 'validate' as const,
         value: create(CpSatValidateRequestSchema, {
@@ -112,8 +122,13 @@ export const cpSatProtocol: SolverBridgeCodec<
         case: 'solveResult' as const,
         value: create(CpSatSolveResultSchema, {
           cpSolverResponseProto: result.response,
+          responseStatistics: result.statistics,
         }),
       }
+      : result.type === 'modelText'
+      ? { case: 'modelText' as const, value: result.text }
+      : result.type === 'statistics'
+      ? { case: 'statistics' as const, value: result.report }
       : {
         case: 'validateResult' as const,
         value: create(CpSatValidateResultSchema, {
@@ -133,7 +148,10 @@ export const cpSatProtocol: SolverBridgeCodec<
         return {
           type: 'solve',
           response: response.payload.value.cpSolverResponseProto,
+          statistics: response.payload.value.responseStatistics,
         };
+      case 'modelText': return { type: 'modelText', text: response.payload.value };
+      case 'statistics': return { type: 'statistics', report: response.payload.value };
       case 'validateResult':
         return {
           type: 'validate',

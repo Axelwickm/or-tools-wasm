@@ -1,3 +1,4 @@
+import { knapsackNumericalCases } from '../../or-tools-wasm/knapsack/numerical.ts';
 import { assertCaseMatrix } from '../../../harness/shared_case.ts';
 import type { ExecutorFixtureMode, SharedCase, SharedCaseResult } from '../../../harness/shared_case.ts';
 import {
@@ -24,15 +25,17 @@ export type KnapsackCaseResult = {
 } & SharedCaseResult<ExecutorFixtureMode>;
 
 type KnapsackSolverLike = {
-  init(profits: number[], weights: number[][], capacities: number[]): void;
+  init(profits: (number | bigint)[], weights: (number | bigint)[][], capacities: (number | bigint)[]): void;
   solve(options?: {
+    numWorkers?: number;
     executor?: 'direct' | 'worker' | ReturnType<typeof serverExecutorConfiguration>;
     onEvent?: (event: { type: string; status?: { state: number } }) => void;
   }): Promise<{ profit: bigint; optimal: boolean; contains(itemId: number): boolean }>;
   setUseReduction(useReduction: boolean): void;
+  setTimeLimit(seconds: number): void;
 };
 
-type KnapsackSolverTypeLike = 0 | 1 | 2 | 5 | 6 | 9;
+type KnapsackSolverTypeLike = 0 | 1 | 2 | 3 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export type KnapsackApi = {
   KnapsackSolver: {
@@ -278,6 +281,50 @@ export const knapsackCases: KnapsackCase[] = [
     },
   },
 ];
+
+knapsackCases.push({
+  id: 'knapsack.native.empty_problem', name: 'KnapsackSolver.empty_problem', solver: 'knapsack',
+  source: 'ortools/algorithms/knapsack_solver.cc', upstream: 'KnapsackSolver::Init', tags: ['python-parity', 'gap-regression'],
+  async run(api) {
+    const solver = new api.KnapsackSolver(api.KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER, 'empty');
+    solver.init([], [[]], [10]);
+    const result = await solver.solve(knapsackExecutionOptions());
+    assert(result.profit === 0n && result.optimal, 'empty generic knapsack must return optimal zero');
+    return { profit: 0, selectedItems: [], optimal: true };
+  },
+}, {
+  id: 'knapsack.native.zero_and_infinite_time_limits', name: 'KnapsackSolver.zero_and_infinite_time_limits', solver: 'knapsack',
+  source: 'ortools/algorithms/knapsack_solver.h; ortools/algorithms/knapsack_solver.cc',
+  upstream: 'KnapsackSolver::set_time_limit', tags: ['python-parity', 'gap-regression'],
+  async run(api) {
+    const solver = new api.KnapsackSolver(api.KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER, 'limits');
+    solver.setUseReduction(false);
+    const profits = Array.from({ length: 40 }, (_, i) => i * 7 % 31 + 1);
+    const weights = Array.from({ length: 40 }, (_, i) => i * 13 % 29 + 1);
+    solver.init(profits, [weights], [180]);
+    solver.setTimeLimit(0);
+    const stopped = await solver.solve(knapsackExecutionOptions());
+    assert(!stopped.optimal, 'zero time limit must stop before proving optimality');
+    solver.setTimeLimit(Infinity);
+    const unlimited = await solver.solve(knapsackExecutionOptions());
+    assert(unlimited.optimal && unlimited.profit > stopped.profit, 'positive infinity must permit the complete search');
+    return { profit: Number(unlimited.profit), selectedItems: profits.map((_, i) => i).filter(i => unlimited.contains(i)), optimal: true };
+  },
+});
+
+for (const [solverType, name] of [[3, 'cbc'], [10, 'cp_sat']] as const) knapsackCases.push({
+  id: `knapsack.native.${name}_backend`, name: `KnapsackSolver.${name}_backend`, solver: 'knapsack',
+  source: 'ortools/algorithms/python/knapsack_solver.cc', upstream: 'KnapsackSolver::SolverType', tags: ['python-parity', 'gap-regression'],
+  async run(api) {
+    const solver = new api.KnapsackSolver(solverType, name);
+    solver.init([3, 5, 9], [[2, 3, 5]], [5]);
+    const result = await solver.solve(knapsackExecutionOptions());
+    assert(result.optimal && result.profit === 9n && result.contains(2), `${name}: exact optimal knapsack result`);
+    return { profit: 9, selectedItems: [2], optimal: true };
+  },
+});
+
+knapsackCases.push(...knapsackNumericalCases);
 
 export async function runKnapsackCases(
   api: KnapsackApi,

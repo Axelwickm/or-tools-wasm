@@ -7,6 +7,8 @@ import {
 } from '../../../harness/shared_case.ts';
 
 type HighLevelApi = {
+  BoundedLinearExpr: new (...args: any[]) => any;
+  rebuildFromLinearExpressionProto: (proto: any, model: any) => any;
   CpModel: new () => any;
   CpSolver: new () => any;
   CpSolverSolutionCallback: new () => any;
@@ -84,7 +86,7 @@ type CpModelLike = {
   minimize(expression: unknown): unknown;
   maximize(expression: unknown): unknown;
   hasObjective(): boolean;
-  modelStats(): string;
+  modelStats(): Promise<string>;
   validate(): Promise<string>;
   removeAllNames(): void;
   readonly modelProto: Record<string, unknown>;
@@ -187,7 +189,7 @@ type ConstraintLike = {
 
 export type CpSatHighLevelParityCase = {
   name: string;
-  source: 'ortools/sat/python/cp_model_test.py';
+  source: string;
   run(api: HighLevelApi): Promise<void> | void;
 } & Partial<SharedCaseMetadata>;
 
@@ -375,6 +377,33 @@ function assertMaxEqualityProto(model: CpModelLike, exprCount: number, targetCoe
 }
 
 export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
+  {
+    // TEMP: parity - rebuild_from_linear_expression_proto checks the upstream expression, identity, coefficient, offset and negation assertions.
+    name: 'CpModelTest.test_rebuild_from_linear_expression_proto',
+    source: 'ortools/sat/python/cp_model_test.py',
+    run({ CpModel, Domain, BoundedLinearExpr, rebuildFromLinearExpressionProto }) {
+      const model = new CpModel(), x = model.newIntVar(0, 4, 'x'), y = model.newIntVar(0, 1, 'y'), z = model.newIntVar(0, 5, 'z');
+      const interval = model.newIntervalVar(x, y, z, 'i');
+      assertEqual(interval.startExpr(), x, `${this.name} start identity`);
+      assertEqual(interval.sizeExpr(), y, `${this.name} size identity`);
+      assertEqual(interval.endExpr(), z, `${this.name} end identity`);
+      assertEqual(String(interval.sizeExpr().negated()), String(y.negated()), `${this.name} Boolean size negation`);
+      let rejected = false; try { interval.startExpr().negated(); } catch (error) { rejected = error instanceof TypeError; }
+      if (!rejected) throw new Error(`${this.name} integer start cannot be negated as a Boolean`);
+      const proto = { vars: [x.index, y.index], coeffs: [1, 2], offset: 0 };
+      for (const offset of [0, 2]) {
+        proto.offset = offset;
+        const flat = new BoundedLinearExpr(rebuildFromLinearExpressionProto(proto, model), new Domain(0, 10));
+        assertEqual(flat.vars[0], x, `${this.name} first variable`); assertEqual(flat.vars[1], y, `${this.name} second variable`);
+        assertEqual(Number(flat.coeffs[0]), 1, `${this.name} first coefficient`); assertEqual(Number(flat.coeffs[1]), 2, `${this.name} second coefficient`);
+        assertEqual(Number(flat.offset), offset, `${this.name} offset`);
+        assertEqual(String(flat.vars[1].negated()), String(y.negated()), `${this.name} flattened Boolean negation`);
+        rejected = false; try { flat.vars[0].negated(); } catch (error) { rejected = error instanceof TypeError; }
+        if (!rejected) throw new Error(`${this.name} flattened integer cannot be negated as a Boolean`);
+      }
+    },
+  },
+
   {
     // TEMP: parity - CpModelTest.test_create_integer_variable matches upstream assertions using the high-level CP-SAT API.
     name: 'CpModelTest.test_create_integer_variable',
@@ -1896,7 +1925,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertLength(lPresence, 1, `${this.name} negated presence literal count`);
       assertEqual((lPresence[0] as NotBoolVarLike).index, b.negated().index, `${this.name} negated presence literal`);
       assertThrows(TypeError, () => model.newOptionalIntervalVar(1, 2, 3, x, 'x'), `${this.name} rejects integer presence literal`);
-      assertThrows(TypeError, () => model.newOptionalIntervalVar(b.plus(x), 2, 3, b, 'x'), `${this.name} rejects Boolean start expression`);
+      assertThrows(TypeError, () => model.newOptionalIntervalVar(b.plus(x), 2, 3, b, 'x'), `${this.name} rejects non-affine start expression`);
       assertThrows(TypeError, () => model.newOptionalIntervalVar(1, 2, 3, b.plus(1), 'x'), `${this.name} rejects non-literal presence expression`);
     },
   },
@@ -2323,7 +2352,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       const y = model.newIntVar(0, 5, 'y');
       model.addLinearConstraint(x.plus(y), 6, 6);
       model.maximize(x.plus(y.times(2)));
-      if (!model.modelStats()) {
+      if (!(await model.modelStats())) {
         throw new Error(`${this.name} expected model_stats() to be truthy`);
       }
       const solver = new CpSolver();
@@ -2966,6 +2995,77 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
   },
 ];
 
+cpSatHighLevelParityCases.push({
+  name: 'CpModelTest.boolean_intvar_literals_and_compound_term',
+  source: 'ortools/sat/python/cp_model_helper.cc',
+  async run({ CpModel, CpSolver, LinearExpr }) {
+    const model = new CpModel();
+    const present = model.newIntVar(0, 1, 'present');
+    const trueConstant = model.newConstant(1);
+    model.addBoolOr([present]); model.addBoolAnd([trueConstant]);
+    model.addAssumption(present);
+    const interval = model.newOptionalFixedSizeIntervalVar(0, 2, present, 'task');
+    model.addNoOverlap([interval]);
+    const value = model.newIntVar(0, 3, 'value');
+    model.add(value.eq(2)).onlyEnforceIf(present);
+    model.minimize(LinearExpr.term(value.plus(1), 3));
+    const solver = new CpSolver();
+    assertEqual(solver.statusName(await solver.solve(model)), 'OPTIMAL', 'Boolean IntVar model solves');
+    assertEqual(solver.booleanValue(present), true, 'positive IntVar literal value');
+    assertEqual(solver.objectiveValue, 9, 'compound linear term objective');
+    const invalid = model.newIntVar(0, 2, 'not_boolean');
+    assertThrows(TypeError, () => model.addBoolOr([invalid]), 'non-Boolean integer literal rejected');
+  },
+}, {
+  name: 'CpSolverTest.callback_response_metrics_and_assumption_core',
+  source: 'ortools/sat/python/cp_model.py',
+  async run({ CpModel, CpSolver, CpSolverSolutionCallback }) {
+    const callback = new CpSolverSolutionCallback();
+    assertEqual(callback.hasResponse(), false, 'callback initially has no response');
+    const model = new CpModel();
+    model.newIntVar(0, 1, 'choice');
+    const solver = new CpSolver();
+    await solver.solve(model, { solutionCallback: callback });
+    assertEqual(callback.hasResponse(), true, 'callback retains native response after solve');
+    assertEqual(typeof callback.responseProto.solution[0], 'bigint', 'callback response keeps exact native solution');
+    for (const metric of ['numBooleans', 'numConflicts', 'numBranches', 'numIntegerPropagations', 'numBinaryPropagations', 'deterministicTime', 'userTime']) {
+      assertEqual(callback[metric] >= 0, true, `callback metric ${metric} is nonnegative`);
+    }
+    const inconsistent = new CpModel();
+    const required = inconsistent.newIntVar(0, 1, 'required');
+    inconsistent.addBoolOr([required.negated()]); inconsistent.addAssumption(required);
+    assertEqual(solver.statusName(await solver.solve(inconsistent)), 'INFEASIBLE', 'assumption model is infeasible');
+    assertArrayEqual(solver.sufficientAssumptionsForInfeasibility(), [required.index], 'native infeasibility core');
+  },
+});
+
+cpSatHighLevelParityCases.push({
+  name: 'CpSolverTest.callback_stop_search_returns_feasible_and_reuses_solver',
+  source: 'ortools/sat/python/cp_model.py',
+  async run({ CpModel, CpSolver, CpSolverSolutionCallback }) {
+    class StopAfterThree extends CpSolverSolutionCallback {
+      count = 0;
+      onSolutionCallback() { if (++this.count === 3) this.stopSearch(); }
+    }
+    const model = new CpModel();
+    const vars = Array.from({ length: 40 }, (_, i) => model.newBoolVar(`choice_${i}`));
+    const solver = new CpSolver();
+    const callback = new StopAfterThree();
+    const started = performance.now();
+    const status = await solver.solve(model, {
+      numWorkers: 1, enumerateAllSolutions: true, maxTimeInSeconds: 20,
+      solutionCallback: callback,
+    });
+    assertEqual(solver.statusName(status), 'FEASIBLE', 'callback stops enumeration with feasible candidate');
+    assertEqual(callback.count, 3, 'callback stops after requested solution count');
+    assertEqual(performance.now() - started < 10000, true, 'native search stops before its time limit');
+    for (const variable of vars) assertEqual([0n, 1n].includes(solver.value(variable)), true, 'retained solution is feasible');
+    const next = new CpModel(); const x = next.newIntVar(0, 2, 'x'); next.maximize(x);
+    assertEqual(solver.statusName(await solver.solve(next)), 'OPTIMAL', 'reuse after stopping solves optimally');
+    assertEqual(solver.value(x), 2n, 'reuse returns current solution');
+  },
+});
+
 export async function runCpSatHighLevelParityCases(api: HighLevelApi) {
   const results: CpSatHighLevelParityResult[] = [];
   for (const mode of executorFixtureModes) {
@@ -2985,6 +3085,9 @@ export async function runCpSatHighLevelParityCases(api: HighLevelApi) {
           CpSolver: MatrixCpSolver,
         };
         for (const testCase of cpSatHighLevelParityCases) {
+          // Asynchronous callback-driven interruption uses the outer worker or
+          // server bridge. Direct mode intentionally blocks the calling thread.
+          if (mode === 'direct' && testCase.name === 'CpSolverTest.callback_stop_search_returns_feasible_and_reuses_solver') continue;
           try {
             await testCase.run(matrixApi);
           } catch (error) {

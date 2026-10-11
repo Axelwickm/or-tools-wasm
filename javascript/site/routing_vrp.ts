@@ -203,7 +203,7 @@ async function runVrp() {
         return;
       }
 
-      const routes = extractRoutes(manager, routing, assignment);
+      const routes = await extractRoutes(manager, routing, assignment);
       renderRouteList(routeOutput, routes);
       renderMap(routes, true);
       appendStatus(statusEl, `Objective: ${assignment.objectiveValue()}`);

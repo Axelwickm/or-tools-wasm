@@ -2,11 +2,16 @@
 #define ORTOOLS_WASM_SERVER_SET_COVER_EXECUTOR_H_
 
 #include "server/src/solver_executor.h"
+#include <memory>
+
+namespace ortools_wasm { class SetCoverGuidedSessions; }
 
 namespace ortools_wasm::server {
 
 class SetCoverExecutor final : public SolverExecutor {
  public:
+  SetCoverExecutor();
+  ~SetCoverExecutor() override;
   std::string solver() const override;
   int RequestedThreads(const SolverExecutorRequest& request,
                        int client_requested_threads,
@@ -14,6 +19,8 @@ class SetCoverExecutor final : public SolverExecutor {
   SolverExecutorResult Execute(const SolverExecutorRequest& request,
                                const JobContext& context,
                                const SolverEventSink& emit_event) override;
+ private:
+  std::unique_ptr<ortools_wasm::SetCoverGuidedSessions> sessions_;
 };
 
 }  // namespace ortools_wasm::server

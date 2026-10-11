@@ -1,5 +1,4 @@
 export {
-  RuntimeError,
   MaxFlowResult,
   MinCostFlowResult,
   LinearSumAssignmentResult,

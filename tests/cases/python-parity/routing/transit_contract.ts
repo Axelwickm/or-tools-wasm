@@ -31,7 +31,7 @@ type RoutingModelLike = {
   start(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): Promise<bigint>;
   status(): number;
 };
 

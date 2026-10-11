@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file pdlp.proto.
  */
 export const file_pdlp: GenFile = /*@__PURE__*/
-  fileDesc("CgpwZGxwLnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIkMKFVBkbHBTcGFyc2VNYXRyaXhFbnRyeRILCgNyb3cYASABKAUSDgoGY29sdW1uGAIgASgFEg0KBXZhbHVlGAMgASgBIoAEChRQZGxwUXVhZHJhdGljUHJvZ3JhbRIVCg1udW1fdmFyaWFibGVzGAEgASgFEhcKD251bV9jb25zdHJhaW50cxgCIAEoBRIUCgxwcm9ibGVtX25hbWUYAyABKAkSGAoQb2JqZWN0aXZlX29mZnNldBgEIAEoARIgChhvYmplY3RpdmVfc2NhbGluZ19mYWN0b3IYBSABKAESGAoQb2JqZWN0aXZlX3ZlY3RvchgGIAMoARIhChlvYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAcgAygBEiUKHWhhc19vYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAggASgIEh8KF2NvbnN0cmFpbnRfbG93ZXJfYm91bmRzGAkgAygBEh8KF2NvbnN0cmFpbnRfdXBwZXJfYm91bmRzGAogAygBEh0KFXZhcmlhYmxlX2xvd2VyX2JvdW5kcxgLIAMoARIdChV2YXJpYWJsZV91cHBlcl9ib3VuZHMYDCADKAESFgoOdmFyaWFibGVfbmFtZXMYDSADKAkSGAoQY29uc3RyYWludF9uYW1lcxgOIAMoCRJQChljb25zdHJhaW50X21hdHJpeF9lbnRyaWVzGA8gAygLMi0ub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU3BhcnNlTWF0cml4RW50cnkipwMKE1BkbHBTb2x2ZVBhcmFtZXRlcnMSHAoPaXRlcmF0aW9uX2xpbWl0GAEgASgFSACIAQESKAobdGVybWluYXRpb25fY2hlY2tfZnJlcXVlbmN5GAIgASgFSAGIAQESIQoUZXBzX29wdGltYWxfcmVsYXRpdmUYAyABKAFIAogBARIhChRlcHNfb3B0aW1hbF9hYnNvbHV0ZRgEIAEoAUgDiAEBEiIKFWxfaW5mX3J1aXpfaXRlcmF0aW9ucxgFIAEoBUgEiAEBEh4KEWwyX25vcm1fcmVzY2FsaW5nGAYgASgISAWIAQESGAoLbnVtX3RocmVhZHMYByABKAVIBogBAUISChBfaXRlcmF0aW9uX2xpbWl0Qh4KHF90ZXJtaW5hdGlvbl9jaGVja19mcmVxdWVuY3lCFwoVX2Vwc19vcHRpbWFsX3JlbGF0aXZlQhcKFV9lcHNfb3B0aW1hbF9hYnNvbHV0ZUIYChZfbF9pbmZfcnVpel9pdGVyYXRpb25zQhQKEl9sMl9ub3JtX3Jlc2NhbGluZ0IOCgxfbnVtX3RocmVhZHMiRQoTUGRscEluaXRpYWxTb2x1dGlvbhIXCg9wcmltYWxfc29sdXRpb24YASADKAESFQoNZHVhbF9zb2x1dGlvbhgCIAMoASJeChNQZGxwVmFsaWRhdGVSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbSJeChNQZGxwSXNMaW5lYXJSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbSJoChZQZGxwRnJvbU1wTW9kZWxSZXF1ZXN0EhYKDm1wX21vZGVsX3Byb3RvGAEgASgMEh8KF3JlbGF4X2ludGVnZXJfdmFyaWFibGVzGAIgASgIEhUKDWluY2x1ZGVfbmFtZXMYAyABKAgiXwoUUGRscFRvTXBNb2RlbFJlcXVlc3QSRwoRcXVhZHJhdGljX3Byb2dyYW0YASABKAsyLC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBRdWFkcmF0aWNQcm9ncmFtIuMBChBQZGxwU29sdmVSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbRI/CgpwYXJhbWV0ZXJzGAIgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU29sdmVQYXJhbWV0ZXJzEkUKEGluaXRpYWxfc29sdXRpb24YAyABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBJbml0aWFsU29sdXRpb24i6gIKEVBkbHBCcmlkZ2VSZXF1ZXN0Ej8KCHZhbGlkYXRlGAEgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwVmFsaWRhdGVSZXF1ZXN0SAASQAoJaXNfbGluZWFyGAIgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwSXNMaW5lYXJSZXF1ZXN0SAASRwoNZnJvbV9tcF9tb2RlbBgDIAEoCzIuLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscEZyb21NcE1vZGVsUmVxdWVzdEgAEkMKC3RvX21wX21vZGVsGAQgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwVG9NcE1vZGVsUmVxdWVzdEgAEjkKBXNvbHZlGAUgASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU29sdmVSZXF1ZXN0SABCCQoHcGF5bG9hZCKOAQoQUGRscFNvbHZlclJlc3VsdBIXCg9wcmltYWxfc29sdXRpb24YASADKAESFQoNZHVhbF9zb2x1dGlvbhgCIAMoARIVCg1yZWR1Y2VkX2Nvc3RzGAMgAygBEhoKEnRlcm1pbmF0aW9uX3JlYXNvbhgEIAEoBRIXCg9pdGVyYXRpb25fY291bnQYBSABKAUiJQoSUGRscFZhbGlkYXRlUmVzdWx0Eg8KB21lc3NhZ2UYASABKAkiIwoSUGRscElzTGluZWFyUmVzdWx0Eg0KBXZhbHVlGAEgASgIImAKFVBkbHBGcm9tTXBNb2RlbFJlc3VsdBJHChFxdWFkcmF0aWNfcHJvZ3JhbRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFF1YWRyYXRpY1Byb2dyYW0iLQoTUGRscFRvTXBNb2RlbFJlc3VsdBIWCg5tcF9tb2RlbF9wcm90bxgBIAEoDCJSCg9QZGxwU29sdmVSZXN1bHQSPwoNc29sdmVyX3Jlc3VsdBgBIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlclJlc3VsdCKJAwoSUGRscEJyaWRnZVJlc3BvbnNlEkUKD3ZhbGlkYXRlX3Jlc3VsdBgBIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFZhbGlkYXRlUmVzdWx0SAASRgoQaXNfbGluZWFyX3Jlc3VsdBgCIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscElzTGluZWFyUmVzdWx0SAASTQoUZnJvbV9tcF9tb2RlbF9yZXN1bHQYAyABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBGcm9tTXBNb2RlbFJlc3VsdEgAEkkKEnRvX21wX21vZGVsX3Jlc3VsdBgEIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFRvTXBNb2RlbFJlc3VsdEgAEj8KDHNvbHZlX3Jlc3VsdBgFIAEoCzInLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlUmVzdWx0SABCCQoHcGF5bG9hZGIGcHJvdG8z");
+  fileDesc("CgpwZGxwLnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIkMKFVBkbHBTcGFyc2VNYXRyaXhFbnRyeRILCgNyb3cYASABKAUSDgoGY29sdW1uGAIgASgFEg0KBXZhbHVlGAMgASgBIoAEChRQZGxwUXVhZHJhdGljUHJvZ3JhbRIVCg1udW1fdmFyaWFibGVzGAEgASgFEhcKD251bV9jb25zdHJhaW50cxgCIAEoBRIUCgxwcm9ibGVtX25hbWUYAyABKAkSGAoQb2JqZWN0aXZlX29mZnNldBgEIAEoARIgChhvYmplY3RpdmVfc2NhbGluZ19mYWN0b3IYBSABKAESGAoQb2JqZWN0aXZlX3ZlY3RvchgGIAMoARIhChlvYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAcgAygBEiUKHWhhc19vYmplY3RpdmVfbWF0cml4X2RpYWdvbmFsGAggASgIEh8KF2NvbnN0cmFpbnRfbG93ZXJfYm91bmRzGAkgAygBEh8KF2NvbnN0cmFpbnRfdXBwZXJfYm91bmRzGAogAygBEh0KFXZhcmlhYmxlX2xvd2VyX2JvdW5kcxgLIAMoARIdChV2YXJpYWJsZV91cHBlcl9ib3VuZHMYDCADKAESFgoOdmFyaWFibGVfbmFtZXMYDSADKAkSGAoQY29uc3RyYWludF9uYW1lcxgOIAMoCRJQChljb25zdHJhaW50X21hdHJpeF9lbnRyaWVzGA8gAygLMi0ub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwU3BhcnNlTWF0cml4RW50cnkiwgMKE1BkbHBTb2x2ZVBhcmFtZXRlcnMSHAoPaXRlcmF0aW9uX2xpbWl0GAEgASgFSACIAQESKAobdGVybWluYXRpb25fY2hlY2tfZnJlcXVlbmN5GAIgASgFSAGIAQESIQoUZXBzX29wdGltYWxfcmVsYXRpdmUYAyABKAFIAogBARIhChRlcHNfb3B0aW1hbF9hYnNvbHV0ZRgEIAEoAUgDiAEBEiIKFWxfaW5mX3J1aXpfaXRlcmF0aW9ucxgFIAEoBUgEiAEBEh4KEWwyX25vcm1fcmVzY2FsaW5nGAYgASgISAWIAQESGAoLbnVtX3RocmVhZHMYByABKAVIBogBARIZChFuYXRpdmVfcGFyYW1ldGVycxgIIAEoDEISChBfaXRlcmF0aW9uX2xpbWl0Qh4KHF90ZXJtaW5hdGlvbl9jaGVja19mcmVxdWVuY3lCFwoVX2Vwc19vcHRpbWFsX3JlbGF0aXZlQhcKFV9lcHNfb3B0aW1hbF9hYnNvbHV0ZUIYChZfbF9pbmZfcnVpel9pdGVyYXRpb25zQhQKEl9sMl9ub3JtX3Jlc2NhbGluZ0IOCgxfbnVtX3RocmVhZHMiRQoTUGRscEluaXRpYWxTb2x1dGlvbhIXCg9wcmltYWxfc29sdXRpb24YASADKAESFQoNZHVhbF9zb2x1dGlvbhgCIAMoASJeChNQZGxwVmFsaWRhdGVSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbSJeChNQZGxwSXNMaW5lYXJSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbSJ+ChZQZGxwRnJvbU1wTW9kZWxSZXF1ZXN0EhYKDm1wX21vZGVsX3Byb3RvGAEgASgMEh8KF3JlbGF4X2ludGVnZXJfdmFyaWFibGVzGAIgASgIEhUKDWluY2x1ZGVfbmFtZXMYAyABKAgSFAoMaW5wdXRfZm9ybWF0GAQgASgFIl8KFFBkbHBUb01wTW9kZWxSZXF1ZXN0EkcKEXF1YWRyYXRpY19wcm9ncmFtGAEgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwUXVhZHJhdGljUHJvZ3JhbSL7AQoQUGRscFNvbHZlUmVxdWVzdBJHChFxdWFkcmF0aWNfcHJvZ3JhbRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFF1YWRyYXRpY1Byb2dyYW0SPwoKcGFyYW1ldGVycxgCIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlUGFyYW1ldGVycxJFChBpbml0aWFsX3NvbHV0aW9uGAMgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5QZGxwSW5pdGlhbFNvbHV0aW9uEhYKDmNhbGxiYWNrX2ZsYWdzGAQgASgFIuoCChFQZGxwQnJpZGdlUmVxdWVzdBI/Cgh2YWxpZGF0ZRgBIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFZhbGlkYXRlUmVxdWVzdEgAEkAKCWlzX2xpbmVhchgCIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscElzTGluZWFyUmVxdWVzdEgAEkcKDWZyb21fbXBfbW9kZWwYAyABKAsyLi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBGcm9tTXBNb2RlbFJlcXVlc3RIABJDCgt0b19tcF9tb2RlbBgEIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFRvTXBNb2RlbFJlcXVlc3RIABI5CgVzb2x2ZRgFIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlUmVxdWVzdEgAQgkKB3BheWxvYWQiqAEKEFBkbHBTb2x2ZXJSZXN1bHQSFwoPcHJpbWFsX3NvbHV0aW9uGAEgAygBEhUKDWR1YWxfc29sdXRpb24YAiADKAESFQoNcmVkdWNlZF9jb3N0cxgDIAMoARIaChJ0ZXJtaW5hdGlvbl9yZWFzb24YBCABKAUSFwoPaXRlcmF0aW9uX2NvdW50GAUgASgFEhgKEG5hdGl2ZV9zb2x2ZV9sb2cYBiABKAwiJQoSUGRscFZhbGlkYXRlUmVzdWx0Eg8KB21lc3NhZ2UYASABKAkiIwoSUGRscElzTGluZWFyUmVzdWx0Eg0KBXZhbHVlGAEgASgIImAKFVBkbHBGcm9tTXBNb2RlbFJlc3VsdBJHChFxdWFkcmF0aWNfcHJvZ3JhbRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFF1YWRyYXRpY1Byb2dyYW0iLQoTUGRscFRvTXBNb2RlbFJlc3VsdBIWCg5tcF9tb2RlbF9wcm90bxgBIAEoDCJSCg9QZGxwU29sdmVSZXN1bHQSPwoNc29sdmVyX3Jlc3VsdBgBIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlclJlc3VsdCLIAwoSUGRscEJyaWRnZVJlc3BvbnNlEkUKD3ZhbGlkYXRlX3Jlc3VsdBgBIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFZhbGlkYXRlUmVzdWx0SAASRgoQaXNfbGluZWFyX3Jlc3VsdBgCIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscElzTGluZWFyUmVzdWx0SAASTQoUZnJvbV9tcF9tb2RlbF9yZXN1bHQYAyABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBGcm9tTXBNb2RlbFJlc3VsdEgAEkkKEnRvX21wX21vZGVsX3Jlc3VsdBgEIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFRvTXBNb2RlbFJlc3VsdEgAEj8KDHNvbHZlX3Jlc3VsdBgFIAEoCzInLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscFNvbHZlUmVzdWx0SAASPQoLc29sdmVfZXZlbnQYBiABKAsyJi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlBkbHBTb2x2ZUV2ZW50SABCCQoHcGF5bG9hZCKBAgoSUGRscEl0ZXJhdGlvbkV2ZW50EhYKDml0ZXJhdGlvbl90eXBlGAEgASgFEhcKD2l0ZXJhdGlvbl9zdGF0cxgCIAEoDBIcChR0ZXJtaW5hdGlvbl9jcml0ZXJpYRgDIAEoDBInCh9sMl9ub3JtX3ByaW1hbF9saW5lYXJfb2JqZWN0aXZlGAQgASgBEiEKGWwyX25vcm1fY29uc3RyYWludF9ib3VuZHMYBSABKAESKgoibF9pbmZfbm9ybV9wcmltYWxfbGluZWFyX29iamVjdGl2ZRgGIAEoARIkChxsX2luZl9ub3JtX2NvbnN0cmFpbnRfYm91bmRzGAcgASgBImsKDlBkbHBTb2x2ZUV2ZW50Eg0KA2xvZxgBIAEoCUgAEj8KCWl0ZXJhdGlvbhgCIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUGRscEl0ZXJhdGlvbkV2ZW50SABCCQoHcGF5bG9hZGIGcHJvdG8z");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.PdlpSparseMatrixEntry
@@ -268,6 +268,11 @@ export type PdlpSolveParameters = Message<"ortools_wasm.bridge.v1.PdlpSolveParam
    * @generated from field: optional int32 num_threads = 7;
    */
   numThreads?: number | undefined;
+
+  /**
+   * @generated from field: bytes native_parameters = 8;
+   */
+  nativeParameters: Uint8Array;
 };
 
 /**
@@ -308,6 +313,11 @@ export type PdlpSolveParametersJson = {
    * @generated from field: optional int32 num_threads = 7;
    */
   numThreads?: number;
+
+  /**
+   * @generated from field: bytes native_parameters = 8;
+   */
+  nativeParameters?: string;
 };
 
 export type PdlpSolveParametersValid = PdlpSolveParameters;
@@ -434,6 +444,13 @@ export type PdlpFromMpModelRequest = Message<"ortools_wasm.bridge.v1.PdlpFromMpM
    * @generated from field: bool include_names = 3;
    */
   includeNames: boolean;
+
+  /**
+   * 0: MPModelProto bytes, 1: MPS text, 2: MPModelProto textproto, 3: MPModelProto JSON.
+   *
+   * @generated from field: int32 input_format = 4;
+   */
+  inputFormat: number;
 };
 
 /**
@@ -454,6 +471,13 @@ export type PdlpFromMpModelRequestJson = {
    * @generated from field: bool include_names = 3;
    */
   includeNames?: boolean;
+
+  /**
+   * 0: MPModelProto bytes, 1: MPS text, 2: MPModelProto textproto, 3: MPModelProto JSON.
+   *
+   * @generated from field: int32 input_format = 4;
+   */
+  inputFormat?: number;
 };
 
 export type PdlpFromMpModelRequestValid = PdlpFromMpModelRequest;
@@ -512,6 +536,11 @@ export type PdlpSolveRequest = Message<"ortools_wasm.bridge.v1.PdlpSolveRequest"
    * @generated from field: ortools_wasm.bridge.v1.PdlpInitialSolution initial_solution = 3;
    */
   initialSolution?: PdlpInitialSolution | undefined;
+
+  /**
+   * @generated from field: int32 callback_flags = 4;
+   */
+  callbackFlags: number;
 };
 
 /**
@@ -532,6 +561,11 @@ export type PdlpSolveRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.PdlpInitialSolution initial_solution = 3;
    */
   initialSolution?: PdlpInitialSolutionJson;
+
+  /**
+   * @generated from field: int32 callback_flags = 4;
+   */
+  callbackFlags?: number;
 };
 
 export type PdlpSolveRequestValid = PdlpSolveRequest;
@@ -650,6 +684,11 @@ export type PdlpSolverResult = Message<"ortools_wasm.bridge.v1.PdlpSolverResult"
    * @generated from field: int32 iteration_count = 5;
    */
   iterationCount: number;
+
+  /**
+   * @generated from field: bytes native_solve_log = 6;
+   */
+  nativeSolveLog: Uint8Array;
 };
 
 /**
@@ -680,6 +719,11 @@ export type PdlpSolverResultJson = {
    * @generated from field: int32 iteration_count = 5;
    */
   iterationCount?: number;
+
+  /**
+   * @generated from field: bytes native_solve_log = 6;
+   */
+  nativeSolveLog?: string;
 };
 
 export type PdlpSolverResultValid = PdlpSolverResult;
@@ -873,6 +917,12 @@ export type PdlpBridgeResponse = Message<"ortools_wasm.bridge.v1.PdlpBridgeRespo
      */
     value: PdlpSolveResult;
     case: "solveResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpSolveEvent solve_event = 6;
+     */
+    value: PdlpSolveEvent;
+    case: "solveEvent";
   } | { case: undefined; value?: undefined };
 };
 
@@ -904,6 +954,11 @@ export type PdlpBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.PdlpSolveResult solve_result = 5;
    */
   solveResult?: PdlpSolveResultJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpSolveEvent solve_event = 6;
+   */
+  solveEvent?: PdlpSolveEventJson;
 };
 
 export type PdlpBridgeResponseValid = PdlpBridgeResponse;
@@ -914,4 +969,143 @@ export type PdlpBridgeResponseValid = PdlpBridgeResponse;
  */
 export const PdlpBridgeResponseSchema: GenMessage<PdlpBridgeResponse, {jsonType: PdlpBridgeResponseJson, validType: PdlpBridgeResponseValid}> = /*@__PURE__*/
   messageDesc(file_pdlp, 16);
+
+/**
+ * Native callback snapshots retain full stats and criteria, including exact int64 fields.
+ *
+ * @generated from message ortools_wasm.bridge.v1.PdlpIterationEvent
+ */
+export type PdlpIterationEvent = Message<"ortools_wasm.bridge.v1.PdlpIterationEvent"> & {
+  /**
+   * @generated from field: int32 iteration_type = 1;
+   */
+  iterationType: number;
+
+  /**
+   * @generated from field: bytes iteration_stats = 2;
+   */
+  iterationStats: Uint8Array;
+
+  /**
+   * @generated from field: bytes termination_criteria = 3;
+   */
+  terminationCriteria: Uint8Array;
+
+  /**
+   * @generated from field: double l2_norm_primal_linear_objective = 4;
+   */
+  l2NormPrimalLinearObjective: number;
+
+  /**
+   * @generated from field: double l2_norm_constraint_bounds = 5;
+   */
+  l2NormConstraintBounds: number;
+
+  /**
+   * @generated from field: double l_inf_norm_primal_linear_objective = 6;
+   */
+  lInfNormPrimalLinearObjective: number;
+
+  /**
+   * @generated from field: double l_inf_norm_constraint_bounds = 7;
+   */
+  lInfNormConstraintBounds: number;
+};
+
+/**
+ * Native callback snapshots retain full stats and criteria, including exact int64 fields.
+ *
+ * @generated from message ortools_wasm.bridge.v1.PdlpIterationEvent
+ */
+export type PdlpIterationEventJson = {
+  /**
+   * @generated from field: int32 iteration_type = 1;
+   */
+  iterationType?: number;
+
+  /**
+   * @generated from field: bytes iteration_stats = 2;
+   */
+  iterationStats?: string;
+
+  /**
+   * @generated from field: bytes termination_criteria = 3;
+   */
+  terminationCriteria?: string;
+
+  /**
+   * @generated from field: double l2_norm_primal_linear_objective = 4;
+   */
+  l2NormPrimalLinearObjective?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double l2_norm_constraint_bounds = 5;
+   */
+  l2NormConstraintBounds?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double l_inf_norm_primal_linear_objective = 6;
+   */
+  lInfNormPrimalLinearObjective?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double l_inf_norm_constraint_bounds = 7;
+   */
+  lInfNormConstraintBounds?: number | "NaN" | "Infinity" | "-Infinity";
+};
+
+export type PdlpIterationEventValid = PdlpIterationEvent;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpIterationEvent.
+ * Use `create(PdlpIterationEventSchema)` to create a new message.
+ */
+export const PdlpIterationEventSchema: GenMessage<PdlpIterationEvent, {jsonType: PdlpIterationEventJson, validType: PdlpIterationEventValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 17);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpSolveEvent
+ */
+export type PdlpSolveEvent = Message<"ortools_wasm.bridge.v1.PdlpSolveEvent"> & {
+  /**
+   * @generated from oneof ortools_wasm.bridge.v1.PdlpSolveEvent.payload
+   */
+  payload: {
+    /**
+     * @generated from field: string log = 1;
+     */
+    value: string;
+    case: "log";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.PdlpIterationEvent iteration = 2;
+     */
+    value: PdlpIterationEvent;
+    case: "iteration";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.PdlpSolveEvent
+ */
+export type PdlpSolveEventJson = {
+  /**
+   * @generated from field: string log = 1;
+   */
+  log?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.PdlpIterationEvent iteration = 2;
+   */
+  iteration?: PdlpIterationEventJson;
+};
+
+export type PdlpSolveEventValid = PdlpSolveEvent;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.PdlpSolveEvent.
+ * Use `create(PdlpSolveEventSchema)` to create a new message.
+ */
+export const PdlpSolveEventSchema: GenMessage<PdlpSolveEvent, {jsonType: PdlpSolveEventJson, validType: PdlpSolveEventValid}> = /*@__PURE__*/
+  messageDesc(file_pdlp, 18);
 

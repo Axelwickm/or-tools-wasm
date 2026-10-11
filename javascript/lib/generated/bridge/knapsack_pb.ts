@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file knapsack.proto.
  */
 export const file_knapsack: GenFile = /*@__PURE__*/
-  fileDesc("Cg5rbmFwc2Fjay5wcm90bxIWb3J0b29sc193YXNtLmJyaWRnZS52MSLUAQoVS25hcHNhY2tCcmlkZ2VSZXF1ZXN0EhMKC3NvbHZlcl90eXBlGAEgASgFEgwKBG5hbWUYAiABKAkSFQoNdXNlX3JlZHVjdGlvbhgDIAEoCBIaChJ0aW1lX2xpbWl0X3NlY29uZHMYBCABKAESDwoHcHJvZml0cxgFIAMoAxJACgd3ZWlnaHRzGAYgAygLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5LbmFwc2Fja1dlaWdodERpbWVuc2lvbhISCgpjYXBhY2l0aWVzGAcgAygDIikKF0tuYXBzYWNrV2VpZ2h0RGltZW5zaW9uEg4KBnZhbHVlcxgBIAMoAyJLChZLbmFwc2Fja0JyaWRnZVJlc3BvbnNlEg4KBnByb2ZpdBgBIAEoAxIPCgdvcHRpbWFsGAIgASgIEhAKCGNvbnRhaW5zGAMgAygIYgZwcm90bzM");
+  fileDesc("Cg5rbmFwc2Fjay5wcm90bxIWb3J0b29sc193YXNtLmJyaWRnZS52MSL+AQoVS25hcHNhY2tCcmlkZ2VSZXF1ZXN0EhMKC3NvbHZlcl90eXBlGAEgASgFEgwKBG5hbWUYAiABKAkSFQoNdXNlX3JlZHVjdGlvbhgDIAEoCBIaChJ0aW1lX2xpbWl0X3NlY29uZHMYBCABKAESDwoHcHJvZml0cxgFIAMoAxJACgd3ZWlnaHRzGAYgAygLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5LbmFwc2Fja1dlaWdodERpbWVuc2lvbhISCgpjYXBhY2l0aWVzGAcgAygDEhgKC251bV93b3JrZXJzGAggASgFSACIAQFCDgoMX251bV93b3JrZXJzIikKF0tuYXBzYWNrV2VpZ2h0RGltZW5zaW9uEg4KBnZhbHVlcxgBIAMoAyJLChZLbmFwc2Fja0JyaWRnZVJlc3BvbnNlEg4KBnByb2ZpdBgBIAEoAxIPCgdvcHRpbWFsGAIgASgIEhAKCGNvbnRhaW5zGAMgAygIYgZwcm90bzM");
 
 /**
  * Knapsack solver payloads carried by the generic job.proto envelope.
@@ -52,6 +52,11 @@ export type KnapsackBridgeRequest = Message<"ortools_wasm.bridge.v1.KnapsackBrid
    * @generated from field: repeated int64 capacities = 7;
    */
   capacities: bigint[];
+
+  /**
+   * @generated from field: optional int32 num_workers = 8;
+   */
+  numWorkers?: number | undefined;
 };
 
 /**
@@ -94,6 +99,11 @@ export type KnapsackBridgeRequestJson = {
    * @generated from field: repeated int64 capacities = 7;
    */
   capacities?: string[];
+
+  /**
+   * @generated from field: optional int32 num_workers = 8;
+   */
+  numWorkers?: number;
 };
 
 export type KnapsackBridgeRequestValid = KnapsackBridgeRequest;

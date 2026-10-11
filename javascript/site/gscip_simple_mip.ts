@@ -37,12 +37,12 @@ async function runGScipExample() {
     renderRows([
       ['Termination', result.terminationReason],
       ['Objective', result.objectiveValue],
-      ['x', result.variableValues.x],
-      ['y', result.variableValues.y],
+      ['x', result.value(x)],
+      ['y', result.value(y)],
     ]);
     appendStatus(`Termination: ${result.terminationReason}`);
     appendStatus(`Objective: ${result.objectiveValue}`);
-    appendStatus(`Values: ${JSON.stringify(result.variableValues)}`);
+    appendStatus(`Values: ${JSON.stringify(result.variableValuesById)}`);
   } catch (error) {
     appendStatus(`Solve failed: ${(error as Error).message}`);
   } finally {

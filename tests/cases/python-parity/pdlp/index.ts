@@ -49,13 +49,17 @@ type QuadraticProgramLike = {
   resizeAndInitialize(numVariables: number, numConstraints: number): void;
   setObjectiveMatrixDiagonal(values: number[]): void;
   objectiveVector: number[];
-  constraintMatrix: { dense?: number[][]; entries?: Array<{ row: number; column: number; value: number }> } | number[][];
+  constraintMatrix: { numRows?: number; numColumns?: number; dense?: number[][]; entries?: Array<{ row: number; column: number; value: number }> } | number[][];
   constraintLowerBounds: number[];
   constraintUpperBounds: number[];
   variableLowerBounds: number[];
   variableUpperBounds: number[];
   variableNames: string[];
+  constraintNames: string[];
+  problemName: string;
+  objectiveMatrixDiagonal: number[] | null;
   objectiveOffset: number;
+  objectiveScalingFactor: number;
 };
 
 type PrimalAndDualSolutionLike = {
@@ -66,11 +70,15 @@ type PrimalAndDualSolutionLike = {
 type PdlpParams = {
   terminationCriteria?: {
     iterationLimit?: number;
+    timeSecLimit?: number;
+    kktMatrixPassLimit?: number;
     simpleOptimalityCriteria?: {
       epsOptimalRelative?: number;
       epsOptimalAbsolute?: number;
     };
   };
+  recordIterationStats?: boolean;
+  presolveOptions?: { useGlop?: boolean };
   terminationCheckFrequency?: number;
   lInfRuizIterations?: number;
   l2NormRescaling?: boolean;
@@ -84,6 +92,10 @@ type PdlpResultLike = {
   solveLog: {
     terminationReason: string;
     iterationCount: number;
+    solveTimeSec?: number;
+    params?: PdlpParams;
+    iterationStats?: Array<{ iterationNumber?: number }>;
+    solutionStats?: { convergenceInformation?: Array<{ primalObjective?: number; dualObjective?: number }> };
   };
 };
 
@@ -529,6 +541,84 @@ type PdlpCase = SharedCase<PdlpApi, Record<string, never>, ExecutorFixtureMode>;
 
 const pdlpCaseDefinitions: RawPdlpCase[] = [
   {
+    name: 'QuadraticProgramTest.resize_resets_previous_quadratic_model',
+    async run(api) {
+      const qp = new api.Pdlp.QuadraticProgram({
+        problemName: 'previous', objectiveOffset: 9, objectiveScalingFactor: -2,
+        objectiveVector: [3, 4], objectiveMatrixDiagonal: [5, 6],
+        variableNames: ['x', 'y'], constraintNames: ['capacity'],
+        constraintMatrix: { numRows: 1, numColumns: 2, entries: [{ row: 0, column: 0, value: 7 }] },
+      });
+      qp.resizeAndInitialize(1, 0);
+      assert(qp.problemName === '', 'resize must clear problem name');
+      assert(qp.objectiveOffset === 0 && qp.objectiveScalingFactor === 1, 'resize must reset offset/scaling');
+      assert(qp.objectiveMatrixDiagonal === null, 'resize must clear quadratic objective');
+      assert(qp.variableNames.length === 0 && qp.constraintNames.length === 0, 'resize must clear optional names');
+      assertSameElements(qp.objectiveVector, [0], 'resized objective');
+      assertSameElements(qp.variableLowerBounds, [-Infinity], 'resized lower bounds');
+      assertSameElements(qp.variableUpperBounds, [Infinity], 'resized upper bounds');
+      await api.Pdlp.validateQuadraticProgramDimensions(qp);
+      assert(await api.Pdlp.isLinearProgram(qp), 'resized quadratic program must be linear');
+      // A stale offset/scaling would change the objective after the next solve.
+      qp.objectiveVector = [1];
+      qp.variableLowerBounds = [2];
+      qp.variableUpperBounds = [3];
+      const result = await api.Pdlp.solve(qp);
+      assert(result.solveLog.terminationReason === 'TERMINATION_REASON_OPTIMAL', 'resized model must solve');
+      assert(Math.abs(result.primalSolution[0] - 2) < 1e-5, 'resized optimum must be 2');
+    },
+  },
+  ...([
+    ['objective vector', (qp: QuadraticProgramLike) => { qp.objectiveVector = [0]; }],
+    ['variable lower bounds', (qp: QuadraticProgramLike) => { qp.variableLowerBounds = [0]; }],
+    ['variable upper bounds', (qp: QuadraticProgramLike) => { qp.variableUpperBounds = []; }],
+    ['constraint lower bounds', (qp: QuadraticProgramLike) => { qp.constraintLowerBounds = []; }],
+    ['constraint upper bounds', (qp: QuadraticProgramLike) => { qp.constraintUpperBounds = [0, 1]; }],
+    ['matrix columns', (qp: QuadraticProgramLike) => { qp.constraintMatrix = { numRows: 1, numColumns: 3, entries: [] }; }],
+    ['matrix rows', (qp: QuadraticProgramLike) => { qp.constraintMatrix = { numRows: 2, numColumns: 2, entries: [] }; }],
+    ['quadratic diagonal', (qp: QuadraticProgramLike) => { qp.objectiveMatrixDiagonal = [1]; }],
+    ['variable names', (qp: QuadraticProgramLike) => { qp.variableNames = ['x']; }],
+    ['constraint names', (qp: QuadraticProgramLike) => { qp.constraintNames = ['first', 'extra']; }],
+  ] as const).map(([dimension, mutate]) => ({
+    name: `QuadraticProgramTest.rejects_inconsistent_${dimension.replaceAll(' ', '_')}`,
+    async run(api: PdlpApi) {
+      const qp = new api.Pdlp.QuadraticProgram();
+      qp.resizeAndInitialize(2, 1);
+      mutate(qp);
+      let message = '';
+      try { await api.Pdlp.validateQuadraticProgramDimensions(qp); }
+      catch (error) { message = error instanceof Error ? error.message : String(error); }
+      assert(message.includes('Inconsistent dimensions'), `expected native dimension error for ${dimension}, received: ${message}`);
+    },
+  })),
+  {
+    name: 'QuadraticProgramTest.solve_rejects_inconsistent_objective_dimensions',
+    async run(api) {
+      const qp = new api.Pdlp.QuadraticProgram();
+      qp.resizeAndInitialize(2, 0);
+      qp.objectiveVector = [1];
+      const result = await api.Pdlp.solve(qp);
+      assert(result.solveLog.terminationReason === 'TERMINATION_REASON_INVALID_PROBLEM', 'solve must reject malformed dimensions instead of padding the model');
+    },
+  },
+  {
+    name: 'QuadraticProgramTest.diagonal_only_infers_variable_dimensions',
+    async run(api) {
+      const qp = new api.Pdlp.QuadraticProgram({ objectiveMatrixDiagonal: [2, 4] });
+      assert(qp.objectiveVector.length === 2 && qp.variableLowerBounds.length === 2 && qp.variableUpperBounds.length === 2,
+        'A diagonal-only objective infers two variables and their default vectors');
+      await api.Pdlp.validateQuadraticProgramDimensions(qp);
+      assert(!(await api.Pdlp.isLinearProgram(qp)), 'Native validation receives the quadratic diagonal');
+      const result = await api.Pdlp.solve(qp);
+      assert(result.solveLog.terminationReason === 'TERMINATION_REASON_OPTIMAL' && result.primalSolution.length === 2
+        && result.primalSolution.every(value => Math.abs(value) < 1e-5), 'Native unconstrained quadratic optimum is zero');
+      const malformed = new api.Pdlp.QuadraticProgram({ objectiveMatrixDiagonal: [2, 4], objectiveVector: [0] });
+      let message = '';
+      try { await api.Pdlp.validateQuadraticProgramDimensions(malformed); } catch (error) { message = String(error); }
+      assert(message.includes('Inconsistent dimensions'), 'Explicit mismatched vectors still reach native dimension validation');
+    },
+  },
+  {
     name: 'QuadraticProgramTest.test_validate_quadratic_program_dimensions_for_empty_qp',
     async run(api) {
       const qp = new api.Pdlp.QuadraticProgram();
@@ -666,15 +756,72 @@ function pdlpCaseId(name: string): string {
     .toLowerCase()}`;
 }
 
+// Python accepts these exact native protobuf controls and returns the full SolveLog.
+for (const [field, reason] of [
+  ['timeSecLimit', 'TERMINATION_REASON_TIME_LIMIT'],
+  ['kktMatrixPassLimit', 'TERMINATION_REASON_KKT_MATRIX_PASS_LIMIT'],
+] as const) {
+  pdlpCaseDefinitions.push({
+    name: `PrimalDualHybridGradientTest.native_${field}_zero`,
+    async run(api) {
+      const result = await api.Pdlp.solve(tinyLp(api), {
+        terminationCriteria: { [field]: 0 },
+        terminationCheckFrequency: 1,
+        presolveOptions: { useGlop: false },
+      });
+      assert(result.solveLog.terminationReason === reason,
+        `${field}: expected ${reason}, got ${result.solveLog.terminationReason}`);
+      assert(result.solveLog.iterationCount === 0, `${field}: expected no iterations`);
+      assert(result.solveLog.params?.terminationCriteria?.[field] === 0,
+        `${field}: native SolveLog must preserve explicit zero`);
+    },
+  });
+}
+pdlpCaseDefinitions.push({
+  name: 'PrimalDualHybridGradientTest.full_native_solve_log',
+  async run(api) {
+    const result = await api.Pdlp.solve(tinyLp(api), {
+      recordIterationStats: true,
+      terminationCheckFrequency: 1,
+      presolveOptions: { useGlop: false },
+      terminationCriteria: { simpleOptimalityCriteria: { epsOptimalAbsolute: 1e-8, epsOptimalRelative: 0 } },
+    });
+    assert(result.solveLog.terminationReason === 'TERMINATION_REASON_OPTIMAL', 'full log solve must be optimal');
+    assert((result.solveLog.iterationStats?.length ?? 0) > 1, 'recordIterationStats must record actual iterations');
+    assert(result.solveLog.params?.presolveOptions?.useGlop === false, 'native log preserves explicit false');
+    assert(result.solveLog.params?.terminationCriteria?.timeSecLimit === Infinity, 'native log preserves unlimited default time');
+    assert((result.solveLog.solveTimeSec ?? -1) >= 0, 'native log contains solve timing');
+    const convergence = result.solveLog.solutionStats?.convergenceInformation ?? [];
+    assert(convergence.some(info => Math.abs((info.primalObjective ?? Infinity) + 1) < 1e-6),
+      'native log must report the solved LP objective -1');
+  },
+}, {
+  name: 'PrimalDualHybridGradientTest.invalid_native_time_limit',
+  async run(api) {
+    const result = await api.Pdlp.solve(tinyLp(api), { terminationCriteria: { timeSecLimit: -1 } });
+    assert(result.solveLog.terminationReason === 'TERMINATION_REASON_INVALID_PARAMETER',
+      'negative native time limit must be rejected by PDLP');
+  },
+});
+
 const pdlpCases: PdlpCase[] = pdlpCaseDefinitions.map((testCase) => ({
   id: pdlpCaseId(testCase.name),
   name: testCase.name,
   solver: 'pdlp',
-  source: testCase.name.startsWith('QuadraticProgramTest.')
-    ? 'ortools/pdlp/python/quadratic_program_test.py'
-    : 'ortools/pdlp/python/solve_test.py',
-  upstream: testCase.name,
-  tags: ['python-parity'],
+  source: testCase.name.includes('native_')
+    ? 'ortools/pdlp/solvers.proto; ortools/pdlp/solve_log.proto'
+    : testCase.name.includes('resize_resets_previous')
+    ? 'ortools/pdlp/quadratic_program.h'
+    : testCase.name.includes('inconsistent_')
+      ? 'ortools/pdlp/quadratic_program.cc'
+      : 'ortools/pdlp/python/pdlp_test.py',
+  upstream: testCase.name.includes('resize_resets_previous')
+    ? 'QuadraticProgram::ResizeAndInitialize'
+    : testCase.name.includes('inconsistent_')
+      ? 'ValidateQuadraticProgramDimensions'
+      : testCase.name,
+  tags: testCase.name.includes('resize_resets_previous') || testCase.name.includes('inconsistent_')
+    ? ['python-parity', 'gap-regression'] : ['python-parity'],
   async run(api) {
     await testCase.run(api);
     return {};

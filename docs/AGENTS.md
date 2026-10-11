@@ -9,12 +9,14 @@ This repo is aiming for Python API parity where it is practical, while still pre
 
 Do not remove or obscure the proto path while adding higher-level wrappers. The goal is to support both styles cleanly.
 
+Current feature expansion is limited to MathOpt and RCPSP. The library owns model builders, typed serialization/results, native lifetimes and cross-runtime execution; upstream owns optimization, search, numerical accounting and native format conversion. Keep required native access hooks minimal. Separate demonstrated upstream bug fixes from integration hooks, preserve reproductions and document observable differences. Do not implement missing backend algorithms to fill a wrapper gap. See the current binding-scope audit in `tests/GAPS.MD`; historical completion notes do not supersede it.
+
 ## API Surface
 
 When adding or changing solver functionality, check the public API entry points as well as implementation files. In particular:
 
 - Update high-level wrapper files such as `javascript/lib/cp_sat/high_level_api.ts` when adding Python-like behavior.
-- Update the solver subpath exports (for example, `javascript/lib/cp-sat.ts`) and `javascript/lib/index.ts` so new public classes, helpers, enums, and types are reachable.
+- Update the solver subpath exports (for example, `javascript/lib/cp-sat.ts`) so new public classes, helpers, enums, and types are reachable. Keep the root `javascript/lib/index.ts` focused on package metadata/cloud exports according to its existing contract.
 - Check generated API files and generator scripts when the missing surface belongs to generated protobuf or parameter types.
 - Keep names close to upstream Python concepts where that helps parity, but use idiomatic TypeScript casing for public methods unless an existing pattern says otherwise.
 
@@ -39,7 +41,7 @@ Prefer targeted verification while iterating, such as `tsc --noEmit` or one focu
 
 ## Example Site
 
-Every solver exposed by the package should have its own example on the example site. Treat each solver as its own product surface. Current dedicated example-site coverage includes CP-SAT, Routing, MPSolver, MathOpt, Knapsack, Network Flow, Set Cover, and RCPSP; PDLP is covered by fixtures and should get a dedicated example-site path when its app-oriented example is added.
+Every solver exposed by the package should have its own example on the example site. Treat each solver as its own product surface. Current dedicated example-site coverage includes CP-SAT, Routing, MPSolver, MathOpt, Knapsack, Network Flow, Set Cover, RCPSP and PDLP (the `pdlp_import` example).
 
 When adding or materially expanding a solver API, add or update a site example that demonstrates that solver directly rather than relying only on tests. Examples should show model construction, solve invocation, status handling, and reading results.
 

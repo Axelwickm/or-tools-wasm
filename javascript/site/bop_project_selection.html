@@ -231,6 +231,9 @@ for (const project of projects) {
 objective.setMaximization();
 
 const status = await solver.solve({ executor: 'worker' });
+if (!await solver.verifySolution(1e-7, true, { executor: 'worker' })) {
+  throw new Error('Solution verification failed');
+}
 if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);</code></pre>
       </details>
     </div>

@@ -6,6 +6,8 @@ message MathOptSolveRequest {
   bytes solve_request_proto = 1;
   bool use_interrupter = 2;
   bool interrupt_at_start = 3;
+  optional bytes callback_registration_proto = 4;
+  bool stream_messages = 5;
 }
 
 message MathOptIncrementalCreateRequest {
@@ -18,10 +20,30 @@ message MathOptIncrementalSolveRequest {
   optional bytes model_update_proto = 3;
   bool use_interrupter = 4;
   bool interrupt_at_start = 5;
+  optional bytes callback_registration_proto = 6;
+  bool stream_messages = 7;
 }
 
 message MathOptIncrementalDeleteRequest {
   uint64 handle = 1;
+}
+
+message MathOptIncrementalUpdateRequest {
+  uint64 handle = 1;
+  bytes model_update_proto = 2;
+}
+
+message MathOptValidateResultRequest {
+  bytes solve_request_proto = 1;
+  bytes result_proto = 2;
+}
+
+message MathOptConvertResultRequest {
+  // Native PrimalSolution, DualSolution, Basis, PrimalRay, DualRay, Solution,
+  // ProblemStatus, ObjectiveBounds, SolveStats and Termination, respectively.
+  int32 kind = 1;
+  bytes model_proto = 2;
+  bytes input_proto = 3;
 }
 
 message MathOptBridgeRequest {
@@ -30,9 +52,27 @@ message MathOptBridgeRequest {
     MathOptIncrementalCreateRequest incremental_create = 2;
     MathOptIncrementalSolveRequest incremental_solve = 3;
     MathOptIncrementalDeleteRequest incremental_delete = 4;
+    bytes model_proto_to_mps = 5;
+    string mps_to_model_proto = 6;
+    bytes validate_model = 7;
+    MathOptValidateResultRequest validate_result = 8;
+    MathOptIncrementalUpdateRequest incremental_update = 9;
+    MathOptConvertResultRequest convert_result = 10;
   }
 }
 
 message MathOptBridgeResponse {
   bytes solve_response_proto = 1;
+  oneof conversion_result {
+    string mps = 2;
+    bytes model_proto = 3;
+    string validation_error = 4;
+    bytes validated_result_proto = 5;
+    bool update_applied = 6;
+  }
+}
+
+message MathOptLogEvent {
+  // Matches SolveResponse.messages so WASM can serialize native log-only batches.
+  repeated string messages = 2;
 }

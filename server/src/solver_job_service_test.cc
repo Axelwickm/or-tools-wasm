@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -229,6 +230,11 @@ void EventsAreOrderedAndCursorBased() {
   }
   const auto after = DecodeBatch(service.Events(EventsRequest(submitted.job_id(), previous)));
   ExpectEq(after.responses_size(), 0, "cursor excludes previously observed events");
+  const auto tail = DecodeBatch(service.Events(EventsRequest(submitted.job_id(), previous - 1)));
+  ExpectEq(tail.responses_size(), 1, "Cursor reads exactly the next entry");
+  ExpectEq(tail.responses(0).sequence_id(), previous, "Cursor addresses the expected entry");
+  const auto future = DecodeBatch(service.Events(EventsRequest(submitted.job_id(), std::numeric_limits<uint64_t>::max())));
+  ExpectEq(future.responses_size(), 0, "Future cursors do not overflow iterator offsets");
   release.Set();
   WaitForResult(&service, submitted.job_id());
 }
@@ -569,10 +575,109 @@ void DuplicateRegistrationPreservesExecutor() {
            "rejected registration preserves the original executor");
 }
 
+bridge::SolverBridgeResponse WaitForCallback(SolverJobService* service, uint64_t job_id) {
+  const auto deadline = std::chrono::steady_clock::now() + 2s;
+  while (std::chrono::steady_clock::now() < deadline) {
+    bridge::SolverEventBatch batch;
+    batch.ParseFromString(service->Events(EventsRequest(job_id)).body);
+    for (const auto& response : batch.responses()) if (response.has_callback_request()) return response;
+    std::this_thread::sleep_for(1ms);
+  }
+  throw TestFailure("Callback event did not arrive");
+}
+
+void CallbackRepliesAreCorrelatedAndCancellationWakesWaiters() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
+  std::atomic<int> interrupted = 0;
+  service.Register(std::make_unique<FakeExecutor>([&](const SolverExecutorRequest& request, const JobContext& context, const SolverEventSink&) {
+    auto cancellation = context.OnCancellation([&] { ++interrupted; });
+    const auto reply = request.callback("native-data");
+    return SolverExecutorResult{true, reply.value_or("stopped"), {}};
+  }));
+  const auto submitted = SubmitJob(&service);
+  const auto callback = WaitForCallback(&service, submitted.job_id());
+  Expect(callback.callback_request().payload() == "native-data", "Callback data delivered through event log");
+  bridge::SolverBridgeRequest input;
+  input.set_request_id(7); input.set_solver("fake");
+  input.mutable_callback_reply()->set_callback_id(callback.callback_request().callback_id() + 1);
+  input.mutable_callback_reply()->set_payload("native-reply");
+  auto reply_request = JobRequest(submitted.job_id()); reply_request.body = input.SerializeAsString();
+  ExpectEq(service.Callback(reply_request).status, 409, "Unknown callback ID rejects");
+  input.mutable_callback_reply()->set_callback_id(callback.callback_request().callback_id());
+  input.set_request_id(99); reply_request.body = input.SerializeAsString();
+  ExpectEq(service.Callback(reply_request).status, 400, "Reply from a different request rejects");
+  input.set_request_id(7); reply_request.body = input.SerializeAsString();
+  ExpectEq(service.Callback(reply_request).status, 200, "Matching callback reply accepted");
+  ExpectEq(service.Callback(reply_request).status, 409, "Duplicate callback reply rejects");
+  Expect(WaitForResult(&service, submitted.job_id()).result_payload() == "native-reply", "Native execution receives callback reply");
+  const auto cancelled = SubmitJob(&service);
+  WaitForCallback(&service, cancelled.job_id());
+  ExpectEq(service.Cancel(CancelRequest(cancelled.job_id())).status, 200, "Waiting callback job can be cancelled");
+  Expect(WaitForResult(&service, cancelled.job_id()).has_failure() && interrupted == 1,
+    "Cancellation wakes callback wait and native interruption registration");
+  const auto cancelled_history = DecodeBatch(service.Events(EventsRequest(cancelled.job_id())));
+  for (const auto& response : cancelled_history.responses()) {
+    Expect(!response.has_callback_request(), "Cancelled callback payload is released");
+  }
+}
+
+void AcknowledgedCallbackPayloadsAreReleasedWhileJobRuns() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest& request, const JobContext&, const SolverEventSink& emit_event) {
+        emit_event("ordinary-event");
+        for (int index = 0; index < 16; ++index) {
+          if (!request.callback(std::string(1024 * 1024, 'x'))) break;
+        }
+        return SolverExecutorResult{true, "finished", {}};
+      }));
+  const auto submitted = SubmitJob(&service);
+  uint64_t previous = submitted.sequence_id();
+  for (int index = 0; index < 16; ++index) {
+    const auto callback = WaitForCallback(&service, submitted.job_id());
+    Expect(callback.sequence_id() > previous, "Each new callback advances the cursor");
+    ExpectEq(callback.callback_request().payload().size(), size_t{1024 * 1024}, "Pending callback data is preserved");
+    bridge::SolverBridgeRequest input;
+    input.set_request_id(7);
+    input.set_solver("fake");
+    input.mutable_callback_reply()->set_callback_id(callback.callback_request().callback_id());
+    input.mutable_callback_reply()->set_payload("reply");
+    auto reply_request = JobRequest(submitted.job_id());
+    reply_request.body = input.SerializeAsString();
+    ExpectEq(service.Callback(reply_request).status, 200, "Callback reply acknowledged");
+
+    const auto history = DecodeBatch(service.Events(EventsRequest(submitted.job_id())));
+    Expect(history.ByteSizeLong() < 1024 * 1024 + 4096, "History retains at most the next pending solution vector");
+    bool metadata = false;
+    bool ordinary_event = false;
+    for (const auto& response : history.responses()) {
+      if (response.sequence_id() == callback.sequence_id()) {
+        metadata = response.request_id() == 7 && response.solver() == "fake" &&
+                   response.job_id() == submitted.job_id() &&
+                   response.payload_case() == bridge::SolverBridgeResponse::PAYLOAD_NOT_SET;
+      }
+      if (response.sequence_id() <= callback.sequence_id()) {
+        Expect(!response.has_callback_request(), "Acknowledged callbacks cannot replay");
+      }
+      ordinary_event |= response.event_payload() == "ordinary-event";
+    }
+    Expect(metadata, "Acknowledged callback keeps sequence and correlation metadata");
+    Expect(ordinary_event, "Ordinary event history is unchanged");
+    previous = callback.sequence_id();
+  }
+  ExpectEq(WaitForResult(&service, submitted.job_id()).result_payload(), std::string("finished"), "Job completes after all callbacks");
+  const auto remaining = DecodeBatch(service.Events(EventsRequest(submitted.job_id(), previous)));
+  Expect(remaining.ByteSizeLong() < 4096, "Old cursor reaches terminal events without retained solutions");
+}
+
 using TestFn = void (*)();
 
 int RunAllTests() {
   const std::vector<std::pair<std::string, TestFn>> tests = {
+      {"AcknowledgedCallbackPayloadsAreReleasedWhileJobRuns", AcknowledgedCallbackPayloadsAreReleasedWhileJobRuns},
+      {"CallbackRepliesAreCorrelatedAndCancellationWakesWaiters", CallbackRepliesAreCorrelatedAndCancellationWakesWaiters},
       {"DuplicateRegistrationPreservesExecutor", DuplicateRegistrationPreservesExecutor},
       {"StatusIsSnapshotAndDoesNotConsumeEvents", StatusIsSnapshotAndDoesNotConsumeEvents},
       {"EventsAreOrderedAndCursorBased", EventsAreOrderedAndCursorBased},

@@ -28,7 +28,7 @@ type RoutingModelLike = {
   start(vehicle: number): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): Promise<bigint>;
   status(): number;
   addDimension?: (
     transitCallbackIndex: number,
@@ -134,23 +134,6 @@ function extractDimensionSuccess(result: [number, boolean] | number | undefined)
     return result;
   }
   return [typeof result === 'number' ? result : -1, result !== undefined];
-}
-
-function inspectTspRoute(
-  manager: RoutingIndexManagerLike,
-  routing: RoutingModelLike,
-  assignment: RoutingAssignmentLike,
-) {
-  const route: number[] = [];
-  let index = routing.start(0);
-  let routeDistance = 0n;
-  while (!routing.isEnd(index)) {
-    const next = assignment.value(routing.nextVar(index));
-    route.push(manager.indexToNode(next));
-    routeDistance += routing.getArcCostForVehicle(index, next, 0);
-    index = next;
-  }
-  return { routeDistance, route };
 }
 
 function inspectDimensionCumul(

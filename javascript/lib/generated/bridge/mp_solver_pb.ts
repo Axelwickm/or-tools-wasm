@@ -2,15 +2,15 @@
 // @generated from file mp_solver.proto (package ortools_wasm.bridge.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file mp_solver.proto.
  */
 export const file_mp_solver: GenFile = /*@__PURE__*/
-  fileDesc("Cg9tcF9zb2x2ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEimQEKFE1wU29sdmVyU29sdmVSZXF1ZXN0EhUKDXJlcXVlc3RfcHJvdG8YASABKAwSEwoLbnVtX3RocmVhZHMYAiABKAUSFQoNaW50ZXJydXB0aWJsZRgDIAEoCBI+CgpwYXJhbWV0ZXJzGAQgASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclBhcmFtZXRlcnMiqwIKEk1wU29sdmVyUGFyYW1ldGVycxJTCg1kb3VibGVfcGFyYW1zGAEgAygLMjwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclBhcmFtZXRlcnMuRG91YmxlUGFyYW1zRW50cnkSVQoOaW50ZWdlcl9wYXJhbXMYAiADKAsyPS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyUGFyYW1ldGVycy5JbnRlZ2VyUGFyYW1zRW50cnkaMwoRRG91YmxlUGFyYW1zRW50cnkSCwoDa2V5GAEgASgFEg0KBXZhbHVlGAIgASgBOgI4ARo0ChJJbnRlZ2VyUGFyYW1zRW50cnkSCwoDa2V5GAEgASgFEg0KBXZhbHVlGAIgASgFOgI4ASIXChVNcFNvbHZlclNjaGVtYVJlcXVlc3QiYQoUTXBTb2x2ZXJTY2hlbWFSZXN1bHQSIgoabGluZWFyX3NvbHZlcl9wcm90b19zY2hlbWEYASABKAkSJQodb3B0aW9uYWxfYm9vbGVhbl9wcm90b19zY2hlbWEYAiABKAkiogEKFU1wU29sdmVyQnJpZGdlUmVxdWVzdBI9CgVzb2x2ZRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTb2x2ZVJlcXVlc3RIABI/CgZzY2hlbWEYAiABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyU2NoZW1hUmVxdWVzdEgAQgkKB3BheWxvYWQifQoWTXBTb2x2ZXJCcmlkZ2VSZXNwb25zZRIYCg5yZXNwb25zZV9wcm90bxgBIAEoDEgAEj4KBnNjaGVtYRgCIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTY2hlbWFSZXN1bHRIAEIJCgdwYXlsb2FkYgZwcm90bzM");
+  fileDesc("Cg9tcF9zb2x2ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEizQEKFE1wU29sdmVyU29sdmVSZXF1ZXN0EhUKDXJlcXVlc3RfcHJvdG8YASABKAwSEwoLbnVtX3RocmVhZHMYAiABKAUSFQoNaW50ZXJydXB0aWJsZRgDIAEoCBI+CgpwYXJhbWV0ZXJzGAQgASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclBhcmFtZXRlcnMSFwoPc3RyZWFtX21lc3NhZ2VzGAUgASgIEhkKEWVkaXRhYmxlX3NuYXBzaG90GAYgASgIIqsCChJNcFNvbHZlclBhcmFtZXRlcnMSUwoNZG91YmxlX3BhcmFtcxgBIAMoCzI8Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJQYXJhbWV0ZXJzLkRvdWJsZVBhcmFtc0VudHJ5ElUKDmludGVnZXJfcGFyYW1zGAIgAygLMj0ub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclBhcmFtZXRlcnMuSW50ZWdlclBhcmFtc0VudHJ5GjMKEURvdWJsZVBhcmFtc0VudHJ5EgsKA2tleRgBIAEoBRINCgV2YWx1ZRgCIAEoAToCOAEaNAoSSW50ZWdlclBhcmFtc0VudHJ5EgsKA2tleRgBIAEoBRINCgV2YWx1ZRgCIAEoBToCOAEiFwoVTXBTb2x2ZXJTY2hlbWFSZXF1ZXN0IvYBChRNcFNvbHZlclNjaGVtYVJlc3VsdBIiChpsaW5lYXJfc29sdmVyX3Byb3RvX3NjaGVtYRgBIAEoCRIlCh1vcHRpb25hbF9ib29sZWFuX3Byb3RvX3NjaGVtYRgCIAEoCRJbChBiYWNrZW5kX3ZlcnNpb25zGAMgAygLMkEub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNjaGVtYVJlc3VsdC5CYWNrZW5kVmVyc2lvbnNFbnRyeRo2ChRCYWNrZW5kVmVyc2lvbnNFbnRyeRILCgNrZXkYASABKAUSDQoFdmFsdWUYAiABKAk6AjgBImgKGk1wU29sdmVySW1wb3J0TW9kZWxSZXF1ZXN0EhMKC21vZGVsX3Byb3RvGAEgASgMEhMKC3NvbHZlcl90eXBlGAIgASgFEgwKBG5hbWUYAyABKAkSEgoKa2VlcF9uYW1lcxgEIAEoCCJPChlNcFNvbHZlckltcG9ydE1vZGVsUmVzdWx0EhMKC21vZGVsX3Byb3RvGAEgASgMEg4KBnN0YXR1cxgCIAEoBRINCgVlcnJvchgDIAEoCSIzChxNcFNvbHZlclZhbGlkYXRlTW9kZWxSZXF1ZXN0EhMKC21vZGVsX3Byb3RvGAEgASgMIkwKIU1wU29sdmVyVmFsaWRhdGVQYXJhbWV0ZXJzUmVxdWVzdBITCgtzb2x2ZXJfdHlwZRgBIAEoBRISCgpwYXJhbWV0ZXJzGAIgASgJIogBCh1NcFNvbHZlclZlcmlmeVNvbHV0aW9uUmVxdWVzdBITCgttb2RlbF9wcm90bxgBIAEoDBIWCg5zb2x1dGlvbl9wcm90bxgCIAEoDBITCgtzb2x2ZXJfdHlwZRgDIAEoBRIRCgl0b2xlcmFuY2UYBCABKAESEgoKbG9nX2Vycm9ycxgFIAEoCCLAAQoaTXBTb2x2ZXJFeHBvcnRNb2RlbFJlcXVlc3QSEwoLbW9kZWxfcHJvdG8YASABKAwSSQoGZm9ybWF0GAIgASgOMjkub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlckV4cG9ydE1vZGVsUmVxdWVzdC5Gb3JtYXQSEQoJb2JmdXNjYXRlGAMgASgIEhQKDGZpeGVkX2Zvcm1hdBgEIAEoCCIZCgZGb3JtYXQSBgoCTFAQABIHCgNNUFMQASJdChlNcFNvbHZlckFjdGl2aXRpZXNSZXF1ZXN0EhMKC21vZGVsX3Byb3RvGAEgASgMEhYKDnNvbHV0aW9uX3Byb3RvGAIgASgMEhMKC3NvbHZlcl90eXBlGAMgASgFIi4KGE1wU29sdmVyQWN0aXZpdGllc1Jlc3VsdBISCgphY3Rpdml0aWVzGAEgAygBInIKG01wU29sdmVyTG9hZFNvbHV0aW9uUmVxdWVzdBITCgttb2RlbF9wcm90bxgBIAEoDBIWCg5zb2x1dGlvbl9wcm90bxgCIAEoDBITCgtzb2x2ZXJfdHlwZRgDIAEoBRIRCgl0b2xlcmFuY2UYBCABKAEiRAoaTXBTb2x2ZXJMb2FkU29sdXRpb25SZXN1bHQSDgoGbG9hZGVkGAEgASgIEhYKDnNvbHV0aW9uX3Byb3RvGAIgASgMIp4ECgxNcFNvbHZlckVkaXQSNwoEa2luZBgBIAEoDjIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJFZGl0LktpbmQSDQoFaW5kZXgYAiABKAUSEAoIdmFyaWFibGUYAyABKAUSDQoFZmlyc3QYBCABKAESDgoGc2Vjb25kGAUgASgBEgwKBGZsYWcYBiABKAgSDAoEbmFtZRgHIAEoCRIQCghoaW50X2lkcxgIIAMoBRITCgtoaW50X3ZhbHVlcxgJIAMoASLRAgoES2luZBIPCgtVTlNQRUNJRklFRBAAEhAKDEFERF9WQVJJQUJMRRABEhIKDkFERF9DT05TVFJBSU5UEAISEwoPVkFSSUFCTEVfQk9VTkRTEAMSFAoQVkFSSUFCTEVfSU5URUdFUhAEEhUKEVZBUklBQkxFX1BSSU9SSVRZEAUSFQoRQ09OU1RSQUlOVF9CT1VORFMQBhIaChZDT05TVFJBSU5UX0NPRUZGSUNJRU5UEAcSEwoPQ09OU1RSQUlOVF9MQVpZEAgSFAoQQ0xFQVJfQ09OU1RSQUlOVBAJEhkKFU9CSkVDVElWRV9DT0VGRklDSUVOVBAKEhQKEE9CSkVDVElWRV9PRkZTRVQQCxIXChNPQkpFQ1RJVkVfRElSRUNUSU9OEAwSEwoPQ0xFQVJfT0JKRUNUSVZFEA0SCQoFQ0xFQVIQDhIICgRISU5UEA8iNQocTXBTb2x2ZXJTZXNzaW9uQ3JlYXRlUmVxdWVzdBIVCg1yZXF1ZXN0X3Byb3RvGAEgASgMIpoCChlNcFNvbHZlclNlc3Npb25SdW5SZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoBBJICgZhY3Rpb24YAiABKA4yOC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyU2Vzc2lvblJ1blJlcXVlc3QuQWN0aW9uEjsKBXNvbHZlGAMgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNvbHZlUmVxdWVzdBIzCgVlZGl0cxgEIAMoCzIkLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJFZGl0IjEKBkFjdGlvbhIJCgVTT0xWRRAAEhEKDU5FWFRfU09MVVRJT04QARIJCgVSRVNFVBACIi0KG01wU29sdmVyU2Vzc2lvbkNsb3NlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQihwEKFU1wU29sdmVyU2Vzc2lvblJlc3VsdBIUCgxoYXNfc29sdXRpb24YASABKAgSFgoOcmVzcG9uc2VfcHJvdG8YAiABKAwSQAoIbWV0YWRhdGEYAyABKAsyLi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyTmF0aXZlTWV0YWRhdGEi8AcKFU1wU29sdmVyQnJpZGdlUmVxdWVzdBI9CgVzb2x2ZRgBIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTb2x2ZVJlcXVlc3RIABI/CgZzY2hlbWEYAiABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyU2NoZW1hUmVxdWVzdEgAEkoKDGltcG9ydF9tb2RlbBgDIAEoCzIyLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJJbXBvcnRNb2RlbFJlcXVlc3RIABJOCg52YWxpZGF0ZV9tb2RlbBgEIAEoCzI0Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJWYWxpZGF0ZU1vZGVsUmVxdWVzdEgAElgKE3ZhbGlkYXRlX3BhcmFtZXRlcnMYBSABKAsyOS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyVmFsaWRhdGVQYXJhbWV0ZXJzUmVxdWVzdEgAElAKD3ZlcmlmeV9zb2x1dGlvbhgGIAEoCzI1Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJWZXJpZnlTb2x1dGlvblJlcXVlc3RIABJOCg5zZXNzaW9uX2NyZWF0ZRgHIAEoCzI0Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTZXNzaW9uQ3JlYXRlUmVxdWVzdEgAEkgKC3Nlc3Npb25fcnVuGAggASgLMjEub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNlc3Npb25SdW5SZXF1ZXN0SAASTAoNc2Vzc2lvbl9jbG9zZRgJIAEoCzIzLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJTZXNzaW9uQ2xvc2VSZXF1ZXN0SAASOQoDaWlzGAogASgLMioub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlcklpc1JlcXVlc3RIABJKCgxleHBvcnRfbW9kZWwYCyABKAsyMi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyRXhwb3J0TW9kZWxSZXF1ZXN0SAASRwoKYWN0aXZpdGllcxgMIAEoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJBY3Rpdml0aWVzUmVxdWVzdEgAEkwKDWxvYWRfc29sdXRpb24YDSABKAsyMy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVyTG9hZFNvbHV0aW9uUmVxdWVzdEgAQgkKB3BheWxvYWQi0wEKFk1wU29sdmVyTmF0aXZlTWV0YWRhdGESFgoOc29sdmVyX3ZlcnNpb24YASABKAkSEgoKaXRlcmF0aW9ucxgCIAEoAxINCgVub2RlcxgDIAEoAxIdChV2YXJpYWJsZV9iYXNpc19zdGF0dXMYBCADKAUSHwoXY29uc3RyYWludF9iYXNpc19zdGF0dXMYBSADKAUSIwoWZXhhY3RfY29uZGl0aW9uX251bWJlchgGIAEoAUgAiAEBQhkKF19leGFjdF9jb25kaXRpb25fbnVtYmVyIrQFChZNcFNvbHZlckJyaWRnZVJlc3BvbnNlEkAKCG1ldGFkYXRhGAMgASgLMi4ub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlck5hdGl2ZU1ldGFkYXRhEhgKDnJlc3BvbnNlX3Byb3RvGAEgASgMSAASPgoGc2NoZW1hGAIgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNjaGVtYVJlc3VsdEgAEkkKDGltcG9ydF9tb2RlbBgEIAEoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJJbXBvcnRNb2RlbFJlc3VsdEgAEiAKFm1vZGVsX3ZhbGlkYXRpb25fZXJyb3IYBSABKAlIABIdChNwYXJhbWV0ZXJzX2FjY2VwdGVkGAYgASgISAASGwoRc29sdXRpb25fdmVyaWZpZWQYByABKAhIABIYCg5zZXNzaW9uX2hhbmRsZRgIIAEoBEgAEkcKDnNlc3Npb25fcmVzdWx0GAkgASgLMi0ub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlclNlc3Npb25SZXN1bHRIABI4CgNpaXMYCiABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1wU29sdmVySWlzUmVzdWx0SAASGAoOZXhwb3J0ZWRfbW9kZWwYCyABKAlIABJGCgphY3Rpdml0aWVzGAwgASgLMjAub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlckFjdGl2aXRpZXNSZXN1bHRIABJLCg1sb2FkX3NvbHV0aW9uGA0gASgLMjIub3J0b29sc193YXNtLmJyaWRnZS52MS5NcFNvbHZlckxvYWRTb2x1dGlvblJlc3VsdEgAQgkKB3BheWxvYWQiJAoQTXBTb2x2ZXJMb2dFdmVudBIQCghtZXNzYWdlcxgBIAMoCSLZAQoSTXBTb2x2ZXJJaXNSZXF1ZXN0EhMKC21vZGVsX3Byb3RvGAEgASgMEhMKC3NvbHZlcl90eXBlGAIgASgFEiIKGnNvbHZlcl9zcGVjaWZpY19wYXJhbWV0ZXJzGAMgASgJEh8KEnRpbWVfbGltaXRfc2Vjb25kcxgEIAEoAUgAiAEBEhcKCm5vZGVfbGltaXQYBSABKANIAYgBARIVCg1pbnRlcnJ1cHRpYmxlGAYgASgIQhUKE190aW1lX2xpbWl0X3NlY29uZHNCDQoLX25vZGVfbGltaXQibwoZTXBTb2x2ZXJJaXNWYXJpYWJsZUJvdW5kcxIWCg52YXJpYWJsZV9pbmRleBgBIAEoBRIcChRsb3dlcl9ib3VuZF9pbmNsdWRlZBgCIAEoCBIcChR1cHBlcl9ib3VuZF9pbmNsdWRlZBgDIAEoCCLPAQoRTXBTb2x2ZXJJaXNSZXN1bHQSFQoNaXNfaW5mZWFzaWJsZRgBIAEoCBIWCg5pc19pcnJlZHVjaWJsZRgCIAEoCBIUCgx0aW1lX3NlY29uZHMYAyABKAESDQoFbm9kZXMYBCABKAMSGgoSY29uc3RyYWludF9pbmRpY2VzGAUgAygFEkoKD3ZhcmlhYmxlX2JvdW5kcxgGIAMoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTXBTb2x2ZXJJaXNWYXJpYWJsZUJvdW5kc2IGcHJvdG8z");
 
 /**
  * The nested payloads retain their existing OR-Tools protobuf types:
@@ -39,6 +39,19 @@ export type MpSolverSolveRequest = Message<"ortools_wasm.bridge.v1.MpSolverSolve
    * @generated from field: ortools_wasm.bridge.v1.MpSolverParameters parameters = 4;
    */
   parameters?: MpSolverParameters | undefined;
+
+  /**
+   * @generated from field: bool stream_messages = 5;
+   */
+  streamMessages: boolean;
+
+  /**
+   * Editable construction preserves free rows and original row indices.
+   * Explicit proto operations retain native import normalization.
+   *
+   * @generated from field: bool editable_snapshot = 6;
+   */
+  editableSnapshot: boolean;
 };
 
 /**
@@ -68,6 +81,19 @@ export type MpSolverSolveRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.MpSolverParameters parameters = 4;
    */
   parameters?: MpSolverParametersJson;
+
+  /**
+   * @generated from field: bool stream_messages = 5;
+   */
+  streamMessages?: boolean;
+
+  /**
+   * Editable construction preserves free rows and original row indices.
+   * Explicit proto operations retain native import normalization.
+   *
+   * @generated from field: bool editable_snapshot = 6;
+   */
+  editableSnapshot?: boolean;
 };
 
 export type MpSolverSolveRequestValid = MpSolverSolveRequest;
@@ -152,6 +178,11 @@ export type MpSolverSchemaResult = Message<"ortools_wasm.bridge.v1.MpSolverSchem
    * @generated from field: string optional_boolean_proto_schema = 2;
    */
   optionalBooleanProtoSchema: string;
+
+  /**
+   * @generated from field: map<int32, string> backend_versions = 3;
+   */
+  backendVersions: { [key: number]: string };
 };
 
 /**
@@ -167,6 +198,11 @@ export type MpSolverSchemaResultJson = {
    * @generated from field: string optional_boolean_proto_schema = 2;
    */
   optionalBooleanProtoSchema?: string;
+
+  /**
+   * @generated from field: map<int32, string> backend_versions = 3;
+   */
+  backendVersions?: { [key: number]: string };
 };
 
 export type MpSolverSchemaResultValid = MpSolverSchemaResult;
@@ -177,6 +213,920 @@ export type MpSolverSchemaResultValid = MpSolverSchemaResult;
  */
 export const MpSolverSchemaResultSchema: GenMessage<MpSolverSchemaResult, {jsonType: MpSolverSchemaResultJson, validType: MpSolverSchemaResultValid}> = /*@__PURE__*/
   messageDesc(file_mp_solver, 3);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverImportModelRequest
+ */
+export type MpSolverImportModelRequest = Message<"ortools_wasm.bridge.v1.MpSolverImportModelRequest"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: int32 solver_type = 2;
+   */
+  solverType: number;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * @generated from field: bool keep_names = 4;
+   */
+  keepNames: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverImportModelRequest
+ */
+export type MpSolverImportModelRequestJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: int32 solver_type = 2;
+   */
+  solverType?: number;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name?: string;
+
+  /**
+   * @generated from field: bool keep_names = 4;
+   */
+  keepNames?: boolean;
+};
+
+export type MpSolverImportModelRequestValid = MpSolverImportModelRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverImportModelRequest.
+ * Use `create(MpSolverImportModelRequestSchema)` to create a new message.
+ */
+export const MpSolverImportModelRequestSchema: GenMessage<MpSolverImportModelRequest, {jsonType: MpSolverImportModelRequestJson, validType: MpSolverImportModelRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 4);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverImportModelResult
+ */
+export type MpSolverImportModelResult = Message<"ortools_wasm.bridge.v1.MpSolverImportModelResult"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: int32 status = 2;
+   */
+  status: number;
+
+  /**
+   * @generated from field: string error = 3;
+   */
+  error: string;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverImportModelResult
+ */
+export type MpSolverImportModelResultJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: int32 status = 2;
+   */
+  status?: number;
+
+  /**
+   * @generated from field: string error = 3;
+   */
+  error?: string;
+};
+
+export type MpSolverImportModelResultValid = MpSolverImportModelResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverImportModelResult.
+ * Use `create(MpSolverImportModelResultSchema)` to create a new message.
+ */
+export const MpSolverImportModelResultSchema: GenMessage<MpSolverImportModelResult, {jsonType: MpSolverImportModelResultJson, validType: MpSolverImportModelResultValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 5);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverValidateModelRequest
+ */
+export type MpSolverValidateModelRequest = Message<"ortools_wasm.bridge.v1.MpSolverValidateModelRequest"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverValidateModelRequest
+ */
+export type MpSolverValidateModelRequestJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+};
+
+export type MpSolverValidateModelRequestValid = MpSolverValidateModelRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverValidateModelRequest.
+ * Use `create(MpSolverValidateModelRequestSchema)` to create a new message.
+ */
+export const MpSolverValidateModelRequestSchema: GenMessage<MpSolverValidateModelRequest, {jsonType: MpSolverValidateModelRequestJson, validType: MpSolverValidateModelRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 6);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverValidateParametersRequest
+ */
+export type MpSolverValidateParametersRequest = Message<"ortools_wasm.bridge.v1.MpSolverValidateParametersRequest"> & {
+  /**
+   * @generated from field: int32 solver_type = 1;
+   */
+  solverType: number;
+
+  /**
+   * @generated from field: string parameters = 2;
+   */
+  parameters: string;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverValidateParametersRequest
+ */
+export type MpSolverValidateParametersRequestJson = {
+  /**
+   * @generated from field: int32 solver_type = 1;
+   */
+  solverType?: number;
+
+  /**
+   * @generated from field: string parameters = 2;
+   */
+  parameters?: string;
+};
+
+export type MpSolverValidateParametersRequestValid = MpSolverValidateParametersRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverValidateParametersRequest.
+ * Use `create(MpSolverValidateParametersRequestSchema)` to create a new message.
+ */
+export const MpSolverValidateParametersRequestSchema: GenMessage<MpSolverValidateParametersRequest, {jsonType: MpSolverValidateParametersRequestJson, validType: MpSolverValidateParametersRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 7);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverVerifySolutionRequest
+ */
+export type MpSolverVerifySolutionRequest = Message<"ortools_wasm.bridge.v1.MpSolverVerifySolutionRequest"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto: Uint8Array;
+
+  /**
+   * @generated from field: int32 solver_type = 3;
+   */
+  solverType: number;
+
+  /**
+   * @generated from field: double tolerance = 4;
+   */
+  tolerance: number;
+
+  /**
+   * @generated from field: bool log_errors = 5;
+   */
+  logErrors: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverVerifySolutionRequest
+ */
+export type MpSolverVerifySolutionRequestJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto?: string;
+
+  /**
+   * @generated from field: int32 solver_type = 3;
+   */
+  solverType?: number;
+
+  /**
+   * @generated from field: double tolerance = 4;
+   */
+  tolerance?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: bool log_errors = 5;
+   */
+  logErrors?: boolean;
+};
+
+export type MpSolverVerifySolutionRequestValid = MpSolverVerifySolutionRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverVerifySolutionRequest.
+ * Use `create(MpSolverVerifySolutionRequestSchema)` to create a new message.
+ */
+export const MpSolverVerifySolutionRequestSchema: GenMessage<MpSolverVerifySolutionRequest, {jsonType: MpSolverVerifySolutionRequestJson, validType: MpSolverVerifySolutionRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 8);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverExportModelRequest
+ */
+export type MpSolverExportModelRequest = Message<"ortools_wasm.bridge.v1.MpSolverExportModelRequest"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverExportModelRequest.Format format = 2;
+   */
+  format: MpSolverExportModelRequest_Format;
+
+  /**
+   * @generated from field: bool obfuscate = 3;
+   */
+  obfuscate: boolean;
+
+  /**
+   * @generated from field: bool fixed_format = 4;
+   */
+  fixedFormat: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverExportModelRequest
+ */
+export type MpSolverExportModelRequestJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverExportModelRequest.Format format = 2;
+   */
+  format?: MpSolverExportModelRequest_FormatJson;
+
+  /**
+   * @generated from field: bool obfuscate = 3;
+   */
+  obfuscate?: boolean;
+
+  /**
+   * @generated from field: bool fixed_format = 4;
+   */
+  fixedFormat?: boolean;
+};
+
+export type MpSolverExportModelRequestValid = MpSolverExportModelRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverExportModelRequest.
+ * Use `create(MpSolverExportModelRequestSchema)` to create a new message.
+ */
+export const MpSolverExportModelRequestSchema: GenMessage<MpSolverExportModelRequest, {jsonType: MpSolverExportModelRequestJson, validType: MpSolverExportModelRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 9);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.MpSolverExportModelRequest.Format
+ */
+export enum MpSolverExportModelRequest_Format {
+  /**
+   * @generated from enum value: LP = 0;
+   */
+  LP = 0,
+
+  /**
+   * @generated from enum value: MPS = 1;
+   */
+  MPS = 1,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.MpSolverExportModelRequest.Format
+ */
+export type MpSolverExportModelRequest_FormatJson = "LP" | "MPS";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.MpSolverExportModelRequest.Format.
+ */
+export const MpSolverExportModelRequest_FormatSchema: GenEnum<MpSolverExportModelRequest_Format, MpSolverExportModelRequest_FormatJson> = /*@__PURE__*/
+  enumDesc(file_mp_solver, 9, 0);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverActivitiesRequest
+ */
+export type MpSolverActivitiesRequest = Message<"ortools_wasm.bridge.v1.MpSolverActivitiesRequest"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto: Uint8Array;
+
+  /**
+   * @generated from field: int32 solver_type = 3;
+   */
+  solverType: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverActivitiesRequest
+ */
+export type MpSolverActivitiesRequestJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto?: string;
+
+  /**
+   * @generated from field: int32 solver_type = 3;
+   */
+  solverType?: number;
+};
+
+export type MpSolverActivitiesRequestValid = MpSolverActivitiesRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverActivitiesRequest.
+ * Use `create(MpSolverActivitiesRequestSchema)` to create a new message.
+ */
+export const MpSolverActivitiesRequestSchema: GenMessage<MpSolverActivitiesRequest, {jsonType: MpSolverActivitiesRequestJson, validType: MpSolverActivitiesRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 10);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverActivitiesResult
+ */
+export type MpSolverActivitiesResult = Message<"ortools_wasm.bridge.v1.MpSolverActivitiesResult"> & {
+  /**
+   * @generated from field: repeated double activities = 1;
+   */
+  activities: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverActivitiesResult
+ */
+export type MpSolverActivitiesResultJson = {
+  /**
+   * @generated from field: repeated double activities = 1;
+   */
+  activities?: (number | "NaN" | "Infinity" | "-Infinity")[];
+};
+
+export type MpSolverActivitiesResultValid = MpSolverActivitiesResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverActivitiesResult.
+ * Use `create(MpSolverActivitiesResultSchema)` to create a new message.
+ */
+export const MpSolverActivitiesResultSchema: GenMessage<MpSolverActivitiesResult, {jsonType: MpSolverActivitiesResultJson, validType: MpSolverActivitiesResultValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 11);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverLoadSolutionRequest
+ */
+export type MpSolverLoadSolutionRequest = Message<"ortools_wasm.bridge.v1.MpSolverLoadSolutionRequest"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto: Uint8Array;
+
+  /**
+   * @generated from field: int32 solver_type = 3;
+   */
+  solverType: number;
+
+  /**
+   * @generated from field: double tolerance = 4;
+   */
+  tolerance: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverLoadSolutionRequest
+ */
+export type MpSolverLoadSolutionRequestJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto?: string;
+
+  /**
+   * @generated from field: int32 solver_type = 3;
+   */
+  solverType?: number;
+
+  /**
+   * @generated from field: double tolerance = 4;
+   */
+  tolerance?: number | "NaN" | "Infinity" | "-Infinity";
+};
+
+export type MpSolverLoadSolutionRequestValid = MpSolverLoadSolutionRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverLoadSolutionRequest.
+ * Use `create(MpSolverLoadSolutionRequestSchema)` to create a new message.
+ */
+export const MpSolverLoadSolutionRequestSchema: GenMessage<MpSolverLoadSolutionRequest, {jsonType: MpSolverLoadSolutionRequestJson, validType: MpSolverLoadSolutionRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 12);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverLoadSolutionResult
+ */
+export type MpSolverLoadSolutionResult = Message<"ortools_wasm.bridge.v1.MpSolverLoadSolutionResult"> & {
+  /**
+   * @generated from field: bool loaded = 1;
+   */
+  loaded: boolean;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverLoadSolutionResult
+ */
+export type MpSolverLoadSolutionResultJson = {
+  /**
+   * @generated from field: bool loaded = 1;
+   */
+  loaded?: boolean;
+
+  /**
+   * @generated from field: bytes solution_proto = 2;
+   */
+  solutionProto?: string;
+};
+
+export type MpSolverLoadSolutionResultValid = MpSolverLoadSolutionResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverLoadSolutionResult.
+ * Use `create(MpSolverLoadSolutionResultSchema)` to create a new message.
+ */
+export const MpSolverLoadSolutionResultSchema: GenMessage<MpSolverLoadSolutionResult, {jsonType: MpSolverLoadSolutionResultJson, validType: MpSolverLoadSolutionResultValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 13);
+
+/**
+ * Each edit mirrors an existing MPSolver/MPVariable/MPConstraint/MPObjective
+ * method. Edits are ordered so Clear and subsequent additions retain semantics.
+ *
+ * @generated from message ortools_wasm.bridge.v1.MpSolverEdit
+ */
+export type MpSolverEdit = Message<"ortools_wasm.bridge.v1.MpSolverEdit"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverEdit.Kind kind = 1;
+   */
+  kind: MpSolverEdit_Kind;
+
+  /**
+   * @generated from field: int32 index = 2;
+   */
+  index: number;
+
+  /**
+   * @generated from field: int32 variable = 3;
+   */
+  variable: number;
+
+  /**
+   * @generated from field: double first = 4;
+   */
+  first: number;
+
+  /**
+   * @generated from field: double second = 5;
+   */
+  second: number;
+
+  /**
+   * @generated from field: bool flag = 6;
+   */
+  flag: boolean;
+
+  /**
+   * @generated from field: string name = 7;
+   */
+  name: string;
+
+  /**
+   * @generated from field: repeated int32 hint_ids = 8;
+   */
+  hintIds: number[];
+
+  /**
+   * @generated from field: repeated double hint_values = 9;
+   */
+  hintValues: number[];
+};
+
+/**
+ * Each edit mirrors an existing MPSolver/MPVariable/MPConstraint/MPObjective
+ * method. Edits are ordered so Clear and subsequent additions retain semantics.
+ *
+ * @generated from message ortools_wasm.bridge.v1.MpSolverEdit
+ */
+export type MpSolverEditJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverEdit.Kind kind = 1;
+   */
+  kind?: MpSolverEdit_KindJson;
+
+  /**
+   * @generated from field: int32 index = 2;
+   */
+  index?: number;
+
+  /**
+   * @generated from field: int32 variable = 3;
+   */
+  variable?: number;
+
+  /**
+   * @generated from field: double first = 4;
+   */
+  first?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double second = 5;
+   */
+  second?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: bool flag = 6;
+   */
+  flag?: boolean;
+
+  /**
+   * @generated from field: string name = 7;
+   */
+  name?: string;
+
+  /**
+   * @generated from field: repeated int32 hint_ids = 8;
+   */
+  hintIds?: number[];
+
+  /**
+   * @generated from field: repeated double hint_values = 9;
+   */
+  hintValues?: (number | "NaN" | "Infinity" | "-Infinity")[];
+};
+
+export type MpSolverEditValid = MpSolverEdit;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverEdit.
+ * Use `create(MpSolverEditSchema)` to create a new message.
+ */
+export const MpSolverEditSchema: GenMessage<MpSolverEdit, {jsonType: MpSolverEditJson, validType: MpSolverEditValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 14);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.MpSolverEdit.Kind
+ */
+export enum MpSolverEdit_Kind {
+  /**
+   * @generated from enum value: UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ADD_VARIABLE = 1;
+   */
+  ADD_VARIABLE = 1,
+
+  /**
+   * @generated from enum value: ADD_CONSTRAINT = 2;
+   */
+  ADD_CONSTRAINT = 2,
+
+  /**
+   * @generated from enum value: VARIABLE_BOUNDS = 3;
+   */
+  VARIABLE_BOUNDS = 3,
+
+  /**
+   * @generated from enum value: VARIABLE_INTEGER = 4;
+   */
+  VARIABLE_INTEGER = 4,
+
+  /**
+   * @generated from enum value: VARIABLE_PRIORITY = 5;
+   */
+  VARIABLE_PRIORITY = 5,
+
+  /**
+   * @generated from enum value: CONSTRAINT_BOUNDS = 6;
+   */
+  CONSTRAINT_BOUNDS = 6,
+
+  /**
+   * @generated from enum value: CONSTRAINT_COEFFICIENT = 7;
+   */
+  CONSTRAINT_COEFFICIENT = 7,
+
+  /**
+   * @generated from enum value: CONSTRAINT_LAZY = 8;
+   */
+  CONSTRAINT_LAZY = 8,
+
+  /**
+   * @generated from enum value: CLEAR_CONSTRAINT = 9;
+   */
+  CLEAR_CONSTRAINT = 9,
+
+  /**
+   * @generated from enum value: OBJECTIVE_COEFFICIENT = 10;
+   */
+  OBJECTIVE_COEFFICIENT = 10,
+
+  /**
+   * @generated from enum value: OBJECTIVE_OFFSET = 11;
+   */
+  OBJECTIVE_OFFSET = 11,
+
+  /**
+   * @generated from enum value: OBJECTIVE_DIRECTION = 12;
+   */
+  OBJECTIVE_DIRECTION = 12,
+
+  /**
+   * @generated from enum value: CLEAR_OBJECTIVE = 13;
+   */
+  CLEAR_OBJECTIVE = 13,
+
+  /**
+   * @generated from enum value: CLEAR = 14;
+   */
+  CLEAR = 14,
+
+  /**
+   * @generated from enum value: HINT = 15;
+   */
+  HINT = 15,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.MpSolverEdit.Kind
+ */
+export type MpSolverEdit_KindJson = "UNSPECIFIED" | "ADD_VARIABLE" | "ADD_CONSTRAINT" | "VARIABLE_BOUNDS" | "VARIABLE_INTEGER" | "VARIABLE_PRIORITY" | "CONSTRAINT_BOUNDS" | "CONSTRAINT_COEFFICIENT" | "CONSTRAINT_LAZY" | "CLEAR_CONSTRAINT" | "OBJECTIVE_COEFFICIENT" | "OBJECTIVE_OFFSET" | "OBJECTIVE_DIRECTION" | "CLEAR_OBJECTIVE" | "CLEAR" | "HINT";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.MpSolverEdit.Kind.
+ */
+export const MpSolverEdit_KindSchema: GenEnum<MpSolverEdit_Kind, MpSolverEdit_KindJson> = /*@__PURE__*/
+  enumDesc(file_mp_solver, 14, 0);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionCreateRequest
+ */
+export type MpSolverSessionCreateRequest = Message<"ortools_wasm.bridge.v1.MpSolverSessionCreateRequest"> & {
+  /**
+   * @generated from field: bytes request_proto = 1;
+   */
+  requestProto: Uint8Array;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionCreateRequest
+ */
+export type MpSolverSessionCreateRequestJson = {
+  /**
+   * @generated from field: bytes request_proto = 1;
+   */
+  requestProto?: string;
+};
+
+export type MpSolverSessionCreateRequestValid = MpSolverSessionCreateRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverSessionCreateRequest.
+ * Use `create(MpSolverSessionCreateRequestSchema)` to create a new message.
+ */
+export const MpSolverSessionCreateRequestSchema: GenMessage<MpSolverSessionCreateRequest, {jsonType: MpSolverSessionCreateRequestJson, validType: MpSolverSessionCreateRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 15);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionRunRequest
+ */
+export type MpSolverSessionRunRequest = Message<"ortools_wasm.bridge.v1.MpSolverSessionRunRequest"> & {
+  /**
+   * @generated from field: uint64 handle = 1;
+   */
+  handle: bigint;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionRunRequest.Action action = 2;
+   */
+  action: MpSolverSessionRunRequest_Action;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSolveRequest solve = 3;
+   */
+  solve?: MpSolverSolveRequest | undefined;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.MpSolverEdit edits = 4;
+   */
+  edits: MpSolverEdit[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionRunRequest
+ */
+export type MpSolverSessionRunRequestJson = {
+  /**
+   * @generated from field: uint64 handle = 1;
+   */
+  handle?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionRunRequest.Action action = 2;
+   */
+  action?: MpSolverSessionRunRequest_ActionJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSolveRequest solve = 3;
+   */
+  solve?: MpSolverSolveRequestJson;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.MpSolverEdit edits = 4;
+   */
+  edits?: MpSolverEditJson[];
+};
+
+export type MpSolverSessionRunRequestValid = MpSolverSessionRunRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverSessionRunRequest.
+ * Use `create(MpSolverSessionRunRequestSchema)` to create a new message.
+ */
+export const MpSolverSessionRunRequestSchema: GenMessage<MpSolverSessionRunRequest, {jsonType: MpSolverSessionRunRequestJson, validType: MpSolverSessionRunRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 16);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.MpSolverSessionRunRequest.Action
+ */
+export enum MpSolverSessionRunRequest_Action {
+  /**
+   * @generated from enum value: SOLVE = 0;
+   */
+  SOLVE = 0,
+
+  /**
+   * @generated from enum value: NEXT_SOLUTION = 1;
+   */
+  NEXT_SOLUTION = 1,
+
+  /**
+   * @generated from enum value: RESET = 2;
+   */
+  RESET = 2,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.MpSolverSessionRunRequest.Action
+ */
+export type MpSolverSessionRunRequest_ActionJson = "SOLVE" | "NEXT_SOLUTION" | "RESET";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.MpSolverSessionRunRequest.Action.
+ */
+export const MpSolverSessionRunRequest_ActionSchema: GenEnum<MpSolverSessionRunRequest_Action, MpSolverSessionRunRequest_ActionJson> = /*@__PURE__*/
+  enumDesc(file_mp_solver, 16, 0);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionCloseRequest
+ */
+export type MpSolverSessionCloseRequest = Message<"ortools_wasm.bridge.v1.MpSolverSessionCloseRequest"> & {
+  /**
+   * @generated from field: uint64 handle = 1;
+   */
+  handle: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionCloseRequest
+ */
+export type MpSolverSessionCloseRequestJson = {
+  /**
+   * @generated from field: uint64 handle = 1;
+   */
+  handle?: string;
+};
+
+export type MpSolverSessionCloseRequestValid = MpSolverSessionCloseRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverSessionCloseRequest.
+ * Use `create(MpSolverSessionCloseRequestSchema)` to create a new message.
+ */
+export const MpSolverSessionCloseRequestSchema: GenMessage<MpSolverSessionCloseRequest, {jsonType: MpSolverSessionCloseRequestJson, validType: MpSolverSessionCloseRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 17);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionResult
+ */
+export type MpSolverSessionResult = Message<"ortools_wasm.bridge.v1.MpSolverSessionResult"> & {
+  /**
+   * @generated from field: bool has_solution = 1;
+   */
+  hasSolution: boolean;
+
+  /**
+   * @generated from field: bytes response_proto = 2;
+   */
+  responseProto: Uint8Array;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverNativeMetadata metadata = 3;
+   */
+  metadata?: MpSolverNativeMetadata | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverSessionResult
+ */
+export type MpSolverSessionResultJson = {
+  /**
+   * @generated from field: bool has_solution = 1;
+   */
+  hasSolution?: boolean;
+
+  /**
+   * @generated from field: bytes response_proto = 2;
+   */
+  responseProto?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverNativeMetadata metadata = 3;
+   */
+  metadata?: MpSolverNativeMetadataJson;
+};
+
+export type MpSolverSessionResultValid = MpSolverSessionResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverSessionResult.
+ * Use `create(MpSolverSessionResultSchema)` to create a new message.
+ */
+export const MpSolverSessionResultSchema: GenMessage<MpSolverSessionResult, {jsonType: MpSolverSessionResultJson, validType: MpSolverSessionResultValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 18);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MpSolverBridgeRequest
@@ -197,6 +1147,72 @@ export type MpSolverBridgeRequest = Message<"ortools_wasm.bridge.v1.MpSolverBrid
      */
     value: MpSolverSchemaRequest;
     case: "schema";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverImportModelRequest import_model = 3;
+     */
+    value: MpSolverImportModelRequest;
+    case: "importModel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverValidateModelRequest validate_model = 4;
+     */
+    value: MpSolverValidateModelRequest;
+    case: "validateModel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverValidateParametersRequest validate_parameters = 5;
+     */
+    value: MpSolverValidateParametersRequest;
+    case: "validateParameters";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverVerifySolutionRequest verify_solution = 6;
+     */
+    value: MpSolverVerifySolutionRequest;
+    case: "verifySolution";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionCreateRequest session_create = 7;
+     */
+    value: MpSolverSessionCreateRequest;
+    case: "sessionCreate";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionRunRequest session_run = 8;
+     */
+    value: MpSolverSessionRunRequest;
+    case: "sessionRun";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionCloseRequest session_close = 9;
+     */
+    value: MpSolverSessionCloseRequest;
+    case: "sessionClose";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverIisRequest iis = 10;
+     */
+    value: MpSolverIisRequest;
+    case: "iis";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverExportModelRequest export_model = 11;
+     */
+    value: MpSolverExportModelRequest;
+    case: "exportModel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverActivitiesRequest activities = 12;
+     */
+    value: MpSolverActivitiesRequest;
+    case: "activities";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverLoadSolutionRequest load_solution = 13;
+     */
+    value: MpSolverLoadSolutionRequest;
+    case: "loadSolution";
   } | { case: undefined; value?: undefined };
 };
 
@@ -213,6 +1229,61 @@ export type MpSolverBridgeRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.MpSolverSchemaRequest schema = 2;
    */
   schema?: MpSolverSchemaRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverImportModelRequest import_model = 3;
+   */
+  importModel?: MpSolverImportModelRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverValidateModelRequest validate_model = 4;
+   */
+  validateModel?: MpSolverValidateModelRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverValidateParametersRequest validate_parameters = 5;
+   */
+  validateParameters?: MpSolverValidateParametersRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverVerifySolutionRequest verify_solution = 6;
+   */
+  verifySolution?: MpSolverVerifySolutionRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionCreateRequest session_create = 7;
+   */
+  sessionCreate?: MpSolverSessionCreateRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionRunRequest session_run = 8;
+   */
+  sessionRun?: MpSolverSessionRunRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionCloseRequest session_close = 9;
+   */
+  sessionClose?: MpSolverSessionCloseRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverIisRequest iis = 10;
+   */
+  iis?: MpSolverIisRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverExportModelRequest export_model = 11;
+   */
+  exportModel?: MpSolverExportModelRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverActivitiesRequest activities = 12;
+   */
+  activities?: MpSolverActivitiesRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverLoadSolutionRequest load_solution = 13;
+   */
+  loadSolution?: MpSolverLoadSolutionRequestJson;
 };
 
 export type MpSolverBridgeRequestValid = MpSolverBridgeRequest;
@@ -222,12 +1293,96 @@ export type MpSolverBridgeRequestValid = MpSolverBridgeRequest;
  * Use `create(MpSolverBridgeRequestSchema)` to create a new message.
  */
 export const MpSolverBridgeRequestSchema: GenMessage<MpSolverBridgeRequest, {jsonType: MpSolverBridgeRequestJson, validType: MpSolverBridgeRequestValid}> = /*@__PURE__*/
-  messageDesc(file_mp_solver, 4);
+  messageDesc(file_mp_solver, 19);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverNativeMetadata
+ */
+export type MpSolverNativeMetadata = Message<"ortools_wasm.bridge.v1.MpSolverNativeMetadata"> & {
+  /**
+   * @generated from field: string solver_version = 1;
+   */
+  solverVersion: string;
+
+  /**
+   * @generated from field: int64 iterations = 2;
+   */
+  iterations: bigint;
+
+  /**
+   * @generated from field: int64 nodes = 3;
+   */
+  nodes: bigint;
+
+  /**
+   * @generated from field: repeated int32 variable_basis_status = 4;
+   */
+  variableBasisStatus: number[];
+
+  /**
+   * @generated from field: repeated int32 constraint_basis_status = 5;
+   */
+  constraintBasisStatus: number[];
+
+  /**
+   * @generated from field: optional double exact_condition_number = 6;
+   */
+  exactConditionNumber?: number | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverNativeMetadata
+ */
+export type MpSolverNativeMetadataJson = {
+  /**
+   * @generated from field: string solver_version = 1;
+   */
+  solverVersion?: string;
+
+  /**
+   * @generated from field: int64 iterations = 2;
+   */
+  iterations?: string;
+
+  /**
+   * @generated from field: int64 nodes = 3;
+   */
+  nodes?: string;
+
+  /**
+   * @generated from field: repeated int32 variable_basis_status = 4;
+   */
+  variableBasisStatus?: number[];
+
+  /**
+   * @generated from field: repeated int32 constraint_basis_status = 5;
+   */
+  constraintBasisStatus?: number[];
+
+  /**
+   * @generated from field: optional double exact_condition_number = 6;
+   */
+  exactConditionNumber?: number | "NaN" | "Infinity" | "-Infinity";
+};
+
+export type MpSolverNativeMetadataValid = MpSolverNativeMetadata;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverNativeMetadata.
+ * Use `create(MpSolverNativeMetadataSchema)` to create a new message.
+ */
+export const MpSolverNativeMetadataSchema: GenMessage<MpSolverNativeMetadata, {jsonType: MpSolverNativeMetadataJson, validType: MpSolverNativeMetadataValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 20);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MpSolverBridgeResponse
  */
 export type MpSolverBridgeResponse = Message<"ortools_wasm.bridge.v1.MpSolverBridgeResponse"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverNativeMetadata metadata = 3;
+   */
+  metadata?: MpSolverNativeMetadata | undefined;
+
   /**
    * @generated from oneof ortools_wasm.bridge.v1.MpSolverBridgeResponse.payload
    */
@@ -243,6 +1398,66 @@ export type MpSolverBridgeResponse = Message<"ortools_wasm.bridge.v1.MpSolverBri
      */
     value: MpSolverSchemaResult;
     case: "schema";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverImportModelResult import_model = 4;
+     */
+    value: MpSolverImportModelResult;
+    case: "importModel";
+  } | {
+    /**
+     * @generated from field: string model_validation_error = 5;
+     */
+    value: string;
+    case: "modelValidationError";
+  } | {
+    /**
+     * @generated from field: bool parameters_accepted = 6;
+     */
+    value: boolean;
+    case: "parametersAccepted";
+  } | {
+    /**
+     * @generated from field: bool solution_verified = 7;
+     */
+    value: boolean;
+    case: "solutionVerified";
+  } | {
+    /**
+     * @generated from field: uint64 session_handle = 8;
+     */
+    value: bigint;
+    case: "sessionHandle";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionResult session_result = 9;
+     */
+    value: MpSolverSessionResult;
+    case: "sessionResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverIisResult iis = 10;
+     */
+    value: MpSolverIisResult;
+    case: "iis";
+  } | {
+    /**
+     * @generated from field: string exported_model = 11;
+     */
+    value: string;
+    case: "exportedModel";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverActivitiesResult activities = 12;
+     */
+    value: MpSolverActivitiesResult;
+    case: "activities";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MpSolverLoadSolutionResult load_solution = 13;
+     */
+    value: MpSolverLoadSolutionResult;
+    case: "loadSolution";
   } | { case: undefined; value?: undefined };
 };
 
@@ -250,6 +1465,11 @@ export type MpSolverBridgeResponse = Message<"ortools_wasm.bridge.v1.MpSolverBri
  * @generated from message ortools_wasm.bridge.v1.MpSolverBridgeResponse
  */
 export type MpSolverBridgeResponseJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverNativeMetadata metadata = 3;
+   */
+  metadata?: MpSolverNativeMetadataJson;
+
   /**
    * @generated from field: bytes response_proto = 1;
    */
@@ -259,6 +1479,56 @@ export type MpSolverBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.MpSolverSchemaResult schema = 2;
    */
   schema?: MpSolverSchemaResultJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverImportModelResult import_model = 4;
+   */
+  importModel?: MpSolverImportModelResultJson;
+
+  /**
+   * @generated from field: string model_validation_error = 5;
+   */
+  modelValidationError?: string;
+
+  /**
+   * @generated from field: bool parameters_accepted = 6;
+   */
+  parametersAccepted?: boolean;
+
+  /**
+   * @generated from field: bool solution_verified = 7;
+   */
+  solutionVerified?: boolean;
+
+  /**
+   * @generated from field: uint64 session_handle = 8;
+   */
+  sessionHandle?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverSessionResult session_result = 9;
+   */
+  sessionResult?: MpSolverSessionResultJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverIisResult iis = 10;
+   */
+  iis?: MpSolverIisResultJson;
+
+  /**
+   * @generated from field: string exported_model = 11;
+   */
+  exportedModel?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverActivitiesResult activities = 12;
+   */
+  activities?: MpSolverActivitiesResultJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MpSolverLoadSolutionResult load_solution = 13;
+   */
+  loadSolution?: MpSolverLoadSolutionResultJson;
 };
 
 export type MpSolverBridgeResponseValid = MpSolverBridgeResponse;
@@ -268,5 +1538,241 @@ export type MpSolverBridgeResponseValid = MpSolverBridgeResponse;
  * Use `create(MpSolverBridgeResponseSchema)` to create a new message.
  */
 export const MpSolverBridgeResponseSchema: GenMessage<MpSolverBridgeResponse, {jsonType: MpSolverBridgeResponseJson, validType: MpSolverBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_mp_solver, 5);
+  messageDesc(file_mp_solver, 21);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverLogEvent
+ */
+export type MpSolverLogEvent = Message<"ortools_wasm.bridge.v1.MpSolverLogEvent"> & {
+  /**
+   * @generated from field: repeated string messages = 1;
+   */
+  messages: string[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverLogEvent
+ */
+export type MpSolverLogEventJson = {
+  /**
+   * @generated from field: repeated string messages = 1;
+   */
+  messages?: string[];
+};
+
+export type MpSolverLogEventValid = MpSolverLogEvent;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverLogEvent.
+ * Use `create(MpSolverLogEventSchema)` to create a new message.
+ */
+export const MpSolverLogEventSchema: GenMessage<MpSolverLogEvent, {jsonType: MpSolverLogEventJson, validType: MpSolverLogEventValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 22);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverIisRequest
+ */
+export type MpSolverIisRequest = Message<"ortools_wasm.bridge.v1.MpSolverIisRequest"> & {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto: Uint8Array;
+
+  /**
+   * @generated from field: int32 solver_type = 2;
+   */
+  solverType: number;
+
+  /**
+   * @generated from field: string solver_specific_parameters = 3;
+   */
+  solverSpecificParameters: string;
+
+  /**
+   * @generated from field: optional double time_limit_seconds = 4;
+   */
+  timeLimitSeconds?: number | undefined;
+
+  /**
+   * @generated from field: optional int64 node_limit = 5;
+   */
+  nodeLimit?: bigint | undefined;
+
+  /**
+   * @generated from field: bool interruptible = 6;
+   */
+  interruptible: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverIisRequest
+ */
+export type MpSolverIisRequestJson = {
+  /**
+   * @generated from field: bytes model_proto = 1;
+   */
+  modelProto?: string;
+
+  /**
+   * @generated from field: int32 solver_type = 2;
+   */
+  solverType?: number;
+
+  /**
+   * @generated from field: string solver_specific_parameters = 3;
+   */
+  solverSpecificParameters?: string;
+
+  /**
+   * @generated from field: optional double time_limit_seconds = 4;
+   */
+  timeLimitSeconds?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: optional int64 node_limit = 5;
+   */
+  nodeLimit?: string;
+
+  /**
+   * @generated from field: bool interruptible = 6;
+   */
+  interruptible?: boolean;
+};
+
+export type MpSolverIisRequestValid = MpSolverIisRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverIisRequest.
+ * Use `create(MpSolverIisRequestSchema)` to create a new message.
+ */
+export const MpSolverIisRequestSchema: GenMessage<MpSolverIisRequest, {jsonType: MpSolverIisRequestJson, validType: MpSolverIisRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 23);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverIisVariableBounds
+ */
+export type MpSolverIisVariableBounds = Message<"ortools_wasm.bridge.v1.MpSolverIisVariableBounds"> & {
+  /**
+   * @generated from field: int32 variable_index = 1;
+   */
+  variableIndex: number;
+
+  /**
+   * @generated from field: bool lower_bound_included = 2;
+   */
+  lowerBoundIncluded: boolean;
+
+  /**
+   * @generated from field: bool upper_bound_included = 3;
+   */
+  upperBoundIncluded: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverIisVariableBounds
+ */
+export type MpSolverIisVariableBoundsJson = {
+  /**
+   * @generated from field: int32 variable_index = 1;
+   */
+  variableIndex?: number;
+
+  /**
+   * @generated from field: bool lower_bound_included = 2;
+   */
+  lowerBoundIncluded?: boolean;
+
+  /**
+   * @generated from field: bool upper_bound_included = 3;
+   */
+  upperBoundIncluded?: boolean;
+};
+
+export type MpSolverIisVariableBoundsValid = MpSolverIisVariableBounds;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverIisVariableBounds.
+ * Use `create(MpSolverIisVariableBoundsSchema)` to create a new message.
+ */
+export const MpSolverIisVariableBoundsSchema: GenMessage<MpSolverIisVariableBounds, {jsonType: MpSolverIisVariableBoundsJson, validType: MpSolverIisVariableBoundsValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 24);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverIisResult
+ */
+export type MpSolverIisResult = Message<"ortools_wasm.bridge.v1.MpSolverIisResult"> & {
+  /**
+   * @generated from field: bool is_infeasible = 1;
+   */
+  isInfeasible: boolean;
+
+  /**
+   * @generated from field: bool is_irreducible = 2;
+   */
+  isIrreducible: boolean;
+
+  /**
+   * @generated from field: double time_seconds = 3;
+   */
+  timeSeconds: number;
+
+  /**
+   * @generated from field: int64 nodes = 4;
+   */
+  nodes: bigint;
+
+  /**
+   * @generated from field: repeated int32 constraint_indices = 5;
+   */
+  constraintIndices: number[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.MpSolverIisVariableBounds variable_bounds = 6;
+   */
+  variableBounds: MpSolverIisVariableBounds[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MpSolverIisResult
+ */
+export type MpSolverIisResultJson = {
+  /**
+   * @generated from field: bool is_infeasible = 1;
+   */
+  isInfeasible?: boolean;
+
+  /**
+   * @generated from field: bool is_irreducible = 2;
+   */
+  isIrreducible?: boolean;
+
+  /**
+   * @generated from field: double time_seconds = 3;
+   */
+  timeSeconds?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: int64 nodes = 4;
+   */
+  nodes?: string;
+
+  /**
+   * @generated from field: repeated int32 constraint_indices = 5;
+   */
+  constraintIndices?: number[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.MpSolverIisVariableBounds variable_bounds = 6;
+   */
+  variableBounds?: MpSolverIisVariableBoundsJson[];
+};
+
+export type MpSolverIisResultValid = MpSolverIisResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MpSolverIisResult.
+ * Use `create(MpSolverIisResultSchema)` to create a new message.
+ */
+export const MpSolverIisResultSchema: GenMessage<MpSolverIisResult, {jsonType: MpSolverIisResultJson, validType: MpSolverIisResultValid}> = /*@__PURE__*/
+  messageDesc(file_mp_solver, 25);
 

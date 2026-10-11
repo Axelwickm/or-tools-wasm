@@ -331,9 +331,10 @@ async function runStiglerDiet() {
       }
       objective.setMinimization();
 
-      appendStatus(statusEl, `Solving with ${solver.solverVersion()}, requested solver threads=${solverThreads}...`);
+      appendStatus(statusEl, `Solving with GLOP, requested solver threads=${solverThreads}...`);
       const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
+      appendStatus(statusEl, `Solver: ${await solver.solverVersion(executionOptions)}`);
 
       const nutrientTotals = Array.from({ length: nutrients.length }, () => 0);
       const selectedFoods: Array<{ food: Food; dailyUnits: number }> = [];

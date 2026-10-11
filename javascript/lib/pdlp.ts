@@ -2,6 +2,7 @@ export {
   Pdlp,
   PrimalAndDualSolution,
   QuadraticProgram,
+  PdlpIterationType,
 } from './pdlp/api.js';
 export { default } from './pdlp/api.js';
 export {
@@ -10,9 +11,13 @@ export {
 export type {
   PdlpApi,
   PdlpEvent,
+  PdlpEventMask,
+  PdlpIterationCallbackInfo,
   PdlpEventHandler,
   PdlpExecutionOptions,
   PdlpFromMpModelOptions,
+  PdlpModelFormat,
+  PdlpReadQuadraticProgramOptions,
   PdlpSolveLog,
   PdlpSolveOptions,
   PdlpSolveParams,

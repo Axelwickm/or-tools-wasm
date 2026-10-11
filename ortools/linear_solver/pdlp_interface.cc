@@ -40,6 +40,7 @@ class PdlpInterface : public MPSolverInterface {
 
   // ----- Solve -----
   MPSolver::ResultStatus Solve(const MPSolverParameters& param) override;
+  bool SupportsMessageCallbacks() const override { return true; }
 
   bool SupportsDirectlySolveProto(std::atomic<bool>* interrupt) const override {
     return true;
@@ -152,7 +153,8 @@ MPSolver::ResultStatus PdlpInterface::Solve(const MPSolverParameters& param) {
                 << ProtobufDebugString(parameters_);
   }
   absl::StatusOr<MPSolutionResponse> response = PdlpSolveProto(
-      std::move(request), /*relax_integer_variables=*/true, &interrupt_solver_);
+      std::move(request), /*relax_integer_variables=*/true, &interrupt_solver_,
+      message_callback_);
 
   if (!response.ok()) {
     LOG(ERROR) << "Unexpected error solving with PDLP: " << response.status();

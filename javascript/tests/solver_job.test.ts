@@ -225,3 +225,138 @@ test('gives a job rejection precedence over callback and abort failures', async 
     jobError,
   );
 });
+
+
+test('preserves callback failure when native cancellation rejects the job', async () => {
+  const controller = new AbortController();
+  const callbackError = new Error('callback failed while stopping');
+  const executor = executorWith((options) => ({
+    requestId: 1,
+    result: Promise.resolve(options.onEvent({ type: 'test', sequence: 1 })).then(() => {
+      throw new DOMException('native job cancelled', 'AbortError');
+    }),
+    cancel: async () => {},
+  }));
+  await assert.rejects(executeSolverJob(executor, 'request', {
+    signal: controller.signal,
+    onEvent: () => { controller.abort(); throw callbackError; },
+  }), callbackError);
+});
+
+test('preserves the caller abort reason when cancellation rejects the job', async () => {
+  for (const reason of [new Error('caller cancellation'), 'caller cancellation', undefined]) {
+    const controller = new AbortController();
+    const executor = executorWith(options => ({
+      requestId: 1,
+      result: Promise.resolve(options.onEvent({ type: 'test', sequence: 1 })).then(() => {
+        throw new DOMException('executor cancellation', 'AbortError');
+      }),
+      cancel: async () => {},
+    }));
+    await assert.rejects(executeSolverJob(executor, 'request', {
+      signal: controller.signal,
+      onEvent: () => controller.abort(reason),
+    }), error => reason instanceof Error || reason === undefined
+      ? error === controller.signal.reason
+      : error instanceof Error && error.name === 'AbortError' && error.message === reason);
+  }
+});
+
+test('preserves executor cancellation errors when the caller has not aborted', async () => {
+  const failure = new DOMException('executor cancellation', 'AbortError');
+  const executor = executorWith(() => ({
+    requestId: 1, result: Promise.reject(failure), cancel: async () => {},
+  }));
+  await assert.rejects(executeSolverJob(executor, 'request', {}), error => error === failure);
+});
+
+
+test('requests native cancellation promptly after a progress callback fails', async () => {
+  const failure = new Error('observer failed');
+  let cancellations = 0;
+  let rejectJob!: (error: Error) => void;
+  const executor = executorWith(options => {
+    const result = new Promise<number>((_resolve, reject) => { rejectJob = reject; });
+    void options.onEvent({ type: 'test', sequence: 1 });
+    return { requestId: 1, result, cancel: async () => {
+      ++cancellations;
+      rejectJob(new DOMException('Native search interrupted', 'AbortError'));
+    } };
+  });
+  await assert.rejects(executeSolverJob(executor, 'request', {
+    onEvent: () => { throw failure; },
+  }), failure);
+  assert.equal(cancellations, 1);
+});
+
+test('native interruption returns a stopped result and removes its listener', async () => {
+  const controller = new AbortController();
+  let finish!: (value: number) => void;
+  let cancels = 0;
+  const executor = executorWith(() => ({
+    requestId: 1,
+    result: new Promise<number>(resolve => { finish = resolve; }),
+    cancel: async () => { ++cancels; finish(7); },
+  }));
+  const result = executeSolverJob(executor, '', { interruptSignal: controller.signal });
+  controller.abort();
+  assert.equal(await result, 7);
+  assert.equal(cancels, 1);
+  const lateController = new AbortController();
+  const completed = executorWith(() => ({ requestId: 2, result: Promise.resolve(9),
+    cancel: async () => { ++cancels; } }));
+  assert.equal(await executeSolverJob(completed, '', { interruptSignal: lateController.signal }), 9);
+  lateController.abort();
+  assert.equal(cancels, 1);
+});
+
+test('pre-interrupted native requests retain their encoded termination path', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let cancels = 0;
+  const executor = executorWith(() => ({ requestId: 1, result: Promise.resolve(3),
+    cancel: async () => { ++cancels; } }));
+  assert.equal(await executeSolverJob(executor, '', { interruptSignal: controller.signal }), 3);
+  assert.equal(cancels, 0);
+});
+
+test('commits a stopped native result before preserving a callback reply failure', async () => {
+  const failure = new Error('native callback failed');
+  let committed = false;
+  const executor = executorWith(options => ({ requestId: 1,
+    result: Promise.resolve().then(() => {
+      try { options.onCallback!(new Uint8Array()); } catch {}
+      return 7;
+    }), cancel: async () => {},
+  }));
+  await assert.rejects(executeSolverJob(executor, '', {
+    onCallback: () => { throw failure; },
+    onSuccess: response => { assert.equal(response, 7); committed = true; },
+  }), error => error === failure);
+  assert.equal(committed, true);
+});
+
+test('synchronous observers run inside event emission and retain failures until native state commits', async () => {
+  const failure = new Error('live observer failed');
+  const delivered: number[] = [];
+  let cancellations = 0, committed = false;
+  const executor = executorWith(options => {
+    // Emit before execute() has returned the job, as a synchronous native hook can.
+    void options.onEvent({ type: 'test', sequence: 1 });
+    assert.deepEqual(delivered, [1], 'observer runs before native emission returns');
+    void options.onEvent({ type: 'test', sequence: 2 });
+    void options.onEvent({ type: 'test', sequence: 3 });
+    return { requestId: 1, result: Promise.resolve(7), cancel: async () => { ++cancellations; } };
+  });
+  await assert.rejects(executeSolverJob(executor, '', {
+    onEventSync: event => {
+      if (event.type !== 'test') return;
+      delivered.push(event.sequence);
+      if (event.sequence === 2) throw failure;
+    },
+    onSuccess: value => { assert.equal(value, 7); committed = true; },
+  }), error => error === failure);
+  assert.deepEqual(delivered, [1, 2], 'later emissions are suppressed after failure');
+  assert.equal(cancellations, 1);
+  assert.equal(committed, true);
+});

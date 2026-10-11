@@ -266,6 +266,164 @@ async function runExactIntegersCase(api: HighLevelCpSatPackage, mode: ExecutorFi
   return { solverStatus };
 }
 
+const sparseDomainParametersCase: SharedCaseMetadata = {
+  id: 'cp_sat.high_level.sparse_domain_parameters',
+  name: 'CP-SAT normalized sparse domains and digit-bearing solver parameters',
+  solver: 'cp-sat',
+  source: 'ortools/util/python/sorted_interval_list_test.py',
+  tags: ['contract', 'high-level', 'domain', 'parameters'],
+};
+
+async function runSparseDomainParametersCase(api: HighLevelCpSatPackage, mode: ExecutorFixtureMode) {
+  const Domain = api.Domain as any;
+  const domain = Domain.fromIntervals([[8, 10], [1, 3], [2, 4], [6, 5]]);
+  assert(JSON.stringify(domain.flatIntervals) === JSON.stringify([1, 4, 8, 10]), 'sparse domain must normalize before model construction');
+  const model = new api.CpModel();
+  const x = model.newIntVarFromDomain(domain, 'sparse');
+  model.add(x.ge(5));
+  model.minimize(x);
+  const solver = new api.CpSolver();
+  const status = await solver.solve(model, {
+    executor: executorForMode(mode), numWorkers: 1,
+    useTimetablingInNoOverlap2d: true,
+    noOverlap2dBooleanRelationsLimit: 4,
+    create1uipBooleanDuringIcr: true,
+    subsolverParams: [{ name: 'default', useEnergeticReasoningInNoOverlap2d: true }],
+  });
+  const solverStatus = solver.statusName(status);
+  assert(solverStatus === 'OPTIMAL', `sparse domain solve expected OPTIMAL, got ${solverStatus}`);
+  assert(solver.value(x) === 8n, 'solver must preserve the sparse-domain hole after normalization');
+  return { solverStatus };
+}
+
+const modelReuseCase: SharedCaseMetadata = {
+  id: 'cp_sat.high_level.model_reuse',
+  name: 'CP-SAT objective and hint clearing preserve live model reuse',
+  solver: 'cp-sat',
+  source: 'javascript/lib/cp_sat/high_level_api.ts',
+  tags: ['contract', 'high-level', 'model-reuse'],
+};
+
+async function runModelReuseCase(api: HighLevelCpSatPackage, mode: ExecutorFixtureMode) {
+  const model = new api.CpModel();
+  const x = model.newIntVar(0, 2, 'x');
+  const solver = new api.CpSolver();
+  for (const objective of [x, x.times(0.5)]) {
+    model.maximize(objective);
+    const optimized = await solver.solve(model, { executor: executorForMode(mode), numWorkers: 1 });
+    assert(solver.statusName(optimized) === 'OPTIMAL' && solver.value(x) === 2n, 'optimization must find x=2 before objective removal');
+    model.clearObjective();
+    class CollectSolutions extends api.CpSolverSolutionCallback {
+      values = new Set<bigint>();
+      onSolutionCallback() { this.values.add(this.value(x)); }
+    }
+    const callback = new CollectSolutions();
+    const feasible = await solver.solve(model, {
+      executor: executorForMode(mode), numWorkers: 1, enumerateAllSolutions: true, solutionCallback: callback,
+    });
+    assert(solver.statusName(feasible) === 'OPTIMAL', 'cleared objective must permit solution enumeration');
+    assert(callback.values.size === 3 && callback.values.has(0n) && callback.values.has(1n) && callback.values.has(2n),
+      'objective clearing must recover all feasible values, for integer and floating objectives');
+  }
+
+  const hinted = new api.CpModel();
+  const y = hinted.newIntVar(0, 1, 'hinted');
+  hinted.addHint(y, 1);
+  const first = await solver.solve(hinted, { executor: executorForMode(mode), numWorkers: 1, fixVariablesToTheirHintedValue: true });
+  assert(solver.statusName(first) === 'OPTIMAL' && solver.value(y) === 1n, 'initial fixed hint must select y=1');
+  hinted.clearHints();
+  hinted.add(y.eq(0));
+  const next = await solver.solve(hinted, { executor: executorForMode(mode), numWorkers: 1, fixVariablesToTheirHintedValue: true });
+  assert(solver.statusName(next) === 'OPTIMAL' && solver.value(y) === 0n, 'cleared hint must not make the reused model infeasible');
+  return { solverStatus: solver.statusName(next) };
+}
+
+const linearDomainCase: SharedCaseMetadata = {
+  id: 'cp_sat.high_level.linear_domain',
+  name: 'CP-SAT sparse expression domains, offsets and constant infeasibility',
+  solver: 'cp-sat',
+  source: 'ortools/sat/python/cp_model.py',
+  tags: ['contract', 'high-level', 'domain'],
+};
+
+async function runLinearDomainCase(api: HighLevelCpSatPackage, mode: ExecutorFixtureMode) {
+  const Domain = api.Domain as any;
+  const model = new api.CpModel();
+  const x = model.newIntVar(0, 10, 'x');
+  model.addLinearExpressionInDomain(x.plus(3), Domain.fromValues([4, 11]));
+  model.maximize(x);
+  const solver = new api.CpSolver();
+  const optimized = await solver.solve(model, { executor: executorForMode(mode), numWorkers: 1 });
+  assert(solver.statusName(optimized) === 'OPTIMAL' && solver.value(x) === 8n, 'sparse expression constraint must preserve holes and subtract its offset');
+  model.addLinearExpressionInDomain(5, Domain.fromValues([4, 6]));
+  const impossible = await solver.solve(model, { executor: executorForMode(mode), numWorkers: 1 });
+  assert(solver.statusName(impossible) === 'INFEASIBLE', 'a constant in a domain hole must make the model infeasible');
+  return { solverStatus: solver.statusName(impossible) };
+}
+
+const cancellationCase: SharedCaseMetadata = {
+  id: 'cp_sat.high_level.abort_and_event_mask',
+  name: 'CP-SAT native cancellation, event masks and solver reuse',
+  solver: 'cp-sat',
+  source: 'javascript/lib/cp_sat/high_level_api.ts',
+  tags: ['contract', 'high-level', 'cancellation'],
+};
+
+async function runCancellationCase(api: HighLevelCpSatPackage, mode: ExecutorFixtureMode) {
+  const model = new api.CpModel();
+  for (let i = 0; i < 40; ++i) model.newBoolVar(`choice_${i}`);
+  const solver = new api.CpSolver();
+  const controller = new AbortController();
+  let solutions = 0;
+  const started = performance.now();
+  try {
+    await solver.solve(model, {
+      executor: executorForMode(mode), numWorkers: 1, enumerateAllSolutions: true,
+      maxTimeInSeconds: 20, signal: controller.signal,
+      onEvent(event: any) { if (event.type === 'solution' && ++solutions === 3) controller.abort(); },
+    });
+    throw new Error('AbortSignal must reject the solve');
+  } catch (error) {
+    assert(error instanceof Error && error.name === 'AbortError', 'AbortSignal must preserve AbortError');
+  }
+  assert(solutions >= 3, 'abort must occur during native search');
+  assert(performance.now() - started < 10000, 'native cancellation must stop before the search time limit');
+  assert(solver.response === null, 'failed solve must not retain an earlier response');
+  const next = new api.CpModel(); const x = next.newIntVar(0, 2, 'x'); next.maximize(x);
+  let maskedSolutions = 0;
+  const status = await solver.solve(next, {
+    executor: executorForMode(mode), numWorkers: 1, eventMask: { solution: false },
+    onEvent(event: any) { if (event.type === 'solution') ++maskedSolutions; },
+  });
+  assert(solver.statusName(status) === 'OPTIMAL' && solver.value(x) === 2n, 'reuse after abort must return current optimum');
+  assert(maskedSolutions === 0, 'internal graceful-stop observer must respect the user event mask');
+  let capacityRejected = false;
+  try {
+    const oversizedStatus = await solver.solve(next, { executor: executorForMode(mode), numWorkers: 1_000_000 });
+    capacityRejected = solver.statusName(oversizedStatus) === 'MODEL_INVALID';
+  } catch (error) {
+    capacityRejected = mode === 'server' && /capacity|threads|workers/i.test(String(error));
+    if (!capacityRejected) throw error;
+  }
+  assert(capacityRejected, 'worker requests exceeding runtime capacity must reject safely');
+  const recoveredStatus = await solver.solve(next, { executor: executorForMode(mode), numWorkers: 1 });
+  assert(solver.statusName(recoveredStatus) === 'OPTIMAL' && solver.value(x) === 2n,
+    'runtime must remain usable after an excessive worker request');
+  class StopConvenience extends api.CpSolverSolutionCallback {
+    count = 0;
+    onSolutionCallback() { if (++this.count === 3) this.stopSearch(); }
+  }
+  const callback = new StopConvenience();
+  const convenience = api.CpSat as { solve(model: unknown, options: unknown): Promise<any> };
+  const stopped = await convenience.solve(model, {
+    executor: executorForMode(mode), numWorkers: 1, enumerateAllSolutions: true,
+    maxTimeInSeconds: 20, solutionCallback: callback,
+  });
+  assert(stopped.hasSolution && solver.statusName(stopped.status) === 'FEASIBLE', 'CpSat.solve must honor callback stopSearch');
+  assert(callback.count === 3, 'convenience solve must stop at requested solution count');
+  return { solverStatus: solver.statusName(status) };
+}
+
 export async function runCpSatHighLevelContractCases(
   api: HighLevelCpSatPackage,
 ): Promise<CpSatHighLevelContractResult[]> {
@@ -278,6 +436,10 @@ export async function runCpSatHighLevelContractCases(
     results.push(passedCase(solverResultsCase, context, await runSolverResultsCase(api, mode)));
     results.push(passedCase(expressionSurfaceCase, context, await runExpressionSurfaceCase(api, mode)));
     results.push(passedCase(exactIntegersCase, context, await runExactIntegersCase(api, mode)));
+    results.push(passedCase(sparseDomainParametersCase, context, await runSparseDomainParametersCase(api, mode)));
+    results.push(passedCase(modelReuseCase, context, await runModelReuseCase(api, mode)));
+    results.push(passedCase(linearDomainCase, context, await runLinearDomainCase(api, mode)));
+    if (mode !== 'direct') results.push(passedCase(cancellationCase, context, await runCancellationCase(api, mode)));
   }
   return results;
 }

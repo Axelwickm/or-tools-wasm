@@ -9,12 +9,15 @@ import {
   type DecisionStrategyProto_VariableSelectionStrategy,
   type DecisionStrategyProto_VariableSelectionStrategy_Name,
   type LinearExpressionProto,
+  type IntegerVariableProto,
+  type IntervalConstraintProto,
   type ProtoInt64,
 } from '../generated/cp_model.js';
 import type {
   CpSatEventHandler,
   CpSatEventMask,
   CpSatSolverParameters,
+  CpSatValidateOptions,
 } from './api.js';
 import type { ExecutorSelection } from '../executor_configuration.js';
 import {
@@ -29,7 +32,7 @@ const INT64_MAX: ProtoInt64 = INT64_MAX_BIGINT;
 export type { IntValue } from '../int64.js';
 export type NumericValue = number | bigint;
 export type LinearExprLike = IntValue | IntVar | NotBoolVar | LinearExpr;
-export type LiteralLike = number | boolean | BoolVar | NotBoolVar;
+export type LiteralLike = number | boolean | IntVar | NotBoolVar;
 export type CpSolverSolveOptions = CpSatSolverParameters & {
   executor?: ExecutorSelection;
   solutionCallback?: CpSolverSolutionCallback;
@@ -123,7 +126,9 @@ function adjustDomainEndpoint(value: ProtoInt64, offset: NumericValue): ProtoInt
     return value;
   }
   rangeError(isExactInteger(offset), 'integer constraints require an integer expression offset');
-  return asInt64(protoInt64ToBigInt(value) - offset);
+  const adjusted = protoInt64ToBigInt(value) - offset;
+  return asInt64(adjusted < INT64_MIN_BIGINT ? INT64_MIN_BIGINT
+    : adjusted > INT64_MAX_BIGINT ? INT64_MAX_BIGINT : adjusted);
 }
 
 function protoInt64ToNumber(value: ProtoInt64 | undefined) {
@@ -207,7 +212,7 @@ function numericMultiply(left: NumericValue, right: NumericValue): NumericValue 
 }
 
 function numericNegate(value: NumericValue): NumericValue {
-  return typeof value === 'bigint' ? -value : -value;
+  return -value;
 }
 
 function numericAbs(value: NumericValue): NumericValue {
@@ -260,7 +265,7 @@ function literalIndex(literal: LiteralLike) {
   }
   if (literal === true) return true;
   if (literal === false) return false;
-  if (!(literal instanceof BoolVar || literal instanceof NotBoolVar)) {
+  if (!(literal instanceof NotBoolVar ? literal.variable.isBoolean() : literal instanceof IntVar && literal.isBoolean())) {
     throw new TypeError('literal must be a Boolean variable or its negation');
   }
   return literal.index;
@@ -271,7 +276,7 @@ function literalReferences(model: CpModel, literals: Iterable<LiteralLike>) {
     const index = literalIndex(literal);
     if (index === true) return model.newConstant(1).index;
     if (index === false) return model.newConstant(0).index;
-    assert(literal instanceof BoolVar || literal instanceof NotBoolVar, 'literal must be a Boolean variable or its negation');
+    assert(literal instanceof IntVar || literal instanceof NotBoolVar, 'literal must be a Boolean variable or its negation');
     requireSameModel(model, literal.model, 'literal');
     return index;
   });
@@ -429,7 +434,7 @@ function formatWeightedDisplaySum(values: LinearExprDisplayNode[], coeffs: Numer
 
 function appendDisplaySumValues(values: LinearExprDisplayNode[], node: LinearExprDisplayNode) {
   if (node.kind === 'sum') {
-    values.push(...node.values);
+    for (const value of node.values) values.push(value);
   } else {
     values.push(node);
   }
@@ -463,7 +468,7 @@ function literalList(first: Iterable<LiteralLike> | LiteralLike, rest: LiteralLi
   if (rest.length > 0) {
     return [first as LiteralLike, ...rest];
   }
-  if (typeof first === 'number' || typeof first === 'boolean' || first instanceof BoolVar || first instanceof NotBoolVar) {
+  if (typeof first === 'number' || typeof first === 'boolean' || first instanceof IntVar || first instanceof NotBoolVar) {
     return [first];
   }
   return Array.from(first);
@@ -500,7 +505,7 @@ export class LinearExpr {
     return weightedSum(values, coeffs);
   }
 
-  static term(variable: IntVar | NotBoolVar, coeff: NumericValue) {
+  static term(variable: LinearExprLike, coeff: NumericValue) {
     return term(variable, coeff);
   }
 
@@ -743,12 +748,49 @@ export class LinearExpr {
 }
 
 export class BoundedLinearExpr {
-  constructor(
-    readonly expression: LinearExpr,
-    readonly lowerBound: ProtoInt64,
-    readonly upperBound: ProtoInt64,
-    readonly domain?: ProtoInt64[],
-  ) {}
+  readonly expression: LinearExpr;
+  readonly lowerBound: ProtoInt64;
+  readonly upperBound: ProtoInt64;
+  readonly domain?: ProtoInt64[];
+
+  constructor(expression: LinearExprLike, bounds: Domain);
+  constructor(expression: LinearExprLike, lowerBound: IntValue, upperBound: IntValue, domain?: ProtoInt64[]);
+  constructor(expression: LinearExprLike, lowerOrDomain: IntValue | Domain, upperBound?: IntValue, domain?: ProtoInt64[]) {
+    this.expression = LinearExpr.from(expression);
+    if (lowerOrDomain instanceof Domain) {
+      const flat = lowerOrDomain.flatIntervals;
+      this.lowerBound = flat[0] ?? 0;
+      this.upperBound = flat[flat.length - 1] ?? -1;
+      this.domain = flat.length === 2 ? undefined : flat;
+    } else {
+      this.lowerBound = asInt64(lowerOrDomain);
+      this.upperBound = asInt64(upperBound as IntValue);
+      this.domain = domain === undefined ? undefined : Domain.fromFlatIntervals(domain).flatIntervals;
+    }
+  }
+
+  get bounds(): Domain { return Domain.fromFlatIntervals(this.domain ?? [this.lowerBound, this.upperBound]); }
+  get vars(): IntVar[] {
+    return Array.from(this.expression.terms.keys()).sort((a, b) => a - b).map(index => {
+      assert(this.expression.model, 'expression variables require a model');
+      return this.expression.model.getIntVarFromProtoIndex(index);
+    });
+  }
+  get coeffs(): NumericValue[] {
+    return Array.from(this.expression.terms).sort(([a], [b]) => a - b).map(([, coefficient]) => coefficient);
+  }
+  get offset(): NumericValue { return this.expression.offset; }
+  get ok(): boolean {
+    if (!this.expression.isInteger()) return false;
+    try {
+      toInt64(this.expression.offset);
+      for (const [index, coefficient] of this.expression.terms) {
+        if (!this.expression.model || !Number.isInteger(index) || index < 0 || index >= (liveModelProto(this.expression.model).variables?.length ?? 0)) return false;
+        toInt64(coefficient);
+      }
+      return true;
+    } catch { return false; }
+  }
 
   toString() {
     const normalizedExpression = new LinearExpr(this.expression.model, this.expression.terms, 0);
@@ -756,6 +798,7 @@ export class BoundedLinearExpr {
     const lower = adjustedProtoInt64ToString(this.lowerBound, this.expression.offset);
     const upper = adjustedProtoInt64ToString(this.upperBound, this.expression.offset);
     if (this.domain !== undefined) {
+      if (this.domain.length === 0) return `${expressionText} in []`;
       if (
         this.domain.length === 4
         && isInt64Min(this.domain[0])
@@ -765,7 +808,7 @@ export class BoundedLinearExpr {
       ) {
         return `${expressionText} != ${numericNegate(this.expression.offset)}`;
       }
-      const [firstLower, firstUpper, secondLower, secondUpper] = this.domain.map((value) =>
+      const [, firstUpper, secondLower] = this.domain.map((value) =>
         adjustedProtoInt64ToString(value, this.expression.offset),
       );
       if (isInt64Min(this.domain[0]) && secondLower !== undefined && isInt64Max(this.domain[3])) {
@@ -773,7 +816,7 @@ export class BoundedLinearExpr {
         const secondLowerStart = (BigInt(secondLower) - 1n).toString();
         return `(${expressionText}) not in [${firstUpperEnd}, ${secondLowerStart}]`;
       }
-      return `${expressionText} in [${[firstLower, firstUpper, secondLower, secondUpper].filter((value) => value !== undefined).join(', ')}]`;
+      return `${expressionText} in [${this.domain.map(value => adjustedProtoInt64ToString(value, this.expression.offset)).join(', ')}]`;
     }
     if (isInt64Min(this.lowerBound) && isInt64Max(this.upperBound)) {
       return `True (unbounded expr ${expressionText})`;
@@ -798,15 +841,49 @@ export class BoundedLinearExpr {
   }
 }
 
+function setProtoName(proto: { name?: string } | undefined, name: string, kind: string) {
+  if (typeof name !== 'string') throw new TypeError(`${kind} name must be a string`);
+  assert(proto, `${kind} no longer exists in model`);
+  if (name === '') delete proto.name;
+  else proto.name = name;
+}
+
 export class IntVar {
   constructor(
     readonly model: CpModel,
     readonly index: number,
-    _name = '',
   ) {}
 
   get name() {
     return liveModelProto(this.model).variables?.[this.index]?.name ?? '';
+  }
+
+  set name(name: string) {
+    setProtoName(liveModelProto(this.model).variables?.[this.index], name, 'variable');
+  }
+
+  withName(name: string): this { this.name = name; return this; }
+
+  get domain(): Domain {
+    const variable = liveModelProto(this.model).variables?.[this.index];
+    assert(variable, 'variable no longer exists in model');
+    return Domain.fromFlatIntervals((variable.domain ?? []).map(protoInt64ToBigInt));
+  }
+
+  set domain(domain: Domain) {
+    if (!(domain instanceof Domain)) throw new TypeError('variable domain must be a Domain');
+    const variable = liveModelProto(this.model).variables?.[this.index];
+    assert(variable, 'variable no longer exists in model');
+    variable.domain = domain.flatIntervals;
+  }
+
+  withDomain(domain: Domain): this { this.domain = domain; return this; }
+
+  /** Detached variable protobuf; edit a modelProto snapshot and rebuild to apply changes. */
+  get proto(): IntegerVariableProto {
+    const variable = liveModelProto(this.model).variables?.[this.index];
+    assert(variable, 'variable no longer exists in model');
+    return cloneProto(variable);
   }
 
   get modelProto() {
@@ -914,20 +991,15 @@ export class BoolVar extends IntVar {
   }
 }
 
-function isBoolExpression(value: LinearExprLike) {
-  return value instanceof BoolVar || value instanceof NotBoolVar;
-}
-
 export class NotBoolVar {
   readonly model: CpModel;
   readonly index: number;
-  readonly name: string;
-
   constructor(readonly variable: IntVar) {
     this.model = variable.model;
     this.index = -variable.index - 1;
-    this.name = variable.name ? `not(${variable.name})` : '';
   }
+
+  get name() { return this.variable.name ? `not(${this.variable.name})` : ''; }
 
   get modelProto() {
     return this.model.modelProto;
@@ -988,12 +1060,30 @@ export class IntervalVar {
   constructor(
     readonly model: CpModel,
     readonly index: number,
-    public name = '',
     private readonly start: LinearExprLike,
     private readonly size: LinearExprLike,
     private readonly end: LinearExprLike,
     private readonly isPresent?: LiteralLike,
   ) {}
+
+  get name() {
+    return liveModelProto(this.model).constraints?.[this.index]?.name ?? '';
+  }
+
+  set name(name: string) {
+    const constraint = liveModelProto(this.model).constraints?.[this.index];
+    assert(constraint?.interval !== undefined, 'interval no longer exists in model');
+    setProtoName(constraint, name, 'interval');
+  }
+
+  withName(name: string): this { this.name = name; return this; }
+
+  /** Detached interval protobuf, excluding its containing constraint metadata. */
+  get proto(): IntervalConstraintProto {
+    const interval = liveModelProto(this.model).constraints?.[this.index]?.interval;
+    assert(interval, 'interval no longer exists in model');
+    return cloneProto(interval);
+  }
 
   get modelProto() {
     return this.model.modelProto;
@@ -1038,16 +1128,24 @@ export class Constraint {
     readonly index: number,
   ) {}
 
+  /** Detached constraint protobuf; nested fields and arrays are copied. */
+  get proto(): ConstraintProto {
+    const constraint = liveModelProto(this.model).constraints?.[this.index];
+    assert(constraint, 'constraint no longer exists in model');
+    return cloneProto(constraint);
+  }
+
+  get modelProto(): CpModelProto { return this.model.modelProto; }
+
   get name() {
     return liveModelProto(this.model).constraints?.[this.index]?.name ?? '';
   }
 
-  withName(name: string) {
-    const constraint = liveModelProto(this.model).constraints?.[this.index];
-    assert(constraint, 'constraint no longer exists in model');
-    constraint.name = name;
-    return this;
+  set name(name: string) {
+    setProtoName(liveModelProto(this.model).constraints?.[this.index], name, 'constraint');
   }
+
+  withName(name: string): this { this.name = name; return this; }
 
   onlyEnforceIf(literals: LiteralLike | Iterable<LiteralLike>, ...rest: LiteralLike[]) {
     const values = literalList(literals, rest);
@@ -1132,8 +1230,8 @@ export function weightedSum(values: Iterable<LinearExprLike>, coeffs: Iterable<N
   return result;
 }
 
-export function term(variable: IntVar | NotBoolVar, coeff: NumericValue) {
-  return variable.times(coeff);
+export function term(variable: LinearExprLike, coeff: NumericValue) {
+  return LinearExpr.from(variable).times(coeff);
 }
 
 function formatDomain(domain: ProtoInt64[]) {
@@ -1155,58 +1253,168 @@ function isBooleanDomain(domain: ProtoInt64[]) {
   return domain.length === 2 && compareProtoInt64(domain[0], 0) >= 0 && compareProtoInt64(domain[1], 1) <= 0;
 }
 
+/** A canonical union of closed intervals over signed int64 values. */
 export class Domain {
-  readonly flatIntervals: ProtoInt64[];
+  private readonly intervals: bigint[];
 
+  constructor();
   constructor(lower: IntValue, upper?: IntValue);
   constructor(flatIntervals: Iterable<IntValue>);
-  constructor(lowerOrIntervals: IntValue | Iterable<IntValue>, upper?: IntValue) {
-    if (upper !== undefined) {
-      this.flatIntervals = [asInt64(lowerOrIntervals as IntValue), asInt64(upper)];
-      return;
+  constructor(lowerOrIntervals: IntValue | Iterable<IntValue> = [], upper?: IntValue) {
+    const flat = upper !== undefined
+      ? [toInt64(lowerOrIntervals as IntValue), toInt64(upper)]
+      : typeof lowerOrIntervals === 'number' || typeof lowerOrIntervals === 'bigint'
+        ? [toInt64(lowerOrIntervals), toInt64(lowerOrIntervals)]
+        : Array.from(lowerOrIntervals, (value) => toInt64(value));
+    rangeError(flat.length % 2 === 0, 'flat domain intervals must contain pairs of bounds');
+    const pairs: Array<[bigint, bigint]> = [];
+    for (let index = 0; index < flat.length; index += 2) {
+      if (flat[index] <= flat[index + 1]) pairs.push([flat[index], flat[index + 1]]);
     }
-    if (
-      typeof lowerOrIntervals === 'number'
-      || typeof lowerOrIntervals === 'bigint'
-    ) {
-      const value = asInt64(lowerOrIntervals);
-      this.flatIntervals = [value, value];
-      return;
+    pairs.sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+    this.intervals = [];
+    for (const [lower, upperBound] of pairs) {
+      const last = this.intervals.length - 1;
+      if (last >= 0 && lower <= this.intervals[last] + 1n) {
+        if (upperBound > this.intervals[last]) this.intervals[last] = upperBound;
+      } else {
+        this.intervals.push(lower, upperBound);
+      }
     }
-    this.flatIntervals = Array.from(lowerOrIntervals, asInt64);
   }
 
-  static fromFlatIntervals(intervals: Iterable<IntValue>) {
-    return new Domain(Array.from(intervals, (value) => toInt64(value)));
+  /** Detached bounds; editing them does not change this domain. */
+  get flatIntervals(): ProtoInt64[] {
+    return this.intervals.map(asInt64);
   }
+
+  flattenedIntervals(): ProtoInt64[] { return this.flatIntervals; }
+
+  static allValues() { return new Domain(INT64_MIN_BIGINT, INT64_MAX_BIGINT); }
+  static greaterOrEqual(value: IntValue) { return new Domain(value, INT64_MAX_BIGINT); }
+  static lowerOrEqual(value: IntValue) { return new Domain(INT64_MIN_BIGINT, value); }
+  static fromFlatIntervals(intervals: Iterable<IntValue>) { return new Domain(intervals); }
 
   static fromIntervals(intervals: Iterable<Iterable<IntValue>>) {
-    const flatIntervals: ProtoInt64[] = [];
+    const flat: bigint[] = [];
     for (const interval of intervals) {
-      const values = Array.from(interval, asInt64);
+      const values = Array.from(interval, (value) => toInt64(value));
       rangeError(values.length === 1 || values.length === 2, 'domain intervals must contain one or two bounds');
-      flatIntervals.push(values[0], values[1] ?? values[0]);
+      flat.push(values[0], values[1] ?? values[0]);
     }
-    return new Domain(flatIntervals.map(protoInt64ToBigInt));
+    return new Domain(flat);
   }
 
   static fromValues(values: Iterable<IntValue>) {
-    const exactValues = Array.from(values, (value) => toInt64(value));
-    const sortedValues = Array.from(new Set(exactValues)).sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
-    const flatIntervals: ProtoInt64[] = [];
-    for (const value of sortedValues) {
-      const lastUpper = flatIntervals[flatIntervals.length - 1];
-      if (lastUpper !== undefined && protoInt64ToBigInt(lastUpper) + 1n === value) {
-        flatIntervals[flatIntervals.length - 1] = asInt64(value);
-      } else {
-        const protoValue = asInt64(value);
-        flatIntervals.push(protoValue, protoValue);
-      }
-    }
-    return new Domain(flatIntervals.map(protoInt64ToBigInt));
+    return new Domain(Array.from(values, (value) => toInt64(value)).flatMap((value) => [value, value]));
   }
 
+  isEmpty() { return this.intervals.length === 0; }
+
+  contains(value: IntValue) {
+    const exact = toInt64(value);
+    for (let index = 0; index < this.intervals.length; index += 2) {
+      if (exact < this.intervals[index]) return false;
+      if (exact <= this.intervals[index + 1]) return true;
+    }
+    return false;
+  }
+
+  /** Like Python Domain.size(), cardinality saturates at INT64_MAX. */
+  size(): bigint {
+    let count = 0n;
+    for (let index = 0; index < this.intervals.length; index += 2) {
+      count += this.intervals[index + 1] - this.intervals[index] + 1n;
+      if (count >= INT64_MAX_BIGINT) return INT64_MAX_BIGINT;
+    }
+    return count;
+  }
+
+  min(): bigint {
+    stateError(!this.isEmpty(), 'empty domain has no minimum');
+    return this.intervals[0];
+  }
+
+  max(): bigint {
+    stateError(!this.isEmpty(), 'empty domain has no maximum');
+    return this.intervals[this.intervals.length - 1];
+  }
+
+  isIncludedIn(domain: Domain) {
+    let other = 0;
+    for (let index = 0; index < this.intervals.length; index += 2) {
+      while (other < domain.intervals.length && this.intervals[index + 1] > domain.intervals[other + 1]) other += 2;
+      if (other === domain.intervals.length || this.intervals[index] < domain.intervals[other]) return false;
+    }
+    return true;
+  }
+
+  overlapsWith(domain: Domain) { return !this.intersectionWith(domain).isEmpty(); }
+
+  intersectionWith(domain: Domain) {
+    const flat: bigint[] = [];
+    for (let left = 0, right = 0; left < this.intervals.length && right < domain.intervals.length;) {
+      const lower = this.intervals[left] > domain.intervals[right] ? this.intervals[left] : domain.intervals[right];
+      const upper = this.intervals[left + 1] < domain.intervals[right + 1] ? this.intervals[left + 1] : domain.intervals[right + 1];
+      if (lower <= upper) flat.push(lower, upper);
+      if (this.intervals[left + 1] < domain.intervals[right + 1]) left += 2;
+      else right += 2;
+    }
+    return new Domain(flat);
+  }
+
+  unionWith(domain: Domain) { return new Domain([...this.intervals, ...domain.intervals]); }
+
+  additionWith(domain: Domain) {
+    const flat: bigint[] = [];
+    for (let left = 0; left < this.intervals.length; left += 2) {
+      for (let right = 0; right < domain.intervals.length; right += 2) {
+        const lower = this.intervals[left] + domain.intervals[right];
+        const upper = this.intervals[left + 1] + domain.intervals[right + 1];
+        if (lower > INT64_MAX_BIGINT || upper < INT64_MIN_BIGINT) continue;
+        flat.push(lower < INT64_MIN_BIGINT ? INT64_MIN_BIGINT : lower,
+          upper > INT64_MAX_BIGINT ? INT64_MAX_BIGINT : upper);
+      }
+    }
+    return new Domain(flat);
+  }
+
+  complement() {
+    const flat: bigint[] = [];
+    let next = INT64_MIN_BIGINT;
+    for (let index = 0; index < this.intervals.length; index += 2) {
+      if (next < this.intervals[index]) flat.push(next, this.intervals[index] - 1n);
+      if (this.intervals[index + 1] === INT64_MAX_BIGINT) return new Domain(flat);
+      next = this.intervals[index + 1] + 1n;
+    }
+    flat.push(next, INT64_MAX_BIGINT);
+    return new Domain(flat);
+  }
+
+  negation() {
+    const flat: bigint[] = [];
+    for (let index = this.intervals.length - 2; index >= 0; index -= 2) {
+      if (this.intervals[index + 1] === INT64_MIN_BIGINT) continue;
+      flat.push(-this.intervals[index + 1], this.intervals[index] === INT64_MIN_BIGINT
+        ? INT64_MAX_BIGINT : -this.intervals[index]);
+    }
+    return new Domain(flat);
+  }
+
+  toString() {
+    if (this.isEmpty()) return '[]';
+    const pieces: string[] = [];
+    for (let index = 0; index < this.intervals.length; index += 2) {
+      const lower = this.intervals[index];
+      const upper = this.intervals[index + 1];
+      pieces.push(lower === upper ? `[${lower}]` : `[${lower},${upper}]`);
+    }
+    return pieces.join('');
+  }
+
+  repr() { return `Domain(${this})`; }
 }
+
 
 export class CpModel {
   private readonly model: CpModelProto;
@@ -1254,7 +1462,7 @@ export class CpModel {
     const index = this.model.variables?.length ?? 0;
     const domain = [asInt64(lb), asInt64(ub)];
     this.model.variables?.push(compareProtoInt64(domain[0], domain[1]) <= 0 ? { name, domain } : { name });
-    const variable = new IntVar(this, index, name);
+    const variable = new IntVar(this, index);
     this.intVariables.set(index, variable);
     return variable;
   }
@@ -1263,7 +1471,7 @@ export class CpModel {
     const index = this.model.variables?.length ?? 0;
     const flatDomain = [...domain.flatIntervals];
     this.model.variables?.push({ name, domain: flatDomain });
-    const variable = new IntVar(this, index, name);
+    const variable = new IntVar(this, index);
     this.intVariables.set(index, variable);
     return variable;
   }
@@ -1271,7 +1479,7 @@ export class CpModel {
   newBoolVar(name = '') {
     const index = this.model.variables?.length ?? 0;
     this.model.variables?.push({ name, domain: [0, 1] });
-    const variable = new BoolVar(this, index, name);
+    const variable = new BoolVar(this, index);
     this.intVariables.set(index, variable);
     return variable;
   }
@@ -1291,7 +1499,7 @@ export class CpModel {
     if (existing !== undefined) {
       return existing;
     }
-    const variable = new IntVar(this, index, variables[index]?.name ?? '');
+    const variable = new IntVar(this, index);
     this.intVariables.set(index, variable);
     return variable;
   }
@@ -1321,7 +1529,6 @@ export class CpModel {
     return new IntervalVar(
       this,
       index,
-      constraint.name ?? '',
       this.expressionFromProto(interval.start),
       this.expressionFromProto(interval.size),
       this.expressionFromProto(interval.end),
@@ -1333,7 +1540,9 @@ export class CpModel {
     const exact = toInt64(value);
     const existingIndex = this.constantIndexes.get(exact);
     if (existingIndex !== undefined) {
-      return existingIndex;
+      const domain = this.model.variables?.[existingIndex]?.domain ?? [];
+      if (domain.length === 2 && protoInt64ToBigInt(domain[0]) === exact && protoInt64ToBigInt(domain[1]) === exact) return existingIndex;
+      this.constantIndexes.delete(exact);
     }
     const index = this.model.variables?.length ?? 0;
     const protoValue = asInt64(exact);
@@ -1379,6 +1588,20 @@ export class CpModel {
         domain: adjustedDomain,
       },
     });
+  }
+
+  /** Constrain an integer linear expression to a possibly sparse domain. */
+  addLinearExpressionInDomain(expression: LinearExprLike, domain: Domain) {
+    if (!(domain instanceof Domain)) throw new TypeError('addLinearExpressionInDomain requires a Domain');
+    const expr = LinearExpr.from(expression);
+    this.checkExpressionModel(expr);
+    rangeError(expr.isInteger(), 'linear constraints require integer expressions');
+    if (expr.terms.size === 0) {
+      return this.pushConstraint(domain.contains(expr.offset as bigint)
+        ? { boolAnd: { literals: [] } }
+        : { boolOr: { literals: [] } });
+    }
+    return this.addLinearConstraint(expr, INT64_MIN_BIGINT, INT64_MAX_BIGINT, domain.flatIntervals);
   }
 
   addEquality(left: LinearExprLike, right: LinearExprLike) {
@@ -1584,25 +1807,14 @@ export class CpModel {
   addMapDomain(variable: IntVar, booleanVariables: Iterable<BoolVar>, offset: IntValue = 0n) {
     requireSameModel(this, variable.model, 'map domain variable');
     const exactOffset = toInt64(offset);
-    for (const [index, literal] of Array.from(booleanVariables).entries()) {
-      requireSameModel(this, literal.model, 'map domain literal');
+    const literals = Array.from(booleanVariables);
+    literalReferences(this, literals);
+    if (literals.length) toInt64(exactOffset + BigInt(literals.length - 1), 'map domain value');
+    for (const [index, literal] of literals.entries()) {
       const value = exactOffset + BigInt(index);
-      this.pushConstraint({
-        enforcementLiteral: [literal.index],
-        linear: {
-          vars: [variable.index],
-          coeffs: [1],
-          domain: [asInt64(value), asInt64(value)],
-        },
-      });
-      this.pushConstraint({
-        enforcementLiteral: [literal.negated().index],
-        linear: {
-          vars: [variable.index],
-          coeffs: [1],
-          domain: [INT64_MIN, asInt64(value - 1n), asInt64(value + 1n), INT64_MAX],
-        },
-      });
+      const domain = new Domain(value);
+      this.addLinearExpressionInDomain(variable, domain).onlyEnforceIf(literal);
+      this.addLinearExpressionInDomain(variable, domain.complement()).onlyEnforceIf(literal.negated());
     }
   }
 
@@ -1619,11 +1831,8 @@ export class CpModel {
   }
 
   newOptionalIntervalVar(start: LinearExprLike, size: LinearExprLike, end: LinearExprLike, isPresent: LiteralLike, name = '') {
-    if (!(isPresent instanceof BoolVar || isPresent instanceof NotBoolVar || typeof isPresent === 'boolean' || isPresent === 0 || isPresent === 1)) {
+    if (!(isPresent instanceof IntVar && isPresent.isBoolean() || isPresent instanceof NotBoolVar || typeof isPresent === 'boolean' || isPresent === 0 || isPresent === 1)) {
       throw new TypeError('optional interval presence literal must be Boolean');
-    }
-    if (this.hasBooleanExpressionTerm(start) || this.hasBooleanExpressionTerm(size) || this.hasBooleanExpressionTerm(end)) {
-      throw new TypeError('optional interval start, size, and end must be integer expressions');
     }
     return this.pushInterval({ start, size, end, isPresent, name });
   }
@@ -1699,11 +1908,15 @@ export class CpModel {
     this.model.solutionHint.values?.push(asInt64(hintValue));
   }
 
+  clearHints() {
+    delete this.model.solutionHint;
+  }
+
   addAssumption(literal: LiteralLike) {
     const index = literalIndex(literal);
     assert(typeof index === 'number', 'assumptions require variable literals');
     assert(
-      literal instanceof BoolVar || literal instanceof NotBoolVar,
+      literal instanceof IntVar || literal instanceof NotBoolVar,
       'assumptions require variable literals',
     );
     requireSameModel(this, literal.model, 'assumption literal');
@@ -1758,21 +1971,31 @@ export class CpModel {
     };
   }
 
+  clearObjective() {
+    delete this.model.objective;
+    delete this.model.floatingPointObjective;
+  }
+
   hasObjective() {
     return this.model.objective !== undefined || this.model.floatingPointObjective !== undefined;
   }
 
-  modelStats() {
-    return JSON.stringify({
-      variables: this.model.variables?.length ?? 0,
-      constraints: this.model.constraints?.length ?? 0,
-      hasObjective: this.hasObjective(),
-    });
+  exportModelProto(): Promise<Uint8Array> {
+    return CpSat.createModel(liveModelProto(this));
   }
 
-  async validate() {
+  exportModelText(options: CpSatValidateOptions = {}): Promise<string> {
+    return CpSat.exportModelText(liveModelProto(this), options);
+  }
+
+  async modelStats(options: CpSatValidateOptions = {}): Promise<string> {
+    const modelBytes = await CpSat.createModel(liveModelProto(this));
+    return CpSat.modelStats(modelBytes, options);
+  }
+
+  async validate(options: CpSatValidateOptions = {}) {
     const modelBytes = await CpSat.createModel(this.model);
-    const validation = await CpSat.validate(modelBytes);
+    const validation = await CpSat.validate(modelBytes, options);
     return validation.ok ? '' : validation.message;
   }
 
@@ -1785,12 +2008,15 @@ export class CpModel {
         end: this.expressionProto(input.end),
       },
     };
+    for (const [part, expression] of Object.entries(constraint.interval!)) {
+      if ((expression.vars?.length ?? 0) > 1) throw new TypeError(`interval ${part} must be affine or constant`);
+    }
     if (input.isPresent !== undefined) {
       constraint.enforcementLiteral = literalReferences(this, [input.isPresent]);
     }
     const index = this.model.constraints?.length ?? 0;
     this.model.constraints?.push(constraint);
-    return new IntervalVar(this, index, input.name, input.start, input.size, input.end, input.isPresent);
+    return new IntervalVar(this, index, input.start, input.size, input.end, input.isPresent);
   }
 
   private pushConstraint(constraint: ConstraintProto) {
@@ -1811,17 +2037,23 @@ export class CpModel {
     return expr.toProto();
   }
 
-  private expressionFromProto(proto: LinearExpressionProto | undefined): LinearExprLike {
-    if (proto === undefined) {
-      return 0n;
-    }
+  rebuildFromLinearExpressionProto(proto: LinearExpressionProto): LinearExpr {
+    if (!proto || typeof proto !== 'object' || Array.isArray(proto) || proto instanceof Uint8Array) throw new TypeError('expected a LinearExpressionProto object');
+    const vars = proto.vars ?? [], coeffs = proto.coeffs ?? [];
+    if (!Array.isArray(vars) || !Array.isArray(coeffs)) throw new TypeError('expression vars and coeffs must be arrays');
+    rangeError(vars.length === coeffs.length, 'expression vars and coeffs lengths must match');
     const terms = new Map<number, NumericValue>();
-    const vars = proto.vars ?? [];
-    const coeffs = proto.coeffs ?? [];
     for (let index = 0; index < vars.length; index += 1) {
-      mergeTerms(terms, vars[index], protoInt64ToBigInt(coeffs[index]));
+      const variable = this.getIntVarFromProtoIndex(vars[index]);
+      mergeTerms(terms, variable.index, protoInt64ToBigInt(coeffs[index]));
     }
-    return new LinearExpr(this, terms, protoInt64ToBigInt(proto.offset ?? 0));
+    const expression = new LinearExpr(this, terms, protoInt64ToBigInt(proto.offset ?? 0));
+    expression.toProto(); // Check that combining duplicate terms did not overflow int64.
+    return expression;
+  }
+
+  private expressionFromProto(proto: LinearExpressionProto | undefined): LinearExprLike {
+    return proto === undefined ? 0n : this.rebuildFromLinearExpressionProto(proto);
   }
 
   private literalFromProtoIndex(index: number): LiteralLike {
@@ -1852,20 +2084,16 @@ export class CpModel {
     });
   }
 
-  private hasBooleanExpressionTerm(expression: LinearExprLike) {
-    if (isBoolExpression(expression)) {
-      return true;
-    }
-    const expr = LinearExpr.from(expression);
-    this.checkExpressionModel(expr);
-    return Array.from(expr.terms.keys()).some((index) => {
-      const domain = this.model.variables?.[index]?.domain ?? [];
-      return isBooleanDomain(domain);
-    });
-  }
 }
 
+let setCallbackStopAction: (callback: CpSolverSolutionCallback, action: (() => void) | null) => void;
+let runSolutionCallback: (callback: CpSolverSolutionCallback, response: CpSolverResponse) => void;
+
 export class CpSolverSolutionCallback {
+  private stopAction: (() => void) | null = null;
+
+  stopSearch() { this.stopAction?.(); }
+
   private currentResponse: CpSolverResponse | null = null;
 
   onSolutionCallback() {}
@@ -1896,21 +2124,43 @@ export class CpSolverSolutionCallback {
     return this.requireCurrentResponse().wallTime ?? 0;
   }
 
-  _run(response: CpSolverResponse) {
-    this.currentResponse = response;
-    try {
-      this.onSolutionCallback();
-    } finally {
-      this.currentResponse = null;
-    }
+  hasResponse() { return this.currentResponse !== null; }
+
+  get responseProto() { return structuredClone(this.requireCurrentResponse()); }
+  get numBooleans() { return protoInt64ToNumber(this.requireCurrentResponse().numBooleans); }
+  get numConflicts() { return protoInt64ToNumber(this.requireCurrentResponse().numConflicts); }
+  get numBranches() { return protoInt64ToNumber(this.requireCurrentResponse().numBranches); }
+  get numIntegerPropagations() { return protoInt64ToNumber(this.requireCurrentResponse().numIntegerPropagations); }
+  get numBinaryPropagations() { return protoInt64ToNumber(this.requireCurrentResponse().numBinaryPropagations); }
+  get deterministicTime() { return this.requireCurrentResponse().deterministicTime ?? 0; }
+  get userTime() { return this.requireCurrentResponse().userTime ?? 0; }
+
+  static {
+    setCallbackStopAction = (callback, action) => { callback.stopAction = action; };
+    runSolutionCallback = (callback, response) => {
+      callback.currentResponse = structuredClone(response);
+      callback.onSolutionCallback();
+    };
   }
 
   private requireCurrentResponse() {
     if (!this.currentResponse) {
-      throw new Error('solve() has not started or the callback is not currently running');
+      throw new Error('callback has not received a solver response');
     }
     return this.currentResponse;
   }
+}
+
+let createCpResult: (model: CpModel, response: CpSolverResponse | null, variableCount: number,
+  statistics: string | null) => CpResult;
+let captureCpResult: (solver: CpSolver, model: CpModel, variableCount: number) => CpResult;
+
+/** Internal entry point for the public CpSat.solve() operation. */
+export async function solveCpModel(model: CpModel, options: CpSolverSolveOptions = {}): Promise<CpResult> {
+  const variableCount = liveModelProto(model).variables?.length ?? 0;
+  const solver = new CpSolver();
+  await solver.solve(model, options);
+  return captureCpResult(solver, model, variableCount);
 }
 
 /** The answer to one solve; later model edits and solves do not change it. */
@@ -1918,14 +2168,18 @@ export class CpResult {
   private readonly answer: CpSolverResponse | null;
   readonly status: CpSolverResponse['status'];
 
-  constructor(
+  private constructor(
     private readonly model: CpModel,
     response: CpSolverResponse | null,
     private readonly variableCount: number,
+    private readonly statistics: string | null,
   ) {
     this.answer = response === null ? null : cloneProto(response);
     this.status = this.answer?.status;
   }
+
+  static { createCpResult = (model, response, variableCount, statistics) =>
+    new CpResult(model, response, variableCount, statistics); }
 
   get response(): CpSolverResponse | null {
     return this.answer === null ? null : cloneProto(this.answer);
@@ -1968,6 +2222,35 @@ export class CpResult {
     return this.answer?.bestObjectiveBound ?? null;
   }
 
+  get wallTime(): number { return this.requireResponse().wallTime ?? 0; }
+  get userTime(): number { return this.requireResponse().userTime ?? 0; }
+  get deterministicTime(): number { return this.requireResponse().deterministicTime ?? 0; }
+  get numIntegers(): number { return protoInt64ToNumber(this.requireResponse().numIntegers); }
+  get numBooleans(): number { return protoInt64ToNumber(this.requireResponse().numBooleans); }
+  get numConflicts(): number { return protoInt64ToNumber(this.requireResponse().numConflicts); }
+  get numBranches(): number { return protoInt64ToNumber(this.requireResponse().numBranches); }
+  get numIntegerPropagations(): number { return protoInt64ToNumber(this.requireResponse().numIntegerPropagations); }
+  get numBinaryPropagations(): number { return protoInt64ToNumber(this.requireResponse().numBinaryPropagations); }
+  get solveLog(): string | undefined { return this.requireResponse().solveLog; }
+  get solutionInfo(): string { return this.requireResponse().solutionInfo ?? ''; }
+
+  statusName(): string { return cpSolverStatusName(this.status); }
+
+  sufficientAssumptionsForInfeasibility(): number[] {
+    return [...(this.requireResponse().sufficientAssumptionsForInfeasibility ?? [])];
+  }
+
+  responseStats(): string {
+    this.requireResponse();
+    stateError(this.statistics !== null, 'native response statistics are unavailable');
+    return this.statistics;
+  }
+
+  private requireResponse(): CpSolverResponse {
+    stateError(this.answer !== null, 'solve result has no solver response');
+    return this.answer;
+  }
+
   private requireSolution(): CpSolverResponse {
     stateError(this.hasSolution && this.answer !== null, 'solve result has no solution');
     return this.answer;
@@ -1975,7 +2258,14 @@ export class CpResult {
 }
 
 export class CpSolver {
+  static { captureCpResult = (solver, model, variableCount) =>
+    createCpResult(model, solver.lastResponse, variableCount, solver.lastResponseStatistics); }
+  private stopAction: (() => void) | null = null;
+
+  stopSearch() { this.stopAction?.(); }
+
   private lastResponse: CpSolverResponse | null = null;
+  private lastResponseStatistics: string | null = null;
   private solving = false;
   readonly parameters: CpSatSolverParameters = {};
   bestBoundCallback: ((bound: number) => void) | null = null;
@@ -2002,48 +2292,75 @@ export class CpSolver {
       signal,
       ...solverParameters
     } = options;
-    const mergedParams = { ...this.parameters, ...solverParameters };
-    const modelBytes = await CpSat.createModel(liveModelProto(model));
-    const hasInternalEvents = Boolean(solutionCallback || this.bestBoundCallback || this.logCallback);
-    let eventMask = requestedEventMask;
-    if (hasInternalEvents && (eventMask || !onEvent)) {
-      eventMask = {
-        solution: Boolean(solutionCallback) || Boolean(eventMask?.solution),
-        bestBound: Boolean(this.bestBoundCallback) || Boolean(eventMask?.bestBound),
-        log: Boolean(this.logCallback) || Boolean(eventMask?.log),
+    const controller = new AbortController();
+    let stopped = false;
+    let observedResponse: CpSolverResponse | null = null;
+    const stopReason = new Error('CP-SAT search stopped.');
+    stopReason.name = 'AbortError';
+    const externalAbort = () => controller.abort(signal?.reason);
+    signal?.addEventListener('abort', externalAbort, { once: true });
+    if (signal?.aborted) externalAbort();
+    this.lastResponse = null;
+    this.lastResponseStatistics = null;
+    this.stopAction = () => { stopped = true; controller.abort(stopReason); };
+    if (solutionCallback) setCallbackStopAction(solutionCallback, this.stopAction);
+    try {
+      const mergedParams = { ...this.parameters, ...solverParameters };
+      const modelBytes = await CpSat.createModel(liveModelProto(model));
+      // Observe candidates internally so stopSearch() can return the last feasible solution.
+      // User event subscriptions keep their requested mask.
+      const userEventMask = requestedEventMask ?? (onEvent
+        ? { solution: true, bestBound: true, log: true }
+        : {});
+      const eventMask = {
+        solution: true,
+        bestBound: Boolean(this.bestBoundCallback) || Boolean(userEventMask.bestBound),
+        log: Boolean(this.logCallback) || Boolean(userEventMask.log),
       };
+      const result = await CpSat.solveProto(modelBytes, {
+        ...mergedParams,
+        executor,
+        signal: controller.signal,
+        eventMask,
+        onEvent: async (event) => {
+              if (stopped && (event.type === 'solution' || event.type === 'bestBound' || event.type === 'log')) return;
+              if (event.type === 'solution') {
+                observedResponse = structuredClone(event.response);
+                if (solutionCallback) runSolutionCallback(solutionCallback, event.response);
+              } else if (event.type === 'bestBound') {
+                this.bestBoundCallback?.(event.bound);
+              } else if (event.type === 'log') {
+                this.logCallback?.(event.message);
+              }
+              if (event.type !== 'solution' && event.type !== 'bestBound' && event.type !== 'log'
+                || userEventMask[event.type]) await onEvent?.(event);
+            },
+      });
+      this.lastResponse = result.response;
+      this.lastResponseStatistics = result.statistics ?? null;
+      return result.response?.status;
+    } catch (error) {
+      if (!stopped || signal?.aborted || !(error instanceof Error) || error.name !== 'AbortError') throw error;
+      this.lastResponse = observedResponse
+        ? { ...(observedResponse as CpSolverResponse), status: CpSolverStatus.FEASIBLE }
+        : { status: CpSolverStatus.UNKNOWN };
+      this.lastResponseStatistics = await CpSat.responseStats(this.lastResponse, { executor });
+      return this.lastResponse.status;
+    } finally {
+      signal?.removeEventListener('abort', externalAbort);
+      this.stopAction = null;
+      if (solutionCallback) setCallbackStopAction(solutionCallback, null);
     }
-    const result = await CpSat.solveProto(modelBytes, {
-      ...mergedParams,
-      executor,
-      signal,
-      eventMask,
-      onEvent: hasInternalEvents || onEvent
-        ? async (event) => {
-            if (event.type === 'solution') {
-              solutionCallback?._run(event.response);
-            } else if (event.type === 'bestBound') {
-              this.bestBoundCallback?.(event.bound);
-            } else if (event.type === 'log') {
-              this.logCallback?.(event.message);
-            }
-            await onEvent?.(event);
-          }
-        : undefined,
-    });
-    this.lastResponse = result.response;
-    return result.response?.status;
   }
 
   get response() {
-    return this.lastResponse;
+    return this.lastResponse === null ? null : cloneProto(this.lastResponse);
   }
 
   responseStats() {
-    return JSON.stringify(
-      this.requireResponse(),
-      (_key, value) => typeof value === 'bigint' ? value.toString() : value,
-    );
+    this.requireResponse();
+    stateError(this.lastResponseStatistics !== null, 'native response statistics are unavailable');
+    return this.lastResponseStatistics;
   }
 
   get deterministicTime() {
@@ -2117,14 +2434,25 @@ export class CpSolver {
   }
 
   statusName(status = this.lastResponse?.status) {
-    if (typeof status === 'string') {
-      return status;
-    }
-    return CpSolverStatus[status as CpSolverStatus] ?? String(status);
+    return cpSolverStatusName(status);
+  }
+
+  sufficientAssumptionsForInfeasibility(): number[] {
+    return [...(this.requireResponse().sufficientAssumptionsForInfeasibility ?? [])];
   }
 
   private requireResponse() {
     stateError(this.lastResponse !== null, 'solve() has not completed with a solver response');
     return this.lastResponse;
   }
+}
+
+function cpSolverStatusName(status: CpSolverResponse['status']): string {
+  return typeof status === 'string' ? status : CpSolverStatus[status as CpSolverStatus] ?? String(status);
+}
+
+/** Rebuild an integer expression bound to the supplied model's variable IDs. */
+export function rebuildFromLinearExpressionProto(proto: LinearExpressionProto, model: CpModel): LinearExpr {
+  if (!(model instanceof CpModel)) throw new TypeError('expression reconstruction requires a CpModel');
+  return model.rebuildFromLinearExpressionProto(proto);
 }

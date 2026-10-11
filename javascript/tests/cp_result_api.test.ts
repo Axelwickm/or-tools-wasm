@@ -9,7 +9,8 @@ import { cpModelProtoSchema } from '../lib/generated/cp_sat_schemas.ts';
 test('CpSat.solve(model) owns its result and keeps the proto solve path', async () => {
   const type = protobuf.parse(cpModelProtoSchema).root.lookupType('operations_research.sat.CpSolverResponse');
   const responses = [3, 7].map((value) => [...type.encode(type.fromObject({
-    status: 'OPTIMAL', solution: [value], objectiveValue: value,
+    status: 'OPTIMAL', solution: [value], objectiveValue: value, wallTime: value / 10,
+    numBranches: value, numConflicts: value, userTime: value / 20, deterministicTime: value / 100,
   })).finish()]);
   const directory = await mkdtemp(fileURLToPath(new URL('.cp-result-', import.meta.url)));
   try {
@@ -25,13 +26,13 @@ test('CpSat.solve(model) owns its result and keeps the proto solve path', async 
           export class DirectCpSatExecutor {
             execute() {
               const response = Uint8Array.from(responses[Math.min(next++, responses.length - 1)]);
-              return { result: Promise.resolve({ type: 'solve', response }) };
+              return { result: Promise.resolve({ type: 'solve', response, statistics: 'native report ' + next }) };
             }
           }
         ` }));
       } }],
     });
-    const { CpSat, CpModel } = await import(outfile);
+    const { CpSat, CpModel, CpSolver, CpSolverSolutionCallback } = await import(outfile);
     const model = new CpModel();
     const x = model.newIntVar(0, 10, 'x');
     const first = await CpSat.solve(model, { executor: 'direct' });
@@ -40,6 +41,24 @@ test('CpSat.solve(model) owns its result and keeps the proto solve path', async 
     assert.equal(first.objectiveValue, 3);
     assert.equal(first.value(x), 3n);
     assert.equal(second.value(x), 7n);
+    assert.equal(first.wallTime, 0.3);
+    assert.equal(first.userTime, 0.15);
+    assert.equal(first.deterministicTime, 0.03);
+    assert.equal(first.numBranches, 3);
+    assert.equal(first.numConflicts, 3);
+    assert.equal(first.numIntegerPropagations, 0);
+    assert.equal(first.statusName(), 'OPTIMAL');
+    assert.equal(first.responseStats(), 'native report 1');
+    assert.equal(second.responseStats(), 'native report 2');
+    const solver = new CpSolver();
+    await solver.solve(model, { executor: 'direct' });
+    solver.response.solution[0] = 99n;
+    solver.response.numBranches = 99n;
+    assert.equal(solver.value(x), 7n);
+    assert.equal(solver.numBranches, 7);
+    const callback = new CpSolverSolutionCallback();
+    assert.equal('_run' in callback, false);
+    assert.equal('_setStopSearchAction' in callback, false);
     const later = model.newIntVar(0, 1, 'later');
     assert.throws(() => first.value(later), /added after this solve/);
     assert.throws(() => first.value(new CpModel().newIntVar(0, 1, 'foreign')), /different CpModel/);

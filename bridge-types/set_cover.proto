@@ -12,6 +12,21 @@ enum SetCoverOperation {
   SET_COVER_OPERATION_STEEPEST = 6;
   SET_COVER_OPERATION_GUIDED_LOCAL = 7;
   SET_COVER_OPERATION_GUIDED_TABU = 8;
+  SET_COVER_OPERATION_INSPECT = 9;
+  SET_COVER_OPERATION_STATISTICS = 10;
+  SET_COVER_OPERATION_GUIDED_TABU_PARAMETERS = 11;
+  SET_COVER_OPERATION_SESSION_CREATE = 12;
+  SET_COVER_OPERATION_SESSION_NEXT = 13;
+  SET_COVER_OPERATION_SESSION_INITIALIZE = 14;
+  SET_COVER_OPERATION_SESSION_DELETE = 15;
+  SET_COVER_OPERATION_COMPRESS_TRACE = 16;
+}
+
+message SetCoverGuidedTabuParameters {
+  optional double lagrangian_factor = 1;
+  optional double epsilon = 2;
+  optional double penalty_factor = 3;
+  optional int32 tabu_list_size = 4;
 }
 
 message SetCoverBridgeRequest {
@@ -23,6 +38,29 @@ message SetCoverBridgeRequest {
   repeated bool focus = 6;
   bool has_focus = 7;
   double max_iterations = 8;
+  optional double time_limit_seconds = 9;
+  reserved 10;
+  reserved "consistency";
+  repeated int32 focus_indices = 11;
+  // 0: costs, 1: rows, 2: columns, 3: row deciles, 4: column deciles.
+  int32 statistics_kind = 12;
+  SetCoverGuidedTabuParameters guided_tabu_parameters = 13;
+  uint64 session_handle = 14;
+  SetCoverOperation session_algorithm = 15;
+  SetCoverTrace trace = 16;
+  int32 num_subsets = 17;
+}
+
+message SetCoverTraceDecision { int32 subset = 1; bool selected = 2; }
+message SetCoverTrace { repeated SetCoverTraceDecision decisions = 1; }
+
+message SetCoverStatistics {
+  double min = 1;
+  double max = 2;
+  double median = 3;
+  double mean = 4;
+  double stddev = 5;
+  double iqr = 6;
 }
 
 message SetCoverBridgeResponse {
@@ -34,4 +72,14 @@ message SetCoverBridgeResponse {
   repeated int32 num_free_elements = 6;
   repeated int32 num_coverage_le_1_elements = 7;
   repeated bool is_redundant = 8;
+  reserved 9;
+  reserved "consistent";
+  repeated bool computed_redundancy = 10;
+  double cost_lower_bound = 11;
+  repeated int32 focus_coverage = 12;
+  SetCoverStatistics statistics = 13;
+  repeated int64 deciles = 14;
+  SetCoverGuidedTabuParameters guided_tabu_parameters = 15;
+  uint64 session_handle = 16;
+  SetCoverTrace trace = 17;
 }

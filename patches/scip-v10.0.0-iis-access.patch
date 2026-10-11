@@ -1,0 +1,41 @@
+diff --git a/src/scip/pub_iisfinder.h b/src/scip/pub_iisfinder.h
+--- a/src/scip/pub_iisfinder.h
++++ b/src/scip/pub_iisfinder.h
+@@ -147,6 +147,13 @@
+    SCIP_IIS*             iis                 /**< pointer to the IIS */
+    );
+-
++
++/** Native copy mappings from source variables/constraints to the IIS subscip.
++ *  Images whose objects were removed from the subscip are no longer members. */
++SCIP_EXPORT
++SCIP_HASHMAP* SCIPiisGetVarsMap(SCIP_IIS* iis);
++SCIP_EXPORT
++SCIP_HASHMAP* SCIPiisGetConssMap(SCIP_IIS* iis);
++
+ /** compares two IIS finders w. r. to their priority */
+ SCIP_EXPORT
+ SCIP_DECL_SORTPTRCOMP(SCIPiisfinderComp);
+diff --git a/src/scip/iisfinder.c b/src/scip/iisfinder.c
+--- a/src/scip/iisfinder.c
++++ b/src/scip/iisfinder.c
+@@ -936,6 +936,18 @@
+    return iis->subscip;
+ }
+-
++
++SCIP_HASHMAP* SCIPiisGetVarsMap(SCIP_IIS* iis)
++{
++   assert( iis != NULL );
++   return iis->varsmap;
++}
++
++SCIP_HASHMAP* SCIPiisGetConssMap(SCIP_IIS* iis)
++{
++   assert( iis != NULL );
++   return iis->conssmap;
++}
++
+ /** compares two IIS finders w. r. to their priority */
+ SCIP_DECL_SORTPTRCOMP(SCIPiisfinderComp)
+ {  /*lint --e{715}*/

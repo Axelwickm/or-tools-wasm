@@ -47,17 +47,12 @@ export async function runKnapsackConcurrencyCase(
 
   const sharedSolver = createSolver(api, 8, 'shared-instance');
   const workerSolve = sharedSolver.solve({ executor: 'worker' });
-  let instanceError: unknown;
-  try {
-    await sharedSolver.solve({ executor: 'direct' });
-  } catch (error) {
-    instanceError = error;
+  sharedSolver.init([3, 9], [[1, 1]], [1]);
+  const directSolve = sharedSolver.solve({ executor: 'direct' });
+  const [worker, direct] = await Promise.all([workerSolve, directSolve]);
+  if (worker.profit !== 26n || direct.profit !== 9n) {
+    throw new Error('Concurrent Knapsack results must use their own captured inputs');
   }
-  if (!(instanceError instanceof Error) || instanceError.name !== 'RuntimeError') {
-    throw new Error(`expected RuntimeError, got ${String(instanceError)}`);
-  }
-  await workerSolve;
-  await sharedSolver.solve({ executor: 'direct' });
 
   return {
     id: 'knapsack.executor.concurrency',

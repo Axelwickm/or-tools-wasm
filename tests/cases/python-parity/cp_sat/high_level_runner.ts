@@ -9,6 +9,8 @@ type HighLevelCpSatPackage = {
   CpSolverSolutionCallback: unknown;
   Domain: unknown;
   LinearExpr: unknown;
+  BoundedLinearExpr: unknown;
+  rebuildFromLinearExpressionProto: unknown;
   DecisionStrategyProto_DomainReductionStrategy: unknown;
   DecisionStrategyProto_VariableSelectionStrategy: unknown;
   sum: unknown;
@@ -25,12 +27,22 @@ export function cpSatHighLevelApiFromPackage(api: HighLevelCpSatPackage) {
       return super.solve(model, { ...options, executor });
     }
   }
+  const BaseCpModel = api.CpModel as new () => {
+    modelStats(options?: Record<string, unknown>): Promise<string>;
+  };
+  class FixtureCpModel extends BaseCpModel {
+    override modelStats(options: Record<string, unknown> = {}) {
+      return super.modelStats({ ...options, executor });
+    }
+  }
   const highLevelApi = {
-    CpModel: api.CpModel,
+    CpModel: FixtureCpModel,
     CpSolver: FixtureCpSolver,
     CpSolverSolutionCallback: api.CpSolverSolutionCallback,
     Domain: api.Domain,
     LinearExpr: api.LinearExpr,
+    BoundedLinearExpr: api.BoundedLinearExpr,
+    rebuildFromLinearExpressionProto: api.rebuildFromLinearExpressionProto,
     DecisionStrategyProto_DomainReductionStrategy: api.DecisionStrategyProto_DomainReductionStrategy,
     DecisionStrategyProto_VariableSelectionStrategy: api.DecisionStrategyProto_VariableSelectionStrategy,
     setFixtureExecutor: (configuration: CpSatExecutorConfiguration) => {

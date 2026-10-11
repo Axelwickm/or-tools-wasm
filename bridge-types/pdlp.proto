@@ -40,6 +40,7 @@ message PdlpSolveParameters {
   optional int32 l_inf_ruiz_iterations = 5;
   optional bool l2_norm_rescaling = 6;
   optional int32 num_threads = 7;
+  bytes native_parameters = 8;
 }
 
 message PdlpInitialSolution {
@@ -59,6 +60,8 @@ message PdlpFromMpModelRequest {
   bytes mp_model_proto = 1;
   bool relax_integer_variables = 2;
   bool include_names = 3;
+  // 0: MPModelProto bytes, 1: MPS text, 2: MPModelProto textproto, 3: MPModelProto JSON.
+  int32 input_format = 4;
 }
 
 message PdlpToMpModelRequest {
@@ -69,6 +72,7 @@ message PdlpSolveRequest {
   PdlpQuadraticProgram quadratic_program = 1;
   PdlpSolveParameters parameters = 2;
   PdlpInitialSolution initial_solution = 3;
+  int32 callback_flags = 4;
 }
 
 message PdlpBridgeRequest {
@@ -87,6 +91,7 @@ message PdlpSolverResult {
   repeated double reduced_costs = 3;
   int32 termination_reason = 4;
   int32 iteration_count = 5;
+  bytes native_solve_log = 6;
 }
 
 message PdlpValidateResult {
@@ -116,5 +121,23 @@ message PdlpBridgeResponse {
     PdlpFromMpModelResult from_mp_model_result = 3;
     PdlpToMpModelResult to_mp_model_result = 4;
     PdlpSolveResult solve_result = 5;
+    PdlpSolveEvent solve_event = 6;
+  }
+}
+
+// Native callback snapshots retain full stats and criteria, including exact int64 fields.
+message PdlpIterationEvent {
+  int32 iteration_type = 1;
+  bytes iteration_stats = 2;
+  bytes termination_criteria = 3;
+  double l2_norm_primal_linear_objective = 4;
+  double l2_norm_constraint_bounds = 5;
+  double l_inf_norm_primal_linear_objective = 6;
+  double l_inf_norm_constraint_bounds = 7;
+}
+message PdlpSolveEvent {
+  oneof payload {
+    string log = 1;
+    PdlpIterationEvent iteration = 2;
   }
 }

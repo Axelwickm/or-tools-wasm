@@ -11,6 +11,7 @@ message KnapsackBridgeRequest {
   repeated int64 profits = 5;
   repeated KnapsackWeightDimension weights = 6;
   repeated int64 capacities = 7;
+  optional int32 num_workers = 8;
 }
 
 message KnapsackWeightDimension {

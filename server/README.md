@@ -9,9 +9,11 @@ Build and run it with Docker Compose:
 docker compose -f server/docker-compose.yml up --build
 ```
 
-The Dockerfile uses a BuildKit cache mount for the native CMake build tree, so
-rebuilding after server-only edits should reuse downloaded dependencies and
-previous OR-Tools objects.
+The Dockerfile caches the native CMake build tree and downloaded dependencies
+with BuildKit. It refreshes source timestamps before compiling to avoid reusing
+stale objects.
+Native compilation defaults to four parallel jobs; override it with the
+`NATIVE_BUILD_JOBS` Docker build argument when needed.
 
 To try it from the example site, select **Server** and enter the server endpoint.
 If authentication is enabled, enter the token in **Bearer token (optional)**
@@ -59,6 +61,7 @@ GET  /jobs/:id/events?after=:sequence
 GET  /jobs/:id/stream?after=:sequence
 GET  /jobs/:id/result
 POST /jobs/:id/cancel
+POST /jobs/:id/callback
 DELETE /jobs/:id
 ```
 
@@ -82,15 +85,18 @@ GET /jobs/:id/result           final result or execution failure; 204 while pend
 
 The server-sent event stream is the primary transport after a job acquires
 scheduler capacity. Queued jobs use the polling endpoints instead of occupying
-an HTTP worker with an idle stream. Each SSE `data` field is a base64-encoded
+an HTTP worker with an idle stream. Callback-enabled MathOpt solves use short
+polling requests so browser connection limits cannot block callback replies.
+Each SSE `data` field is a base64-encoded
 `SolverBridgeResponse`, so status, solver events, and terminal results retain
 the same protobuf contract as direct execution and the worker bridge. The
 stream closes after its terminal result or failure.
 
-Event reads are non-destructive. Each retained response has a monotonically
-increasing sequence ID, so clients can resume a stream or poll without losing
-or duplicating callbacks. The protobuf event and result endpoints remain
-available as a fallback when streaming is unavailable.
+Events have monotonically increasing sequence IDs so clients can resume reading.
+MathOpt callbacks require a correlated `SolverBridgeRequest.callback_reply` sent to
+`POST /jobs/:id/callback` within 30 seconds. The client handles this exchange;
+acknowledged callback payloads are released while their sequence metadata remains.
+The protobuf event and result endpoints remain available when streaming is unavailable.
 
 The native server registers CP-SAT, Knapsack, MathOpt, MPSolver, Network Flow,
 PDLP, Routing, and Set Cover executors. Each returns the same typed payload used
@@ -104,6 +110,12 @@ immediately.
 
 The server path is native C++. JavaScript remains only on the client/package
 side for selecting a server executor and sending bridge protobuf bytes.
+
+MathOpt, MPSolver and guided Set Cover sessions retain native state between jobs.
+Always await the session's `close()` to release it; completed-job retention does
+not close sessions. Restarting the server invalidates existing sessions. GLPK
+persistent sessions are unsupported on the server because its environment is
+owned by the creating thread; one-shot GLPK solves remain supported.
 
 ## JavaScript client
 

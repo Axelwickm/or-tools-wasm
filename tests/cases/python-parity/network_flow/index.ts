@@ -8,6 +8,7 @@ import {
   solverJobStates,
 } from '../../../harness/shared_case.ts';
 import { networkFlowExecutionOptions, setNetworkFlowMode } from './execution.ts';
+import { networkFlowNumericalCases } from '../../or-tools-wasm/network_flow/numerical.ts';
 
 export type NetworkFlowCaseResult = {
   id: string;
@@ -28,7 +29,9 @@ type SolveOptions = {
 };
 
 type SimpleMaxFlowLike = {
-  addArcsWithCapacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>): number[];
+  addArcWithCapacity(tail: number, head: number, capacity: number | bigint): number;
+  setArcCapacity(arc: number, capacity: number | bigint): void;
+  addArcsWithCapacity(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number | bigint>): number[];
   numNodes(): number;
   numArcs(): number;
   tail(arc: number): number;
@@ -41,8 +44,11 @@ type SimpleMaxFlowLike = {
 };
 
 type SimpleMinCostFlowLike = {
-  addArcsWithCapacityAndUnitCost(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number>, unitCosts: ArrayLike<number>): number[];
-  setNodesSupplies(nodes: ArrayLike<number>, supplies: ArrayLike<number>): void;
+  addArcWithCapacityAndUnitCost(tail: number, head: number, capacity: number | bigint, unitCost: number | bigint): number;
+  setArcCapacity(arc: number, capacity: number | bigint): void;
+  setNodeSupply(node: number, supply: number | bigint): void;
+  addArcsWithCapacityAndUnitCost(tails: ArrayLike<number>, heads: ArrayLike<number>, capacities: ArrayLike<number | bigint>, unitCosts: ArrayLike<number | bigint>): number[];
+  setNodesSupplies(nodes: ArrayLike<number>, supplies: ArrayLike<number | bigint>): void;
   numNodes(): number;
   numArcs(): number;
   tail(arc: number): number;
@@ -50,13 +56,14 @@ type SimpleMinCostFlowLike = {
   capacity(arc: number): bigint;
   unitCost(arc: number): bigint;
   supply(node: number): bigint;
-  solve(options?: SolveOptions): Promise<{
+  solve(options?: SolveOptions & { maxFlowWithMinCost?: boolean }): Promise<{
     status: number; optimalCost: bigint; maximumFlow: bigint; flow(arc: number): bigint; flows(arcs: ArrayLike<number>): bigint[];
   }>;
 };
 
 type SimpleLinearSumAssignmentLike = {
-  addArcsWithCost(leftNodes: ArrayLike<number>, rightNodes: ArrayLike<number>, costs: ArrayLike<number>): number[];
+  addArcWithCost(leftNode: number, rightNode: number, cost: number | bigint): number;
+  addArcsWithCost(leftNodes: ArrayLike<number>, rightNodes: ArrayLike<number>, costs: ArrayLike<number | bigint>): number[];
   numNodes(): number;
   numArcs(): number;
   leftNode(arc: number): number;
@@ -71,15 +78,15 @@ export type NetworkFlowApi = {
   SimpleMaxFlow: {
     new(): SimpleMaxFlowLike;
   };
-  SimpleMaxFlowStatus: { readonly OPTIMAL: 0 };
+  SimpleMaxFlowStatus: { readonly OPTIMAL: 0; readonly POSSIBLE_OVERFLOW: 1; readonly BAD_INPUT: 2 };
   SimpleMinCostFlow: {
     new(): SimpleMinCostFlowLike;
   };
-  SimpleMinCostFlowStatus: { readonly OPTIMAL: 1 };
+  SimpleMinCostFlowStatus: { readonly OPTIMAL: 1; readonly INFEASIBLE: 3; readonly UNBALANCED: 4; readonly BAD_COST_RANGE: 6; readonly BAD_CAPACITY_RANGE: 7 };
   SimpleLinearSumAssignment: {
     new(): SimpleLinearSumAssignmentLike;
   };
-  SimpleLinearSumAssignmentStatus: { readonly OPTIMAL: 0 };
+  SimpleLinearSumAssignmentStatus: { readonly OPTIMAL: 0; readonly INFEASIBLE: 1; readonly POSSIBLE_OVERFLOW: 2 };
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -261,6 +268,57 @@ export const networkFlowCases: NetworkFlowCase[] = [
     run: (api, context) => runAssignmentSample(api, context.mode ?? 'direct'),
   },
 ];
+
+networkFlowCases.push({
+  id: 'network_flow.native.max_flow_capacity_reuse', name: 'SimpleMaxFlow.capacity_reuse', solver: 'network-flow',
+  source: 'ortools/graph/python/max_flow.cc', upstream: 'SimpleMaxFlow::SetArcCapacity', tags: ['python-parity', 'gap-regression'],
+  async run(api) {
+    const flow = new api.SimpleMaxFlow();
+    const [arc] = flow.addArcsWithCapacity([0], [1], [1]);
+    const exact = 9007199254740993n;
+    flow.setArcCapacity(arc, exact);
+    let result = await flow.solve({ ...networkFlowExecutionOptions(), source: 0, sink: 1 });
+    assert(result.status === api.SimpleMaxFlowStatus.OPTIMAL && result.optimalFlow === exact && result.flow(arc) === exact,
+      'mutated capacity reaches native max-flow with exact int64 result');
+    flow.setArcCapacity(arc, 3);
+    result = await flow.solve({ ...networkFlowExecutionOptions(), source: 0, sink: 1 });
+    assert(result.optimalFlow === 3n, 'repeat solve uses changed capacity');
+    return { status: result.status, objectiveValue: 3 };
+  },
+}, {
+  id: 'network_flow.native.min_cost_mutation_and_statuses', name: 'SimpleMinCostFlow.mutation_and_statuses', solver: 'network-flow',
+  source: 'ortools/graph/python/min_cost_flow.cc', upstream: 'SetArcCapacity; SetNodeSupply; SolveMaxFlowWithMinCost', tags: ['python-parity', 'gap-regression'],
+  async run(api) {
+    const flow = new api.SimpleMinCostFlow();
+    const [arc] = flow.addArcsWithCapacityAndUnitCost([0], [1], [3], [5]);
+    flow.setNodesSupplies([0, 1], [5, -5]);
+    let result = await flow.solve(networkFlowExecutionOptions());
+    assert(result.status === api.SimpleMinCostFlowStatus.INFEASIBLE, 'insufficient capacity reports infeasible');
+    result = await flow.solve({ ...networkFlowExecutionOptions(), maxFlowWithMinCost: true });
+    assert(result.status === api.SimpleMinCostFlowStatus.OPTIMAL && result.maximumFlow === 3n && result.optimalCost === 15n,
+      'alternate solve delivers maximum feasible flow at minimum cost');
+    flow.setNodeSupply(1, -4);
+    result = await flow.solve(networkFlowExecutionOptions());
+    assert(result.status === api.SimpleMinCostFlowStatus.UNBALANCED, 'unbalanced supply status preserved');
+    flow.setArcCapacity(arc, 10); flow.setNodeSupply(0, 2); flow.setNodeSupply(1, -2);
+    result = await flow.solve(networkFlowExecutionOptions());
+    assert(result.status === api.SimpleMinCostFlowStatus.OPTIMAL && result.maximumFlow === 2n && result.optimalCost === 10n,
+      'reused solver reflects changed capacities and supplies after failures');
+    return { status: result.status, objectiveValue: 10 };
+  },
+}, {
+  id: 'network_flow.native.assignment_infeasible', name: 'SimpleLinearSumAssignment.infeasible', solver: 'network-flow',
+  source: 'ortools/graph/python/linear_sum_assignment.cc', upstream: 'SimpleLinearSumAssignment::Solve', tags: ['python-parity', 'gap-regression'],
+  async run(api) {
+    const assignment = new api.SimpleLinearSumAssignment();
+    assignment.addArcsWithCost([0, 1], [0, 0], [1, 2]);
+    const result = await assignment.solve(networkFlowExecutionOptions());
+    assert(result.status === api.SimpleLinearSumAssignmentStatus.INFEASIBLE, 'missing perfect matching reports infeasible');
+    return { status: result.status, objectiveValue: Number(result.optimalCost) };
+  },
+});
+
+networkFlowCases.push(...networkFlowNumericalCases);
 
 export async function runNetworkFlowCases(
   api: NetworkFlowApi,

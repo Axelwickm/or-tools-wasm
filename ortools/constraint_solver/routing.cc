@@ -2747,7 +2747,8 @@ void RoutingModel::CloseModelWithParameters(
     }
     if (vehicle_amortized_cost_factors_set_) {
       std::vector<IntVar*> route_lengths;
-      solver_->MakeIntVarArray(vehicles_, 0, size, &route_lengths);
+      // Route cardinalities include the end indices as well as ordinary indices.
+      solver_->MakeIntVarArray(vehicles_, 0, size + vehicles_, &route_lengths);
       solver_->AddConstraint(
           solver_->MakeDistribute(vehicle_vars_, route_lengths));
       std::vector<IntVar*> vehicle_used;

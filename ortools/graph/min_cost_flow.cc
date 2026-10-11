@@ -1067,9 +1067,18 @@ SimpleMinCostFlow::Status SimpleMinCostFlow::SolveWithPossibleAdjustment(
   for (NodeIndex node = 0; node < num_nodes; ++node) {
     if (node_supply_[node] > 0) {
       ++supply_node_count;
+      if (node_supply_[node] >
+          std::numeric_limits<FlowQuantity>::max() - total_supply) {
+        return BAD_CAPACITY_RANGE;
+      }
       total_supply += node_supply_[node];
     } else if (node_supply_[node] < 0) {
       ++demand_node_count;
+      if (node_supply_[node] == std::numeric_limits<FlowQuantity>::min() ||
+          total_demand >
+              std::numeric_limits<FlowQuantity>::max() + node_supply_[node]) {
+        return BAD_CAPACITY_RANGE;
+      }
       total_demand -= node_supply_[node];
     }
   }
@@ -1146,6 +1155,9 @@ SimpleMinCostFlow::Status SimpleMinCostFlow::SolveWithPossibleAdjustment(
   ArcIndex arc;
   for (arc = 0; arc < num_arcs; ++arc) {
     ArcIndex permuted_arc = PermutedArc(arc);
+    if (arc_cost_[arc] == std::numeric_limits<CostValue>::min()) {
+      return BAD_COST_RANGE;
+    }
     min_cost_flow.SetArcUnitCost(permuted_arc, arc_cost_[arc]);
     min_cost_flow.SetArcCapacity(permuted_arc, arc_capacity_[arc]);
   }

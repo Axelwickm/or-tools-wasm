@@ -10,6 +10,8 @@ message SolverBridgeRequest {
   oneof operation {
     bytes execute_payload = 10;
     SolverCancelRequest cancel = 11;
+    SolverInterruptRequest interrupt = 12;
+    SolverCallbackReply callback_reply = 13;
   }
 }
 
@@ -20,6 +22,25 @@ message SolverResourceRequest {
 
 message SolverCancelRequest {
   uint32 target_request_id = 1;
+}
+
+message SolverInterruptRequest {
+  uint32 target_request_id = 1;
+}
+
+message SolverJobInterrupted {
+  uint32 target_request_id = 1;
+}
+
+message SolverCallbackRequest {
+  uint64 callback_id = 1;
+  bytes payload = 2;
+}
+
+message SolverCallbackReply {
+  uint64 callback_id = 1;
+  bytes payload = 2;
+  string error = 3;
 }
 
 message SolverBridgeResponse {
@@ -38,6 +59,8 @@ message SolverBridgeResponse {
     bytes result_payload = 13;
     SolverJobCancelled cancelled = 14;
     SolverWorkerReady ready = 15;
+    SolverJobInterrupted interrupted = 16;
+    SolverCallbackRequest callback_request = 17;
   }
 }
 

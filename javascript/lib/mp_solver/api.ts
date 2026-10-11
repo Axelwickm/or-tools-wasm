@@ -1,3 +1,6 @@
+import type { MPModelProto, MPModelRequest, MPSolutionResponse } from '../generated/mp_solver_types.js';
+import { toInt64 } from '../int64.js';
+import { rootIntegerParameter } from './text_parameter_threads.js';
 import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
@@ -8,11 +11,17 @@ import {
   SolverWorkerExecutor,
   type SolverWorkerLike,
 } from '../worker_helpers.js';
-import { decodeProtobufWithExactLongs, encodeProtobufBigInts } from '../protobufjs_helpers.js';
+import { decodeProtobufWithExactLongs, encodeProtobufBigInts, normalizeProtobufInput } from '../protobufjs_helpers.js';
 import { DirectMpSolverExecutor } from './direct_executor.js';
 import {
   mpSolverProtocol,
   type MpSolverExecutor,
+  type MpSolverLogEvent,
+  type MpSolverNativeMetadata,
+  type MpSolverIISResult,
+  type MpSolverEdit,
+  MpSolverEdit_Kind as EditKind,
+  MpSolverSessionRunRequest_Action as SessionAction,
 } from './protocol.js';
 import * as protobufModule from 'protobufjs';
 
@@ -27,7 +36,7 @@ const directExecutor = new DirectMpSolverExecutor();
 const workerExecutor = new SolverWorkerExecutor(
   mpSolverProtocol,
   createMpSolverWorker,
-  (operation) => operation.type === 'solve' && operation.interruptible,
+  (operation) => (operation.type === 'solve' || operation.type === 'sessionRun' || operation.type === 'iis') && operation.interruptible,
 );
 
 function createMpSolverExecutor(selection: ExecutorSelection = 'auto'): MpSolverExecutor {
@@ -43,7 +52,7 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): M
   }
 }
 
-export type MPSolverEvent = SolverJobEvent;
+export type MPSolverEvent = SolverJobEvent | MpSolverLogEvent;
 export type MPSolverExecutionOptions = {
   executor?: ExecutorSelection;
   onEvent?: (event: MPSolverEvent) => void | Promise<void>;
@@ -52,7 +61,21 @@ export type MPSolverExecutionOptions = {
 
 export type MPSolverSolveOptions = MPSolverExecutionOptions & {
   parameters?: MPSolverParameters;
+  messageCallback?: (messages: string[]) => void;
+  enableOutput?: boolean;
 };
+
+export type MPSolverIISResult = MpSolverIISResult;
+export type MPSolverNativeMetadata = MpSolverNativeMetadata;
+export type MPSolverIISOptions = MPSolverExecutionOptions & {
+  solverType?: OptimizationProblemType;
+  solverSpecificParameters?: string;
+  timeLimitSeconds?: number;
+  nodeLimit?: number | bigint;
+};
+
+export type MPSolverIncrementalSolverOptions = MPSolverSolveOptions;
+export type MPSolverIncrementalSolveOptions = Omit<MPSolverSolveOptions, 'executor'>;
 
 export type MpSolveParameters = {
   relativeMipGap?: number;
@@ -65,6 +88,7 @@ export type MpSolveParameters = {
 };
 
 export type MpSolveOptions = MPSolverExecutionOptions & {
+  messageCallback?: (messages: string[]) => void;
   solverType?: OptimizationProblemType;
   threads?: number;
   timeLimitSeconds?: number;
@@ -78,22 +102,24 @@ export type LinearSolverSchemas = {
   optional_boolean: string;
 };
 
-export type MPSolverModelRequest = Record<string, unknown>;
-export type MPSolverSolutionResponse = Record<string, unknown>;
+export type MPSolverModelProto = MPModelProto;
+export type MPSolverModelRequest = MPModelRequest;
+export type MPSolverSolutionResponse = MPSolutionResponse;
 
 export type MPSolverProtoSolveResult = {
   bytes: Uint8Array;
   response: MPSolverSolutionResponse;
+  metadata?: MpSolverNativeMetadata;
 };
 
 export type MPSolverProtoSolveOptions = {
+  messageCallback?: (messages: string[]) => void;
   parameters?: MPSolverParameters;
   solverType?: OptimizationProblemType;
   timeLimitSeconds?: number;
   enableOutput?: boolean;
   solverSpecificParameters?: string;
   loadSolution?: boolean;
-  tolerance?: number;
   numThreads?: number;
 } & MPSolverExecutionOptions;
 
@@ -188,54 +214,94 @@ async function encodeMPModelRequest(
   request: MPSolverModelRequest,
   options: Pick<MPSolverExecutionOptions, 'executor'> = {},
 ): Promise<Uint8Array> {
+  const source = structuredClone(request);
   const type = await resolveMPModelRequestType(options);
-  const error = type.verify(request);
+  const converted = encodeProtobufBigInts(normalizeProtobufInput(source, type), type) as Record<string, unknown>;
+  const error = type.verify(converted);
   if (error) {
     throw new Error(`MPSolver.createModelRequest: ${error}`);
   }
-  return type.encode(type.create(request)).finish();
+  return type.encode(type.create(converted)).finish();
 }
 
 async function decodeMPModelRequest(
   bytes: Uint8Array,
   options: Pick<MPSolverExecutionOptions, 'executor'> = {},
 ): Promise<MPSolverModelRequest> {
+  const source = new Uint8Array(bytes);
   const type = await resolveMPModelRequestType(options);
-  return type.toObject(type.decode(bytes), {
-    enums: Number,
-    longs: Number,
-    defaults: true,
-    arrays: true,
-    objects: true,
-  }) as MPSolverModelRequest;
+  return decodeProtobufWithExactLongs<MPSolverModelRequest>(type, source, Number);
 }
 
 async function encodeMPModel(
-  model: MPSolverModelRequest,
+  model: MPSolverModelProto,
   options: Pick<MPSolverExecutionOptions, 'executor'> = {},
 ): Promise<Uint8Array> {
+  const source = structuredClone(model);
   const type = await resolveMPModelType(options);
-  const error = type.verify(model);
+  const converted = encodeProtobufBigInts(normalizeProtobufInput(source, type), type) as Record<string, unknown>;
+  const error = type.verify(converted);
   if (error) {
     throw new Error(`MPSolver.exportModelProto: ${error}`);
   }
-  return type.encode(type.create(model)).finish();
+  return type.encode(type.create(converted)).finish();
+}
+
+async function computeIIS(model: Uint8Array | MPSolverModelProto,
+  options: MPSolverIISOptions = {}): Promise<MPSolverIISResult> {
+  const source = model instanceof Uint8Array ? new Uint8Array(model) : structuredClone(model);
+  const execution = { executor: options.executor, onEvent: options.onEvent, signal: options.signal };
+  const executor = createMpSolverExecutor(execution.executor);
+  const { solverType = OptimizationProblemType.SCIP_MIXED_INTEGER_PROGRAMMING,
+    solverSpecificParameters = '', timeLimitSeconds } = options;
+  const nodeLimit = options.nodeLimit === undefined ? undefined : toInt64(options.nodeLimit);
+  if (!Number.isInteger(solverType) || solverType < 0 || solverType > 2147483647)
+    throw new RangeError('IIS solverType must be a nonnegative signed 32-bit integer.');
+  if (timeLimitSeconds !== undefined && (!Number.isFinite(timeLimitSeconds) || timeLimitSeconds < 0))
+    throw new RangeError('IIS timeLimitSeconds must be finite and nonnegative.');
+  const bytes = source instanceof Uint8Array ? source : await encodeMPModel(source, execution);
+  const result = await executeSolverJob(executor, { type: 'iis',
+    model: bytes, solverType, solverSpecificParameters, timeLimitSeconds, nodeLimit,
+    interruptible: Boolean(execution.signal),
+  }, { ...execution, resources: { threads: 1 } });
+  if (result.type !== 'iis') throw new Error('MPSolver executor returned the wrong IIS response.');
+  return result.result;
+}
+
+/** Return the native diagnostic for invalid models or trivially infeasible bounds; otherwise an empty string. */
+export async function findErrorInModelProto(
+  model: Uint8Array | MPSolverModelProto,
+  options: MPSolverExecutionOptions = {},
+): Promise<string> {
+  const source = model instanceof Uint8Array ? new Uint8Array(model) : structuredClone(model);
+  const bytes = source instanceof Uint8Array ? source : await encodeMPModel(source, options);
+  const result = await executeSolverJob(createMpSolverExecutor(options.executor), { type: 'validateModel', model: bytes }, options);
+  if (result.type !== 'validateModel') throw new Error('MPSolver executor returned the wrong validation response.');
+  return result.error;
 }
 
 async function decodeMPSolutionResponse(
   bytes: Uint8Array,
   options: Pick<MPSolverExecutionOptions, 'executor'> = {},
 ): Promise<MPSolverSolutionResponse> {
+  const source = new Uint8Array(bytes);
   const type = await resolveMPSolutionResponseType(options);
-  return decodeProtobufWithExactLongs<MPSolverSolutionResponse>(type, bytes);
+  const message = type.decode(source);
+  const response = decodeProtobufWithExactLongs<MPSolverSolutionResponse>(type, source);
+  // Proto defaults must not fabricate optimization values absent on the wire.
+  for (const field of ['objectiveValue', 'bestObjectiveBound'] as const) {
+    if (!Object.prototype.hasOwnProperty.call(message, field)) delete response[field];
+  }
+  return response;
 }
 
 async function encodeMPSolutionResponse(
   response: MPSolverSolutionResponse,
   options: Pick<MPSolverExecutionOptions, 'executor'> = {},
 ): Promise<Uint8Array> {
+  const source = structuredClone(response);
   const type = await resolveMPSolutionResponseType(options);
-  const converted = encodeProtobufBigInts(response, type) as Record<string, unknown>;
+  const converted = encodeProtobufBigInts(normalizeProtobufInput(source, type), type) as Record<string, unknown>;
   const error = type.verify(converted);
   if (error) {
     throw new Error(`MPSolver.createSolutionResponse: ${error}`);
@@ -253,15 +319,44 @@ function normalizedNumThreads(options: Pick<MPSolverProtoSolveOptions, 'numThrea
 }
 
 
+function messageObserver(callback: MPSolverSolveOptions['messageCallback']) {
+  return (event: MPSolverEvent) => {
+    if (event.type !== 'log' || !callback) return;
+    const returned = callback(event.messages) as unknown;
+    if (returned && typeof (returned as { then?: unknown }).then === 'function') {
+      void Promise.resolve(returned).catch(() => {});
+      throw new TypeError('MPSolver message callbacks must return synchronously; use onEvent for asynchronous observers.');
+    }
+  };
+}
+
 async function solveModelRequestBytes(
   requestBytes: Uint8Array,
   interruptible: boolean,
   options: Pick<
     MPSolverProtoSolveOptions,
-    'executor' | 'numThreads' | 'onEvent' | 'signal' | 'parameters'
+    'executor' | 'numThreads' | 'onEvent' | 'signal' | 'messageCallback'
   > = {},
-): Promise<Uint8Array> {
-  const numThreads = normalizedNumThreads(options) ?? 1;
+  parameters?: ReturnType<MPSolverParameterState['snapshot']>,
+  editableSnapshot = false,
+): Promise<{ type: 'solve'; response: Uint8Array; metadata?: MpSolverNativeMetadata }> {
+  if (options.messageCallback) {
+    const type = await resolveMPModelRequestType(options);
+    const message = type.decode(requestBytes);
+    if (!Object.prototype.hasOwnProperty.call(message, 'enableInternalSolverOutput')) {
+      Object.assign(message, { enableInternalSolverOutput: true });
+      requestBytes = type.encode(message).finish();
+    }
+  }
+  const request = await decodeMPModelRequest(requestBytes, options);
+  const type = request.solverType;
+  const solverType = typeof type === 'string'
+    ? OptimizationProblemType[type as keyof typeof OptimizationProblemType] : type;
+  const parameterThreads = solverType === OptimizationProblemType.SAT_INTEGER_PROGRAMMING
+    ? rootIntegerParameter(String(request.solverSpecificParameters ?? ''), ['num_workers', 'num_search_workers'])
+    : solverType === OptimizationProblemType.PDLP_LINEAR_PROGRAMMING
+      ? rootIntegerParameter(String(request.solverSpecificParameters ?? ''), ['num_threads']) : undefined;
+  const numThreads = normalizedNumThreads(options) ?? parameterThreads ?? 1;
   const executor = createMpSolverExecutor(options.executor);
   const response = await executeSolverJob(
     executor,
@@ -270,17 +365,36 @@ async function solveModelRequestBytes(
       request: requestBytes,
       numThreads,
       interruptible,
-      parameters: options.parameters ? solverParameterState(options.parameters).snapshot() : undefined,
+      streamMessages: Boolean(options.messageCallback || (request.enableInternalSolverOutput && options.onEvent)),
+      parameters,
+      editableSnapshot,
     },
     {
       showCloudNotice: !(executor instanceof SolverServerExecutor),
       resources: { threads: numThreads },
       onEvent: options.onEvent,
+      onEventSync: messageObserver(options.messageCallback),
       signal: options.signal,
     },
   );
   if (response.type !== 'solve') throw new Error('MP Solver executor returned the wrong solve response.');
-  return response.response;
+  return response;
+}
+
+async function executeModelRequest(
+  request: Uint8Array | MPSolverModelRequest,
+  options: Pick<MPSolverProtoSolveOptions,
+    'executor' | 'numThreads' | 'onEvent' | 'signal' | 'parameters' | 'messageCallback'> = {},
+  editableSnapshot = false,
+): Promise<MPSolverProtoSolveResult> {
+  const { parameters, ...execution } = options;
+  const parameterSnapshot = parameters ? solverParameterState(parameters).snapshot() : undefined;
+  const requestBytes = request instanceof Uint8Array
+    ? new Uint8Array(request) : await encodeMPModelRequest(request, execution);
+  const requestObject = await decodeMPModelRequest(requestBytes, execution);
+  const interruptible = Boolean(execution.signal) && solverTypeSupportsInterruption(requestObject.solverType);
+  const solved = await solveModelRequestBytes(requestBytes, interruptible, execution, parameterSnapshot, editableSnapshot);
+  return { bytes: solved.response, response: await decodeMPSolutionResponse(solved.response, execution), metadata: solved.metadata };
 }
 
 export enum OptimizationProblemType {
@@ -376,10 +490,6 @@ type MPVariableState = {
   ub: number;
   integer: boolean;
   branchingPriority: number;
-  solutionValue: number;
-  unroundedSolutionValue: number;
-  reducedCost: number;
-  basisStatus: BasisStatus;
 };
 
 type MPConstraintState = {
@@ -388,8 +498,6 @@ type MPConstraintState = {
   lb: number;
   ub: number;
   coeffs: Map<number, number>;
-  dualValue: number;
-  basisStatus: BasisStatus;
   lazy: boolean;
 };
 
@@ -397,8 +505,6 @@ type MPObjectiveState = {
   coeffs: Map<number, number>;
   offset: number;
   maximize: boolean;
-  value: number;
-  bestBound: number;
 };
 
 type MPSolverState = {
@@ -410,15 +516,14 @@ type MPSolverState = {
   outputEnabled: boolean;
   timeLimitMs: number;
   numThreads: number;
+  numThreadsExplicit: boolean;
   solverSpecificParameters: string;
   hints: { varIndex: number[]; varValue: number[] } | null;
-  wallTimeMs: number;
-  iterations: number;
-  nodes: number;
-  solutionLoaded: boolean;
+  answer: MpAnswer | null;
 };
 
 const supportedProblemTypes = new Set<OptimizationProblemType>([
+  OptimizationProblemType.PDLP_LINEAR_PROGRAMMING,
   OptimizationProblemType.CLP_LINEAR_PROGRAMMING,
   OptimizationProblemType.GLPK_LINEAR_PROGRAMMING,
   OptimizationProblemType.GLOP_LINEAR_PROGRAMMING,
@@ -431,6 +536,8 @@ const supportedProblemTypes = new Set<OptimizationProblemType>([
 ]);
 
 const solverTypeAliases = new Map<string, OptimizationProblemType>([
+  ['PDLP', OptimizationProblemType.PDLP_LINEAR_PROGRAMMING],
+  ['PDLP_LINEAR_PROGRAMMING', OptimizationProblemType.PDLP_LINEAR_PROGRAMMING],
   ['CLP', OptimizationProblemType.CLP_LINEAR_PROGRAMMING],
   ['CLP_LINEAR_PROGRAMMING', OptimizationProblemType.CLP_LINEAR_PROGRAMMING],
   ['GLPK_LP', OptimizationProblemType.GLPK_LINEAR_PROGRAMMING],
@@ -482,7 +589,8 @@ function problemIsMip(problemType: OptimizationProblemType): boolean {
 function problemSupportsNumThreads(problemType: OptimizationProblemType): boolean {
   return problemType === OptimizationProblemType.SCIP_MIXED_INTEGER_PROGRAMMING
     || problemType === OptimizationProblemType.CBC_MIXED_INTEGER_PROGRAMMING
-    || problemType === OptimizationProblemType.SAT_INTEGER_PROGRAMMING;
+    || problemType === OptimizationProblemType.SAT_INTEGER_PROGRAMMING
+    || problemType === OptimizationProblemType.PDLP_LINEAR_PROGRAMMING;
 }
 
 function createSolverState(name: string, problemType: OptimizationProblemType): MPSolverState {
@@ -498,18 +606,14 @@ function createSolverState(name: string, problemType: OptimizationProblemType): 
       coeffs: new Map(),
       offset: 0,
       maximize: false,
-      value: 0,
-      bestBound: 0,
     },
     outputEnabled: false,
     timeLimitMs: 0,
     numThreads: 1,
+    numThreadsExplicit: false,
     solverSpecificParameters: '',
     hints: null,
-    wallTimeMs: 0,
-    iterations: 0,
-    nodes: 0,
-    solutionLoaded: false,
+    answer: null,
   };
 }
 
@@ -556,34 +660,8 @@ function responseHasSolution(status: unknown): boolean {
   return resultStatus === MPSolverResultStatus.OPTIMAL || resultStatus === MPSolverResultStatus.FEASIBLE;
 }
 
-function constraintActivity(state: MPSolverState, constraint: MPConstraintState): number {
-  let value = 0;
-  for (const [variableIndex, coefficient] of constraint.coeffs) {
-    value += coefficient * (state.variables[variableIndex]?.solutionValue ?? 0);
-  }
-  return value;
-}
-
-function objectiveValue(state: MPSolverState): number {
-  let value = state.objective.offset;
-  for (const [variableIndex, coefficient] of state.objective.coeffs) {
-    value += coefficient * (state.variables[variableIndex]?.solutionValue ?? 0);
-  }
-  return value;
-}
-
-function basisStatusForBounds(value: number, lb: number, ub: number): BasisStatus {
-  const tolerance = 1e-7;
-  if (Number.isFinite(lb) && Number.isFinite(ub) && Math.abs(lb - ub) <= tolerance) {
-    return BasisStatus.FIXED_VALUE;
-  }
-  if (Number.isFinite(lb) && Math.abs(value - lb) <= tolerance) return BasisStatus.AT_LOWER_BOUND;
-  if (Number.isFinite(ub) && Math.abs(value - ub) <= tolerance) return BasisStatus.AT_UPPER_BOUND;
-  return BasisStatus.BASIC;
-}
-
-function modelProto(state: MPSolverState): MPSolverModelRequest {
-  const model: MPSolverModelRequest = {
+function modelProto(state: MPSolverState): MPSolverModelProto {
+  const model: MPSolverModelProto = {
     name: state.name,
     maximize: state.objective.maximize,
     objectiveOffset: state.objective.offset,
@@ -610,85 +688,92 @@ function modelProto(state: MPSolverState): MPSolverModelRequest {
   return model;
 }
 
-function modelRequest(state: MPSolverState, options: MPSolverProtoSolveOptions = {}): MPSolverModelRequest {
+function modelRequestSettings(state: MPSolverState, options: MPSolverProtoSolveOptions = {}): MPSolverModelRequest {
   const request: MPSolverModelRequest = {
     solverType: options.solverType ?? state.problemType,
-    model: modelProto(state),
   };
   const timeLimitSeconds = options.timeLimitSeconds ?? (state.timeLimitMs > 0 ? state.timeLimitMs / 1000 : undefined);
   if (timeLimitSeconds !== undefined) request.solverTimeLimitSeconds = timeLimitSeconds;
-  const enableOutput = options.enableOutput ?? state.outputEnabled;
-  if (enableOutput) request.enableInternalSolverOutput = true;
+  const enableOutput = options.enableOutput ?? (Boolean(options.messageCallback) || state.outputEnabled);
+  request.enableInternalSolverOutput = enableOutput;
   const solverSpecificParameters = options.solverSpecificParameters ?? state.solverSpecificParameters;
   if (solverSpecificParameters) request.solverSpecificParameters = solverSpecificParameters;
   return request;
 }
 
-function applySolutionResponse(state: MPSolverState, response: MPSolverSolutionResponse): boolean {
-  const loaded = responseHasSolution(response.status);
-  const variableValues = Array.isArray(response.variableValue) ? response.variableValue : [];
-  for (const variable of state.variables) {
-    const value = Number(variableValues[variable.index] ?? 0);
-    variable.solutionValue = value;
-    variable.unroundedSolutionValue = value;
-    variable.basisStatus = basisStatusForBounds(value, variable.lb, variable.ub);
+function modelRequest(state: MPSolverState, options: MPSolverProtoSolveOptions = {}): MPSolverModelRequest {
+  return { ...modelRequestSettings(state, options), model: modelProto(state) };
+}
+
+// An owned answer shared by the result-object API and the stateful facade.
+type MpAnswerOptions = {
+  metadata?: MpSolverNativeMetadata;
+  elapsedMs?: number;
+  unroundedVariableValues?: number[];
+};
+
+class MpAnswer {
+  readonly response: MPSolverSolutionResponse;
+  readonly metadata?: MpSolverNativeMetadata;
+  readonly status: MPSolverResultStatus;
+  readonly hasSolution: boolean;
+  readonly hasNativeBasis: boolean;
+  readonly wallTimeMs: number;
+  private readonly unroundedVariableValues?: number[];
+
+  constructor(response: MPSolverSolutionResponse, readonly variableCount: number,
+      readonly constraintCount: number, readonly solverType: OptimizationProblemType,
+      options: MpAnswerOptions = {}) {
+    this.response = structuredClone(response);
+    this.metadata = options.metadata && structuredClone(options.metadata);
+    this.unroundedVariableValues = options.unroundedVariableValues?.slice();
+    this.status = responseStatusToResultStatus(response.status);
+    this.hasSolution = responseHasSolution(response.status);
+    const values = response.variableValue;
+    if (this.hasSolution && (!Array.isArray(values) || values.length !== variableCount ||
+        values.some(value => typeof value !== 'number' || Number.isNaN(value))))
+      throw new Error('MPSolver native solution dimensions or values are invalid.');
+    this.wallTimeMs = solveWallTimeMs(response) ?? options.elapsedMs ?? 0;
+    this.hasNativeBasis = this.hasSolution && !problemIsMip(solverType) &&
+      solverType !== OptimizationProblemType.PDLP_LINEAR_PROGRAMMING &&
+      this.metadata?.variableBasisStatus.length === variableCount && this.metadata.constraintBasisStatus.length === constraintCount;
   }
-  const reducedCosts = Array.isArray(response.reducedCost) ? response.reducedCost : [];
-  for (const variable of state.variables) {
-    if (variable.index < reducedCosts.length) {
-      variable.reducedCost = Number(reducedCosts[variable.index]);
-    }
+
+  vector(name: 'variableValue' | 'reducedCost' | 'dualValue', index: number): number {
+    const values = this.response[name];
+    return Array.isArray(values) ? Number(values[index] ?? 0) : 0;
   }
-  const dualValues = Array.isArray(response.dualValue) ? response.dualValue : [];
-  for (const constraint of state.constraints) {
-    if (constraint.index < dualValues.length) {
-      constraint.dualValue = Number(dualValues[constraint.index]);
-    }
-    constraint.basisStatus = basisStatusForBounds(constraintActivity(state, constraint), constraint.lb, constraint.ub);
+
+  unroundedValue(index: number): number {
+    return this.unroundedVariableValues?.[index] ?? this.vector('variableValue', index);
   }
-  state.objective.value = typeof response.objectiveValue === 'number' ? response.objectiveValue : objectiveValue(state);
-  state.objective.bestBound = problemIsMip(state.problemType) && typeof response.bestObjectiveBound === 'number'
-    ? response.bestObjectiveBound
-    : state.objective.value;
-  const reportedWallTime = solveWallTimeMs(response);
-  if (reportedWallTime !== undefined) state.wallTimeMs = reportedWallTime;
-  state.solutionLoaded = loaded;
-  return loaded;
+
+  basis(index: number, constraint = false): BasisStatus {
+    if (!this.hasNativeBasis) throw new Error('MPSolver native basis is unavailable for this backend or solution.');
+    return (constraint ? this.metadata!.constraintBasisStatus : this.metadata!.variableBasisStatus)[index] as BasisStatus;
+  }
+}
+
+function applySolutionResponse(state: MPSolverState, response: MPSolverSolutionResponse,
+    options: MpAnswerOptions & { solverType?: OptimizationProblemType } = {}): boolean {
+  state.answer = new MpAnswer(response, state.variables.length, state.constraints.length, options.solverType ?? state.problemType, options);
+  return state.answer.hasSolution;
 }
 
 function solveWallTimeMs(response: MPSolverSolutionResponse): number | undefined {
   const solveInfo = response.solveInfo as { solveWallTimeSeconds?: number } | undefined;
-  return typeof solveInfo?.solveWallTimeSeconds === 'number'
-    ? Math.round(solveInfo.solveWallTimeSeconds * 1000)
-    : undefined;
+  return typeof solveInfo?.solveWallTimeSeconds === 'number' ? Math.round(solveInfo.solveWallTimeSeconds * 1000) : undefined;
 }
 
-function resetSolution(state: MPSolverState): void {
-  for (const variable of state.variables) {
-    variable.solutionValue = 0;
-    variable.unroundedSolutionValue = 0;
-    variable.reducedCost = 0;
-    variable.basisStatus = BasisStatus.FREE;
-  }
-  for (const constraint of state.constraints) {
-    constraint.dualValue = 0;
-    constraint.basisStatus = BasisStatus.FREE;
-  }
-  state.objective.value = 0;
-  state.objective.bestBound = 0;
-  state.wallTimeMs = 0;
-  state.iterations = 0;
-  state.nodes = 0;
-  state.solutionLoaded = false;
+function resetSolution(state: MPSolverState): void { state.answer = null; }
+function safeCounter(value: bigint): number {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number)) throw new RangeError('MPSolver counter exceeds safe integer range; read the exact result metadata instead.');
+  return number;
 }
 
-type MPVariableRef = {
-  index: number;
-};
-
-type MPConstraintRef = {
-  index: number;
-};
+type MPVariableRef = { readonly index: number; readonly generation: object };
+type MPConstraintRef = { readonly index: number; readonly generation: object };
 
 class MPSolverParameterState {
   private readonly doubleParams = new Map<DoubleParam, number>();
@@ -732,20 +817,69 @@ class MPSolverParameterState {
 
 }
 
+type ImportedMPModel = {
+  variable: Array<{ name: string; lowerBound: number; upperBound: number; objectiveCoefficient: number; isInteger: boolean; branchingPriority: number }>;
+  constraint: Array<{ name: string; lowerBound: number; upperBound: number; varIndex: number[]; coefficient: number[]; isLazy: boolean }>;
+  maximize: boolean;
+  objectiveOffset: number;
+  solutionHint?: { varIndex: number[]; varValue: number[] } | null;
+};
+
 class MPSolverModel {
   private readonly state: MPSolverState;
+  private generation: object = {};
+  private revision = 0;
+  private readonly trackers = new Set<MpSolverEdit[]>();
+  private busy = false;
+  claimOperation(): void {
+    if (this.busy) throw new Error('MPSolver model already has an operation in progress.');
+    this.busy = true;
+  }
+  releaseOperation(): void { this.busy = false; }
+  currentGeneration(): object { return this.generation; }
 
   constructor(name: string, problemType: OptimizationProblemType) {
     this.state = createSolverState(name, problemType);
   }
 
+  private markChanged(edit?: MpSolverEdit): void {
+    if (edit) this.recordEdit(edit);
+    ++this.revision;
+    resetSolution(this.state);
+  }
+
+  private recordEdit(edit: MpSolverEdit): void {
+    for (const tracker of this.trackers) tracker.push(edit);
+  }
+
+  trackEdits(): { request: MPSolverModelRequest; edits: MpSolverEdit[] } {
+    const edits: MpSolverEdit[] = [];
+    this.trackers.add(edits);
+    return { request: modelRequest(this.state), edits };
+  }
+
+  stopTracking(edits: MpSolverEdit[]): void { this.trackers.delete(edits); edits.length = 0; }
+  sessionSnapshot(options: MPSolverProtoSolveOptions = {}) {
+    const request = modelRequestSettings(this.state, options);
+    return { request, revision: this.revision, numThreads: options.numThreads ?? (this.state.numThreadsExplicit ? this.state.numThreads : undefined) };
+  }
+
+  applySessionResult(response: MPSolverSolutionResponse, metadata: MpSolverNativeMetadata | undefined,
+      revision: number, started: number, storeAnswer = true): MPSolverResultStatus {
+    if (revision !== this.revision) throw new Error('MPSolver model was modified during solve; its stale result was discarded.');
+    if (storeAnswer) applySolutionResponse(this.state, response, { metadata, elapsedMs: Date.now() - started });
+    return responseStatusToResultStatus(response.status);
+  }
+
   private variableState(ref: MPVariableRef): MPVariableState {
+    if (ref.generation !== this.generation) throw new Error('MPSolver variable belongs to another model or was deleted by clear().');
     const variable = this.state.variables[ref.index];
     if (!variable) throw new Error(`MPSolver.variable: no variable at index ${ref.index}.`);
     return variable;
   }
 
   private constraintState(ref: MPConstraintRef): MPConstraintState {
+    if (ref.generation !== this.generation) throw new Error('MPSolver constraint belongs to another model or was deleted by clear().');
     const constraint = this.state.constraints[ref.index];
     if (!constraint) throw new Error(`MPSolver.constraint: no constraint at index ${ref.index}.`);
     return constraint;
@@ -764,12 +898,15 @@ class MPSolverModel {
   }
 
   clear(): void {
+    this.generation = {};
     this.state.variables = [];
     this.state.constraints = [];
     this.state.objective.coeffs.clear();
     this.state.objective.offset = 0;
+    this.state.objective.maximize = false;
     this.state.hints = null;
     resetSolution(this.state);
+    this.markChanged({ kind: EditKind.CLEAR });
   }
 
   infinity(): number {
@@ -777,17 +914,17 @@ class MPSolverModel {
   }
 
   variable(index: number): MPVariableRef {
-    this.variableState({ index });
-    return { index };
+    this.variableState({ index, generation: this.generation });
+    return { index, generation: this.generation };
   }
 
   variables(): MPVariableRef[] {
-    return this.state.variables.map((variable) => ({ index: variable.index }));
+    return this.state.variables.map((variable) => ({ index: variable.index, generation: this.generation }));
   }
 
   lookupVariable(name: string): MPVariableRef | null {
     const variable = this.state.variables.find((candidate) => candidate.name === name);
-    return variable ? { index: variable.index } : null;
+    return variable ? { index: variable.index, generation: this.generation } : null;
   }
 
   addVariable(lb: number, ub: number, integer: boolean, name: string): MPVariableRef {
@@ -798,29 +935,31 @@ class MPSolverModel {
       ub,
       integer,
       branchingPriority: 0,
-      solutionValue: 0,
-      unroundedSolutionValue: 0,
-      reducedCost: 0,
-      basisStatus: BasisStatus.FREE,
     };
     this.state.variables.push(variable);
-    return { index: variable.index };
+    this.markChanged({ kind: EditKind.ADD_VARIABLE, index: variable.index, first: lb, second: ub, flag: integer, name });
+    return { index: variable.index, generation: this.generation };
   }
 
   variableSolutionValue(ref: MPVariableRef): number {
-    return this.variableState(ref).solutionValue;
+    const index = this.variableState(ref).index;
+    return this.state.answer?.vector('variableValue', index) ?? 0;
   }
 
   variableUnroundedSolutionValue(ref: MPVariableRef): number {
-    return this.variableState(ref).unroundedSolutionValue;
+    const index = this.variableState(ref).index;
+    return this.state.answer?.unroundedValue(index) ?? 0;
   }
 
   variableReducedCost(ref: MPVariableRef): number {
-    return this.variableState(ref).reducedCost;
+    const index = this.variableState(ref).index;
+    return this.state.answer?.vector('reducedCost', index) ?? 0;
   }
 
   variableBasisStatus(ref: MPVariableRef): BasisStatus {
-    return this.variableState(ref).basisStatus;
+    const index = this.variableState(ref).index;
+    if (!this.state.answer) throw new Error('MPSolver native basis is unavailable for this backend or solution.');
+    return this.state.answer.basis(index);
   }
 
   variableIndex(ref: MPVariableRef): number {
@@ -843,14 +982,17 @@ class MPSolverModel {
     const variable = this.variableState(ref);
     variable.lb = lb;
     variable.ub = ub;
+    this.markChanged({ kind: EditKind.VARIABLE_BOUNDS, index: ref.index, first: lb, second: ub });
   }
 
   setVariableLb(ref: MPVariableRef, lb: number): void {
     this.variableState(ref).lb = lb;
+    this.markChanged({ kind: EditKind.VARIABLE_BOUNDS, index: ref.index, first: lb, second: this.variableState(ref).ub });
   }
 
   setVariableUb(ref: MPVariableRef, ub: number): void {
     this.variableState(ref).ub = ub;
+    this.markChanged({ kind: EditKind.VARIABLE_BOUNDS, index: ref.index, first: this.variableState(ref).lb, second: ub });
   }
 
   variableInteger(ref: MPVariableRef): boolean {
@@ -859,6 +1001,7 @@ class MPSolverModel {
 
   setVariableInteger(ref: MPVariableRef, integer: boolean): void {
     this.variableState(ref).integer = integer;
+    this.markChanged({ kind: EditKind.VARIABLE_INTEGER, index: ref.index, flag: integer });
   }
 
   variableBranchingPriority(ref: MPVariableRef): number {
@@ -867,20 +1010,21 @@ class MPSolverModel {
 
   setVariableBranchingPriority(ref: MPVariableRef, priority: number): void {
     this.variableState(ref).branchingPriority = priority;
+    this.markChanged({ kind: EditKind.VARIABLE_PRIORITY, index: ref.index, first: priority });
   }
 
   constraint(index: number): MPConstraintRef {
-    this.constraintState({ index });
-    return { index };
+    this.constraintState({ index, generation: this.generation });
+    return { index, generation: this.generation };
   }
 
   constraints(): MPConstraintRef[] {
-    return this.state.constraints.map((constraint) => ({ index: constraint.index }));
+    return this.state.constraints.map((constraint) => ({ index: constraint.index, generation: this.generation }));
   }
 
   lookupConstraint(name: string): MPConstraintRef | null {
     const constraint = this.state.constraints.find((candidate) => candidate.name === name);
-    return constraint ? { index: constraint.index } : null;
+    return constraint ? { index: constraint.index, generation: this.generation } : null;
   }
 
   addConstraint(lb: number | null, ub: number | null, name: string): MPConstraintRef {
@@ -890,29 +1034,32 @@ class MPSolverModel {
       lb: lb ?? Number.NEGATIVE_INFINITY,
       ub: ub ?? Number.POSITIVE_INFINITY,
       coeffs: new Map(),
-      dualValue: 0,
-      basisStatus: BasisStatus.FREE,
       lazy: false,
     };
     this.state.constraints.push(constraint);
-    return { index: constraint.index };
+    this.markChanged({ kind: EditKind.ADD_CONSTRAINT, index: constraint.index, first: constraint.lb, second: constraint.ub, name });
+    return { index: constraint.index, generation: this.generation };
   }
 
   setConstraintCoefficient(constraintRef: MPConstraintRef, variableRef: MPVariableRef, coefficient: number): void {
     const constraint = this.constraintState(constraintRef);
+    this.variableState(variableRef);
     if (coefficient === 0) {
       constraint.coeffs.delete(variableRef.index);
     } else {
       constraint.coeffs.set(variableRef.index, coefficient);
     }
+    this.markChanged({ kind: EditKind.CONSTRAINT_COEFFICIENT, index: constraintRef.index, variable: variableRef.index, first: coefficient });
   }
 
   constraintCoefficient(constraintRef: MPConstraintRef, variableRef: MPVariableRef): number {
+    this.variableState(variableRef);
     return this.constraintState(constraintRef).coeffs.get(variableRef.index) ?? 0;
   }
 
   clearConstraint(constraint: MPConstraintRef): void {
     this.constraintState(constraint).coeffs.clear();
+    this.markChanged({ kind: EditKind.CLEAR_CONSTRAINT, index: constraint.index });
   }
 
   constraintIndex(ref: MPConstraintRef): number {
@@ -935,22 +1082,28 @@ class MPSolverModel {
     const constraint = this.constraintState(ref);
     constraint.lb = lb;
     constraint.ub = ub;
+    this.markChanged({ kind: EditKind.CONSTRAINT_BOUNDS, index: ref.index, first: lb, second: ub });
   }
 
   setConstraintLb(ref: MPConstraintRef, lb: number): void {
     this.constraintState(ref).lb = lb;
+    this.markChanged({ kind: EditKind.CONSTRAINT_BOUNDS, index: ref.index, first: lb, second: this.constraintState(ref).ub });
   }
 
   setConstraintUb(ref: MPConstraintRef, ub: number): void {
     this.constraintState(ref).ub = ub;
+    this.markChanged({ kind: EditKind.CONSTRAINT_BOUNDS, index: ref.index, first: this.constraintState(ref).lb, second: ub });
   }
 
   constraintDualValue(ref: MPConstraintRef): number {
-    return this.constraintState(ref).dualValue;
+    const index = this.constraintState(ref).index;
+    return this.state.answer?.vector('dualValue', index) ?? 0;
   }
 
   constraintBasisStatus(ref: MPConstraintRef): BasisStatus {
-    return this.constraintState(ref).basisStatus;
+    const index = this.constraintState(ref).index;
+    if (!this.state.answer) throw new Error('MPSolver native basis is unavailable for this backend or solution.');
+    return this.state.answer.basis(index, true);
   }
 
   constraintIsLazy(ref: MPConstraintRef): boolean {
@@ -959,33 +1112,39 @@ class MPSolverModel {
 
   setConstraintIsLazy(ref: MPConstraintRef, laziness: boolean): void {
     this.constraintState(ref).lazy = laziness;
+    this.markChanged({ kind: EditKind.CONSTRAINT_LAZY, index: ref.index, flag: laziness });
   }
 
   clearObjective(): void {
     this.state.objective.coeffs.clear();
     this.state.objective.offset = 0;
-    this.state.objective.value = 0;
-    this.state.objective.bestBound = 0;
+    this.state.objective.maximize = false;
+    this.markChanged({ kind: EditKind.CLEAR_OBJECTIVE });
   }
 
   setObjectiveCoefficient(variable: MPVariableRef, coefficient: number): void {
+    this.variableState(variable);
     if (coefficient === 0) {
       this.state.objective.coeffs.delete(variable.index);
     } else {
       this.state.objective.coeffs.set(variable.index, coefficient);
     }
+    this.markChanged({ kind: EditKind.OBJECTIVE_COEFFICIENT, index: variable.index, first: coefficient });
   }
 
   objectiveCoefficient(variable: MPVariableRef): number {
+    this.variableState(variable);
     return this.state.objective.coeffs.get(variable.index) ?? 0;
   }
 
   setObjectiveOffset(offset: number): void {
     this.state.objective.offset = offset;
+    this.markChanged({ kind: EditKind.OBJECTIVE_OFFSET, first: offset });
   }
 
   addObjectiveOffset(offset: number): void {
     this.state.objective.offset += offset;
+    this.markChanged({ kind: EditKind.OBJECTIVE_OFFSET, first: this.state.objective.offset });
   }
 
   objectiveOffset(): number {
@@ -994,14 +1153,16 @@ class MPSolverModel {
 
   setObjectiveDirection(maximize: boolean): void {
     this.state.objective.maximize = maximize;
+    this.markChanged({ kind: EditKind.OBJECTIVE_DIRECTION, flag: maximize });
   }
 
   objectiveValue(): number {
-    return this.state.objective.value;
+    return typeof this.state.answer?.response.objectiveValue === 'number' ? this.state.answer.response.objectiveValue : 0;
   }
 
   objectiveBestBound(): number {
-    return this.state.objective.bestBound;
+    const value = this.state.answer?.response.bestObjectiveBound;
+    return typeof value === 'number' ? value : this.state.answer ? (this.state.objective.maximize ? -Infinity : Infinity) : 0;
   }
 
   objectiveMaximization(): boolean {
@@ -1010,18 +1171,25 @@ class MPSolverModel {
 
   async solve(
     parameters?: MPSolverParameters,
-    options: MPSolverExecutionOptions = {},
+    options: MPSolverSolveOptions = {},
   ): Promise<MPSolverResultStatus> {
     const started = Date.now();
-    const result = await MPSolver.solveModelRequest(
-      modelRequest(this.state),
-      { ...options, numThreads: this.state.numThreads, parameters },
+    const revision = this.revision;
+    resetSolution(this.state);
+    const result = await executeModelRequest(
+      modelRequest(this.state, { enableOutput: options.enableOutput, messageCallback: options.messageCallback }),
+      { ...options, numThreads: this.state.numThreadsExplicit ? this.state.numThreads : undefined, parameters: parameters ?? new MPSolverParameters() },
+      true,
     );
-    applySolutionResponse(this.state, result.response);
-    if (solveWallTimeMs(result.response) === undefined) {
-      this.state.wallTimeMs = Date.now() - started;
-    }
+    if (revision !== this.revision) throw new Error('MPSolver model was modified during solve; its stale result was discarded.');
+    applySolutionResponse(this.state, result.response, { metadata: result.metadata, elapsedMs: Date.now() - started });
     return responseStatusToResultStatus(result.response.status);
+  }
+
+  computeIrreducibleInfeasibleSubset(options: MPSolverIISOptions = {}): Promise<MPSolverIISResult> {
+    return computeIIS(modelProto(this.state), { ...options,
+      solverType: options.solverType ?? this.state.problemType,
+      solverSpecificParameters: options.solverSpecificParameters ?? this.state.solverSpecificParameters });
   }
 
   exportModelProto(
@@ -1030,59 +1198,125 @@ class MPSolverModel {
     return encodeMPModel(modelProto(this.state), options);
   }
 
+  async loadModelFromProto(model: Uint8Array | MPSolverModelProto, keepNames: boolean,
+    options: MPSolverExecutionOptions): Promise<string> {
+    const revision = this.revision;
+    const source = model instanceof Uint8Array ? new Uint8Array(model) : structuredClone(model);
+    const bytes = source instanceof Uint8Array ? source : await encodeMPModel(source, options);
+    const result = await executeSolverJob(createMpSolverExecutor(options.executor), {
+      type: 'importModel', model: bytes, solverType: this.state.problemType, name: this.state.name, keepNames,
+    }, options);
+    if (result.type !== 'importModel') throw new Error('MPSolver executor returned the wrong model-import response.');
+    const imported = result.status === 0x61
+      ? decodeProtobufWithExactLongs<ImportedMPModel>(await resolveMPModelType(options), result.model, Number) : null;
+    if (revision !== this.revision) throw new Error('MPSolver model was modified while loading a model; its stale import was discarded.');
+    // Like native LoadModelFromProto, loading replaces the model even on a
+    // validation failure. Solver settings and its name remain in place.
+    this.clear();
+    if (!imported) return result.error || `MPSolver model import failed with status ${result.status}.`;
+    for (const variable of imported.variable) {
+      const ref = this.addVariable(variable.lowerBound, variable.upperBound, variable.isInteger, variable.name);
+      this.setVariableBranchingPriority(ref, variable.branchingPriority);
+      this.setObjectiveCoefficient(ref, variable.objectiveCoefficient);
+    }
+    for (const row of imported.constraint) {
+      const ref = this.addConstraint(row.lowerBound, row.upperBound, row.name);
+      this.setConstraintIsLazy(ref, row.isLazy);
+      row.varIndex.forEach((index, position) => this.setConstraintCoefficient(ref, this.variable(index), row.coefficient[position]));
+    }
+    this.setObjectiveOffset(imported.objectiveOffset);
+    this.setObjectiveDirection(imported.maximize);
+    if (imported.solutionHint) this.setHint(imported.solutionHint.varIndex.map(index => this.variable(index)), imported.solutionHint.varValue);
+    return '';
+  }
+
+  fillSolutionResponseProto(response: MPSolverSolutionResponse): void {
+    for (const key of Object.keys(response) as (keyof MPSolverSolutionResponse)[]) delete response[key];
+    const answer = this.state.answer;
+    Object.assign(response, answer ? structuredClone(answer.response) : {});
+    response.status = answer?.status ?? MPSolverResultStatus.NOT_SOLVED;
+    // Preserve the facade's numeric status and LP/MIP field contract. Values
+    // still come solely from the owned native answer.
+    if (!answer?.hasSolution) {
+      for (const key of ['variableValue', 'objectiveValue', 'bestObjectiveBound', 'dualValue', 'reducedCost'] as const) delete response[key];
+    } else if (problemIsMip(answer.solverType)) {
+      delete response.dualValue;
+      delete response.reducedCost;
+    }
+  }
+
+  exportSolutionProto(options: Pick<MPSolverExecutionOptions, 'executor'>): Promise<Uint8Array> {
+    const response: MPSolverSolutionResponse = {};
+    this.fillSolutionResponseProto(response);
+    return encodeMPSolutionResponse(response, options);
+  }
+
   exportModelRequestProto(options: MPSolverProtoSolveOptions = {}): Promise<Uint8Array> {
     return encodeMPModelRequest(modelRequest(this.state, options), options);
   }
 
-  async loadSolutionFromProto(
-    response: Uint8Array | MPSolverSolutionResponse,
-    tolerance: number,
-    options: Pick<MPSolverExecutionOptions, 'executor'> = {},
-  ): Promise<boolean> {
-    const decoded = response instanceof Uint8Array
-      ? await decodeMPSolutionResponse(response, options)
-      : response;
-    if (!responseHasSolution(decoded.status) || Number.isNaN(tolerance)) return false;
-    const values = decoded.variableValue ?? [];
-    if (!Array.isArray(values) || values.length !== this.state.variables.length) return false;
-    for (const variable of this.state.variables) {
-      const value = values[variable.index];
-      if (typeof value !== 'number' || Number.isNaN(value)) return false;
-      if (tolerance !== Infinity &&
-          (variable.lb - value > tolerance || value - variable.ub > tolerance)) return false;
-    }
-    return applySolutionResponse(this.state, decoded);
+  async solveWithProto(options: MPSolverProtoSolveOptions): Promise<MPSolverProtoSolveResult & { loaded: boolean }> {
+    options = { ...options };
+    const started = Date.now();
+    const revision = this.revision;
+    const load = options.loadSolution ?? true;
+    if (load) resetSolution(this.state);
+    const result = await executeModelRequest(modelRequest(this.state, options), options, true);
+    if (revision !== this.revision) throw new Error('MPSolver model was modified during solve; its stale result was discarded.');
+    let loaded = false;
+    if (load) loaded = applySolutionResponse(this.state, result.response, {
+      metadata: result.metadata, elapsedMs: Date.now() - started, solverType: options.solverType,
+    });
+    return { ...result, loaded };
   }
 
-  verifySolution(tolerance: number, _logErrors = false): boolean {
-    if (!this.state.solutionLoaded) return false;
-    if (Number.isNaN(tolerance)) return false;
-    if (tolerance < 0) tolerance = Infinity;
-    for (const variable of this.state.variables) {
-      if (Number.isNaN(variable.solutionValue)) return false;
-      if (variable.solutionValue < variable.lb - tolerance || variable.solutionValue > variable.ub + tolerance) return false;
-      if (variable.integer && Math.abs(variable.solutionValue - Math.round(variable.solutionValue)) > tolerance) return false;
-    }
-    for (const constraint of this.state.constraints) {
-      const activity = constraintActivity(this.state, constraint);
-      if (Number.isNaN(activity)) return false;
-      if (activity < constraint.lb - tolerance || activity > constraint.ub + tolerance) return false;
-    }
-    const actual = objectiveValue(this.state);
-    const reported = this.state.objective.value;
-    if (Number.isNaN(actual) || Number.isNaN(reported)) return false;
-    if (actual === reported) return true;
-    if (!Number.isFinite(actual) || !Number.isFinite(reported)) return false;
-    const error = Math.abs(actual - reported);
-    return error <= tolerance || error <= tolerance * Math.max(Math.abs(actual), Math.abs(reported));
+  async loadSolutionFromProto(response: Uint8Array | MPSolverSolutionResponse, tolerance: number,
+      options: MPSolverExecutionOptions = {}): Promise<boolean> {
+    const execution = { ...options }, revision = this.revision;
+    const executor = createMpSolverExecutor(execution.executor);
+    const model = modelProto(this.state), solverType = this.state.problemType;
+    const [modelBytes, solutionBytes] = await Promise.all([
+      encodeMPModel(model, execution), response instanceof Uint8Array ? new Uint8Array(response) : encodeMPSolutionResponse(response, execution),
+    ]);
+    const result = await executeSolverJob(executor, {
+      type: 'loadSolution', model: modelBytes, solution: solutionBytes, solverType, tolerance,
+    }, execution);
+    if (result.type !== 'loadSolution') throw new Error('MPSolver executor returned the wrong solution import response.');
+    const [normalized, submitted] = result.loaded ? await Promise.all([
+      decodeMPSolutionResponse(result.solution, execution), decodeMPSolutionResponse(solutionBytes, execution),
+    ]) : [null, null];
+    if (revision !== this.revision) throw new Error('MPSolver model was modified while loading a solution.');
+    // Native loading keeps the submitted coordinates internally; its exported
+    // solution rounds integer coordinates. Retain both public accessor values.
+    return normalized !== null && submitted !== null && applySolutionResponse(this.state, normalized, {
+      unroundedVariableValues: submitted.variableValue as number[],
+    });
+  }
+
+  async verifySolution(tolerance: number, logErrors = false, options: MPSolverExecutionOptions = {}): Promise<boolean> {
+    if (!this.state.answer?.hasSolution) return false;
+    options = { ...options };
+    const executor = createMpSolverExecutor(options.executor);
+    // Snapshot both inputs before schema loading or executor dispatch can yield.
+    const model = modelProto(this.state);
+    const solution: MPSolverSolutionResponse = {
+      status: this.state.answer!.status,
+      objectiveValue: this.objectiveValue(),
+      variableValue: this.state.variables.map(variable => this.state.answer!.vector('variableValue', variable.index)),
+    };
+    const solverType = this.state.problemType;
+    const [modelBytes, solutionBytes] = await Promise.all([
+      encodeMPModel(model, options), encodeMPSolutionResponse(solution, options),
+    ]);
+    const result = await executeSolverJob(executor, {
+      type: 'verifySolution', model: modelBytes, solution: solutionBytes, solverType, tolerance, logErrors,
+    }, options);
+    if (result.type !== 'verifySolution') throw new Error('MPSolver executor returned the wrong verification response.');
+    return result.verified;
   }
 
   reset(): void {
     resetSolution(this.state);
-  }
-
-  nextSolution(): boolean {
-    return false;
   }
 
   enableOutput(): void {
@@ -1111,6 +1345,7 @@ class MPSolverModel {
       return false;
     }
     this.state.numThreads = numThreads;
+    this.state.numThreadsExplicit = true;
     return true;
   }
 
@@ -1118,40 +1353,79 @@ class MPSolverModel {
     return this.state.numThreads;
   }
 
-  setSolverSpecificParametersAsString(parameters: string): boolean {
+  async setSolverSpecificParametersAsString(parameters: string, options: MPSolverExecutionOptions = {}): Promise<boolean> {
+    if (typeof parameters !== 'string') throw new TypeError('MPSolver parameters must be a string.');
+    const result = await executeSolverJob(createMpSolverExecutor(options.executor),
+      { type: 'validateParameters', solverType: this.state.problemType, parameters }, options);
+    if (result.type !== 'validateParameters') throw new Error('MPSolver executor returned the wrong parameter validation response.');
+    // Native MPSolver stores the submitted text even when its backend rejects it.
     this.state.solverSpecificParameters = parameters;
-    return true;
+    return result.accepted;
   }
 
   getSolverSpecificParametersAsString(): string {
     return this.state.solverSpecificParameters;
   }
 
-  solverVersion(): string {
-    return 'OR-Tools serialized MPSolver';
+  async solverVersion(options: MPSolverExecutionOptions = {}): Promise<string> {
+    const result = await executeSolverJob(createMpSolverExecutor(options.executor), { type: 'schema' }, options);
+    if (result.type !== 'schema') throw new Error('MPSolver executor returned the wrong version response.');
+    const version = result.backendVersions?.[this.state.problemType];
+    if (!version) throw new Error('MPSolver executor returned no version for this backend.');
+    return version;
   }
 
-  computeConstraintActivities(): number[] {
-    return this.state.constraints.map((constraint) => constraintActivity(this.state, constraint));
+  async computeConstraintActivities(options: MPSolverExecutionOptions = {}): Promise<number[]> {
+    if (!this.state.answer?.hasSolution) return [];
+    const execution = { ...options };
+    const executor = createMpSolverExecutor(execution.executor);
+    const solverType = this.state.problemType;
+    const model = modelProto(this.state);
+    const solution: MPSolverSolutionResponse = {
+      status: this.state.answer!.status,
+      objectiveValue: this.objectiveValue(),
+      variableValue: this.state.variables.map(variable => this.state.answer!.vector('variableValue', variable.index)),
+    };
+    const [modelBytes, solutionBytes] = await Promise.all([
+      encodeMPModel(model, execution), encodeMPSolutionResponse(solution, execution),
+    ]);
+    const result = await executeSolverJob(executor, {
+      type: 'activities', model: modelBytes, solution: solutionBytes, solverType,
+    }, execution);
+    if (result.type !== 'activities') throw new Error('MPSolver executor returned the wrong activities response.');
+    return result.activities;
   }
 
   computeExactConditionNumber(): number {
-    return 0;
+    if (this.state.answer?.metadata?.exactConditionNumber === undefined) throw new Error('MPSolver exact condition number is unavailable for this backend or unsolved model.');
+    return this.state.answer.metadata.exactConditionNumber;
   }
 
   setHint(variables: MPVariableRef[], values: number[]): void {
+    for (const variable of variables) this.variableState(variable);
     this.state.hints = {
       varIndex: variables.map((variable) => variable.index),
       varValue: [...values],
     };
+    this.recordEdit({ kind: EditKind.HINT, hintIds: [...this.state.hints.varIndex], hintValues: [...values] });
   }
 
-  exportModelAsLpFormat(_obfuscate: boolean): string {
-    return `${this.state.objective.maximize ? 'Maximize' : 'Minimize'}\n obj: ${this.state.name}\nSubject To\n${this.state.constraints.map((c) => ` ${c.name}`).join('\n')}\nEnd\n`;
+  exportModelAsLpFormat(obfuscate: boolean, options: MPSolverExecutionOptions = {}): Promise<string> {
+    return this.exportTextModel('lp', false, obfuscate, options);
   }
 
-  exportModelAsMpsFormat(_fixedFormat: boolean, _obfuscate: boolean): string {
-    return `NAME          ${this.state.name}\nROWS\nCOLUMNS\nRHS\nBOUNDS\nENDATA\n`;
+  exportModelAsMpsFormat(fixedFormat: boolean, obfuscate: boolean, options: MPSolverExecutionOptions = {}): Promise<string> {
+    return this.exportTextModel('mps', fixedFormat, obfuscate, options);
+  }
+
+  private async exportTextModel(format: 'lp' | 'mps', fixedFormat: boolean, obfuscate: boolean,
+    options: MPSolverExecutionOptions): Promise<string> {
+    const execution = { ...options };
+    const executor = createMpSolverExecutor(execution.executor);
+    const model = await encodeMPModel(modelProto(this.state), execution);
+    const result = await executeSolverJob(executor, { type: 'exportModel', model, format, fixedFormat, obfuscate }, execution);
+    if (result.type !== 'exportModel') throw new Error('MPSolver executor returned the wrong model-export response.');
+    return result.text;
   }
 
   numVariables(): number {
@@ -1163,30 +1437,29 @@ class MPSolverModel {
   }
 
   wallTime(): number {
-    return this.state.wallTimeMs;
+    return this.state.answer?.wallTimeMs ?? 0;
   }
 
   iterations(): number {
-    return this.state.iterations;
+    return safeCounter(this.state.answer?.metadata?.iterations ?? 0n);
   }
 
   nodes(): number {
-    return this.state.nodes;
+    return safeCounter(this.state.answer?.metadata?.nodes ?? 0n);
   }
 
 }
 
-export class MPVariable {
-  constructor(
-    private readonly model: MPSolverModel,
-    readonly ref: MPVariableRef,
-  ) {}
+let createMPVariable: (model: MPSolverModel, ref: MPVariableRef) => MPVariable;
 
-  /** @internal */
-  refForModel(model: MPSolverModel): MPVariableRef {
-    if (this.model !== model) throw new Error('Variable belongs to a different MPSolver model.');
-    return this.ref;
-  }
+export class MPVariable {
+  static { createMPVariable = (model, ref) => new MPVariable(model, ref); }
+  private constructor(
+    private readonly model: MPSolverModel,
+    private readonly ref: MPVariableRef,
+  ) { Object.freeze(ref); variableHandles.set(this, { model, ref }); }
+
+
 
   solutionValue(): number {
     return this.model.variableSolutionValue(this.ref);
@@ -1253,24 +1526,23 @@ export class MPVariable {
   }
 }
 
-export class MPConstraint {
-  constructor(
-    private readonly model: MPSolverModel,
-    readonly ref: MPConstraintRef,
-  ) {}
+let createMPConstraint: (model: MPSolverModel, ref: MPConstraintRef) => MPConstraint;
 
-  /** @internal */
-  refForModel(model: MPSolverModel): MPConstraintRef {
-    if (this.model !== model) throw new Error('Constraint belongs to a different MpModel.');
-    return this.ref;
-  }
+export class MPConstraint {
+  static { createMPConstraint = (model, ref) => new MPConstraint(model, ref); }
+  private constructor(
+    private readonly model: MPSolverModel,
+    private readonly ref: MPConstraintRef,
+  ) { Object.freeze(ref); constraintHandles.set(this, { model, ref }); }
+
+
 
   setCoefficient(variable: MPVariable, coefficient: number): void {
-    this.model.setConstraintCoefficient(this.ref, variable.refForModel(this.model), coefficient);
+    this.model.setConstraintCoefficient(this.ref, mpVariableRef(variable, this.model), coefficient);
   }
 
   getCoefficient(variable: MPVariable): number {
-    return this.model.constraintCoefficient(this.ref, variable.refForModel(this.model));
+    return this.model.constraintCoefficient(this.ref, mpVariableRef(variable, this.model));
   }
 
   clear(): void {
@@ -1322,19 +1594,22 @@ export class MPConstraint {
   }
 }
 
+let createMPObjective: (model: MPSolverModel) => MPObjective;
+
 export class MPObjective {
-  constructor(private readonly model: MPSolverModel) {}
+  static { createMPObjective = (model) => new MPObjective(model); }
+  private constructor(private readonly model: MPSolverModel) {}
 
   clear(): void {
     this.model.clearObjective();
   }
 
   setCoefficient(variable: MPVariable, coefficient: number): void {
-    this.model.setObjectiveCoefficient(variable.refForModel(this.model), coefficient);
+    this.model.setObjectiveCoefficient(mpVariableRef(variable, this.model), coefficient);
   }
 
   getCoefficient(variable: MPVariable): number {
-    return this.model.objectiveCoefficient(variable.refForModel(this.model));
+    return this.model.objectiveCoefficient(mpVariableRef(variable, this.model));
   }
 
   setOffset(offset: number): void {
@@ -1457,17 +1732,34 @@ function mpParameters(options: MpSolveParameters | undefined): MPSolverParameter
 }
 
 /** Model construction backed by the same state and serializer as MPSolver. */
+const modelStates = new WeakMap<MpModel, MPSolverModel>();
+const solverModels = new WeakMap<MPSolver, MPSolverModel>();
+const variableHandles = new WeakMap<MPVariable, { model: MPSolverModel; ref: MPVariableRef }>();
+const constraintHandles = new WeakMap<MPConstraint, { model: MPSolverModel; ref: MPConstraintRef }>();
+function mpVariableRef(variable: MPVariable, model: MPSolverModel): MPVariableRef {
+  const handle = variableHandles.get(variable);
+  if (!handle || handle.model !== model) throw new Error('Variable belongs to a different MPSolver model.');
+  return handle.ref;
+}
+
+function mpModelState(model: MpModel | MPSolver): MPSolverModel {
+  const state = modelStates.get(model as MpModel) ?? solverModels.get(model as MPSolver);
+  if (!state) throw new TypeError('Expected an MPSolver model.');
+  return state;
+}
+
 export class MpModel {
   private readonly state: MPSolverModel;
   private readonly objectiveHandle: MPObjective;
 
   constructor(name = '') {
     this.state = new MPSolverModel(name, OptimizationProblemType.GLOP_LINEAR_PROGRAMMING);
-    this.objectiveHandle = new MPObjective(this.state);
+    modelStates.set(this, this.state);
+    this.objectiveHandle = createMPObjective(this.state);
   }
 
   addVariable(lb: number, ub: number, integer: boolean, name = ''): MPVariable {
-    return new MPVariable(this.state, this.state.addVariable(lb, ub, integer, name));
+    return createMPVariable(this.state, this.state.addVariable(lb, ub, integer, name));
   }
 
   addNumVariable(lb: number, ub: number, name = ''): MPVariable {
@@ -1488,73 +1780,288 @@ export class MpModel {
   addConstraint(lbOrName?: number | string, ub?: number, name = ''): MPConstraint {
     const hasBounds = typeof lbOrName === 'number' && typeof ub === 'number';
     const constraintName = typeof lbOrName === 'string' ? lbOrName : name;
-    return new MPConstraint(this.state,
+    return createMPConstraint(this.state,
       this.state.addConstraint(hasBounds ? lbOrName : null, hasBounds ? ub : null, constraintName));
   }
 
   objective(): MPObjective { return this.objectiveHandle; }
+  incremental(options: MpSolveOptions = {}): MpIncrementalSolver { return new MpIncrementalSolver(this, options); }
   numVariables(): number { return this.state.numVariables(); }
   numConstraints(): number { return this.state.numConstraints(); }
 
-  /** @internal */
-  variableIndex(variable: MPVariable): number { return variable.refForModel(this.state).index; }
-  /** @internal */
-  constraintIndex(constraint: MPConstraint): number { return constraint.refForModel(this.state).index; }
+  computeIrreducibleInfeasibleSubset(options: MPSolverIISOptions = {}): Promise<MPSolverIISResult> {
+    return this.state.computeIrreducibleInfeasibleSubset({ ...options,
+      solverType: options.solverType ?? OptimizationProblemType.SCIP_MIXED_INTEGER_PROGRAMMING });
+  }
 
-  /** @internal */
-  exportRequest(options: MPSolverProtoSolveOptions): Promise<Uint8Array> {
-    return this.state.exportModelRequestProto(options);
+
+}
+
+let createMpResult: (model: MpModel | MPSolver, response: MPSolverSolutionResponse,
+  variableCount: number, constraintCount: number, metadata?: MpSolverNativeMetadata,
+  solverType?: OptimizationProblemType, elapsedMs?: number) => MpResult;
+
+export class MpResult {
+  static { createMpResult = (model, response, variableCount, constraintCount, metadata, solverType, elapsedMs) =>
+    new MpResult(model, response, variableCount, constraintCount, metadata, solverType, elapsedMs); }
+
+  private readonly answer: MpAnswer;
+  private readonly owner: MPSolverModel;
+  private readonly generation: object;
+
+  private constructor(model: MpModel | MPSolver, response: MPSolverSolutionResponse,
+      variableCount: number, constraintCount: number, metadata?: MpSolverNativeMetadata,
+      solverType = OptimizationProblemType.GLOP_LINEAR_PROGRAMMING, elapsedMs = 0) {
+    this.owner = mpModelState(model);
+    this.generation = this.owner.currentGeneration();
+    this.answer = new MpAnswer(response, variableCount, constraintCount, solverType, { metadata, elapsedMs });
+  }
+
+  get status(): MPSolverResultStatus { return this.answer.status; }
+  get hasSolution(): boolean { return this.answer.hasSolution; }
+  get objectiveValue(): number | null {
+    return this.hasSolution && typeof this.answer.response.objectiveValue === 'number' ? this.answer.response.objectiveValue : null;
+  }
+  get bestObjectiveBound(): number | null {
+    return typeof this.answer.response.bestObjectiveBound === 'number' ? this.answer.response.bestObjectiveBound : null;
+  }
+  get response(): MPSolverSolutionResponse { return structuredClone(this.answer.response); }
+  get nativeMetadata(): MpSolverNativeMetadata | null { return this.answer.metadata ? structuredClone(this.answer.metadata) : null; }
+  get solverVersion(): string | null { return this.answer.metadata?.solverVersion ?? null; }
+  get iterations(): bigint | null { return this.answer.metadata?.iterations ?? null; }
+  get nodes(): bigint | null { return this.answer.metadata?.nodes ?? null; }
+  get wallTimeMs(): number { return this.answer.wallTimeMs; }
+  get exactConditionNumber(): number | null { return this.answer.metadata?.exactConditionNumber ?? null; }
+
+  private index(element: MPVariable | MPConstraint): number {
+    const handle = element instanceof MPVariable ? variableHandles.get(element) : constraintHandles.get(element);
+    if (!handle || handle.model !== this.owner || handle.ref.generation !== this.generation)
+      throw new Error('Element belongs to a different MPSolver model or generation.');
+    const count = element instanceof MPVariable ? this.answer.variableCount : this.answer.constraintCount;
+    if (handle.ref.index >= count) throw new Error('Element was added after this solve.');
+    return handle.ref.index;
+  }
+  private valueAt(name: 'variableValue' | 'reducedCost' | 'dualValue', element: MPVariable | MPConstraint): number {
+    const index = this.index(element), values = this.answer.response[name];
+    if (!this.hasSolution || !Array.isArray(values) || index >= values.length) throw new Error('Solve result has no value for this element.');
+    return values[index];
+  }
+  value(variable: MPVariable): number { return this.valueAt('variableValue', variable); }
+  reducedCost(variable: MPVariable): number { return this.valueAt('reducedCost', variable); }
+  dualValue(constraint: MPConstraint): number { return this.valueAt('dualValue', constraint); }
+  basisStatus(element: MPVariable | MPConstraint): BasisStatus {
+    return this.answer.basis(this.index(element), element instanceof MPConstraint);
   }
 }
 
-export class MpResult {
-  readonly status: MPSolverResultStatus;
-  readonly hasSolution: boolean;
-  readonly objectiveValue: number | null;
-  readonly bestObjectiveBound: number | null;
-  private readonly answer: MPSolverSolutionResponse;
+class MPSolverRuntimeLostError extends Error {
+  constructor() {
+    super('MPSolver IncrementalSolver runtime was replaced; close it and create a new solver.');
+    this.name = 'MPSolverRuntimeLostError';
+  }
+}
 
-  constructor(private readonly model: MpModel, response: MPSolverSolutionResponse,
-    private readonly variableCount: number, private readonly constraintCount: number) {
-    this.answer = structuredClone(response);
-    this.status = responseStatusToResultStatus(response.status);
-    this.hasSolution = responseHasSolution(response.status);
-    this.objectiveValue = this.hasSolution && typeof response.objectiveValue === 'number'
-      ? response.objectiveValue : null;
-    this.bestObjectiveBound = typeof response.bestObjectiveBound === 'number'
-      ? response.bestObjectiveBound : null;
+/** Own a native solver on a fixed executor, forwarding subsequent model edits. */
+class MpNativeSession {
+  private readonly edits: MpSolverEdit[];
+  private readonly executor: MpSolverExecutor;
+  private readonly encodingOptions: { executor: ResolvedExecutorConfiguration };
+  private readonly options: MPSolverProtoSolveOptions;
+  readonly solverType: OptimizationProblemType;
+  private readonly initPromise: Promise<bigint>;
+  private handle: bigint | null = null;
+  private runtime: object | undefined;
+  private state: 'open' | 'failed' | 'closing' | 'closed' = 'open';
+  private activeOperation: Promise<unknown> | null = null;
+  private closePromise: Promise<void> | null = null;
+  private callbackDepth = 0;
+
+  constructor(private readonly model: MPSolverModel, options: MPSolverProtoSolveOptions = {}, private readonly storeAnswer = true) {
+    this.solverType = options.solverType ?? model.problemType();
+    const configuration = resolveExecutorConfiguration(options.executor);
+    if (configuration.type === 'cloud') throw new Error('MPSolver incremental sessions require a direct, worker or server executor.');
+    this.executor = createResolvedExecutor(configuration);
+    this.encodingOptions = { executor: configuration };
+    const { executor: _, ...defaults } = options;
+    this.options = defaults;
+    const tracking = model.trackEdits();
+    this.edits = tracking.edits;
+    this.initPromise = this.create({ ...tracking.request, ...model.sessionSnapshot(options).request, model: tracking.request.model, solverType: this.solverType });
+    void this.initPromise.catch(() => this.fail());
   }
 
-  get response(): MPSolverSolutionResponse { return structuredClone(this.answer); }
-
-  value(variable: MPVariable): number {
-    const index = this.model.variableIndex(variable);
-    if (index >= this.variableCount) throw new Error('Variable was added after this solve.');
-    const values = Array.isArray(this.answer.variableValue) ? this.answer.variableValue : [];
-    if (!this.hasSolution || index >= values.length) throw new Error('solve result has no value for this variable');
-    return values[index];
+  private async create(request: MPSolverModelRequest): Promise<bigint> {
+    const bytes = await encodeMPModelRequest(request, this.encodingOptions);
+    await executeSolverJob(this.executor, { type: 'sessionCreate', request: bytes }, {
+      ...this.events(this.options),
+      onDispatch: runtime => { this.runtime = runtime; },
+      onSuccess: result => {
+        if (result.type !== 'sessionCreate' || result.handle <= 0n) throw new Error('MPSolver session creation returned no handle.');
+        this.handle = result.handle;
+      },
+    });
+    return this.handle!;
   }
 
-  reducedCost(variable: MPVariable): number {
-    const index = this.model.variableIndex(variable);
-    const values = Array.isArray(this.answer.reducedCost) ? this.answer.reducedCost : [];
-    if (!this.hasSolution || index >= this.variableCount || index >= values.length) {
-      throw new Error('solve result has no reduced cost for this variable');
-    }
-    return values[index];
+  solve(options: MPSolverProtoSolveOptions = {}): Promise<MPSolverResultStatus> {
+    return this.run(SessionAction.SOLVE, { ...this.options, ...options }).then(result => result.status);
   }
 
-  dualValue(constraint: MPConstraint): number {
-    const index = this.model.constraintIndex(constraint);
-    const values = Array.isArray(this.answer.dualValue) ? this.answer.dualValue : [];
-    if (!this.hasSolution || index >= this.constraintCount || index >= values.length) {
-      throw new Error('solve result has no dual value for this constraint');
-    }
-    return values[index];
+  solveWithProto(options: MPSolverProtoSolveOptions = {}): Promise<MPSolverProtoSolveResult> {
+    return this.run(SessionAction.SOLVE, { ...this.options, ...options }).then(result => result.proto!);
   }
+
+  /** Advance the native solution pool; returns false when no next solution exists. */
+  nextSolution(options: Omit<MPSolverProtoSolveOptions, 'parameters'> = {}): Promise<boolean> {
+    return this.run(SessionAction.NEXT_SOLUTION, { ...this.options, ...options }).then(result => result.hasSolution);
+  }
+
+  nextResult(options: MPSolverProtoSolveOptions = {}): Promise<MPSolverProtoSolveResult | null> {
+    return this.run(SessionAction.NEXT_SOLUTION, { ...this.options, ...options }).then(result => result.hasSolution ? result.proto! : null);
+  }
+
+  /** Native Reset discards backend state while retaining the mathematical model. */
+  reset(options: Omit<MPSolverProtoSolveOptions, 'parameters'> = {}): Promise<void> {
+    return this.run(SessionAction.RESET, { ...this.options, ...options }).then(() => undefined);
+  }
+
+  private run(action: SessionAction, options: MPSolverProtoSolveOptions): Promise<{ status: MPSolverResultStatus; hasSolution: boolean; proto?: MPSolverProtoSolveResult }> {
+    if (this.state !== 'open') return Promise.reject(new Error(`MPSolver IncrementalSolver is ${this.state}; close it and create a new solver.`));
+    if (this.activeOperation) return Promise.reject(new Error('MPSolver IncrementalSolver already has an operation in progress.'));
+    let parameters: { doubleParams: Record<number, number>; integerParams: Record<number, number> };
+    try {
+      parameters = solverParameterState(options.parameters ?? new MPSolverParameters()).snapshot();
+      this.model.claimOperation();
+    } catch (error) { return Promise.reject(error); }
+    const snapshot = this.model.sessionSnapshot({ ...options, solverType: this.solverType });
+    if (action === SessionAction.SOLVE)
+      snapshot.request.enableInternalSolverOutput = options.enableOutput ??
+        (Boolean(options.messageCallback) || snapshot.request.enableInternalSolverOutput);
+    const pending = this.edits.slice();
+    const started = Date.now();
+    let operation!: Promise<{ status: MPSolverResultStatus; hasSolution: boolean; proto?: MPSolverProtoSolveResult }>;
+    operation = (async () => {
+      const handle = await this.initPromise;
+      const request = await encodeMPModelRequest(snapshot.request, this.encodingOptions);
+      const threads = normalizedNumThreads({ numThreads: snapshot.numThreads })
+        ?? (this.solverType === OptimizationProblemType.SAT_INTEGER_PROGRAMMING
+          ? rootIntegerParameter(String(snapshot.request.solverSpecificParameters ?? ''), ['num_workers', 'num_search_workers'])
+          : this.solverType === OptimizationProblemType.PDLP_LINEAR_PROGRAMMING
+            ? rootIntegerParameter(String(snapshot.request.solverSpecificParameters ?? ''), ['num_threads']) : undefined) ?? 1;
+      const observers = this.events(options);
+      let committed = false;
+      const alreadyAborted = options.signal?.aborted;
+      const outcome: { status: MPSolverResultStatus; hasSolution: boolean; proto?: MPSolverProtoSolveResult } = { status: MPSolverResultStatus.NOT_SOLVED, hasSolution: false };
+      try {
+        await executeSolverJob(this.executor, { type: 'sessionRun', handle, action, edits: pending,
+          request, numThreads: threads, streamMessages: action === SessionAction.SOLVE && Boolean(options.messageCallback || (snapshot.request.enableInternalSolverOutput && options.onEvent)), interruptible: action === SessionAction.SOLVE && Boolean(options.signal) && solverTypeSupportsInterruption(this.solverType), parameters }, {
+          ...observers, onEventSync: messageObserver(observers.messageCallback), resources: { threads: action === SessionAction.SOLVE ? threads : 1 },
+          onDispatch: runtime => this.assertRuntime(runtime),
+          onSuccess: async result => {
+            if (result.type !== 'sessionResult') throw new Error('MPSolver executor returned the wrong session response.');
+            this.edits.splice(0, pending.length);
+            committed = true;
+            outcome.hasSolution = result.hasSolution;
+            if (result.response.length) {
+              const response = await decodeMPSolutionResponse(result.response, this.encodingOptions);
+              outcome.proto = { bytes: new Uint8Array(result.response), response, metadata: result.metadata };
+              outcome.status = this.model.applySessionResult(response, result.metadata, snapshot.revision, started, this.storeAnswer);
+            } else if (action === SessionAction.RESET) {
+              if (this.model.sessionSnapshot().revision !== snapshot.revision) throw new Error('MPSolver model was modified during reset.');
+              this.model.reset();
+            }
+          },
+        });
+      } catch (error) { if (!committed && !alreadyAborted) this.fail(); throw error; }
+      return outcome;
+    })().finally(() => { this.model.releaseOperation(); if (this.activeOperation === operation) this.activeOperation = null; });
+    this.activeOperation = operation;
+    return operation;
+  }
+
+  close(): Promise<void> {
+    if (this.callbackDepth) return Promise.reject(new Error('MPSolver IncrementalSolver cannot be closed from one of its callbacks.'));
+    if (this.state === 'closed') return Promise.resolve();
+    if (this.closePromise) return this.closePromise;
+    this.state = 'closing';
+    let attempt!: Promise<void>;
+    attempt = (async () => {
+      await this.initPromise.catch(() => undefined);
+      await this.activeOperation?.catch(() => undefined);
+      if (this.handle !== null) {
+        try {
+          await executeSolverJob(this.executor, { type: 'sessionClose', handle: this.handle }, {
+            onDispatch: runtime => this.assertRuntime(runtime),
+          });
+        } catch (error) { if (!(error instanceof MPSolverRuntimeLostError)) throw error; }
+      }
+      this.model.stopTracking(this.edits);
+      this.handle = null; this.runtime = undefined; this.state = 'closed';
+    })().finally(() => { if (this.closePromise === attempt) this.closePromise = null; });
+    this.closePromise = attempt;
+    return attempt;
+  }
+
+  private fail(): void {
+    if (this.state === 'open') this.state = 'failed';
+    this.model.stopTracking(this.edits);
+  }
+  private assertRuntime(runtime: object): void { if (runtime !== this.runtime) throw new MPSolverRuntimeLostError(); }
+  private events(options: MPSolverProtoSolveOptions): MPSolverIncrementalSolveOptions {
+    const onEvent = options.onEvent;
+    const messageCallback = options.messageCallback;
+    return { ...options, messageCallback: messageCallback ? messages => {
+      this.callbackDepth++;
+      try { return messageCallback(messages); } finally { this.callbackDepth--; }
+    } : undefined, onEvent: onEvent ? async event => {
+      this.callbackDepth++;
+      try { await onEvent(event); } finally { this.callbackDepth--; }
+    } : undefined };
+  }
+}
+
+/** Python-style adapter retaining solution getters on its existing solver. */
+export class MPSolverIncrementalSolver {
+  private readonly session: MpNativeSession;
+  constructor(readonly solver: MPSolver, options: MPSolverIncrementalSolverOptions = {}) {
+    this.session = new MpNativeSession(mpModelState(solver), options);
+  }
+  solve(options: MPSolverIncrementalSolveOptions = {}): Promise<MPSolverResultStatus> { return this.session.solve(options); }
+  solveWithProto(options: MPSolverIncrementalSolveOptions = {}): Promise<MPSolverProtoSolveResult> { return this.session.solveWithProto(options); }
+  nextSolution(options: Omit<MPSolverIncrementalSolveOptions, 'parameters'> = {}): Promise<boolean> { return this.session.nextSolution(options); }
+  reset(options: Omit<MPSolverIncrementalSolveOptions, 'parameters'> = {}): Promise<void> { return this.session.reset(options); }
+  close(): Promise<void> { return this.session.close(); }
+}
+
+export type MpIncrementalSolveOptions = Omit<MpSolveOptions, 'executor' | 'solverType'>;
+function mpSessionOptions(options: MpSolveOptions): MPSolverProtoSolveOptions {
+  const { parameters, threads, ...native } = options;
+  return { ...native, ...(threads === undefined ? {} : { numThreads: threads }),
+    ...(parameters === undefined ? {} : { parameters: mpParameters(parameters) }) };
+}
+
+/** Retain native model state while returning an independent answer per solve. */
+export class MpIncrementalSolver {
+  private readonly session: MpNativeSession;
+  constructor(readonly model: MpModel, options: MpSolveOptions = {}) {
+    this.session = new MpNativeSession(mpModelState(model), mpSessionOptions(options), false);
+  }
+  async solve(options: MpIncrementalSolveOptions = {}): Promise<MpResult> {
+    const variableCount = this.model.numVariables(), constraintCount = this.model.numConstraints();
+    const result = await this.session.solveWithProto(mpSessionOptions(options));
+    return createMpResult(this.model, result.response, variableCount, constraintCount, result.metadata, this.session.solverType);
+  }
+  async nextSolution(options: Pick<MpIncrementalSolveOptions, 'signal' | 'onEvent'> = {}): Promise<MpResult | null> {
+    const variableCount = this.model.numVariables(), constraintCount = this.model.numConstraints();
+    const result = await this.session.nextResult(options);
+    return result ? createMpResult(this.model, result.response, variableCount, constraintCount, result.metadata, this.session.solverType) : null;
+  }
+  reset(options: Pick<MpIncrementalSolveOptions, 'signal' | 'onEvent'> = {}): Promise<void> { return this.session.reset(options); }
+  close(): Promise<void> { return this.session.close(); }
 }
 
 export class MPSolver {
+  static readonly IncrementalSolver = MPSolverIncrementalSolver;
   static readonly CLP_LINEAR_PROGRAMMING = OptimizationProblemType.CLP_LINEAR_PROGRAMMING;
   static readonly GLPK_LINEAR_PROGRAMMING = OptimizationProblemType.GLPK_LINEAR_PROGRAMMING;
   static readonly GLOP_LINEAR_PROGRAMMING = OptimizationProblemType.GLOP_LINEAR_PROGRAMMING;
@@ -1594,7 +2101,8 @@ export class MPSolver {
 
   constructor(name: string, problemType: OptimizationProblemType) {
     this.model = new MPSolverModel(name, problemType);
-    this.objectiveInstance = new MPObjective(this.model);
+    solverModels.set(this, this.model);
+    this.objectiveInstance = createMPObjective(this.model);
   }
 
   static async solve(model: MpModel, options: MpSolveOptions = {}): Promise<MpResult> {
@@ -1602,13 +2110,14 @@ export class MPSolver {
       solverSpecificParameters, parameters, ...execution } = options;
     const variableCount = model.numVariables();
     const constraintCount = model.numConstraints();
-    const request = await model.exportRequest({
+    const solveParameters = mpParameters(parameters);
+    const request = await mpModelState(model).exportModelRequestProto({
       ...execution, solverType, timeLimitSeconds, enableOutput, solverSpecificParameters,
     });
-    const result = await MPSolver.solveModelRequest(request, {
-      ...execution, numThreads: threads, parameters: mpParameters(parameters),
-    });
-    return new MpResult(model, result.response, variableCount, constraintCount);
+    const result = await executeModelRequest(request, {
+      ...execution, numThreads: threads, parameters: solveParameters,
+    }, true);
+    return createMpResult(model, result.response, variableCount, constraintCount, result.metadata, solverType);
   }
 
 
@@ -1643,6 +2152,15 @@ export class MPSolver {
     return getLinearSolverSchemas(options);
   }
 
+  static computeIrreducibleInfeasibleSubset(model: Uint8Array | MPSolverModelProto,
+    options: MPSolverIISOptions = {}): Promise<MPSolverIISResult> {
+    return computeIIS(model, options);
+  }
+
+  static findErrorInModelProto(model: Uint8Array | MPSolverModelProto, options: MPSolverExecutionOptions = {}): Promise<string> {
+    return findErrorInModelProto(model, options);
+  }
+
   static createModelRequest(
     request: MPSolverModelRequest,
     options: Pick<MPSolverExecutionOptions, 'executor'> = {},
@@ -1668,26 +2186,10 @@ export class MPSolver {
     request: Uint8Array | MPSolverModelRequest,
     options: Pick<
       MPSolverProtoSolveOptions,
-      'executor' | 'numThreads' | 'onEvent' | 'signal' | 'parameters'
+      'executor' | 'numThreads' | 'onEvent' | 'signal' | 'parameters' | 'messageCallback'
     > = {},
   ): Promise<MPSolverProtoSolveResult> {
-    const requestObject = request instanceof Uint8Array
-      ? await decodeMPModelRequest(request, options)
-      : request;
-    const requestBytes = request instanceof Uint8Array
-      ? request
-      : await encodeMPModelRequest(request, options);
-    const interruptible = Boolean(options.signal)
-      && solverTypeSupportsInterruption(requestObject.solverType);
-    const bytes = await solveModelRequestBytes(
-      requestBytes,
-      interruptible,
-      options,
-    );
-    return {
-      bytes,
-      response: await decodeMPSolutionResponse(bytes, options),
-    };
+    return executeModelRequest(request, options);
   }
 
   name(): string {
@@ -1711,20 +2213,20 @@ export class MPSolver {
   }
 
   variable(index: number): MPVariable {
-    return new MPVariable(this.model, this.model.variable(index));
+    return createMPVariable(this.model, this.model.variable(index));
   }
 
   variables(): MPVariable[] {
-    return this.model.variables().map((ref) => new MPVariable(this.model, ref));
+    return this.model.variables().map((ref) => createMPVariable(this.model, ref));
   }
 
   lookupVariable(name: string): MPVariable | null {
     const ref = this.model.lookupVariable(name);
-    return ref ? new MPVariable(this.model, ref) : null;
+    return ref ? createMPVariable(this.model, ref) : null;
   }
 
   addVariable(lb: number, ub: number, integer: boolean, name: string): MPVariable {
-    return new MPVariable(this.model, this.model.addVariable(lb, ub, integer, name));
+    return createMPVariable(this.model, this.model.addVariable(lb, ub, integer, name));
   }
 
   addNumVariable(lb: number, ub: number, name: string): MPVariable {
@@ -1740,16 +2242,16 @@ export class MPSolver {
   }
 
   constraint(index: number): MPConstraint {
-    return new MPConstraint(this.model, this.model.constraint(index));
+    return createMPConstraint(this.model, this.model.constraint(index));
   }
 
   constraints(): MPConstraint[] {
-    return this.model.constraints().map((ref) => new MPConstraint(this.model, ref));
+    return this.model.constraints().map((ref) => createMPConstraint(this.model, ref));
   }
 
   lookupConstraint(name: string): MPConstraint | null {
     const ref = this.model.lookupConstraint(name);
-    return ref ? new MPConstraint(this.model, ref) : null;
+    return ref ? createMPConstraint(this.model, ref) : null;
   }
 
   addConstraint(): MPConstraint;
@@ -1758,7 +2260,7 @@ export class MPSolver {
   addConstraint(lbOrName?: number | string, ub?: number, name = ''): MPConstraint {
     const hasBounds = typeof lbOrName === 'number' && typeof ub === 'number';
     const constraintName = typeof lbOrName === 'string' ? lbOrName : name;
-    return new MPConstraint(
+    return createMPConstraint(
       this.model,
       this.model.addConstraint(hasBounds ? lbOrName : null, hasBounds ? ub : null, constraintName),
     );
@@ -1770,11 +2272,13 @@ export class MPSolver {
 
   async solve(options: MPSolverSolveOptions = {}): Promise<MPSolverResultStatus> {
     if (this.solving) throw new Error('MPSolver.solve() is already in progress.');
+    this.model.claimOperation();
     this.solving = true;
     try {
       return await this.model.solve(options.parameters, options);
     } finally {
       this.solving = false;
+      this.model.releaseOperation();
     }
   }
 
@@ -1784,44 +2288,61 @@ export class MPSolver {
     return this.model.exportModelProto(options);
   }
 
+  /** Replace the current model, discarding names. Empty string means success. */
+  loadModelFromProto(model: Uint8Array | MPSolverModelProto,
+    options: MPSolverExecutionOptions = {}): Promise<string> {
+    return this.model.loadModelFromProto(model, false, options);
+  }
+
+  /** Replace the current model, preserving unique nonempty names. */
+  loadModelFromProtoKeepNames(model: Uint8Array | MPSolverModelProto,
+    options: MPSolverExecutionOptions = {}): Promise<string> {
+    return this.model.loadModelFromProto(model, true, options);
+  }
+
+  /** Clear and fill an existing response object from the current solution. */
+  fillSolutionResponseProto(response: MPSolverSolutionResponse): void {
+    this.model.fillSolutionResponseProto(response);
+  }
+
+  exportSolutionProto(options: Pick<MPSolverExecutionOptions, 'executor'> = {}): Promise<Uint8Array> {
+    return this.model.exportSolutionProto(options);
+  }
+
   exportModelRequestProto(options: MPSolverProtoSolveOptions = {}): Promise<Uint8Array> {
     return this.model.exportModelRequestProto(options);
   }
 
   async solveWithProto(options: MPSolverProtoSolveOptions = {}): Promise<MPSolverProtoSolveResult & { loaded: boolean }> {
     if (this.solving) throw new Error('MPSolver.solve() is already in progress.');
+    this.model.claimOperation();
     this.solving = true;
     try {
-      const requestBytes = await this.exportModelRequestProto(options);
-      const result = await MPSolver.solveModelRequest(requestBytes, options);
-      let loaded = false;
-      if (options.loadSolution ?? true) {
-        loaded = await this.loadSolutionFromProto(result.bytes, options.tolerance, options);
-      }
-      return { ...result, loaded };
+      return await this.model.solveWithProto(options);
     } finally {
       this.solving = false;
+      this.model.releaseOperation();
     }
   }
 
   async loadSolutionFromProto(
     response: Uint8Array | MPSolverSolutionResponse = {},
     tolerance = 1e-7,
-    options: Pick<MPSolverExecutionOptions, 'executor'> = {},
+    options: MPSolverExecutionOptions = {},
   ): Promise<boolean> {
     return this.model.loadSolutionFromProto(response, tolerance, options);
   }
 
-  verifySolution(tolerance: number, logErrors: boolean): boolean {
-    return this.model.verifySolution(tolerance, logErrors);
+  computeIrreducibleInfeasibleSubset(options: MPSolverIISOptions = {}): Promise<MPSolverIISResult> {
+    return this.model.computeIrreducibleInfeasibleSubset(options);
+  }
+
+  verifySolution(tolerance: number, logErrors = false, options: MPSolverExecutionOptions = {}): Promise<boolean> {
+    return this.model.verifySolution(tolerance, logErrors, options);
   }
 
   reset(): void {
     this.model.reset();
-  }
-
-  nextSolution(): boolean {
-    return this.model.nextSolution();
   }
 
   enableOutput(): void {
@@ -1852,20 +2373,20 @@ export class MPSolver {
     return this.model.getNumThreads();
   }
 
-  setSolverSpecificParametersAsString(parameters: string): boolean {
-    return this.model.setSolverSpecificParametersAsString(parameters);
+  setSolverSpecificParametersAsString(parameters: string, options: MPSolverExecutionOptions = {}): Promise<boolean> {
+    return this.model.setSolverSpecificParametersAsString(parameters, options);
   }
 
   getSolverSpecificParametersAsString(): string {
     return this.model.getSolverSpecificParametersAsString();
   }
 
-  solverVersion(): string {
-    return this.model.solverVersion();
+  solverVersion(options: MPSolverExecutionOptions = {}): Promise<string> {
+    return this.model.solverVersion(options);
   }
 
-  computeConstraintActivities(): number[] {
-    return this.model.computeConstraintActivities();
+  computeConstraintActivities(options: MPSolverExecutionOptions = {}): Promise<number[]> {
+    return this.model.computeConstraintActivities(options);
   }
 
   computeExactConditionNumber(): number {
@@ -1876,15 +2397,15 @@ export class MPSolver {
     if (variables.length !== values.length) {
       throw new Error(`MPSolver.setHint: variable/value length mismatch (${variables.length} !== ${values.length}).`);
     }
-    this.model.setHint(variables.map((variable) => variable.refForModel(this.model)), values);
+    this.model.setHint(variables.map((variable) => mpVariableRef(variable, this.model)), values);
   }
 
-  exportModelAsLpFormat(obfuscate: boolean): string {
-    return this.model.exportModelAsLpFormat(obfuscate);
+  exportModelAsLpFormat(obfuscate: boolean, options: MPSolverExecutionOptions = {}): Promise<string> {
+    return this.model.exportModelAsLpFormat(obfuscate, options);
   }
 
-  exportModelAsMpsFormat(fixedFormat: boolean, obfuscate: boolean): string {
-    return this.model.exportModelAsMpsFormat(fixedFormat, obfuscate);
+  exportModelAsMpsFormat(fixedFormat: boolean, obfuscate: boolean, options: MPSolverExecutionOptions = {}): Promise<string> {
+    return this.model.exportModelAsMpsFormat(fixedFormat, obfuscate, options);
   }
 
   numVariables(): number {

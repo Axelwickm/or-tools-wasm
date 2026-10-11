@@ -11,6 +11,8 @@ const solutionOutput = requiredElement('solution-output', 'div');
 const usageOutput = requiredElement('usage-output', 'div');
 const statusEl = requiredElement('status', 'pre');
 const executorSelector = requiredElement('solver-executor', 'select');
+const backendSelector = requiredElement('backend', 'select');
+const workerCount = requiredElement('num-workers', 'input');
 const runButton = requiredElement('run', 'button');
 const addItemButton = requiredElement('add-item', 'button');
 const removeItemButton = requiredElement('remove-item', 'button');
@@ -178,13 +180,15 @@ async function runKnapsack() {
     renderSolution();
 
     const solver = new KnapsackSolver(
-      KnapsackSolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER,
+      Number(backendSelector.value) as KnapsackSolverType,
       'KnapsackExample',
     );
     solver.init(values, weights, capacities);
 
     appendStatus(`Solving with ${executorSelector.value} executor...`);
-    const result = await solver.solve({ executor: readKnapsackExecutor() });
+    const result = await solver.solve({ executor: readKnapsackExecutor(),
+      numWorkers: backendSelector.value === String(KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER)
+        ? readNumberInput(workerCount) : 1 });
     lastProfit = result.profit;
     selectedItems = values
       .map((_, item) => item)
@@ -201,6 +205,10 @@ async function runKnapsack() {
     setRunning(false);
   }
 }
+
+backendSelector.addEventListener('change', () => {
+  workerCount.disabled = backendSelector.value !== String(KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER);
+});
 
 function addItem() {
   syncFromInputs();

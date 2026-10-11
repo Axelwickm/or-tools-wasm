@@ -93,8 +93,8 @@ const externalRuntimeLoaderPlugin = {
     buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
       path: require.resolve('protobufjs'),
     }));
-    buildContext.onResolve({ filter: /^\.\/runtime_loader\.js$/ }, (args) => ({
-      path: args.path,
+    buildContext.onResolve({ filter: /^(?:\.\.?\/)+runtime_loader\.js$/ }, () => ({
+      path: './runtime_loader.js',
       external: true,
     }));
   },

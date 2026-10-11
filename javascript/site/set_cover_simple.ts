@@ -1,6 +1,7 @@
 import {
   type ExecutorConfiguration,
   GreedySolutionGenerator,
+  GuidedTabuSearch,
   SetCoverInvariant,
   SetCoverModel,
 } from 'or-tools-wasm/set-cover';
@@ -132,6 +133,10 @@ const statusEl = requiredElement('status', 'pre');
 const executorSelector = requiredElement('solver-executor', 'select');
 const runButton = requiredElement('run', 'button');
 const clearButton = requiredElement('clear', 'button');
+const guidedTabuInput = requiredElement('guided-tabu', 'input');
+const penaltyFactorInput = requiredElement('penalty-factor', 'input');
+const epsilonInput = requiredElement('epsilon', 'input');
+const tabuSizeInput = requiredElement('tabu-size', 'input');
 let readSetCoverExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let selectedSubsets: number[] = [];
@@ -266,31 +271,48 @@ async function runSetCover() {
     renderSolution();
 
     const model = buildModel();
+    const costStats = await model.computeCostStats({ executor: readSetCoverExecutor() });
+    appendStatus(`Subset costs: median ${costStats.median}, standard deviation ${costStats.stddev}, interquartile range ${costStats.iqr}.`);
     const inv = new SetCoverInvariant(model);
     const greedy = new GreedySolutionGenerator(inv);
 
     appendStatus(`Solving with ${executorSelector.value} executor...`);
-    const hasFound = await greedy.nextSolution(undefined, {
+    await greedy.nextSolution(undefined, {
       executor: readSetCoverExecutor(),
     });
-    if (!hasFound) {
+    if (await inv.numUncoveredElements({ executor: readSetCoverExecutor() }) !== 0) {
       appendStatus('No solution found by the greedy heuristic.');
       return;
     }
 
-    const solution = inv.exportSolutionAsProto();
-    selectedSubsets = solution.subset;
+    if (guidedTabuInput.checked) {
+      const search = new GuidedTabuSearch(inv);
+      try {
+        search.setPenaltyFactor(Number(penaltyFactorInput.value));
+        search.setEpsilon(Number(epsilonInput.value));
+        search.setTabuListSize(Number(tabuSizeInput.value));
+        search.setMaxIterations(40);
+        await search.initialize({ executor: readSetCoverExecutor() });
+        for (let pass = 0; pass < 5; pass++) await search.nextSolution();
+        appendStatus('Guided tabu search finished after five continued passes.');
+      } finally { await search.close(); }
+    }
+
+    await inv.compressTrace({ executor: readSetCoverExecutor() });
+    appendStatus(`Selected region order: ${inv.trace().map(decision => regions[decision.subset()]?.name).join(', ')}.`);
+    const state = await inv.inspect({ executor: readSetCoverExecutor() });
+    selectedSubsets = state.selected.flatMap((selected, subset) => selected ? [subset] : []);
     coveredElements = new Set();
     for (const subsetIndex of selectedSubsets) {
       for (const element of regions[subsetIndex]?.elements ?? []) {
         coveredElements.add(element);
       }
     }
-    lastCost = solution.cost ?? inv.cost();
-    lastUncovered = inv.numUncoveredElements();
+    lastCost = state.cost;
+    lastUncovered = state.numUncoveredElements;
     renderMap();
     renderSolution();
-    appendStatus(`Done. Cost ${inv.cost()}.`);
+    appendStatus(`Done. Cost ${state.cost}.`);
   } catch (error) {
     const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
     appendStatus(message);
@@ -301,6 +323,9 @@ async function runSetCover() {
 }
 
 runButton.addEventListener('click', () => void runSetCover());
+guidedTabuInput.addEventListener('change', () => {
+  for (const input of [penaltyFactorInput, epsilonInput, tabuSizeInput]) input.disabled = !guidedTabuInput.checked;
+});
 clearButton.addEventListener('click', clearSolution);
 coverageMap.addEventListener('pointerover', (event) => {
   const target = event.target;

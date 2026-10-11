@@ -1,3 +1,21 @@
+import { runMathOptCallbackCases } from '../../cases/or-tools-wasm/mathopt/callbacks.ts';
+import { runMathOptModelImportCases } from '../../cases/or-tools-wasm/mathopt/model_import.ts';
+import { runMathOptMpsCases } from '../../cases/or-tools-wasm/mathopt/mps.ts';
+import { runMathOptIndicatorCases } from '../../cases/or-tools-wasm/mathopt/indicators.ts';
+import { runMathOptAdmissionCases } from '../../cases/or-tools-wasm/mathopt/admission.ts';
+import * as MathOptControlApi from 'or-tools-wasm/mathopt';
+import { runMathOptCancellationCases } from '../../cases/or-tools-wasm/mathopt/cancellation.ts';
+import * as MPSolverControlApi from 'or-tools-wasm/mp-solver';
+import { runMpSolverCancellationCases } from '../../cases/or-tools-wasm/mp_solver/cancellation.ts';
+import { runMpSolverModelImportCases } from '../../cases/or-tools-wasm/mp_solver/model_import.ts';
+import { runMpSolverModelValidationCases } from '../../cases/or-tools-wasm/mp_solver/model_validation.ts';
+import { runMpSolverModelReuseCases } from '../../cases/or-tools-wasm/mp_solver/model_reuse.ts';
+import * as RcpspControlApi from 'or-tools-wasm/rcpsp';
+import { runRcpspModelCorrectnessCases } from '../../cases/or-tools-wasm/rcpsp/model_correctness.ts';
+import * as RoutingApi from 'or-tools-wasm/routing';
+import { runRoutingControlCases } from '../../cases/or-tools-wasm/routing/controls.ts';
+import { runPdlpControlCases } from '../../cases/or-tools-wasm/pdlp/controls.ts';
+import { runMpSolverProtoValidationCases } from '../../cases/or-tools-wasm/mp_solver/proto_validation.ts';
 import {
   CpSat,
 } from 'or-tools-wasm/cp-sat';
@@ -20,15 +38,17 @@ import {
   SimpleMinCostFlowStatus,
 } from 'or-tools-wasm/network-flow';
 import {
-  ConsistencyLevel,
   ElementDegreeSolutionGenerator,
   GreedySolutionGenerator,
   GuidedLocalSearch,
+  GuidedTabuSearch,
   RandomSolutionGenerator,
+  SetCover,
   SetCoverInvariant,
   SetCoverModel,
   SteepestSearch,
   TrivialSolutionGenerator,
+  terminateLoadedRuntimeThreads as terminateSetCoverRuntimeThreads,
 } from 'or-tools-wasm/set-cover';
 import { MathOpt } from 'or-tools-wasm/mathopt';
 import * as PdlpApi from 'or-tools-wasm/pdlp';
@@ -51,6 +71,10 @@ import { cpSatCases, runCpSatCases } from '../../cases/python-parity/cp_sat/runn
 import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
+import { runCpSatStatisticsCases } from '../../cases/or-tools-wasm/cp_sat/statistics.ts';
+import { runCpSatModelExportCases } from '../../cases/or-tools-wasm/cp_sat/model_export.ts';
+import { runCpSatMutationCases } from '../../cases/or-tools-wasm/cp_sat/mutation.ts';
+import { runCpSatExpressionHelperCases } from '../../cases/or-tools-wasm/cp_sat/expression_helpers.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
@@ -107,6 +131,10 @@ test('runs the shared high-level CP-SAT Python parity cases in Node', async (t) 
 });
 
 test('runs the first-party high-level CP-SAT contract cases in Node', async (t) => {
+  await runCpSatStatisticsCases(CpSatApi as never);
+  await runCpSatModelExportCases(CpSatApi as never);
+  await runCpSatMutationCases(CpSatApi as never);
+  await runCpSatExpressionHelperCases(CpSatApi as never);
   const results = await runCpSatHighLevelContractCases(CpSatApi as never);
   await assertCaseResults(t, 'node high-level CP-SAT contract', results);
 });
@@ -133,6 +161,7 @@ test('reuses CP-SAT threads across repeated solves in Node', async () => {
 });
 
 test('runs the shared Routing cases in Node', async (t) => {
+  await runRoutingControlCases(RoutingApi as never);
   const routingResults = await runRoutingCases({
     BOOL_FALSE,
     BOOL_UNSPECIFIED,
@@ -160,6 +189,11 @@ test('runs the shared MPSolver cases in Node', async (t) => {
     MPSolver,
     MPSolverParameters,
   }, { modes: executorFixtureModes });
+  await runMpSolverProtoValidationCases({ MPSolver } as never);
+  await runMpSolverCancellationCases(MPSolverControlApi as never);
+  await runMpSolverModelReuseCases(MPSolverControlApi as never);
+  await runMpSolverModelImportCases(MPSolverControlApi as never);
+  await runMpSolverModelValidationCases(MPSolverControlApi as never);
   await assertCaseResults(t, 'node MPSolver', mpSolverResults);
 });
 
@@ -210,6 +244,7 @@ test('isolates Network Flow event-handler errors in Node', async () => {
 
 test('runs the shared Set Cover cases in Node', async (t) => {
   const setCoverResults = await runSetCoverCases({
+    SetCover,
     SetCoverModel,
     SetCoverInvariant,
     TrivialSolutionGenerator,
@@ -218,7 +253,8 @@ test('runs the shared Set Cover cases in Node', async (t) => {
     ElementDegreeSolutionGenerator,
     SteepestSearch,
     GuidedLocalSearch,
-    ConsistencyLevel,
+    GuidedTabuSearch,
+    terminateLoadedRuntimeThreads: terminateSetCoverRuntimeThreads,
   });
   await assertCaseResults(t, 'node Set Cover', setCoverResults);
 });
@@ -236,6 +272,7 @@ test('isolates Set Cover event-handler errors in Node', async () => {
 });
 
 test('runs the shared RCPSP cases in Node', async (t) => {
+  await runRcpspModelCorrectnessCases(RcpspControlApi as never);
   const rcpspResults = await runRcpspCases(RcpspApi);
   await assertCaseResults(t, 'node RCPSP', rcpspResults);
 });
@@ -253,13 +290,20 @@ test('isolates RCPSP event-handler errors in Node', async () => {
 });
 
 test('runs the shared MathOpt cases in Node', async (t) => {
+  await runMathOptIndicatorCases(MathOptControlApi as never);
+  await runMathOptCallbackCases(MathOptControlApi as never);
+  await runMathOptModelImportCases(MathOptControlApi as never);
+  await runMathOptMpsCases(MathOptControlApi as never);
+  await runMathOptAdmissionCases(MathOptControlApi as never);
+  await runMathOptCancellationCases(MathOptControlApi as never);
   const mathOptResults = await runMathOptCases({
     MathOpt,
-  }, { modes: executorFixtureModes });
+  } as never, { modes: executorFixtureModes });
   await assertCaseResults(t, 'node MathOpt', mathOptResults);
 });
 
 test('runs the shared PDLP cases in Node', async (t) => {
+  await runPdlpControlCases(PdlpApi as never);
   const pdlpResults = await runPdlpCases(PdlpApi);
   await assertCaseResults(t, 'node PDLP', pdlpResults);
 });

@@ -1,5 +1,5 @@
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
-import { readWasmResult, withWasmCString } from '../wasm_memory.js';
+import { readWasmResult, withWasmCString, withWasmAllocations, type WasmByteAllocator } from '../wasm_memory.js';
 
 export type NativeKnapsackResult = {
   ok: boolean;
@@ -10,12 +10,9 @@ export type NativeKnapsackResult = {
   error?: string;
 };
 
-function copyInt64ToHeap(module: OrToolsWasmModule, values: bigint[]): number {
-  if (!values.length) return 0;
+function copyInt64ToHeap(allocate: WasmByteAllocator, values: bigint[]): number {
   const array = BigInt64Array.from(values);
-  const ptr = module._malloc(array.byteLength);
-  module.HEAPU8.set(new Uint8Array(array.buffer), ptr);
-  return ptr;
+  return allocate(new Uint8Array(array.buffer));
 }
 
 function flattenKnapsackWeights(weights: bigint[][], itemCount: number): bigint[] {
@@ -24,7 +21,7 @@ function flattenKnapsackWeights(weights: bigint[][], itemCount: number): bigint[
     if (dimension.length !== itemCount) {
       throw new Error('KnapsackSolver.init: each weight dimension must match profits length.');
     }
-    flattened.push(...dimension);
+    for (const weight of dimension) flattened.push(weight);
   }
   return flattened;
 }
@@ -35,26 +32,28 @@ export async function executeKnapsackWithModule(
   name: string,
   useReduction: boolean,
   timeLimitSeconds: number,
+  numWorkers: number,
   profits: bigint[],
   weights: bigint[][],
   capacities: bigint[],
 ): Promise<NativeKnapsackResult> {
   const flattenedWeights = flattenKnapsackWeights(weights, profits.length);
-  const profitsPtr = copyInt64ToHeap(module, profits);
-  const weightsPtr = copyInt64ToHeap(module, flattenedWeights);
-  const capacitiesPtr = copyInt64ToHeap(module, capacities);
-  try {
+  return withWasmAllocations(module, async allocate => {
+    const profitsPtr = copyInt64ToHeap(allocate, profits);
+    const weightsPtr = copyInt64ToHeap(allocate, flattenedWeights);
+    const capacitiesPtr = copyInt64ToHeap(allocate, capacities);
     const bytes = await withWasmCString(module, name, (namePtr) => readWasmResult(
       module,
       (lengthPtr) => module.ccall(
         'knapsack_solve_serialized',
         'number',
-        ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+        ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
         [
           solverType,
           namePtr,
           useReduction ? 1 : 0,
           timeLimitSeconds,
+          numWorkers,
           profitsPtr,
           profits.length,
           weightsPtr,
@@ -75,9 +74,5 @@ export async function executeKnapsackWithModule(
       throw new Error(result.error || 'KnapsackSolver.solve: native solve failed.');
     }
     return result;
-  } finally {
-    if (profitsPtr) module._free(profitsPtr);
-    if (weightsPtr) module._free(weightsPtr);
-    if (capacitiesPtr) module._free(capacitiesPtr);
-  }
+  });
 }

@@ -174,7 +174,7 @@ async function runSimpleRouting() {
         return;
       }
 
-      const routes = extractRoutes(manager, routing, assignment);
+      const routes = await extractRoutes(manager, routing, assignment);
       renderRouteList(routeOutput, routes);
       renderMap(routes[0]?.nodes ?? null, true);
       appendStatus(statusEl, `Objective: ${assignment.objectiveValue()}`);

@@ -36,11 +36,11 @@ export function setRunning(runButton: HTMLButtonElement | null, running: boolean
   }
 }
 
-export function extractRoutes(
+export async function extractRoutes(
   manager: RoutingIndexManager,
   routing: RoutingModel,
   assignment: Assignment,
-): RouteSummary[] {
+): Promise<RouteSummary[]> {
   const routes: RouteSummary[] = [];
   for (let vehicle = 0; vehicle < manager.getNumberOfVehicles(); vehicle++) {
     let index = routing.start(vehicle);
@@ -50,7 +50,7 @@ export function extractRoutes(
     while (!routing.isEnd(index)) {
       const previousIndex = index;
       index = assignment.value(routing.nextVar(index));
-      distance += Number(routing.getArcCostForVehicle(previousIndex, index, vehicle));
+      distance += Number(await routing.getArcCostForVehicle(previousIndex, index, vehicle));
       nodes.push(manager.indexToNode(index));
       step++;
       if (step > manager.getNumberOfIndices() + manager.getNumberOfVehicles()) {

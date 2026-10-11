@@ -38,17 +38,17 @@
 		<div class="code-toggle">
 			<details>
 				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { CpModel, CpSat, sum } from 'or-tools-wasm/cp-sat';
+				<pre class="code-block"><code data-highlight="ts">import { BoundedLinearExpr, CpModel, CpSat, Domain, sum } from 'or-tools-wasm/cp-sat';
 
 const size = 5;
 const numCells = size * size;
 const model = new CpModel();
 const cells = Array.from({ length: numCells }, (_, index) =&gt;
-  model.newIntVar(1, numCells, `cell_${index}`));
+  model.newIntVar(1, numCells).withName(`cell_${index}`));
 model.addAllDifferent(cells);
 const target = (size * (numCells + 1)) / 2;
 const addSum = (indices: number[]) =&gt;
-  model.addEquality(sum(indices.map((index) =&gt; cells[index])), target);
+  model.add(new BoundedLinearExpr(sum(indices.map((index) =&gt; cells[index])), new Domain(target, target)));
 
 for (let row = 0; row &lt; size; row += 1) {
   addSum(Array.from({ length: size }, (_, column) =&gt; row * size + column));
@@ -58,6 +58,11 @@ for (let column = 0; column &lt; size; column += 1) {
 }
 addSum(Array.from({ length: size }, (_, index) =&gt; index * size + index));
 addSum(Array.from({ length: size }, (_, index) =&gt; index * size + size - index - 1));
+
+console.log(await model.modelStats({ executor: 'worker' }));
+console.log(await model.exportModelText({ executor: 'worker' }));
+// Individual proto inspection returns a detached snapshot.
+console.log(cells[0].proto.domain);
 
 const result = await CpSat.solve(model, {
   executor: 'worker',

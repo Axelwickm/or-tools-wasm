@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
+#include "absl/cleanup/cleanup.h"
 #include "absl/strings/str_format.h"
 #include "ortools/base/logging.h"
 #include "ortools/base/timer.h"
@@ -97,6 +98,7 @@ class GLPKInterface : public MPSolverInterface {
   // ----- Solve -----
   // Solve the problem using the parameter values specified.
   MPSolver::ResultStatus Solve(const MPSolverParameters& param) override;
+  bool SupportsMessageCallbacks() const override { return true; }
 
   // ----- Model modifications and extraction -----
   // Resets extracted model
@@ -517,6 +519,17 @@ MPSolver::ResultStatus GLPKInterface::Solve(const MPSolverParameters& param) {
       MPSolverParameters::INCREMENTALITY_OFF) {
     Reset();
   }
+
+  // GLPK's terminal hook belongs to this thread's native environment.
+  if (message_callback_) {
+    glp_term_hook([](void* data, const char* message) -> int {
+      (*static_cast<std::function<void(const std::string&)>*>(data))(message);
+      return 1;  // The callback consumes the output.
+    }, &message_callback_);
+  }
+  const absl::Cleanup clear_messages = [&] {
+    if (message_callback_) glp_term_hook(nullptr, nullptr);
+  };
 
   // Set log level.
   if (quiet_) {

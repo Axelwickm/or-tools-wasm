@@ -7,6 +7,7 @@
 
 #include <emscripten/emscripten.h>
 
+#include "javascript/network_flow_validation.h"
 #include "ortools/graph/assignment.h"
 #include "ortools/graph/max_flow.h"
 #include "ortools/graph/min_cost_flow.h"
@@ -84,6 +85,9 @@ EMSCRIPTEN_KEEPALIVE const char* graph_max_flow_solve_serialized(
   }
 
   try {
+    const auto error = ortools_wasm::ValidateNetworkFlowEndpoints(
+        tails_data, heads_data, num_arcs, ortools_wasm::kMaxFlowNode);
+    if (!error.empty()) return ErrorResult(error);
     SimpleMaxFlow solver;
     for (int arc = 0; arc < num_arcs; ++arc) {
       solver.AddArcWithCapacity(tails_data[arc], heads_data[arc],
@@ -135,6 +139,12 @@ EMSCRIPTEN_KEEPALIVE const char* graph_min_cost_flow_solve_serialized(
   }
 
   try {
+    const auto error = ortools_wasm::ValidateNetworkFlowEndpoints(
+        tails_data, heads_data, num_arcs, ortools_wasm::kMinCostFlowNode);
+    if (!error.empty()) return ErrorResult(error);
+    if (num_supplies > ortools_wasm::kMinCostFlowNode + 1) {
+      return ErrorResult("SimpleMinCostFlow: too many supply nodes.");
+    }
     SimpleMinCostFlow solver;
     for (int arc = 0; arc < num_arcs; ++arc) {
       solver.AddArcWithCapacityAndUnitCost(tails_data[arc], heads_data[arc],
@@ -182,6 +192,10 @@ EMSCRIPTEN_KEEPALIVE const char* graph_linear_sum_assignment_solve_serialized(
   }
 
   try {
+    const auto error = ortools_wasm::ValidateNetworkFlowEndpoints(
+        left_nodes_data, right_nodes_data, num_arcs,
+        ortools_wasm::kAssignmentNode);
+    if (!error.empty()) return ErrorResult(error);
     SimpleLinearSumAssignment solver;
     solver.ReserveArcs(num_arcs);
     for (int arc = 0; arc < num_arcs; ++arc) {

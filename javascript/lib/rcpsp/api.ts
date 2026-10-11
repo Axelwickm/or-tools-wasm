@@ -1,5 +1,7 @@
+import { parsePsplib } from './psplib.js';
 import {
   CpModel,
+  LinearExpr,
   CpSolver,
   CpSolverStatus,
   CpSolverSolutionCallback,
@@ -27,9 +29,13 @@ export type RcpspRecipeProto = {
   resources?: number[];
 };
 
+export type RcpspPerRecipeDelays = { minDelays?: number[] };
+export type RcpspPerSuccessorDelays = { recipeDelays?: RcpspPerRecipeDelays[] };
+
 export type RcpspTaskProto = {
   name?: string;
   successors?: number[];
+  successorDelays?: RcpspPerSuccessorDelays[];
   recipes?: RcpspRecipeProto[];
 };
 
@@ -79,12 +85,9 @@ export type RcpspSolveResult = {
   statusName: string;
   makespan: bigint | null;
   objectiveValue: number | null;
+  resourceCapacities: bigint[] | null;
   tasks: RcpspScheduleTask[];
   response: CpSolver['response'];
-  model: CpModel;
-  starts: IntVar[];
-  ends: IntVar[];
-  makespanVar: IntVar;
 };
 
 export type RcpspEvent =
@@ -93,6 +96,7 @@ export type RcpspEvent =
     type: 'solution';
     makespan: bigint;
     objectiveValue: number;
+    resourceCapacities: bigint[] | null;
     tasks: RcpspScheduleTask[];
   }
   | { type: 'bestBound'; bound: number };
@@ -112,6 +116,7 @@ type BuiltModel = {
   ends: IntVar[];
   makespanVar: IntVar;
   recipePresence: Array<Array<BoolVar | true>>;
+  capacityVars: IntVar[];
 };
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -129,18 +134,6 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function maxCapacity(resource: RcpspResourceProto) {
-  return resource.maxCapacity ?? 0;
-}
-
-function minCapacity(resource: RcpspResourceProto) {
-  return resource.minCapacity ?? 0;
-}
-
-function unitCost(resource: RcpspResourceProto) {
-  return resource.unitCost ?? 0;
-}
-
 function normalizeRecipe(recipe: RcpspRecipeProto, numResources: number): Required<RcpspRecipeProto> {
   const duration = asInteger(recipe.duration ?? 0, 'recipe duration');
   assert(duration >= 0, 'recipe duration must be non-negative');
@@ -155,32 +148,68 @@ function normalizeRecipe(recipe: RcpspRecipeProto, numResources: number): Requir
   return { duration, demands, resources };
 }
 
-function normalizeProblem(proto: RcpspProblemProto): RcpspProblemProto {
+function normalizeProblem(proto: RcpspProblemProto) {
   const resources = (proto.resources ?? []).map((resource, index) => ({
     name: resource.name ?? `R${index + 1}`,
-    maxCapacity: asInteger(maxCapacity(resource), `resource ${index} capacity`),
-    minCapacity: asInteger(minCapacity(resource), `resource ${index} min capacity`),
+    maxCapacity: asInteger(resource.maxCapacity ?? 0, `resource ${index} capacity`),
+    minCapacity: asInteger(resource.minCapacity ?? 0, `resource ${index} min capacity`),
     renewable: resource.renewable ?? true,
-    unitCost: asInteger(unitCost(resource), `resource ${index} unit cost`),
+    unitCost: asInteger(resource.unitCost ?? 0, `resource ${index} unit cost`),
   }));
   const tasks = (proto.tasks ?? []).map((task, index) => ({
     name: task.name ?? `task_${index}`,
     successors: [...(task.successors ?? [])],
+    successorDelays: (task.successorDelays ?? []).map(delays => ({
+      recipeDelays: (delays.recipeDelays ?? []).map(recipe => ({
+        minDelays: (recipe.minDelays ?? []).map(delay => asInteger(delay, `task ${index} minimum delay`)),
+      })),
+    })),
     recipes: (task.recipes?.length ? task.recipes : [{ duration: 0, demands: [] }])
       .map((recipe) => normalizeRecipe(recipe, resources.length)),
   }));
   for (const [index, task] of tasks.entries()) {
-    for (const successor of task.successors ?? []) {
+    for (const successor of task.successors) {
       asInteger(successor, `task ${index} successor`);
       assert(successor >= 0 && successor < tasks.length, `task ${index} successor ${successor} is out of range`);
     }
   }
+  for (const [index, task] of tasks.entries()) {
+    if (proto.isRcpspMax) {
+      assert(task.successorDelays.length === task.successors.length,
+        `task ${index} delay matrices must match successors`);
+      for (const [edge, successor] of task.successors.entries()) {
+        const rows = task.successorDelays[edge].recipeDelays;
+        assert(rows.length === task.recipes.length, `task ${index} delay rows must match recipes`);
+        for (const row of rows) assert(row.minDelays.length === tasks[successor].recipes.length,
+          `task ${index} delay columns must match successor recipes`);
+      }
+    } else assert(task.successorDelays.length === 0,
+      `task ${index} minimum delays require isRcpspMax`);
+    if (!proto.isConsumerProducer) for (const recipe of task.recipes) {
+      assert(recipe.demands.every(demand => demand >= 0), `task ${index} demands must be non-negative`);
+    }
+  }
+  assert(!(proto.isConsumerProducer && proto.isResourceInvestment), 'Consumer/producer and resource investment are separate RCPSP variants');
+  for (const [index, resource] of resources.entries()) {
+    if (proto.isConsumerProducer) {
+      assert(resource.minCapacity <= resource.maxCapacity, `resource ${index} minimum capacity exceeds maximum capacity`);
+    } else {
+      assert(resource.maxCapacity >= 0 || (proto.isResourceInvestment && resource.maxCapacity === -1),
+        `resource ${index} capacity must be non-negative or -1 for unbounded investment capacity`);
+      if (proto.isResourceInvestment) assert(resource.unitCost >= 0, `resource ${index} investment unit cost must be non-negative`);
+    }
+  }
+  if (proto.isConsumerProducer) for (const [index, task] of tasks.entries())
+    assert(task.recipes.every(recipe => recipe.duration === 0), `consumer/producer task ${index} duration must be zero`);
+  const horizon = asInteger(proto.horizon ?? computeHorizon({ tasks }), 'RCPSP horizon');
+  const deadline = asInteger(proto.deadline ?? 0, 'RCPSP deadline');
+  assert(horizon >= 0 && deadline >= 0, 'RCPSP horizon and deadline must be non-negative');
   return {
     name: proto.name ?? 'rcpsp',
     basedata: proto.basedata ?? '',
     seed: proto.seed ?? 0,
-    horizon: proto.horizon ?? computeHorizon({ tasks }),
-    deadline: proto.deadline ?? 0,
+    horizon,
+    deadline,
     releaseDate: proto.releaseDate ?? 0,
     dueDate: proto.dueDate ?? 0,
     tardinessCost: proto.tardinessCost ?? 0,
@@ -193,10 +222,12 @@ function normalizeProblem(proto: RcpspProblemProto): RcpspProblemProto {
   };
 }
 
+type NormalizedRcpspProblem = ReturnType<typeof normalizeProblem>;
+
 function recipeDemandByResource(recipe: Required<RcpspRecipeProto>, resourceIndex: number) {
   let demand = 0;
   for (const [index, resource] of recipe.resources.entries()) {
-    if (resource === resourceIndex) demand += recipe.demands[index];
+    if (resource === resourceIndex) demand = asInteger(demand + recipe.demands[index], 'total recipe resource demand');
   }
   return demand;
 }
@@ -204,88 +235,20 @@ function recipeDemandByResource(recipe: Required<RcpspRecipeProto>, resourceInde
 function computeHorizon(problem: Pick<RcpspProblemProto, 'tasks'>) {
   let horizon = 0;
   for (const task of problem.tasks ?? []) {
-    const maxDuration = Math.max(0, ...(task.recipes ?? []).map((recipe) => recipe.duration ?? 0));
-    horizon += maxDuration;
+    const maxDuration = (task.recipes ?? []).reduce((maximum, recipe) => Math.max(maximum, recipe.duration ?? 0), 0);
+    horizon = asInteger(horizon + maxDuration, 'computed RCPSP horizon');
+    for (const delays of task.successorDelays ?? []) {
+      let maxDelay = 0;
+      for (const row of delays.recipeDelays ?? []) for (const delay of row.minDelays ?? [])
+        maxDelay = Math.max(maxDelay, delay);
+      horizon = asInteger(horizon + maxDelay, 'computed RCPSP horizon');
+    }
   }
   return horizon;
 }
 
-function readNumberAfterColon(line: string) {
-  const match = /:\s*(-?\d+)/.exec(line);
-  return match ? Number(match[1]) : null;
-}
-
-function numericTokens(line: string) {
-  return Array.from(line.matchAll(/-?\d+/g), (match) => Number(match[0]));
-}
-
-function parseSingleModePsplib(text: string): RcpspProblemProto {
-  const lines = text.split(/\r?\n/);
-  const horizon = lines.map(readNumberAfterColon).find((value, index) => value !== null && /horizon/i.test(lines[index])) ?? 0;
-  let jobs = 0;
-  let renewableResources = 0;
-  let basedata = '';
-  let seed = 0;
-  for (const line of lines) {
-    if (/file with basedata/i.test(line)) basedata = line.split(':').slice(1).join(':').trim();
-    if (/initial value random generator/i.test(line)) seed = readNumberAfterColon(line) ?? 0;
-    if (/jobs \(incl\. supersource\/sink \)/i.test(line)) jobs = readNumberAfterColon(line) ?? 0;
-    if (/- renewable/i.test(line)) renewableResources = readNumberAfterColon(line) ?? 0;
-  }
-  assert(jobs > 0, 'RCPSP parser expected a jobs count');
-  assert(renewableResources >= 0, 'RCPSP parser expected renewable resource count');
-
-  const precedenceStart = lines.findIndex((line) => /PRECEDENCE RELATIONS/i.test(line));
-  const requestsStart = lines.findIndex((line) => /REQUESTS\/DURATIONS/i.test(line));
-  const availabilityStart = lines.findIndex((line) => /RESOURCEAVAILABILITIES/i.test(line));
-  assert(precedenceStart >= 0 && requestsStart > precedenceStart && availabilityStart > requestsStart, 'unsupported RCPSP text format');
-
-  const tasks: RcpspTaskProto[] = Array.from({ length: jobs }, (_, index) => ({
-    name: `job_${index + 1}`,
-    successors: [],
-    recipes: [],
-  }));
-
-  for (const line of lines.slice(precedenceStart, requestsStart)) {
-    const values = numericTokens(line);
-    if (values.length < 3) continue;
-    const [job, _modes, numSuccessors, ...successors] = values;
-    if (job < 1 || job > jobs) continue;
-    tasks[job - 1].successors = successors.slice(0, numSuccessors).map((successor) => successor - 1);
-  }
-
-  for (const line of lines.slice(requestsStart, availabilityStart)) {
-    const values = numericTokens(line);
-    if (values.length < 3 + renewableResources) continue;
-    const [job, _mode, duration, ...demands] = values;
-    if (job < 1 || job > jobs) continue;
-    tasks[job - 1].recipes = [{
-      duration,
-      demands: demands.slice(0, renewableResources),
-      resources: Array.from({ length: renewableResources }, (_, index) => index),
-    }];
-  }
-
-  const availabilityLine = lines.slice(availabilityStart).find((line) => numericTokens(line).length === renewableResources);
-  assert(availabilityLine, 'RCPSP parser expected resource capacities');
-  const capacities = numericTokens(availabilityLine);
-  return normalizeProblem({
-    name: basedata || 'psplib',
-    basedata,
-    seed,
-    horizon: horizon || computeHorizon({ tasks }),
-    resources: capacities.map((capacity, index) => ({
-      name: `R${index + 1}`,
-      maxCapacity: capacity,
-      renewable: true,
-    })),
-    tasks,
-  });
-}
-
 export class RcpspProblem {
-  private readonly problem: RcpspProblemProto;
-  private solving = false;
+  private readonly problem: NormalizedRcpspProblem;
 
   constructor(problem: RcpspProblemProto = {}) {
     this.problem = normalizeProblem(problem);
@@ -296,23 +259,23 @@ export class RcpspProblem {
   }
 
   static fromPsplib(text: string) {
-    return new RcpspProblem(parseSingleModePsplib(text));
+    return new RcpspProblem(parsePsplib(text));
   }
 
   get name() {
-    return this.problem.name ?? '';
+    return this.problem.name;
   }
 
   get resources() {
-    return clone(this.problem.resources ?? []);
+    return clone(this.problem.resources);
   }
 
   get tasks() {
-    return clone(this.problem.tasks ?? []);
+    return clone(this.problem.tasks);
   }
 
   get horizon() {
-    return this.problem.horizon ?? computeHorizon(this.problem);
+    return this.problem.horizon;
   }
 
   exportModelAsProto() {
@@ -324,18 +287,6 @@ export class RcpspProblem {
   }
 
   async solve(options: RcpspSolveOptions = {}): Promise<RcpspSolveResult> {
-    if (this.solving) {
-      throw new Error('RcpspProblem.solve() is already in progress.');
-    }
-    this.solving = true;
-    try {
-      return await this.solveOnce(options);
-    } finally {
-      this.solving = false;
-    }
-  }
-
-  private async solveOnce(options: RcpspSolveOptions): Promise<RcpspSolveResult> {
     const {
       executor,
       onEvent,
@@ -380,23 +331,21 @@ export class RcpspProblem {
       statusName,
       makespan: successful ? solver.value(built.makespanVar) : null,
       objectiveValue: successful ? solver.objectiveValue : null,
+      resourceCapacities: successful && this.problem.isResourceInvestment ? built.capacityVars.map(variable => solver.value(variable)) : null,
       tasks,
       response,
-      model: built.model,
-      starts: built.starts,
-      ends: built.ends,
-      makespanVar: built.makespanVar,
     };
   }
 }
 
 class RcpspSolutionCallback extends CpSolverSolutionCallback {
   constructor(
-    private readonly problem: RcpspProblemProto,
+    private readonly problem: NormalizedRcpspProblem,
     private readonly built: BuiltModel,
     private readonly emit: (solution: {
       makespan: bigint;
       objectiveValue: number;
+      resourceCapacities: bigint[] | null;
       tasks: RcpspScheduleTask[];
     }) => void,
   ) {
@@ -407,6 +356,7 @@ class RcpspSolutionCallback extends CpSolverSolutionCallback {
     this.emit({
       makespan: this.value(this.built.makespanVar),
       objectiveValue: this.objectiveValue,
+      resourceCapacities: this.problem.isResourceInvestment ? this.built.capacityVars.map(variable => this.value(variable)) : null,
       tasks: extractSchedule(this.problem, this, this.built),
     });
   }
@@ -416,15 +366,18 @@ export class RcpspModelBuilder {
   private readonly resourceNames: string[] = [];
   private readonly resources: RcpspResourceProto[] = [];
   private readonly activities: RcpspActivityInput[] = [];
+  private readonly activityNames = new Set<string>();
 
   constructor(private readonly name = 'rcpsp') {}
 
   addResource(input: RcpspResourceInput) {
     assert(!this.resourceNames.includes(input.name), `duplicate RCPSP resource ${input.name}`);
+    const capacity = asInteger(input.capacity, `resource ${input.name} capacity`);
+    assert(capacity >= 0, `resource ${input.name} capacity must be non-negative`);
     this.resourceNames.push(input.name);
     this.resources.push({
       name: input.name,
-      maxCapacity: asInteger(input.capacity, `resource ${input.name} capacity`),
+      maxCapacity: capacity,
       renewable: input.renewable ?? true,
     });
     return this;
@@ -432,8 +385,11 @@ export class RcpspModelBuilder {
 
   addActivity(input: RcpspActivityInput) {
     assert(input.name, 'activity name is required');
-    assert(!this.activities.some((activity) => activity.name === input.name), `duplicate RCPSP activity ${input.name}`);
-    this.activities.push({ ...input });
+    assert(input.name !== 'source' && input.name !== 'sink', 'source and sink are reserved RCPSP activity names');
+    assert(!this.activityNames.has(input.name), `duplicate RCPSP activity ${input.name}`);
+    this.activities.push({ ...input, successors: input.successors && [...input.successors],
+      demands: input.demands && (Array.isArray(input.demands) ? [...input.demands] : { ...input.demands }) });
+    this.activityNames.add(input.name);
     return this;
   }
 
@@ -473,10 +429,10 @@ export class RcpspModelBuilder {
       });
     }
 
-    const nonSourceTasks = tasks.slice(1, -1);
-    tasks[0].successors = nonSourceTasks
+    const hasPredecessor = new Set(tasks.flatMap(task => task.successors ?? []));
+    tasks[0].successors = tasks.slice(1, -1)
       .map((_, offset) => offset + 1)
-      .filter((candidate) => !tasks.some((task) => task.successors?.includes(candidate)));
+      .filter(candidate => !hasPredecessor.has(candidate));
     const sink = tasks.length - 1;
     for (let index = 1; index < sink; index += 1) {
       if (!tasks[index].successors?.length) tasks[index].successors = [sink];
@@ -491,94 +447,120 @@ export class RcpspModelBuilder {
   }
 }
 
-export class RcpspParser {
-  private currentProblem = new RcpspProblem();
-
-  parseString(text: string) {
-    this.currentProblem = RcpspProblem.fromPsplib(text);
-    return true;
-  }
-
-  problem() {
-    return this.currentProblem.exportModelAsProto();
-  }
-}
-
-function buildCpSatModel(problemProto: RcpspProblemProto): BuiltModel {
-  const problem = normalizeProblem(problemProto);
-  assert(!problem.isConsumerProducer, 'consumer/producer RCPSP is not supported by the CP-SAT builder yet');
-  assert(!problem.isResourceInvestment, 'resource-investment RCPSP is not supported by the CP-SAT builder yet');
-  assert(!problem.isRcpspMax, 'RCPSP/Max delays are not supported by the CP-SAT builder yet');
-
-  const horizon = problem.horizon ?? computeHorizon(problem);
+function buildCpSatModel(problem: NormalizedRcpspProblem): BuiltModel {
+  const horizon = problem.isResourceInvestment ? problem.deadline : problem.horizon;
   const model = new CpModel();
-  model.name = problem.name ?? 'rcpsp';
-  const tasks = problem.tasks ?? [];
-  const resources = problem.resources ?? [];
-  const starts = tasks.map((task, index) => model.newIntVar(0, horizon, `${task.name ?? `task_${index}`}_start`));
-  const ends = tasks.map((task, index) => model.newIntVar(0, horizon, `${task.name ?? `task_${index}`}_end`));
+  model.name = problem.name;
+  const tasks = problem.tasks;
+  const resources = problem.resources;
+  const starts = tasks.map((task, index) => model.newIntVar(0, horizon, `${task.name}_start`));
+  const ends = tasks.map((task, index) => model.newIntVar(0, horizon, `${task.name}_end`));
   const recipePresence: Array<Array<BoolVar | true>> = [];
   const intervalsByResource: IntervalVar[][] = resources.map(() => []);
   const demandsByResource: number[][] = resources.map(() => []);
+  const budgetDemandsByResource: Array<Array<LinearExpr | number>> = resources.map(() => []);
+  const reservoirStarts: IntVar[][] = resources.map(() => []);
+  const reservoirDemands: number[][] = resources.map(() => []);
+  const reservoirActive: Array<Array<BoolVar | true>> = resources.map(() => []);
+  const investmentCapacityBounds = resources.map(() => 0n);
 
   for (const [taskIndex, task] of tasks.entries()) {
-    const recipes = (task.recipes ?? []).map((recipe) => normalizeRecipe(recipe, resources.length));
-    assert(recipes.length > 0, `task ${taskIndex} must have at least one recipe`);
+    const recipes = task.recipes;
     const presences = recipes.length > 1 ? recipes.map((_, recipeIndex) => model.newBoolVar(`task_${taskIndex}_recipe_${recipeIndex}`)) : [];
     recipePresence[taskIndex] = presences.length ? presences : recipes.map(() => true);
     if (presences.length) model.addExactlyOne(presences);
+    const maximumDemands = resources.map(() => 0);
 
     for (const [recipeIndex, recipe] of recipes.entries()) {
-      const intervalName = `${task.name ?? `task_${taskIndex}`}_recipe_${recipeIndex}`;
+      const intervalName = `${task.name}_recipe_${recipeIndex}`;
       const interval = presences.length
         ? model.newOptionalIntervalVar(starts[taskIndex], recipe.duration, ends[taskIndex], presences[recipeIndex], intervalName)
         : model.newIntervalVar(starts[taskIndex], recipe.duration, ends[taskIndex], intervalName);
       for (const [resourceIndex, resource] of resources.entries()) {
         const demand = recipeDemandByResource(recipe, resourceIndex);
-        if (demand > 0 && resource.renewable !== false) {
+        maximumDemands[resourceIndex] = Math.max(maximumDemands[resourceIndex], demand);
+        if (problem.isConsumerProducer) {
+          if (demand !== 0) {
+            reservoirStarts[resourceIndex].push(starts[taskIndex]);
+            reservoirDemands[resourceIndex].push(demand);
+            reservoirActive[resourceIndex].push(recipePresence[taskIndex][recipeIndex]);
+          }
+        } else if (!problem.isResourceInvestment && resource.renewable === false) {
+          budgetDemandsByResource[resourceIndex].push(
+            presences.length ? presences[recipeIndex].times(demand) : demand,
+          );
+        } else if (demand > 0) {
           intervalsByResource[resourceIndex].push(interval);
           demandsByResource[resourceIndex].push(demand);
         }
       }
     }
+    if (problem.isResourceInvestment) for (const [resourceIndex, demand] of maximumDemands.entries())
+      investmentCapacityBounds[resourceIndex] += BigInt(demand);
   }
 
   for (const [taskIndex, task] of tasks.entries()) {
-    for (const successor of task.successors ?? []) {
-      model.add(ends[taskIndex].le(starts[successor]));
+    if ((problem.deadline) > 0) model.add(ends[taskIndex].le(problem.deadline));
+    for (const [edge, successor] of (task.successors).entries()) {
+      if (!problem.isRcpspMax) {
+        model.add(ends[taskIndex].le(starts[successor]));
+        continue;
+      }
+      for (const [recipe, delays] of task.successorDelays![edge].recipeDelays!.entries()) {
+        for (const [successorRecipe, delay] of delays.minDelays!.entries()) {
+          const constraint = model.add(starts[taskIndex].plus(delay).le(starts[successor]));
+          const presences = [recipePresence[taskIndex][recipe], recipePresence[successor][successorRecipe]]
+            .filter((presence): presence is BoolVar => presence !== true);
+          if (presences.length) constraint.onlyEnforceIf(presences);
+        }
+      }
     }
   }
 
+  const capacityVars: IntVar[] = [];
   for (const [resourceIndex, resource] of resources.entries()) {
-    if (intervalsByResource[resourceIndex].length) {
-      model.addCumulative(intervalsByResource[resourceIndex], demandsByResource[resourceIndex], maxCapacity(resource));
+    if (problem.isConsumerProducer) {
+      // RCPSP checks levels for t >= 0 and permits bounds excluding zero.
+      // Shift by a fixed event at t=0: L(t)-min must lie in [0,max-min].
+      model.addReservoirConstraint([0, ...reservoirStarts[resourceIndex]],
+        [-BigInt(resource.minCapacity), ...reservoirDemands[resourceIndex]],
+        0, BigInt(resource.maxCapacity) - BigInt(resource.minCapacity),
+        [true, ...reservoirActive[resourceIndex]]);
+    } else if (problem.isResourceInvestment) {
+      const upper = resource.maxCapacity === -1 ? investmentCapacityBounds[resourceIndex] : BigInt(resource.maxCapacity);
+      const capacity = model.newIntVar(0, upper, `${resource.name}_capacity`);
+      capacityVars.push(capacity);
+      model.addCumulative(intervalsByResource[resourceIndex], demandsByResource[resourceIndex], capacity);
+    } else if (resource.renewable === false) {
+      model.add(LinearExpr.from(LinearExpr.sum(budgetDemandsByResource[resourceIndex])).le(resource.maxCapacity));
+    } else if (intervalsByResource[resourceIndex].length) {
+      model.addCumulative(intervalsByResource[resourceIndex], demandsByResource[resourceIndex], resource.maxCapacity);
     }
   }
 
   const makespanVar = model.newIntVar(0, horizon, 'makespan');
-  const sinkIndex = tasks.length - 1;
-  model.addMaxEquality(makespanVar, sinkIndex >= 0 ? [ends[sinkIndex]] : ends);
-  model.minimize(makespanVar);
-  return { model, starts, ends, makespanVar, recipePresence };
+  if (ends.length) model.addMaxEquality(makespanVar, ends);
+  else model.add(makespanVar.eq(0));
+  model.minimize(problem.isResourceInvestment ? LinearExpr.weightedSum(capacityVars, resources.map(resource => resource.unitCost)) : makespanVar);
+  return { model, starts, ends, makespanVar, recipePresence, capacityVars };
 }
 
 type RcpspSolutionReader = Pick<CpSolver, 'value' | 'booleanValue'>;
 
-function extractSchedule(problemProto: RcpspProblemProto, solver: RcpspSolutionReader, built: BuiltModel): RcpspScheduleTask[] {
-  const problem = normalizeProblem(problemProto);
-  return (problem.tasks ?? []).map((task, id) => {
-    const recipes = (task.recipes ?? []).map((recipe) => normalizeRecipe(recipe, problem.resources?.length ?? 0));
+function extractSchedule(problem: NormalizedRcpspProblem, solver: RcpspSolutionReader, built: BuiltModel): RcpspScheduleTask[] {
+  return (problem.tasks).map((task, id) => {
+    const recipes = task.recipes;
     const selectedRecipe = Math.max(0, built.recipePresence[id].findIndex((presence) => presence === true || solver.booleanValue(presence)));
     const recipe = recipes[selectedRecipe];
     return {
       id,
-      name: task.name ?? `task_${id}`,
+      name: task.name,
       start: solver.value(built.starts[id]),
       end: solver.value(built.ends[id]),
       duration: recipe.duration,
       selectedRecipe,
-      demands: (problem.resources ?? []).map((_, resource) => recipeDemandByResource(recipe, resource)),
-      successors: [...(task.successors ?? [])],
+      demands: (problem.resources).map((_, resource) => recipeDemandByResource(recipe, resource)),
+      successors: [...(task.successors)],
     };
   });
 }

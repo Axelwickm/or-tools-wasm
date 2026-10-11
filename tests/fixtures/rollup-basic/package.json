@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit && rollup -c",
+    "build": "tsc --noEmit && node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && rollup -c",
     "serve-static": "node static-server.mjs"
   },
   "dependencies": {

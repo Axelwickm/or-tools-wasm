@@ -342,11 +342,12 @@ async function solveNetworkDesign() {
       }
       objective.setMinimization();
 
-      appendStatus(statusEl, `Solving fixed-charge network design with ${solver.solverVersion()}, requested solver threads=${solverThreads}...`);
+      appendStatus(statusEl, `Solving fixed-charge network design, requested solver threads=${solverThreads}...`);
       const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL && status !== MPSolver.FEASIBLE) {
         throw new Error(`expected OPTIMAL or FEASIBLE, got ${status}`);
       }
+      appendStatus(statusEl, `Solver: ${await solver.solverVersion(executionOptions)}`);
 
       const arcSolutions = arcs.map((arc, arcIndex) => {
         const demandFlows = demands.map((_, demandIndex) => flow[arcIndex][demandIndex].solutionValue());

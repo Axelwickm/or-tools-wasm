@@ -2,15 +2,15 @@
 // @generated from file routing.proto (package ortools_wasm.bridge.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file routing.proto.
  */
 export const file_routing: GenFile = /*@__PURE__*/
-  fileDesc("Cg1yb3V0aW5nLnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIjIKDVJvdXRpbmdNYXRyaXgSDgoGdmFsdWVzGAEgAygDEhEKCWRpbWVuc2lvbhgCIAEoBSKoAQoTUm91dGluZ0FkZERpbWVuc2lvbhI9Cg50cmFuc2l0X21hdHJpeBgBIAEoCzIlLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ01hdHJpeBIRCglzbGFja19tYXgYAiABKAMSEAoIY2FwYWNpdHkYAyABKAMSHwoXZml4X3N0YXJ0X2N1bXVsX3RvX3plcm8YBCABKAgSDAoEbmFtZRgFIAEoCSK9AQomUm91dGluZ0FkZERpbWVuc2lvbldpdGhWZWhpY2xlQ2FwYWNpdHkSPQoOdHJhbnNpdF9tYXRyaXgYASABKAsyJS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdNYXRyaXgSEQoJc2xhY2tfbWF4GAIgASgDEhIKCmNhcGFjaXRpZXMYAyADKAMSHwoXZml4X3N0YXJ0X2N1bXVsX3RvX3plcm8YBCABKAgSDAoEbmFtZRgFIAEoCSK9AQomUm91dGluZ0FkZERpbWVuc2lvbldpdGhWZWhpY2xlVHJhbnNpdHMSPwoQdHJhbnNpdF9tYXRyaWNlcxgBIAMoCzIlLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ01hdHJpeBIRCglzbGFja19tYXgYAiABKAMSEAoIY2FwYWNpdHkYAyABKAMSHwoXZml4X3N0YXJ0X2N1bXVsX3RvX3plcm8YBCABKAgSDAoEbmFtZRgFIAEoCSJtChtSb3V0aW5nQWRkQ29uc3RhbnREaW1lbnNpb24SDQoFdmFsdWUYASABKAMSEAoIY2FwYWNpdHkYAiABKAMSHwoXZml4X3N0YXJ0X2N1bXVsX3RvX3plcm8YAyABKAgSDAoEbmFtZRgEIAEoCSJsChlSb3V0aW5nQWRkVmVjdG9yRGltZW5zaW9uEg4KBnZhbHVlcxgBIAMoAxIQCghjYXBhY2l0eRgCIAEoAxIfChdmaXhfc3RhcnRfY3VtdWxfdG9femVybxgDIAEoCBIMCgRuYW1lGAQgASgJIpMBChlSb3V0aW5nQWRkTWF0cml4RGltZW5zaW9uEjUKBm1hdHJpeBgBIAEoCzIlLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ01hdHJpeBIQCghjYXBhY2l0eRgCIAEoAxIfChdmaXhfc3RhcnRfY3VtdWxfdG9femVybxgDIAEoCBIMCgRuYW1lGAQgASgJIkoKFVJvdXRpbmdBZGREaXNqdW5jdGlvbhIPCgdpbmRpY2VzGAEgAygDEhQKB3BlbmFsdHkYAiABKANIAIgBAUIKCghfcGVuYWx0eSI/ChtSb3V0aW5nQWRkUGlja3VwQW5kRGVsaXZlcnkSDgoGcGlja3VwGAEgASgDEhAKCGRlbGl2ZXJ5GAIgASgDIkIKI1JvdXRpbmdBZGRWZWhpY2xlRXF1YWxpdHlDb25zdHJhaW50EgwKBGxlZnQYASABKAMSDQoFcmlnaHQYAiABKAMiWwokUm91dGluZ0FkZEN1bXVsTGVzc09yRXF1YWxDb25zdHJhaW50EhYKDmRpbWVuc2lvbl9uYW1lGAEgASgJEgwKBGxlZnQYAiABKAMSDQoFcmlnaHQYAyABKAMiZAocUm91dGluZ1NldFNvZnRTcGFuVXBwZXJCb3VuZBIWCg5kaW1lbnNpb25fbmFtZRgBIAEoCRINCgVib3VuZBgCIAEoAxIMCgRjb3N0GAMgASgDEg8KB3ZlaGljbGUYBCABKAUicQopUm91dGluZ1NldFF1YWRyYXRpY0Nvc3RTb2Z0U3BhblVwcGVyQm91bmQSFgoOZGltZW5zaW9uX25hbWUYASABKAkSDQoFYm91bmQYAiABKAMSDAoEY29zdBgDIAEoAxIPCgd2ZWhpY2xlGAQgASgFIo0JChVSb3V0aW5nTW9kZWxPcGVyYXRpb24SRAoNYWRkX2RpbWVuc2lvbhgBIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZERpbWVuc2lvbkgAEm0KI2FkZF9kaW1lbnNpb25fd2l0aF92ZWhpY2xlX2NhcGFjaXR5GAIgASgLMj4ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkRGltZW5zaW9uV2l0aFZlaGljbGVDYXBhY2l0eUgAEm0KI2FkZF9kaW1lbnNpb25fd2l0aF92ZWhpY2xlX3RyYW5zaXRzGAMgASgLMj4ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkRGltZW5zaW9uV2l0aFZlaGljbGVUcmFuc2l0c0gAElUKFmFkZF9jb25zdGFudF9kaW1lbnNpb24YBCABKAsyMy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRDb25zdGFudERpbWVuc2lvbkgAElEKFGFkZF92ZWN0b3JfZGltZW5zaW9uGAUgASgLMjEub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkVmVjdG9yRGltZW5zaW9uSAASUQoUYWRkX21hdHJpeF9kaW1lbnNpb24YBiABKAsyMS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRNYXRyaXhEaW1lbnNpb25IABJICg9hZGRfZGlzanVuY3Rpb24YByABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGREaXNqdW5jdGlvbkgAElYKF2FkZF9waWNrdXBfYW5kX2RlbGl2ZXJ5GAggASgLMjMub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkUGlja3VwQW5kRGVsaXZlcnlIABJmCh9hZGRfdmVoaWNsZV9lcXVhbGl0eV9jb25zdHJhaW50GAkgASgLMjsub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkVmVoaWNsZUVxdWFsaXR5Q29uc3RyYWludEgAEmoKImFkZF9jdW11bF9sZXNzX29yX2VxdWFsX2NvbnN0cmFpbnQYCiABKAsyPC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRDdW11bExlc3NPckVxdWFsQ29uc3RyYWludEgAElkKGXNldF9zb2Z0X3NwYW5fdXBwZXJfYm91bmQYCyABKAsyNC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdTZXRTb2Z0U3BhblVwcGVyQm91bmRIABJ1CihzZXRfcXVhZHJhdGljX2Nvc3Rfc29mdF9zcGFuX3VwcGVyX2JvdW5kGAwgASgLMkEub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nU2V0UXVhZHJhdGljQ29zdFNvZnRTcGFuVXBwZXJCb3VuZEgAQgsKCW9wZXJhdGlvbiIfCgxSb3V0aW5nUm91dGUSDwoHaW5kaWNlcxgBIAMoAyJxChhSb3V0aW5nSW5pdGlhbEFzc2lnbm1lbnQSNAoGcm91dGVzGAEgAygLMiQub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nUm91dGUSHwoXaWdub3JlX2luYWN0aXZlX2luZGljZXMYAiABKAgimgMKFFJvdXRpbmdCcmlkZ2VSZXF1ZXN0EhUKDW51bV9sb2NhdGlvbnMYASABKAUSFAoMbnVtX3ZlaGljbGVzGAIgASgFEg4KBnN0YXJ0cxgDIAMoBRIMCgRlbmRzGAQgAygFEh8KF2ZpcnN0X3NvbHV0aW9uX3N0cmF0ZWd5GAUgASgFEhYKDnNvbHV0aW9uX2xpbWl0GAYgASgDEj0KDnRyYW5zaXRfbWF0cml4GAcgASgLMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTWF0cml4EkEKCm9wZXJhdGlvbnMYCCADKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdNb2RlbE9wZXJhdGlvbhIXCg9kaW1lbnNpb25fbmFtZXMYCSADKAkSTAoSaW5pdGlhbF9hc3NpZ25tZW50GAogASgLMjAub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nSW5pdGlhbEFzc2lnbm1lbnQSFQoNaW50ZXJydXB0aWJsZRgLIAEoCCI8ChZSb3V0aW5nRGltZW5zaW9uVmFsdWVzEgwKBG5hbWUYASABKAkSFAoMY3VtdWxfdmFsdWVzGAIgAygDIs0BChVSb3V0aW5nQnJpZGdlUmVzcG9uc2USFAoMaGFzX3NvbHV0aW9uGAEgASgIEg4KBnN0YXR1cxgCIAEoBRIXCg9vYmplY3RpdmVfdmFsdWUYAyABKAMSEwoLbmV4dF92YWx1ZXMYBCADKAMSDgoGc3RhcnRzGAUgAygDEgwKBGVuZHMYBiADKAMSQgoKZGltZW5zaW9ucxgHIAMoCzIuLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0RpbWVuc2lvblZhbHVlc2IGcHJvdG8z");
+  fileDesc("Cg1yb3V0aW5nLnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIksKDVJvdXRpbmdNYXRyaXgSDgoGdmFsdWVzGAEgAygDEhEKCWRpbWVuc2lvbhgCIAEoBRIXCg9yb3V0aW5nX2luZGljZXMYAyABKAgiqAEKE1JvdXRpbmdBZGREaW1lbnNpb24SPQoOdHJhbnNpdF9tYXRyaXgYASABKAsyJS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdNYXRyaXgSEQoJc2xhY2tfbWF4GAIgASgDEhAKCGNhcGFjaXR5GAMgASgDEh8KF2ZpeF9zdGFydF9jdW11bF90b196ZXJvGAQgASgIEgwKBG5hbWUYBSABKAkivQEKJlJvdXRpbmdBZGREaW1lbnNpb25XaXRoVmVoaWNsZUNhcGFjaXR5Ej0KDnRyYW5zaXRfbWF0cml4GAEgASgLMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTWF0cml4EhEKCXNsYWNrX21heBgCIAEoAxISCgpjYXBhY2l0aWVzGAMgAygDEh8KF2ZpeF9zdGFydF9jdW11bF90b196ZXJvGAQgASgIEgwKBG5hbWUYBSABKAkivQEKJlJvdXRpbmdBZGREaW1lbnNpb25XaXRoVmVoaWNsZVRyYW5zaXRzEj8KEHRyYW5zaXRfbWF0cmljZXMYASADKAsyJS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdNYXRyaXgSEQoJc2xhY2tfbWF4GAIgASgDEhAKCGNhcGFjaXR5GAMgASgDEh8KF2ZpeF9zdGFydF9jdW11bF90b196ZXJvGAQgASgIEgwKBG5hbWUYBSABKAkiyQEKMFJvdXRpbmdBZGREaW1lbnNpb25XaXRoVmVoaWNsZVRyYW5zaXRBbmRDYXBhY2l0eRI/ChB0cmFuc2l0X21hdHJpY2VzGAEgAygLMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTWF0cml4EhEKCXNsYWNrX21heBgCIAEoAxISCgpjYXBhY2l0aWVzGAMgAygDEh8KF2ZpeF9zdGFydF9jdW11bF90b196ZXJvGAQgASgIEgwKBG5hbWUYBSABKAkikwEKG1JvdXRpbmdBZGRDb25zdGFudERpbWVuc2lvbhINCgV2YWx1ZRgBIAEoAxIQCghjYXBhY2l0eRgCIAEoAxIfChdmaXhfc3RhcnRfY3VtdWxfdG9femVybxgDIAEoCBIMCgRuYW1lGAQgASgJEhYKCXNsYWNrX21heBgFIAEoA0gAiAEBQgwKCl9zbGFja19tYXgibAoZUm91dGluZ0FkZFZlY3RvckRpbWVuc2lvbhIOCgZ2YWx1ZXMYASADKAMSEAoIY2FwYWNpdHkYAiABKAMSHwoXZml4X3N0YXJ0X2N1bXVsX3RvX3plcm8YAyABKAgSDAoEbmFtZRgEIAEoCSKTAQoZUm91dGluZ0FkZE1hdHJpeERpbWVuc2lvbhI1CgZtYXRyaXgYASABKAsyJS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdNYXRyaXgSEAoIY2FwYWNpdHkYAiABKAMSHwoXZml4X3N0YXJ0X2N1bXVsX3RvX3plcm8YAyABKAgSDAoEbmFtZRgEIAEoCSK6AQoVUm91dGluZ0FkZERpc2p1bmN0aW9uEg8KB2luZGljZXMYASADKAMSFAoHcGVuYWx0eRgCIAEoA0gAiAEBEhwKD21heF9jYXJkaW5hbGl0eRgDIAEoA0gBiAEBEiIKFXBlbmFsdHlfY29zdF9iZWhhdmlvchgEIAEoBUgCiAEBQgoKCF9wZW5hbHR5QhIKEF9tYXhfY2FyZGluYWxpdHlCGAoWX3BlbmFsdHlfY29zdF9iZWhhdmlvciI/ChtSb3V0aW5nQWRkUGlja3VwQW5kRGVsaXZlcnkSDgoGcGlja3VwGAEgASgDEhAKCGRlbGl2ZXJ5GAIgASgDIkIKI1JvdXRpbmdBZGRWZWhpY2xlRXF1YWxpdHlDb25zdHJhaW50EgwKBGxlZnQYASABKAMSDQoFcmlnaHQYAiABKAMiWwokUm91dGluZ0FkZEN1bXVsTGVzc09yRXF1YWxDb25zdHJhaW50EhYKDmRpbWVuc2lvbl9uYW1lGAEgASgJEgwKBGxlZnQYAiABKAMSDQoFcmlnaHQYAyABKAMiNQoUUm91dGluZ1NldE5leHRWYWx1ZXMSDQoFaW5kZXgYASABKAMSDgoGdmFsdWVzGAIgAygDIjgKF1JvdXRpbmdTZXRWZWhpY2xlVmFsdWVzEg0KBWluZGV4GAEgASgDEg4KBnZhbHVlcxgCIAMoBSJECiFSb3V0aW5nU2V0QWxsb3dlZFZlaGljbGVzRm9ySW5kZXgSEAoIdmVoaWNsZXMYASADKAUSDQoFaW5kZXgYAiABKAMiXAoVUm91dGluZ1NldFNsYWNrQm91bmRzEhYKDmRpbWVuc2lvbl9uYW1lGAEgASgJEg0KBWluZGV4GAIgASgDEg0KBWxvd2VyGAMgASgDEg0KBXVwcGVyGAQgASgDIjcKFlJvdXRpbmdTZXRBY3RpdmVWYWx1ZXMSDQoFaW5kZXgYASABKAMSDgoGdmFsdWVzGAIgAygFIqQBChhSb3V0aW5nU2V0RGltZW5zaW9uVmFsdWUSFgoOZGltZW5zaW9uX25hbWUYASABKAkSPwoEa2luZBgCIAEoDjIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0RpbWVuc2lvblZhbHVlS2luZBINCgV2YWx1ZRgDIAEoAxIUCgd2ZWhpY2xlGAQgASgFSACIAQFCCgoIX3ZlaGljbGUiXAoVUm91dGluZ1NldEN1bXVsQm91bmRzEhYKDmRpbWVuc2lvbl9uYW1lGAEgASgJEg0KBWluZGV4GAIgASgDEg0KBWxvd2VyGAMgASgDEg0KBXVwcGVyGAQgASgDImEKGFJvdXRpbmdBZGROb2RlUHJlY2VkZW5jZRIWCg5kaW1lbnNpb25fbmFtZRgBIAEoCRINCgVmaXJzdBgCIAEoAxIOCgZzZWNvbmQYAyABKAMSDgoGb2Zmc2V0GAQgASgDImQKHFJvdXRpbmdTZXRTb2Z0U3BhblVwcGVyQm91bmQSFgoOZGltZW5zaW9uX25hbWUYASABKAkSDQoFYm91bmQYAiABKAMSDAoEY29zdBgDIAEoAxIPCgd2ZWhpY2xlGAQgASgFInEKKVJvdXRpbmdTZXRRdWFkcmF0aWNDb3N0U29mdFNwYW5VcHBlckJvdW5kEhYKDmRpbWVuc2lvbl9uYW1lGAEgASgJEg0KBWJvdW5kGAIgASgDEgwKBGNvc3QYAyABKAMSDwoHdmVoaWNsZRgEIAEoBSKGAQokUm91dGluZ1NldEFyY0Nvc3RFdmFsdWF0b3JPZlZlaGljbGVzEj0KDnRyYW5zaXRfbWF0cml4GAEgASgLMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTWF0cml4EhAKCHZlaGljbGVzGAMgAygFSgQIAhADUgd2ZWhpY2xlInQKGFJvdXRpbmdTZXRDdW11bFNvZnRCb3VuZBIWCg5kaW1lbnNpb25fbmFtZRgBIAEoCRINCgVpbmRleBgCIAEoAxINCgVib3VuZBgDIAEoAxITCgtjb2VmZmljaWVudBgEIAEoAxINCgVsb3dlchgFIAEoCCIyCh9Sb3V0aW5nU2V0TWF4aW11bUFjdGl2ZVZlaGljbGVzEg8KB21heGltdW0YASABKAUiOwoaUm91dGluZ1NldEZpeGVkVmVoaWNsZUNvc3QSDAoEY29zdBgBIAEoAxIPCgd2ZWhpY2xlGAIgASgFIlUKH1JvdXRpbmdTZXRBbW9ydGl6ZWRWZWhpY2xlQ29zdHMSDgoGbGluZWFyGAEgASgDEhEKCXF1YWRyYXRpYxgCIAEoAxIPCgd2ZWhpY2xlGAMgASgFIkIKHlJvdXRpbmdTZXRWZWhpY2xlVXNlZFdoZW5FbXB0eRIPCgdpc191c2VkGAEgASgIEg8KB3ZlaGljbGUYAiABKAUiRAojUm91dGluZ0FkZFNvZnRTYW1lVmVoaWNsZUNvbnN0cmFpbnQSDwoHaW5kaWNlcxgBIAMoAxIMCgRjb3N0GAIgASgDIkEKHlJvdXRpbmdTZXRQaWNrdXBEZWxpdmVyeVBvbGljeRIOCgZwb2xpY3kYASABKAUSDwoHdmVoaWNsZRgCIAEoBSJCChNSb3V0aW5nU2V0VmlzaXRUeXBlEg0KBWluZGV4GAEgASgDEgwKBHR5cGUYAiABKAUSDgoGcG9saWN5GAMgASgFIkEKIVJvdXRpbmdBZGRIYXJkVHlwZUluY29tcGF0aWJpbGl0eRINCgV0eXBlMRgBIAEoBRINCgV0eXBlMhgCIAEoBSJFCiVSb3V0aW5nQWRkVGVtcG9yYWxUeXBlSW5jb21wYXRpYmlsaXR5Eg0KBXR5cGUxGAEgASgFEg0KBXR5cGUyGAIgASgFIpkBChlSb3V0aW5nQWRkVHlwZVJlcXVpcmVtZW50EkAKBGtpbmQYASABKA4yMi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdUeXBlUmVxdWlyZW1lbnRLaW5kEhYKDmRlcGVuZGVudF90eXBlGAIgASgFEiIKGnJlcXVpcmVkX3R5cGVfYWx0ZXJuYXRpdmVzGAMgAygFIoQCChNSb3V0aW5nQWRkRmluYWxpemVyEkIKDXZhcmlhYmxlX2tpbmQYASABKA4yKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdWYXJpYWJsZUtpbmQSFgoOZGltZW5zaW9uX25hbWUYAiABKAkSDQoFaW5kZXgYAyABKAMSOgoEa2luZBgEIAEoDjIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0ZpbmFsaXplcktpbmQSDgoGdGFyZ2V0GAUgASgDEhMKBndlaWdodBgGIAEoA0gAiAEBEhYKDnJlc291cmNlX2dyb3VwGAcgASgFQgkKB193ZWlnaHQilAEKGFJvdXRpbmdWYXJpYWJsZVJlZmVyZW5jZRI5CgRraW5kGAEgASgOMisub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nVmFyaWFibGVLaW5kEhYKDmRpbWVuc2lvbl9uYW1lGAIgASgJEg0KBWluZGV4GAMgASgDEhYKDnJlc291cmNlX2dyb3VwGAQgASgFIsQBChNSb3V0aW5nTW9kaWZ5RG9tYWluEkIKCHZhcmlhYmxlGAEgASgLMjAub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nVmFyaWFibGVSZWZlcmVuY2USOwoGYWN0aW9uGAIgASgOMisub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nRG9tYWluQWN0aW9uEg0KBWxvd2VyGAMgASgDEg0KBXVwcGVyGAQgASgDEg4KBnZhbHVlcxgFIAMoAyJsChFSb3V0aW5nTGluZWFyVGVybRJCCgh2YXJpYWJsZRgBIAEoCzIwLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1ZhcmlhYmxlUmVmZXJlbmNlEhMKC2NvZWZmaWNpZW50GAIgASgDImMKF1JvdXRpbmdMaW5lYXJFeHByZXNzaW9uEjgKBXRlcm1zGAEgAygLMikub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTGluZWFyVGVybRIOCgZvZmZzZXQYAiABKAMirAEKF1JvdXRpbmdMaW5lYXJDb21wYXJpc29uEj0KBGxlZnQYASABKAsyLy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdMaW5lYXJFeHByZXNzaW9uEj4KBXJpZ2h0GAIgASgLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTGluZWFyRXhwcmVzc2lvbhISCgpjb21wYXJpc29uGAMgASgFIsICChpSb3V0aW5nQWRkTGluZWFyQ29uc3RyYWludBI9CgRsZWZ0GAEgASgLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTGluZWFyRXhwcmVzc2lvbhI+CgVyaWdodBgCIAEoCzIvLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0xpbmVhckV4cHJlc3Npb24SEgoKY29tcGFyaXNvbhgDIAEoBRJDCgpjb25kaXRpb25zGAQgAygLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTGluZWFyQ29tcGFyaXNvbhJMChJib29sZWFuX2NvbmRpdGlvbnMYBSADKAsyMC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdCb29sZWFuRXhwcmVzc2lvbiJMChNSb3V0aW5nQXJjQ29zdFF1ZXJ5EhIKCmZyb21faW5kZXgYASABKAMSEAoIdG9faW5kZXgYAiABKAMSDwoHdmVoaWNsZRgDIAEoBSK8AQoSUm91dGluZ0RvbWFpblF1ZXJ5EkIKCHZhcmlhYmxlGAEgASgLMjAub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nVmFyaWFibGVSZWZlcmVuY2USGwoOY29udGFpbnNfdmFsdWUYAiABKANIAIgBARIdChBzb2Z0X2xvd2VyX2JvdW5kGAMgASgISAGIAQFCEQoPX2NvbnRhaW5zX3ZhbHVlQhMKEV9zb2Z0X2xvd2VyX2JvdW5kIpgBChNSb3V0aW5nRG9tYWluUmVzdWx0EgsKA21pbhgBIAEoAxILCgNtYXgYAiABKAMSDAoEc2l6ZRgDIAEoBBINCgVib3VuZBgEIAEoCBIVCghjb250YWlucxgFIAEoCEgAiAEBEhcKCnNvZnRfYm91bmQYBiABKANIAYgBAUILCglfY29udGFpbnNCDQoLX3NvZnRfYm91bmQi2xsKFVJvdXRpbmdNb2RlbE9wZXJhdGlvbhJECg1hZGRfZGltZW5zaW9uGAEgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkRGltZW5zaW9uSAASbQojYWRkX2RpbWVuc2lvbl93aXRoX3ZlaGljbGVfY2FwYWNpdHkYAiABKAsyPi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGREaW1lbnNpb25XaXRoVmVoaWNsZUNhcGFjaXR5SAASbQojYWRkX2RpbWVuc2lvbl93aXRoX3ZlaGljbGVfdHJhbnNpdHMYAyABKAsyPi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGREaW1lbnNpb25XaXRoVmVoaWNsZVRyYW5zaXRzSAASVQoWYWRkX2NvbnN0YW50X2RpbWVuc2lvbhgEIAEoCzIzLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZENvbnN0YW50RGltZW5zaW9uSAASUQoUYWRkX3ZlY3Rvcl9kaW1lbnNpb24YBSABKAsyMS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRWZWN0b3JEaW1lbnNpb25IABJRChRhZGRfbWF0cml4X2RpbWVuc2lvbhgGIAEoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZE1hdHJpeERpbWVuc2lvbkgAEkgKD2FkZF9kaXNqdW5jdGlvbhgHIAEoCzItLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZERpc2p1bmN0aW9uSAASVgoXYWRkX3BpY2t1cF9hbmRfZGVsaXZlcnkYCCABKAsyMy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRQaWNrdXBBbmREZWxpdmVyeUgAEmYKH2FkZF92ZWhpY2xlX2VxdWFsaXR5X2NvbnN0cmFpbnQYCSABKAsyOy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRWZWhpY2xlRXF1YWxpdHlDb25zdHJhaW50SAASagoiYWRkX2N1bXVsX2xlc3Nfb3JfZXF1YWxfY29uc3RyYWludBgKIAEoCzI8Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZEN1bXVsTGVzc09yRXF1YWxDb25zdHJhaW50SAASWQoZc2V0X3NvZnRfc3Bhbl91cHBlcl9ib3VuZBgLIAEoCzI0Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1NldFNvZnRTcGFuVXBwZXJCb3VuZEgAEnUKKHNldF9xdWFkcmF0aWNfY29zdF9zb2Z0X3NwYW5fdXBwZXJfYm91bmQYDCABKAsyQS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdTZXRRdWFkcmF0aWNDb3N0U29mdFNwYW5VcHBlckJvdW5kSAASagoic2V0X2FyY19jb3N0X2V2YWx1YXRvcl9vZl92ZWhpY2xlcxgNIAEoCzI8Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1NldEFyY0Nvc3RFdmFsdWF0b3JPZlZlaGljbGVzSAASTwoTYWRkX25vZGVfcHJlY2VkZW5jZRgOIAEoCzIwLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZE5vZGVQcmVjZWRlbmNlSAASSQoQc2V0X2N1bXVsX2JvdW5kcxgPIAEoCzItLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1NldEN1bXVsQm91bmRzSAASYwoec2V0X2FsbG93ZWRfdmVoaWNsZXNfZm9yX2luZGV4GBAgASgLMjkub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nU2V0QWxsb3dlZFZlaGljbGVzRm9ySW5kZXhIABJNChJzZXRfdmVoaWNsZV92YWx1ZXMYESABKAsyLy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdTZXRWZWhpY2xlVmFsdWVzSAASRwoPc2V0X25leHRfdmFsdWVzGBIgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nU2V0TmV4dFZhbHVlc0gAEkkKEHNldF9zbGFja19ib3VuZHMYEyABKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdTZXRTbGFja0JvdW5kc0gAEksKEXNldF9hY3RpdmVfdmFsdWVzGBQgASgLMi4ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nU2V0QWN0aXZlVmFsdWVzSAASTwoTc2V0X2RpbWVuc2lvbl92YWx1ZRgVIAEoCzIwLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1NldERpbWVuc2lvblZhbHVlSAASUAoUc2V0X2N1bXVsX3NvZnRfYm91bmQYFiABKAsyMC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdTZXRDdW11bFNvZnRCb3VuZEgAEl4KG3NldF9tYXhpbXVtX2FjdGl2ZV92ZWhpY2xlcxgXIAEoCzI3Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1NldE1heGltdW1BY3RpdmVWZWhpY2xlc0gAElQKFnNldF9maXhlZF92ZWhpY2xlX2Nvc3QYGCABKAsyMi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdTZXRGaXhlZFZlaGljbGVDb3N0SAASXgobc2V0X2Ftb3J0aXplZF92ZWhpY2xlX2Nvc3RzGBkgASgLMjcub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nU2V0QW1vcnRpemVkVmVoaWNsZUNvc3RzSAASXQobc2V0X3ZlaGljbGVfdXNlZF93aGVuX2VtcHR5GBogASgLMjYub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nU2V0VmVoaWNsZVVzZWRXaGVuRW1wdHlIABJnCiBhZGRfc29mdF9zYW1lX3ZlaGljbGVfY29uc3RyYWludBgbIAEoCzI7Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZFNvZnRTYW1lVmVoaWNsZUNvbnN0cmFpbnRIABJcChpzZXRfcGlja3VwX2RlbGl2ZXJ5X3BvbGljeRgcIAEoCzI2Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1NldFBpY2t1cERlbGl2ZXJ5UG9saWN5SAASgwEKL2FkZF9kaW1lbnNpb25fd2l0aF92ZWhpY2xlX3RyYW5zaXRfYW5kX2NhcGFjaXR5GB0gASgLMkgub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkRGltZW5zaW9uV2l0aFZlaGljbGVUcmFuc2l0QW5kQ2FwYWNpdHlIABJFCg5zZXRfdmlzaXRfdHlwZRgeIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1NldFZpc2l0VHlwZUgAEmIKHWFkZF9oYXJkX3R5cGVfaW5jb21wYXRpYmlsaXR5GB8gASgLMjkub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkSGFyZFR5cGVJbmNvbXBhdGliaWxpdHlIABJqCiFhZGRfdGVtcG9yYWxfdHlwZV9pbmNvbXBhdGliaWxpdHkYICABKAsyPS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRUZW1wb3JhbFR5cGVJbmNvbXBhdGliaWxpdHlIABJRChRhZGRfdHlwZV9yZXF1aXJlbWVudBghIAEoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZFR5cGVSZXF1aXJlbWVudEgAEkQKDWFkZF9maW5hbGl6ZXIYIiABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBZGRGaW5hbGl6ZXJIABJECg1tb2RpZnlfZG9tYWluGCMgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTW9kaWZ5RG9tYWluSAASUwoVYWRkX2xpbmVhcl9jb25zdHJhaW50GCQgASgLMjIub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkTGluZWFyQ29uc3RyYWludEgAElEKFGFkZF9ib29sZWFuX3ZhcmlhYmxlGCUgASgLMjEub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQWRkQm9vbGVhblZhcmlhYmxlSAASVQoWYWRkX2Jvb2xlYW5fY29uc3RyYWludBgmIAEoCzIzLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZEJvb2xlYW5Db25zdHJhaW50SAASVQoWYWRkX2ludGVnZXJfZXhwcmVzc2lvbhgnIAEoCzIzLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0FkZEludGVnZXJFeHByZXNzaW9uSABCCwoJb3BlcmF0aW9uIh8KDFJvdXRpbmdSb3V0ZRIPCgdpbmRpY2VzGAEgAygDInEKGFJvdXRpbmdJbml0aWFsQXNzaWdubWVudBI0CgZyb3V0ZXMYASADKAsyJC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdSb3V0ZRIfChdpZ25vcmVfaW5hY3RpdmVfaW5kaWNlcxgCIAEoCCKKBwoUUm91dGluZ0JyaWRnZVJlcXVlc3QSFQoNbnVtX2xvY2F0aW9ucxgBIAEoBRIUCgxudW1fdmVoaWNsZXMYAiABKAUSDgoGc3RhcnRzGAMgAygFEgwKBGVuZHMYBCADKAUSPQoOdHJhbnNpdF9tYXRyaXgYByABKAsyJS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdNYXRyaXgSQQoKb3BlcmF0aW9ucxgIIAMoCzItLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ01vZGVsT3BlcmF0aW9uEhcKD2RpbWVuc2lvbl9uYW1lcxgJIAMoCRJMChJpbml0aWFsX2Fzc2lnbm1lbnQYCiABKAsyMC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdJbml0aWFsQXNzaWdubWVudBIVCg1pbnRlcnJ1cHRpYmxlGAsgASgIEh8KF3NlYXJjaF9wYXJhbWV0ZXJzX3Byb3RvGAwgASgMEh8KF3NlYXJjaF9wYXJhbWV0ZXJfZmllbGRzGA0gAygJEh4KFm1vZGVsX3BhcmFtZXRlcnNfcHJvdG8YDiABKAwSHgoWbW9kZWxfcGFyYW1ldGVyX2ZpZWxkcxgPIAMoCRIXCg9zb2x1dGlvbl9ldmVudHMYECABKAgSIQoZdHJhY2tfdW5jaGVja2VkX25laWdoYm9ycxgRIAEoCBIcChRyZWFkX2Fzc2lnbm1lbnRfb25seRgSIAEoCBJCCg5kb21haW5fcXVlcmllcxgTIAMoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0RvbWFpblF1ZXJ5EkUKEGFyY19jb3N0X3F1ZXJpZXMYFCADKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdBcmNDb3N0UXVlcnkSRQoPcmVzb3VyY2VfZ3JvdXBzGBUgAygLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nUmVzb3VyY2VHcm91cBImChlyZXNvdXJjZV9pbnNwZWN0aW9uX2dyb3VwGBYgASgFSACIAQFCHAoaX3Jlc291cmNlX2luc3BlY3Rpb25fZ3JvdXBKBAgFEAZKBAgGEAdSF2ZpcnN0X3NvbHV0aW9uX3N0cmF0ZWd5Ug5zb2x1dGlvbl9saW1pdCJkChZSb3V0aW5nRGltZW5zaW9uVmFsdWVzEgwKBG5hbWUYASABKAkSFAoMY3VtdWxfdmFsdWVzGAIgAygDEhIKCmN1bXVsX21pbnMYAyADKAMSEgoKY3VtdWxfbWF4cxgEIAMoAyJ5ChlSb3V0aW5nQXNzaWdubWVudFZhcmlhYmxlEkIKCHZhcmlhYmxlGAEgASgLMjAub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nVmFyaWFibGVSZWZlcmVuY2USCwoDbWluGAIgASgDEgsKA21heBgDIAEoAyLjBQoVUm91dGluZ0JyaWRnZVJlc3BvbnNlEhQKDGhhc19zb2x1dGlvbhgBIAEoCBIOCgZzdGF0dXMYAiABKAUSFwoPb2JqZWN0aXZlX3ZhbHVlGAMgASgDEhMKC25leHRfdmFsdWVzGAQgAygDEg4KBnN0YXJ0cxgFIAMoAxIMCgRlbmRzGAYgAygDEkIKCmRpbWVuc2lvbnMYByADKAsyLi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdEaW1lbnNpb25WYWx1ZXMSHAoUbG9jYWxfc2VhcmNoX3Byb2ZpbGUYCCABKAkSPgoLc29sdmVfZXZlbnQYCSABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdTb2x2ZUV2ZW50EhYKDnZlaGljbGVfdmFsdWVzGAogAygFEi4KIWF1dG9tYXRpY19maXJzdF9zb2x1dGlvbl9zdHJhdGVneRgLIAEoBUgAiAEBEkMKDmRvbWFpbl9yZXN1bHRzGAwgAygLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nRG9tYWluUmVzdWx0EhEKCWFyY19jb3N0cxgNIAMoAxJPChRhc3NpZ25tZW50X3ZhcmlhYmxlcxgOIAMoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0Fzc2lnbm1lbnRWYXJpYWJsZRJPChRyZXNvdXJjZV9hc3NpZ25tZW50cxgPIAMoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1Jlc291cmNlQXNzaWdubWVudBJOChNyZXNvdXJjZV9pbnNwZWN0aW9uGBAgASgLMjEub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nUmVzb3VyY2VJbnNwZWN0aW9uQiQKIl9hdXRvbWF0aWNfZmlyc3Rfc29sdXRpb25fc3RyYXRlZ3kiVwoRUm91dGluZ1NvbHZlRXZlbnQSFwoPb2JqZWN0aXZlX3ZhbHVlGAEgASgDEhYKDnNvbHV0aW9uX2NvdW50GAIgASgDEhEKCXVuY2hlY2tlZBgDIAEoCCJTCg9Sb3V0aW5nUmVzb3VyY2USFgoOZGltZW5zaW9uX25hbWUYASABKAkSFAoMc3RhcnRfZG9tYWluGAIgAygDEhIKCmVuZF9kb21haW4YAyADKAMiPQoXUm91dGluZ1ZlaGljbGVSZXNvdXJjZXMSDwoHdmVoaWNsZRgBIAEoBRIRCglyZXNvdXJjZXMYAiADKAUiuQEKFFJvdXRpbmdSZXNvdXJjZUdyb3VwEjoKCXJlc291cmNlcxgBIAMoCzInLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ1Jlc291cmNlEhkKEXJlcXVpcmVkX3ZlaGljbGVzGAIgAygFEkoKEWFsbG93ZWRfcmVzb3VyY2VzGAMgAygLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nVmVoaWNsZVJlc291cmNlcyI3ChlSb3V0aW5nUmVzb3VyY2VBc3NpZ25tZW50EgwKBG1pbnMYASADKAMSDAoEbWF4cxgCIAMoAyJ2ChhSb3V0aW5nSW5zcGVjdGVkUmVzb3VyY2USEwoLY2xhc3NfaW5kZXgYASABKAUSRQoUZGltZW5zaW9uX2F0dHJpYnV0ZXMYAiADKAsyJy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdSZXNvdXJjZSJ3ChRSb3V0aW5nUmVzb3VyY2VDbGFzcxIYChByZXNvdXJjZV9pbmRpY2VzGAEgAygFEkUKFGRpbWVuc2lvbl9hdHRyaWJ1dGVzGAIgAygLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nUmVzb3VyY2UivAEKGVJvdXRpbmdSZXNvdXJjZUluc3BlY3Rpb24SGwoTYWZmZWN0ZWRfZGltZW5zaW9ucxgBIAMoCRJDCglyZXNvdXJjZXMYAiADKAsyMC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdJbnNwZWN0ZWRSZXNvdXJjZRI9CgdjbGFzc2VzGAMgAygLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nUmVzb3VyY2VDbGFzcyKEAgoYUm91dGluZ0Jvb2xlYW5FeHByZXNzaW9uEgwKBGtpbmQYASABKAUSDQoFdmFsdWUYAiABKAgSQgoIdmFyaWFibGUYAyABKAsyMC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdWYXJpYWJsZVJlZmVyZW5jZRJDCgpjb21wYXJpc29uGAQgASgLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nTGluZWFyQ29tcGFyaXNvbhJCCghvcGVyYW5kcxgFIAMoCzIwLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0Jvb2xlYW5FeHByZXNzaW9uInAKGVJvdXRpbmdBZGRCb29sZWFuVmFyaWFibGUSDQoFaW5kZXgYASABKAUSRAoKZXhwcmVzc2lvbhgCIAEoCzIwLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuUm91dGluZ0Jvb2xlYW5FeHByZXNzaW9uImMKG1JvdXRpbmdBZGRCb29sZWFuQ29uc3RyYWludBJECgpleHByZXNzaW9uGAEgASgLMjAub3J0b29sc193YXNtLmJyaWRnZS52MS5Sb3V0aW5nQm9vbGVhbkV4cHJlc3Npb24ifQobUm91dGluZ0FkZEludGVnZXJFeHByZXNzaW9uEg0KBWluZGV4GAEgASgFEgwKBGtpbmQYAiABKAUSQQoIb3BlcmFuZHMYAyADKAsyLy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlJvdXRpbmdMaW5lYXJFeHByZXNzaW9uKogCChlSb3V0aW5nRGltZW5zaW9uVmFsdWVLaW5kEiwKKFJPVVRJTkdfRElNRU5TSU9OX1ZBTFVFX0tJTkRfVU5TUEVDSUZJRUQQABIxCi1ST1VUSU5HX0RJTUVOU0lPTl9WQUxVRV9LSU5EX1NQQU5fVVBQRVJfQk9VTkQQARIqCiZST1VUSU5HX0RJTUVOU0lPTl9WQUxVRV9LSU5EX1NQQU5fQ09TVBACEisKJ1JPVVRJTkdfRElNRU5TSU9OX1ZBTFVFX0tJTkRfU0xBQ0tfQ09TVBADEjEKLVJPVVRJTkdfRElNRU5TSU9OX1ZBTFVFX0tJTkRfR0xPQkFMX1NQQU5fQ09TVBAEKlIKGlJvdXRpbmdUeXBlUmVxdWlyZW1lbnRLaW5kEhAKDFNBTUVfVkVISUNMRRAAEg8KC1dIRU5fQURESU5HEAESEQoNV0hFTl9SRU1PVklORxACKpcBChRSb3V0aW5nRmluYWxpemVyS2luZBIhCh1ST1VUSU5HX0ZJTkFMSVpFUl9VTlNQRUNJRklFRBAAEh4KGlJPVVRJTkdfRklOQUxJWkVSX01JTklNSVpFEAESHgoaUk9VVElOR19GSU5BTElaRVJfTUFYSU1JWkUQAhIcChhST1VUSU5HX0ZJTkFMSVpFUl9UQVJHRVQQAyqxAwoTUm91dGluZ1ZhcmlhYmxlS2luZBIgChxST1VUSU5HX1ZBUklBQkxFX1VOU1BFQ0lGSUVEEAASGgoWUk9VVElOR19WQVJJQUJMRV9DVU1VTBABEhoKFlJPVVRJTkdfVkFSSUFCTEVfU0xBQ0sQAhIZChVST1VUSU5HX1ZBUklBQkxFX05FWFQQAxIcChhST1VUSU5HX1ZBUklBQkxFX1ZFSElDTEUQBBIbChdST1VUSU5HX1ZBUklBQkxFX0FDVElWRRAFEhwKGFJPVVRJTkdfVkFSSUFCTEVfVFJBTlNJVBAGEiIKHlJPVVRJTkdfVkFSSUFCTEVfRklYRURfVFJBTlNJVBAHEiMKH1JPVVRJTkdfVkFSSUFCTEVfQUNUSVZFX1ZFSElDTEUQCBIlCiFST1VUSU5HX1ZBUklBQkxFX1JPVVRFX0NPTlNJREVSRUQQCRIdChlST1VUSU5HX1ZBUklBQkxFX1JFU09VUkNFEAoSHAoYUk9VVElOR19WQVJJQUJMRV9CT09MRUFOEAsSHwobUk9VVElOR19WQVJJQUJMRV9FWFBSRVNTSU9OEAwqsAEKE1JvdXRpbmdEb21haW5BY3Rpb24SHgoaUk9VVElOR19ET01BSU5fVU5TUEVDSUZJRUQQABIYChRST1VUSU5HX0RPTUFJTl9SQU5HRRABEhkKFVJPVVRJTkdfRE9NQUlOX1ZBTFVFUxACEiIKHlJPVVRJTkdfRE9NQUlOX1JFTU9WRV9JTlRFUlZBTBADEiAKHFJPVVRJTkdfRE9NQUlOX1JFTU9WRV9WQUxVRVMQBGIGcHJvdG8z");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingMatrix
@@ -25,6 +25,14 @@ export type RoutingMatrix = Message<"ortools_wasm.bridge.v1.RoutingMatrix"> & {
    * @generated from field: int32 dimension = 2;
    */
   dimension: number;
+
+  /**
+   * Sampled JS callbacks use routing indices, including duplicate depots.
+   * Native node matrices retain the default false value.
+   *
+   * @generated from field: bool routing_indices = 3;
+   */
+  routingIndices: boolean;
 };
 
 /**
@@ -40,6 +48,14 @@ export type RoutingMatrixJson = {
    * @generated from field: int32 dimension = 2;
    */
   dimension?: number;
+
+  /**
+   * Sampled JS callbacks use routing indices, including duplicate depots.
+   * Native node matrices retain the default false value.
+   *
+   * @generated from field: bool routing_indices = 3;
+   */
+  routingIndices?: boolean;
 };
 
 export type RoutingMatrixValid = RoutingMatrix;
@@ -259,6 +275,75 @@ export const RoutingAddDimensionWithVehicleTransitsSchema: GenMessage<RoutingAdd
   messageDesc(file_routing, 3);
 
 /**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddDimensionWithVehicleTransitAndCapacity
+ */
+export type RoutingAddDimensionWithVehicleTransitAndCapacity = Message<"ortools_wasm.bridge.v1.RoutingAddDimensionWithVehicleTransitAndCapacity"> & {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingMatrix transit_matrices = 1;
+   */
+  transitMatrices: RoutingMatrix[];
+
+  /**
+   * @generated from field: int64 slack_max = 2;
+   */
+  slackMax: bigint;
+
+  /**
+   * @generated from field: repeated int64 capacities = 3;
+   */
+  capacities: bigint[];
+
+  /**
+   * @generated from field: bool fix_start_cumul_to_zero = 4;
+   */
+  fixStartCumulToZero: boolean;
+
+  /**
+   * @generated from field: string name = 5;
+   */
+  name: string;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddDimensionWithVehicleTransitAndCapacity
+ */
+export type RoutingAddDimensionWithVehicleTransitAndCapacityJson = {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingMatrix transit_matrices = 1;
+   */
+  transitMatrices?: RoutingMatrixJson[];
+
+  /**
+   * @generated from field: int64 slack_max = 2;
+   */
+  slackMax?: string;
+
+  /**
+   * @generated from field: repeated int64 capacities = 3;
+   */
+  capacities?: string[];
+
+  /**
+   * @generated from field: bool fix_start_cumul_to_zero = 4;
+   */
+  fixStartCumulToZero?: boolean;
+
+  /**
+   * @generated from field: string name = 5;
+   */
+  name?: string;
+};
+
+export type RoutingAddDimensionWithVehicleTransitAndCapacityValid = RoutingAddDimensionWithVehicleTransitAndCapacity;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddDimensionWithVehicleTransitAndCapacity.
+ * Use `create(RoutingAddDimensionWithVehicleTransitAndCapacitySchema)` to create a new message.
+ */
+export const RoutingAddDimensionWithVehicleTransitAndCapacitySchema: GenMessage<RoutingAddDimensionWithVehicleTransitAndCapacity, {jsonType: RoutingAddDimensionWithVehicleTransitAndCapacityJson, validType: RoutingAddDimensionWithVehicleTransitAndCapacityValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 4);
+
+/**
  * @generated from message ortools_wasm.bridge.v1.RoutingAddConstantDimension
  */
 export type RoutingAddConstantDimension = Message<"ortools_wasm.bridge.v1.RoutingAddConstantDimension"> & {
@@ -281,6 +366,11 @@ export type RoutingAddConstantDimension = Message<"ortools_wasm.bridge.v1.Routin
    * @generated from field: string name = 4;
    */
   name: string;
+
+  /**
+   * @generated from field: optional int64 slack_max = 5;
+   */
+  slackMax?: bigint | undefined;
 };
 
 /**
@@ -306,6 +396,11 @@ export type RoutingAddConstantDimensionJson = {
    * @generated from field: string name = 4;
    */
   name?: string;
+
+  /**
+   * @generated from field: optional int64 slack_max = 5;
+   */
+  slackMax?: string;
 };
 
 export type RoutingAddConstantDimensionValid = RoutingAddConstantDimension;
@@ -315,7 +410,7 @@ export type RoutingAddConstantDimensionValid = RoutingAddConstantDimension;
  * Use `create(RoutingAddConstantDimensionSchema)` to create a new message.
  */
 export const RoutingAddConstantDimensionSchema: GenMessage<RoutingAddConstantDimension, {jsonType: RoutingAddConstantDimensionJson, validType: RoutingAddConstantDimensionValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 4);
+  messageDesc(file_routing, 5);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingAddVectorDimension
@@ -374,7 +469,7 @@ export type RoutingAddVectorDimensionValid = RoutingAddVectorDimension;
  * Use `create(RoutingAddVectorDimensionSchema)` to create a new message.
  */
 export const RoutingAddVectorDimensionSchema: GenMessage<RoutingAddVectorDimension, {jsonType: RoutingAddVectorDimensionJson, validType: RoutingAddVectorDimensionValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 5);
+  messageDesc(file_routing, 6);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingAddMatrixDimension
@@ -433,7 +528,7 @@ export type RoutingAddMatrixDimensionValid = RoutingAddMatrixDimension;
  * Use `create(RoutingAddMatrixDimensionSchema)` to create a new message.
  */
 export const RoutingAddMatrixDimensionSchema: GenMessage<RoutingAddMatrixDimension, {jsonType: RoutingAddMatrixDimensionJson, validType: RoutingAddMatrixDimensionValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 6);
+  messageDesc(file_routing, 7);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingAddDisjunction
@@ -448,6 +543,16 @@ export type RoutingAddDisjunction = Message<"ortools_wasm.bridge.v1.RoutingAddDi
    * @generated from field: optional int64 penalty = 2;
    */
   penalty?: bigint | undefined;
+
+  /**
+   * @generated from field: optional int64 max_cardinality = 3;
+   */
+  maxCardinality?: bigint | undefined;
+
+  /**
+   * @generated from field: optional int32 penalty_cost_behavior = 4;
+   */
+  penaltyCostBehavior?: number | undefined;
 };
 
 /**
@@ -463,6 +568,16 @@ export type RoutingAddDisjunctionJson = {
    * @generated from field: optional int64 penalty = 2;
    */
   penalty?: string;
+
+  /**
+   * @generated from field: optional int64 max_cardinality = 3;
+   */
+  maxCardinality?: string;
+
+  /**
+   * @generated from field: optional int32 penalty_cost_behavior = 4;
+   */
+  penaltyCostBehavior?: number;
 };
 
 export type RoutingAddDisjunctionValid = RoutingAddDisjunction;
@@ -472,7 +587,7 @@ export type RoutingAddDisjunctionValid = RoutingAddDisjunction;
  * Use `create(RoutingAddDisjunctionSchema)` to create a new message.
  */
 export const RoutingAddDisjunctionSchema: GenMessage<RoutingAddDisjunction, {jsonType: RoutingAddDisjunctionJson, validType: RoutingAddDisjunctionValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 7);
+  messageDesc(file_routing, 8);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingAddPickupAndDelivery
@@ -511,7 +626,7 @@ export type RoutingAddPickupAndDeliveryValid = RoutingAddPickupAndDelivery;
  * Use `create(RoutingAddPickupAndDeliverySchema)` to create a new message.
  */
 export const RoutingAddPickupAndDeliverySchema: GenMessage<RoutingAddPickupAndDelivery, {jsonType: RoutingAddPickupAndDeliveryJson, validType: RoutingAddPickupAndDeliveryValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 8);
+  messageDesc(file_routing, 9);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingAddVehicleEqualityConstraint
@@ -550,7 +665,7 @@ export type RoutingAddVehicleEqualityConstraintValid = RoutingAddVehicleEquality
  * Use `create(RoutingAddVehicleEqualityConstraintSchema)` to create a new message.
  */
 export const RoutingAddVehicleEqualityConstraintSchema: GenMessage<RoutingAddVehicleEqualityConstraint, {jsonType: RoutingAddVehicleEqualityConstraintJson, validType: RoutingAddVehicleEqualityConstraintValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 9);
+  messageDesc(file_routing, 10);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingAddCumulLessOrEqualConstraint
@@ -599,7 +714,399 @@ export type RoutingAddCumulLessOrEqualConstraintValid = RoutingAddCumulLessOrEqu
  * Use `create(RoutingAddCumulLessOrEqualConstraintSchema)` to create a new message.
  */
 export const RoutingAddCumulLessOrEqualConstraintSchema: GenMessage<RoutingAddCumulLessOrEqualConstraint, {jsonType: RoutingAddCumulLessOrEqualConstraintJson, validType: RoutingAddCumulLessOrEqualConstraintValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 10);
+  messageDesc(file_routing, 11);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetNextValues
+ */
+export type RoutingSetNextValues = Message<"ortools_wasm.bridge.v1.RoutingSetNextValues"> & {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: repeated int64 values = 2;
+   */
+  values: bigint[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetNextValues
+ */
+export type RoutingSetNextValuesJson = {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: repeated int64 values = 2;
+   */
+  values?: string[];
+};
+
+export type RoutingSetNextValuesValid = RoutingSetNextValues;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetNextValues.
+ * Use `create(RoutingSetNextValuesSchema)` to create a new message.
+ */
+export const RoutingSetNextValuesSchema: GenMessage<RoutingSetNextValues, {jsonType: RoutingSetNextValuesJson, validType: RoutingSetNextValuesValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 12);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetVehicleValues
+ */
+export type RoutingSetVehicleValues = Message<"ortools_wasm.bridge.v1.RoutingSetVehicleValues"> & {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: repeated int32 values = 2;
+   */
+  values: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetVehicleValues
+ */
+export type RoutingSetVehicleValuesJson = {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: repeated int32 values = 2;
+   */
+  values?: number[];
+};
+
+export type RoutingSetVehicleValuesValid = RoutingSetVehicleValues;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetVehicleValues.
+ * Use `create(RoutingSetVehicleValuesSchema)` to create a new message.
+ */
+export const RoutingSetVehicleValuesSchema: GenMessage<RoutingSetVehicleValues, {jsonType: RoutingSetVehicleValuesJson, validType: RoutingSetVehicleValuesValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 13);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetAllowedVehiclesForIndex
+ */
+export type RoutingSetAllowedVehiclesForIndex = Message<"ortools_wasm.bridge.v1.RoutingSetAllowedVehiclesForIndex"> & {
+  /**
+   * @generated from field: repeated int32 vehicles = 1;
+   */
+  vehicles: number[];
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetAllowedVehiclesForIndex
+ */
+export type RoutingSetAllowedVehiclesForIndexJson = {
+  /**
+   * @generated from field: repeated int32 vehicles = 1;
+   */
+  vehicles?: number[];
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index?: string;
+};
+
+export type RoutingSetAllowedVehiclesForIndexValid = RoutingSetAllowedVehiclesForIndex;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetAllowedVehiclesForIndex.
+ * Use `create(RoutingSetAllowedVehiclesForIndexSchema)` to create a new message.
+ */
+export const RoutingSetAllowedVehiclesForIndexSchema: GenMessage<RoutingSetAllowedVehiclesForIndex, {jsonType: RoutingSetAllowedVehiclesForIndexJson, validType: RoutingSetAllowedVehiclesForIndexValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 14);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetSlackBounds
+ */
+export type RoutingSetSlackBounds = Message<"ortools_wasm.bridge.v1.RoutingSetSlackBounds"> & {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: int64 lower = 3;
+   */
+  lower: bigint;
+
+  /**
+   * @generated from field: int64 upper = 4;
+   */
+  upper: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetSlackBounds
+ */
+export type RoutingSetSlackBoundsJson = {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: int64 lower = 3;
+   */
+  lower?: string;
+
+  /**
+   * @generated from field: int64 upper = 4;
+   */
+  upper?: string;
+};
+
+export type RoutingSetSlackBoundsValid = RoutingSetSlackBounds;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetSlackBounds.
+ * Use `create(RoutingSetSlackBoundsSchema)` to create a new message.
+ */
+export const RoutingSetSlackBoundsSchema: GenMessage<RoutingSetSlackBounds, {jsonType: RoutingSetSlackBoundsJson, validType: RoutingSetSlackBoundsValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 15);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetActiveValues
+ */
+export type RoutingSetActiveValues = Message<"ortools_wasm.bridge.v1.RoutingSetActiveValues"> & {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: repeated int32 values = 2;
+   */
+  values: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetActiveValues
+ */
+export type RoutingSetActiveValuesJson = {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: repeated int32 values = 2;
+   */
+  values?: number[];
+};
+
+export type RoutingSetActiveValuesValid = RoutingSetActiveValues;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetActiveValues.
+ * Use `create(RoutingSetActiveValuesSchema)` to create a new message.
+ */
+export const RoutingSetActiveValuesSchema: GenMessage<RoutingSetActiveValues, {jsonType: RoutingSetActiveValuesJson, validType: RoutingSetActiveValuesValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 16);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetDimensionValue
+ */
+export type RoutingSetDimensionValue = Message<"ortools_wasm.bridge.v1.RoutingSetDimensionValue"> & {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingDimensionValueKind kind = 2;
+   */
+  kind: RoutingDimensionValueKind;
+
+  /**
+   * @generated from field: int64 value = 3;
+   */
+  value: bigint;
+
+  /**
+   * @generated from field: optional int32 vehicle = 4;
+   */
+  vehicle?: number | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetDimensionValue
+ */
+export type RoutingSetDimensionValueJson = {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingDimensionValueKind kind = 2;
+   */
+  kind?: RoutingDimensionValueKindJson;
+
+  /**
+   * @generated from field: int64 value = 3;
+   */
+  value?: string;
+
+  /**
+   * @generated from field: optional int32 vehicle = 4;
+   */
+  vehicle?: number;
+};
+
+export type RoutingSetDimensionValueValid = RoutingSetDimensionValue;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetDimensionValue.
+ * Use `create(RoutingSetDimensionValueSchema)` to create a new message.
+ */
+export const RoutingSetDimensionValueSchema: GenMessage<RoutingSetDimensionValue, {jsonType: RoutingSetDimensionValueJson, validType: RoutingSetDimensionValueValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 17);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetCumulBounds
+ */
+export type RoutingSetCumulBounds = Message<"ortools_wasm.bridge.v1.RoutingSetCumulBounds"> & {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: int64 lower = 3;
+   */
+  lower: bigint;
+
+  /**
+   * @generated from field: int64 upper = 4;
+   */
+  upper: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetCumulBounds
+ */
+export type RoutingSetCumulBoundsJson = {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: int64 lower = 3;
+   */
+  lower?: string;
+
+  /**
+   * @generated from field: int64 upper = 4;
+   */
+  upper?: string;
+};
+
+export type RoutingSetCumulBoundsValid = RoutingSetCumulBounds;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetCumulBounds.
+ * Use `create(RoutingSetCumulBoundsSchema)` to create a new message.
+ */
+export const RoutingSetCumulBoundsSchema: GenMessage<RoutingSetCumulBounds, {jsonType: RoutingSetCumulBoundsJson, validType: RoutingSetCumulBoundsValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 18);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddNodePrecedence
+ */
+export type RoutingAddNodePrecedence = Message<"ortools_wasm.bridge.v1.RoutingAddNodePrecedence"> & {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: int64 first = 2;
+   */
+  first: bigint;
+
+  /**
+   * @generated from field: int64 second = 3;
+   */
+  second: bigint;
+
+  /**
+   * @generated from field: int64 offset = 4;
+   */
+  offset: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddNodePrecedence
+ */
+export type RoutingAddNodePrecedenceJson = {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: int64 first = 2;
+   */
+  first?: string;
+
+  /**
+   * @generated from field: int64 second = 3;
+   */
+  second?: string;
+
+  /**
+   * @generated from field: int64 offset = 4;
+   */
+  offset?: string;
+};
+
+export type RoutingAddNodePrecedenceValid = RoutingAddNodePrecedence;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddNodePrecedence.
+ * Use `create(RoutingAddNodePrecedenceSchema)` to create a new message.
+ */
+export const RoutingAddNodePrecedenceSchema: GenMessage<RoutingAddNodePrecedence, {jsonType: RoutingAddNodePrecedenceJson, validType: RoutingAddNodePrecedenceValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 19);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingSetSoftSpanUpperBound
@@ -658,7 +1165,7 @@ export type RoutingSetSoftSpanUpperBoundValid = RoutingSetSoftSpanUpperBound;
  * Use `create(RoutingSetSoftSpanUpperBoundSchema)` to create a new message.
  */
 export const RoutingSetSoftSpanUpperBoundSchema: GenMessage<RoutingSetSoftSpanUpperBound, {jsonType: RoutingSetSoftSpanUpperBoundJson, validType: RoutingSetSoftSpanUpperBoundValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 11);
+  messageDesc(file_routing, 20);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingSetQuadraticCostSoftSpanUpperBound
@@ -717,7 +1224,1131 @@ export type RoutingSetQuadraticCostSoftSpanUpperBoundValid = RoutingSetQuadratic
  * Use `create(RoutingSetQuadraticCostSoftSpanUpperBoundSchema)` to create a new message.
  */
 export const RoutingSetQuadraticCostSoftSpanUpperBoundSchema: GenMessage<RoutingSetQuadraticCostSoftSpanUpperBound, {jsonType: RoutingSetQuadraticCostSoftSpanUpperBoundJson, validType: RoutingSetQuadraticCostSoftSpanUpperBoundValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 12);
+  messageDesc(file_routing, 21);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetArcCostEvaluatorOfVehicles
+ */
+export type RoutingSetArcCostEvaluatorOfVehicles = Message<"ortools_wasm.bridge.v1.RoutingSetArcCostEvaluatorOfVehicles"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingMatrix transit_matrix = 1;
+   */
+  transitMatrix?: RoutingMatrix | undefined;
+
+  /**
+   * @generated from field: repeated int32 vehicles = 3;
+   */
+  vehicles: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetArcCostEvaluatorOfVehicles
+ */
+export type RoutingSetArcCostEvaluatorOfVehiclesJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingMatrix transit_matrix = 1;
+   */
+  transitMatrix?: RoutingMatrixJson;
+
+  /**
+   * @generated from field: repeated int32 vehicles = 3;
+   */
+  vehicles?: number[];
+};
+
+export type RoutingSetArcCostEvaluatorOfVehiclesValid = RoutingSetArcCostEvaluatorOfVehicles;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetArcCostEvaluatorOfVehicles.
+ * Use `create(RoutingSetArcCostEvaluatorOfVehiclesSchema)` to create a new message.
+ */
+export const RoutingSetArcCostEvaluatorOfVehiclesSchema: GenMessage<RoutingSetArcCostEvaluatorOfVehicles, {jsonType: RoutingSetArcCostEvaluatorOfVehiclesJson, validType: RoutingSetArcCostEvaluatorOfVehiclesValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 22);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetCumulSoftBound
+ */
+export type RoutingSetCumulSoftBound = Message<"ortools_wasm.bridge.v1.RoutingSetCumulSoftBound"> & {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: int64 bound = 3;
+   */
+  bound: bigint;
+
+  /**
+   * @generated from field: int64 coefficient = 4;
+   */
+  coefficient: bigint;
+
+  /**
+   * @generated from field: bool lower = 5;
+   */
+  lower: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetCumulSoftBound
+ */
+export type RoutingSetCumulSoftBoundJson = {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: int64 index = 2;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: int64 bound = 3;
+   */
+  bound?: string;
+
+  /**
+   * @generated from field: int64 coefficient = 4;
+   */
+  coefficient?: string;
+
+  /**
+   * @generated from field: bool lower = 5;
+   */
+  lower?: boolean;
+};
+
+export type RoutingSetCumulSoftBoundValid = RoutingSetCumulSoftBound;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetCumulSoftBound.
+ * Use `create(RoutingSetCumulSoftBoundSchema)` to create a new message.
+ */
+export const RoutingSetCumulSoftBoundSchema: GenMessage<RoutingSetCumulSoftBound, {jsonType: RoutingSetCumulSoftBoundJson, validType: RoutingSetCumulSoftBoundValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 23);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetMaximumActiveVehicles
+ */
+export type RoutingSetMaximumActiveVehicles = Message<"ortools_wasm.bridge.v1.RoutingSetMaximumActiveVehicles"> & {
+  /**
+   * @generated from field: int32 maximum = 1;
+   */
+  maximum: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetMaximumActiveVehicles
+ */
+export type RoutingSetMaximumActiveVehiclesJson = {
+  /**
+   * @generated from field: int32 maximum = 1;
+   */
+  maximum?: number;
+};
+
+export type RoutingSetMaximumActiveVehiclesValid = RoutingSetMaximumActiveVehicles;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetMaximumActiveVehicles.
+ * Use `create(RoutingSetMaximumActiveVehiclesSchema)` to create a new message.
+ */
+export const RoutingSetMaximumActiveVehiclesSchema: GenMessage<RoutingSetMaximumActiveVehicles, {jsonType: RoutingSetMaximumActiveVehiclesJson, validType: RoutingSetMaximumActiveVehiclesValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 24);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetFixedVehicleCost
+ */
+export type RoutingSetFixedVehicleCost = Message<"ortools_wasm.bridge.v1.RoutingSetFixedVehicleCost"> & {
+  /**
+   * @generated from field: int64 cost = 1;
+   */
+  cost: bigint;
+
+  /**
+   * @generated from field: int32 vehicle = 2;
+   */
+  vehicle: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetFixedVehicleCost
+ */
+export type RoutingSetFixedVehicleCostJson = {
+  /**
+   * @generated from field: int64 cost = 1;
+   */
+  cost?: string;
+
+  /**
+   * @generated from field: int32 vehicle = 2;
+   */
+  vehicle?: number;
+};
+
+export type RoutingSetFixedVehicleCostValid = RoutingSetFixedVehicleCost;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetFixedVehicleCost.
+ * Use `create(RoutingSetFixedVehicleCostSchema)` to create a new message.
+ */
+export const RoutingSetFixedVehicleCostSchema: GenMessage<RoutingSetFixedVehicleCost, {jsonType: RoutingSetFixedVehicleCostJson, validType: RoutingSetFixedVehicleCostValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 25);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetAmortizedVehicleCosts
+ */
+export type RoutingSetAmortizedVehicleCosts = Message<"ortools_wasm.bridge.v1.RoutingSetAmortizedVehicleCosts"> & {
+  /**
+   * @generated from field: int64 linear = 1;
+   */
+  linear: bigint;
+
+  /**
+   * @generated from field: int64 quadratic = 2;
+   */
+  quadratic: bigint;
+
+  /**
+   * @generated from field: int32 vehicle = 3;
+   */
+  vehicle: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetAmortizedVehicleCosts
+ */
+export type RoutingSetAmortizedVehicleCostsJson = {
+  /**
+   * @generated from field: int64 linear = 1;
+   */
+  linear?: string;
+
+  /**
+   * @generated from field: int64 quadratic = 2;
+   */
+  quadratic?: string;
+
+  /**
+   * @generated from field: int32 vehicle = 3;
+   */
+  vehicle?: number;
+};
+
+export type RoutingSetAmortizedVehicleCostsValid = RoutingSetAmortizedVehicleCosts;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetAmortizedVehicleCosts.
+ * Use `create(RoutingSetAmortizedVehicleCostsSchema)` to create a new message.
+ */
+export const RoutingSetAmortizedVehicleCostsSchema: GenMessage<RoutingSetAmortizedVehicleCosts, {jsonType: RoutingSetAmortizedVehicleCostsJson, validType: RoutingSetAmortizedVehicleCostsValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 26);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetVehicleUsedWhenEmpty
+ */
+export type RoutingSetVehicleUsedWhenEmpty = Message<"ortools_wasm.bridge.v1.RoutingSetVehicleUsedWhenEmpty"> & {
+  /**
+   * @generated from field: bool is_used = 1;
+   */
+  isUsed: boolean;
+
+  /**
+   * @generated from field: int32 vehicle = 2;
+   */
+  vehicle: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetVehicleUsedWhenEmpty
+ */
+export type RoutingSetVehicleUsedWhenEmptyJson = {
+  /**
+   * @generated from field: bool is_used = 1;
+   */
+  isUsed?: boolean;
+
+  /**
+   * @generated from field: int32 vehicle = 2;
+   */
+  vehicle?: number;
+};
+
+export type RoutingSetVehicleUsedWhenEmptyValid = RoutingSetVehicleUsedWhenEmpty;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetVehicleUsedWhenEmpty.
+ * Use `create(RoutingSetVehicleUsedWhenEmptySchema)` to create a new message.
+ */
+export const RoutingSetVehicleUsedWhenEmptySchema: GenMessage<RoutingSetVehicleUsedWhenEmpty, {jsonType: RoutingSetVehicleUsedWhenEmptyJson, validType: RoutingSetVehicleUsedWhenEmptyValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 27);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddSoftSameVehicleConstraint
+ */
+export type RoutingAddSoftSameVehicleConstraint = Message<"ortools_wasm.bridge.v1.RoutingAddSoftSameVehicleConstraint"> & {
+  /**
+   * @generated from field: repeated int64 indices = 1;
+   */
+  indices: bigint[];
+
+  /**
+   * @generated from field: int64 cost = 2;
+   */
+  cost: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddSoftSameVehicleConstraint
+ */
+export type RoutingAddSoftSameVehicleConstraintJson = {
+  /**
+   * @generated from field: repeated int64 indices = 1;
+   */
+  indices?: string[];
+
+  /**
+   * @generated from field: int64 cost = 2;
+   */
+  cost?: string;
+};
+
+export type RoutingAddSoftSameVehicleConstraintValid = RoutingAddSoftSameVehicleConstraint;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddSoftSameVehicleConstraint.
+ * Use `create(RoutingAddSoftSameVehicleConstraintSchema)` to create a new message.
+ */
+export const RoutingAddSoftSameVehicleConstraintSchema: GenMessage<RoutingAddSoftSameVehicleConstraint, {jsonType: RoutingAddSoftSameVehicleConstraintJson, validType: RoutingAddSoftSameVehicleConstraintValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 28);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetPickupDeliveryPolicy
+ */
+export type RoutingSetPickupDeliveryPolicy = Message<"ortools_wasm.bridge.v1.RoutingSetPickupDeliveryPolicy"> & {
+  /**
+   * @generated from field: int32 policy = 1;
+   */
+  policy: number;
+
+  /**
+   * @generated from field: int32 vehicle = 2;
+   */
+  vehicle: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetPickupDeliveryPolicy
+ */
+export type RoutingSetPickupDeliveryPolicyJson = {
+  /**
+   * @generated from field: int32 policy = 1;
+   */
+  policy?: number;
+
+  /**
+   * @generated from field: int32 vehicle = 2;
+   */
+  vehicle?: number;
+};
+
+export type RoutingSetPickupDeliveryPolicyValid = RoutingSetPickupDeliveryPolicy;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetPickupDeliveryPolicy.
+ * Use `create(RoutingSetPickupDeliveryPolicySchema)` to create a new message.
+ */
+export const RoutingSetPickupDeliveryPolicySchema: GenMessage<RoutingSetPickupDeliveryPolicy, {jsonType: RoutingSetPickupDeliveryPolicyJson, validType: RoutingSetPickupDeliveryPolicyValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 29);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetVisitType
+ */
+export type RoutingSetVisitType = Message<"ortools_wasm.bridge.v1.RoutingSetVisitType"> & {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: int32 type = 2;
+   */
+  type: number;
+
+  /**
+   * @generated from field: int32 policy = 3;
+   */
+  policy: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSetVisitType
+ */
+export type RoutingSetVisitTypeJson = {
+  /**
+   * @generated from field: int64 index = 1;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: int32 type = 2;
+   */
+  type?: number;
+
+  /**
+   * @generated from field: int32 policy = 3;
+   */
+  policy?: number;
+};
+
+export type RoutingSetVisitTypeValid = RoutingSetVisitType;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSetVisitType.
+ * Use `create(RoutingSetVisitTypeSchema)` to create a new message.
+ */
+export const RoutingSetVisitTypeSchema: GenMessage<RoutingSetVisitType, {jsonType: RoutingSetVisitTypeJson, validType: RoutingSetVisitTypeValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 30);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddHardTypeIncompatibility
+ */
+export type RoutingAddHardTypeIncompatibility = Message<"ortools_wasm.bridge.v1.RoutingAddHardTypeIncompatibility"> & {
+  /**
+   * @generated from field: int32 type1 = 1;
+   */
+  type1: number;
+
+  /**
+   * @generated from field: int32 type2 = 2;
+   */
+  type2: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddHardTypeIncompatibility
+ */
+export type RoutingAddHardTypeIncompatibilityJson = {
+  /**
+   * @generated from field: int32 type1 = 1;
+   */
+  type1?: number;
+
+  /**
+   * @generated from field: int32 type2 = 2;
+   */
+  type2?: number;
+};
+
+export type RoutingAddHardTypeIncompatibilityValid = RoutingAddHardTypeIncompatibility;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddHardTypeIncompatibility.
+ * Use `create(RoutingAddHardTypeIncompatibilitySchema)` to create a new message.
+ */
+export const RoutingAddHardTypeIncompatibilitySchema: GenMessage<RoutingAddHardTypeIncompatibility, {jsonType: RoutingAddHardTypeIncompatibilityJson, validType: RoutingAddHardTypeIncompatibilityValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 31);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddTemporalTypeIncompatibility
+ */
+export type RoutingAddTemporalTypeIncompatibility = Message<"ortools_wasm.bridge.v1.RoutingAddTemporalTypeIncompatibility"> & {
+  /**
+   * @generated from field: int32 type1 = 1;
+   */
+  type1: number;
+
+  /**
+   * @generated from field: int32 type2 = 2;
+   */
+  type2: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddTemporalTypeIncompatibility
+ */
+export type RoutingAddTemporalTypeIncompatibilityJson = {
+  /**
+   * @generated from field: int32 type1 = 1;
+   */
+  type1?: number;
+
+  /**
+   * @generated from field: int32 type2 = 2;
+   */
+  type2?: number;
+};
+
+export type RoutingAddTemporalTypeIncompatibilityValid = RoutingAddTemporalTypeIncompatibility;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddTemporalTypeIncompatibility.
+ * Use `create(RoutingAddTemporalTypeIncompatibilitySchema)` to create a new message.
+ */
+export const RoutingAddTemporalTypeIncompatibilitySchema: GenMessage<RoutingAddTemporalTypeIncompatibility, {jsonType: RoutingAddTemporalTypeIncompatibilityJson, validType: RoutingAddTemporalTypeIncompatibilityValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 32);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddTypeRequirement
+ */
+export type RoutingAddTypeRequirement = Message<"ortools_wasm.bridge.v1.RoutingAddTypeRequirement"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingTypeRequirementKind kind = 1;
+   */
+  kind: RoutingTypeRequirementKind;
+
+  /**
+   * @generated from field: int32 dependent_type = 2;
+   */
+  dependentType: number;
+
+  /**
+   * @generated from field: repeated int32 required_type_alternatives = 3;
+   */
+  requiredTypeAlternatives: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddTypeRequirement
+ */
+export type RoutingAddTypeRequirementJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingTypeRequirementKind kind = 1;
+   */
+  kind?: RoutingTypeRequirementKindJson;
+
+  /**
+   * @generated from field: int32 dependent_type = 2;
+   */
+  dependentType?: number;
+
+  /**
+   * @generated from field: repeated int32 required_type_alternatives = 3;
+   */
+  requiredTypeAlternatives?: number[];
+};
+
+export type RoutingAddTypeRequirementValid = RoutingAddTypeRequirement;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddTypeRequirement.
+ * Use `create(RoutingAddTypeRequirementSchema)` to create a new message.
+ */
+export const RoutingAddTypeRequirementSchema: GenMessage<RoutingAddTypeRequirement, {jsonType: RoutingAddTypeRequirementJson, validType: RoutingAddTypeRequirementValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 33);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddFinalizer
+ */
+export type RoutingAddFinalizer = Message<"ortools_wasm.bridge.v1.RoutingAddFinalizer"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableKind variable_kind = 1;
+   */
+  variableKind: RoutingVariableKind;
+
+  /**
+   * @generated from field: string dimension_name = 2;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: int64 index = 3;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingFinalizerKind kind = 4;
+   */
+  kind: RoutingFinalizerKind;
+
+  /**
+   * @generated from field: int64 target = 5;
+   */
+  target: bigint;
+
+  /**
+   * Presence distinguishes weighted priority zero from an ordinary finalizer.
+   *
+   * @generated from field: optional int64 weight = 6;
+   */
+  weight?: bigint | undefined;
+
+  /**
+   * @generated from field: int32 resource_group = 7;
+   */
+  resourceGroup: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddFinalizer
+ */
+export type RoutingAddFinalizerJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableKind variable_kind = 1;
+   */
+  variableKind?: RoutingVariableKindJson;
+
+  /**
+   * @generated from field: string dimension_name = 2;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: int64 index = 3;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingFinalizerKind kind = 4;
+   */
+  kind?: RoutingFinalizerKindJson;
+
+  /**
+   * @generated from field: int64 target = 5;
+   */
+  target?: string;
+
+  /**
+   * Presence distinguishes weighted priority zero from an ordinary finalizer.
+   *
+   * @generated from field: optional int64 weight = 6;
+   */
+  weight?: string;
+
+  /**
+   * @generated from field: int32 resource_group = 7;
+   */
+  resourceGroup?: number;
+};
+
+export type RoutingAddFinalizerValid = RoutingAddFinalizer;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddFinalizer.
+ * Use `create(RoutingAddFinalizerSchema)` to create a new message.
+ */
+export const RoutingAddFinalizerSchema: GenMessage<RoutingAddFinalizer, {jsonType: RoutingAddFinalizerJson, validType: RoutingAddFinalizerValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 34);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingVariableReference
+ */
+export type RoutingVariableReference = Message<"ortools_wasm.bridge.v1.RoutingVariableReference"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableKind kind = 1;
+   */
+  kind: RoutingVariableKind;
+
+  /**
+   * @generated from field: string dimension_name = 2;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: int64 index = 3;
+   */
+  index: bigint;
+
+  /**
+   * @generated from field: int32 resource_group = 4;
+   */
+  resourceGroup: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingVariableReference
+ */
+export type RoutingVariableReferenceJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableKind kind = 1;
+   */
+  kind?: RoutingVariableKindJson;
+
+  /**
+   * @generated from field: string dimension_name = 2;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: int64 index = 3;
+   */
+  index?: string;
+
+  /**
+   * @generated from field: int32 resource_group = 4;
+   */
+  resourceGroup?: number;
+};
+
+export type RoutingVariableReferenceValid = RoutingVariableReference;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingVariableReference.
+ * Use `create(RoutingVariableReferenceSchema)` to create a new message.
+ */
+export const RoutingVariableReferenceSchema: GenMessage<RoutingVariableReference, {jsonType: RoutingVariableReferenceJson, validType: RoutingVariableReferenceValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 35);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingModifyDomain
+ */
+export type RoutingModifyDomain = Message<"ortools_wasm.bridge.v1.RoutingModifyDomain"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReference | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingDomainAction action = 2;
+   */
+  action: RoutingDomainAction;
+
+  /**
+   * @generated from field: int64 lower = 3;
+   */
+  lower: bigint;
+
+  /**
+   * @generated from field: int64 upper = 4;
+   */
+  upper: bigint;
+
+  /**
+   * @generated from field: repeated int64 values = 5;
+   */
+  values: bigint[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingModifyDomain
+ */
+export type RoutingModifyDomainJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReferenceJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingDomainAction action = 2;
+   */
+  action?: RoutingDomainActionJson;
+
+  /**
+   * @generated from field: int64 lower = 3;
+   */
+  lower?: string;
+
+  /**
+   * @generated from field: int64 upper = 4;
+   */
+  upper?: string;
+
+  /**
+   * @generated from field: repeated int64 values = 5;
+   */
+  values?: string[];
+};
+
+export type RoutingModifyDomainValid = RoutingModifyDomain;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingModifyDomain.
+ * Use `create(RoutingModifyDomainSchema)` to create a new message.
+ */
+export const RoutingModifyDomainSchema: GenMessage<RoutingModifyDomain, {jsonType: RoutingModifyDomainJson, validType: RoutingModifyDomainValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 36);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingLinearTerm
+ */
+export type RoutingLinearTerm = Message<"ortools_wasm.bridge.v1.RoutingLinearTerm"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReference | undefined;
+
+  /**
+   * @generated from field: int64 coefficient = 2;
+   */
+  coefficient: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingLinearTerm
+ */
+export type RoutingLinearTermJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReferenceJson;
+
+  /**
+   * @generated from field: int64 coefficient = 2;
+   */
+  coefficient?: string;
+};
+
+export type RoutingLinearTermValid = RoutingLinearTerm;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingLinearTerm.
+ * Use `create(RoutingLinearTermSchema)` to create a new message.
+ */
+export const RoutingLinearTermSchema: GenMessage<RoutingLinearTerm, {jsonType: RoutingLinearTermJson, validType: RoutingLinearTermValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 37);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingLinearExpression
+ */
+export type RoutingLinearExpression = Message<"ortools_wasm.bridge.v1.RoutingLinearExpression"> & {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingLinearTerm terms = 1;
+   */
+  terms: RoutingLinearTerm[];
+
+  /**
+   * @generated from field: int64 offset = 2;
+   */
+  offset: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingLinearExpression
+ */
+export type RoutingLinearExpressionJson = {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingLinearTerm terms = 1;
+   */
+  terms?: RoutingLinearTermJson[];
+
+  /**
+   * @generated from field: int64 offset = 2;
+   */
+  offset?: string;
+};
+
+export type RoutingLinearExpressionValid = RoutingLinearExpression;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingLinearExpression.
+ * Use `create(RoutingLinearExpressionSchema)` to create a new message.
+ */
+export const RoutingLinearExpressionSchema: GenMessage<RoutingLinearExpression, {jsonType: RoutingLinearExpressionJson, validType: RoutingLinearExpressionValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 38);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingLinearComparison
+ */
+export type RoutingLinearComparison = Message<"ortools_wasm.bridge.v1.RoutingLinearComparison"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression left = 1;
+   */
+  left?: RoutingLinearExpression | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression right = 2;
+   */
+  right?: RoutingLinearExpression | undefined;
+
+  /**
+   * 1: equal, 2: not equal, 3: <=, 4: >=, 5: <, 6: >.
+   *
+   * @generated from field: int32 comparison = 3;
+   */
+  comparison: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingLinearComparison
+ */
+export type RoutingLinearComparisonJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression left = 1;
+   */
+  left?: RoutingLinearExpressionJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression right = 2;
+   */
+  right?: RoutingLinearExpressionJson;
+
+  /**
+   * 1: equal, 2: not equal, 3: <=, 4: >=, 5: <, 6: >.
+   *
+   * @generated from field: int32 comparison = 3;
+   */
+  comparison?: number;
+};
+
+export type RoutingLinearComparisonValid = RoutingLinearComparison;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingLinearComparison.
+ * Use `create(RoutingLinearComparisonSchema)` to create a new message.
+ */
+export const RoutingLinearComparisonSchema: GenMessage<RoutingLinearComparison, {jsonType: RoutingLinearComparisonJson, validType: RoutingLinearComparisonValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 39);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddLinearConstraint
+ */
+export type RoutingAddLinearConstraint = Message<"ortools_wasm.bridge.v1.RoutingAddLinearConstraint"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression left = 1;
+   */
+  left?: RoutingLinearExpression | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression right = 2;
+   */
+  right?: RoutingLinearExpression | undefined;
+
+  /**
+   * 1: equal, 2: not equal, 3: <=, 4: >=, 5: <, 6: >.
+   *
+   * @generated from field: int32 comparison = 3;
+   */
+  comparison: number;
+
+  /**
+   * Enforce the comparison only when all these comparisons hold.
+   *
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingLinearComparison conditions = 4;
+   */
+  conditions: RoutingLinearComparison[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingBooleanExpression boolean_conditions = 5;
+   */
+  booleanConditions: RoutingBooleanExpression[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddLinearConstraint
+ */
+export type RoutingAddLinearConstraintJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression left = 1;
+   */
+  left?: RoutingLinearExpressionJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearExpression right = 2;
+   */
+  right?: RoutingLinearExpressionJson;
+
+  /**
+   * 1: equal, 2: not equal, 3: <=, 4: >=, 5: <, 6: >.
+   *
+   * @generated from field: int32 comparison = 3;
+   */
+  comparison?: number;
+
+  /**
+   * Enforce the comparison only when all these comparisons hold.
+   *
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingLinearComparison conditions = 4;
+   */
+  conditions?: RoutingLinearComparisonJson[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingBooleanExpression boolean_conditions = 5;
+   */
+  booleanConditions?: RoutingBooleanExpressionJson[];
+};
+
+export type RoutingAddLinearConstraintValid = RoutingAddLinearConstraint;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddLinearConstraint.
+ * Use `create(RoutingAddLinearConstraintSchema)` to create a new message.
+ */
+export const RoutingAddLinearConstraintSchema: GenMessage<RoutingAddLinearConstraint, {jsonType: RoutingAddLinearConstraintJson, validType: RoutingAddLinearConstraintValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 40);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingArcCostQuery
+ */
+export type RoutingArcCostQuery = Message<"ortools_wasm.bridge.v1.RoutingArcCostQuery"> & {
+  /**
+   * @generated from field: int64 from_index = 1;
+   */
+  fromIndex: bigint;
+
+  /**
+   * @generated from field: int64 to_index = 2;
+   */
+  toIndex: bigint;
+
+  /**
+   * @generated from field: int32 vehicle = 3;
+   */
+  vehicle: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingArcCostQuery
+ */
+export type RoutingArcCostQueryJson = {
+  /**
+   * @generated from field: int64 from_index = 1;
+   */
+  fromIndex?: string;
+
+  /**
+   * @generated from field: int64 to_index = 2;
+   */
+  toIndex?: string;
+
+  /**
+   * @generated from field: int32 vehicle = 3;
+   */
+  vehicle?: number;
+};
+
+export type RoutingArcCostQueryValid = RoutingArcCostQuery;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingArcCostQuery.
+ * Use `create(RoutingArcCostQuerySchema)` to create a new message.
+ */
+export const RoutingArcCostQuerySchema: GenMessage<RoutingArcCostQuery, {jsonType: RoutingArcCostQueryJson, validType: RoutingArcCostQueryValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 41);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingDomainQuery
+ */
+export type RoutingDomainQuery = Message<"ortools_wasm.bridge.v1.RoutingDomainQuery"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReference | undefined;
+
+  /**
+   * @generated from field: optional int64 contains_value = 2;
+   */
+  containsValue?: bigint | undefined;
+
+  /**
+   * @generated from field: optional bool soft_lower_bound = 3;
+   */
+  softLowerBound?: boolean | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingDomainQuery
+ */
+export type RoutingDomainQueryJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReferenceJson;
+
+  /**
+   * @generated from field: optional int64 contains_value = 2;
+   */
+  containsValue?: string;
+
+  /**
+   * @generated from field: optional bool soft_lower_bound = 3;
+   */
+  softLowerBound?: boolean;
+};
+
+export type RoutingDomainQueryValid = RoutingDomainQuery;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingDomainQuery.
+ * Use `create(RoutingDomainQuerySchema)` to create a new message.
+ */
+export const RoutingDomainQuerySchema: GenMessage<RoutingDomainQuery, {jsonType: RoutingDomainQueryJson, validType: RoutingDomainQueryValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 42);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingDomainResult
+ */
+export type RoutingDomainResult = Message<"ortools_wasm.bridge.v1.RoutingDomainResult"> & {
+  /**
+   * @generated from field: int64 min = 1;
+   */
+  min: bigint;
+
+  /**
+   * @generated from field: int64 max = 2;
+   */
+  max: bigint;
+
+  /**
+   * @generated from field: uint64 size = 3;
+   */
+  size: bigint;
+
+  /**
+   * @generated from field: bool bound = 4;
+   */
+  bound: boolean;
+
+  /**
+   * @generated from field: optional bool contains = 5;
+   */
+  contains?: boolean | undefined;
+
+  /**
+   * @generated from field: optional int64 soft_bound = 6;
+   */
+  softBound?: bigint | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingDomainResult
+ */
+export type RoutingDomainResultJson = {
+  /**
+   * @generated from field: int64 min = 1;
+   */
+  min?: string;
+
+  /**
+   * @generated from field: int64 max = 2;
+   */
+  max?: string;
+
+  /**
+   * @generated from field: uint64 size = 3;
+   */
+  size?: string;
+
+  /**
+   * @generated from field: bool bound = 4;
+   */
+  bound?: boolean;
+
+  /**
+   * @generated from field: optional bool contains = 5;
+   */
+  contains?: boolean;
+
+  /**
+   * @generated from field: optional int64 soft_bound = 6;
+   */
+  softBound?: string;
+};
+
+export type RoutingDomainResultValid = RoutingDomainResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingDomainResult.
+ * Use `create(RoutingDomainResultSchema)` to create a new message.
+ */
+export const RoutingDomainResultSchema: GenMessage<RoutingDomainResult, {jsonType: RoutingDomainResultJson, validType: RoutingDomainResultValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 43);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingModelOperation
@@ -798,6 +2429,168 @@ export type RoutingModelOperation = Message<"ortools_wasm.bridge.v1.RoutingModel
      */
     value: RoutingSetQuadraticCostSoftSpanUpperBound;
     case: "setQuadraticCostSoftSpanUpperBound";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetArcCostEvaluatorOfVehicles set_arc_cost_evaluator_of_vehicles = 13;
+     */
+    value: RoutingSetArcCostEvaluatorOfVehicles;
+    case: "setArcCostEvaluatorOfVehicles";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddNodePrecedence add_node_precedence = 14;
+     */
+    value: RoutingAddNodePrecedence;
+    case: "addNodePrecedence";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetCumulBounds set_cumul_bounds = 15;
+     */
+    value: RoutingSetCumulBounds;
+    case: "setCumulBounds";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetAllowedVehiclesForIndex set_allowed_vehicles_for_index = 16;
+     */
+    value: RoutingSetAllowedVehiclesForIndex;
+    case: "setAllowedVehiclesForIndex";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetVehicleValues set_vehicle_values = 17;
+     */
+    value: RoutingSetVehicleValues;
+    case: "setVehicleValues";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetNextValues set_next_values = 18;
+     */
+    value: RoutingSetNextValues;
+    case: "setNextValues";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetSlackBounds set_slack_bounds = 19;
+     */
+    value: RoutingSetSlackBounds;
+    case: "setSlackBounds";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetActiveValues set_active_values = 20;
+     */
+    value: RoutingSetActiveValues;
+    case: "setActiveValues";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetDimensionValue set_dimension_value = 21;
+     */
+    value: RoutingSetDimensionValue;
+    case: "setDimensionValue";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetCumulSoftBound set_cumul_soft_bound = 22;
+     */
+    value: RoutingSetCumulSoftBound;
+    case: "setCumulSoftBound";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetMaximumActiveVehicles set_maximum_active_vehicles = 23;
+     */
+    value: RoutingSetMaximumActiveVehicles;
+    case: "setMaximumActiveVehicles";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetFixedVehicleCost set_fixed_vehicle_cost = 24;
+     */
+    value: RoutingSetFixedVehicleCost;
+    case: "setFixedVehicleCost";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetAmortizedVehicleCosts set_amortized_vehicle_costs = 25;
+     */
+    value: RoutingSetAmortizedVehicleCosts;
+    case: "setAmortizedVehicleCosts";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetVehicleUsedWhenEmpty set_vehicle_used_when_empty = 26;
+     */
+    value: RoutingSetVehicleUsedWhenEmpty;
+    case: "setVehicleUsedWhenEmpty";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddSoftSameVehicleConstraint add_soft_same_vehicle_constraint = 27;
+     */
+    value: RoutingAddSoftSameVehicleConstraint;
+    case: "addSoftSameVehicleConstraint";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetPickupDeliveryPolicy set_pickup_delivery_policy = 28;
+     */
+    value: RoutingSetPickupDeliveryPolicy;
+    case: "setPickupDeliveryPolicy";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddDimensionWithVehicleTransitAndCapacity add_dimension_with_vehicle_transit_and_capacity = 29;
+     */
+    value: RoutingAddDimensionWithVehicleTransitAndCapacity;
+    case: "addDimensionWithVehicleTransitAndCapacity";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingSetVisitType set_visit_type = 30;
+     */
+    value: RoutingSetVisitType;
+    case: "setVisitType";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddHardTypeIncompatibility add_hard_type_incompatibility = 31;
+     */
+    value: RoutingAddHardTypeIncompatibility;
+    case: "addHardTypeIncompatibility";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddTemporalTypeIncompatibility add_temporal_type_incompatibility = 32;
+     */
+    value: RoutingAddTemporalTypeIncompatibility;
+    case: "addTemporalTypeIncompatibility";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddTypeRequirement add_type_requirement = 33;
+     */
+    value: RoutingAddTypeRequirement;
+    case: "addTypeRequirement";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddFinalizer add_finalizer = 34;
+     */
+    value: RoutingAddFinalizer;
+    case: "addFinalizer";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingModifyDomain modify_domain = 35;
+     */
+    value: RoutingModifyDomain;
+    case: "modifyDomain";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddLinearConstraint add_linear_constraint = 36;
+     */
+    value: RoutingAddLinearConstraint;
+    case: "addLinearConstraint";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddBooleanVariable add_boolean_variable = 37;
+     */
+    value: RoutingAddBooleanVariable;
+    case: "addBooleanVariable";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddBooleanConstraint add_boolean_constraint = 38;
+     */
+    value: RoutingAddBooleanConstraint;
+    case: "addBooleanConstraint";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.RoutingAddIntegerExpression add_integer_expression = 39;
+     */
+    value: RoutingAddIntegerExpression;
+    case: "addIntegerExpression";
   } | { case: undefined; value?: undefined };
 };
 
@@ -864,6 +2657,141 @@ export type RoutingModelOperationJson = {
    * @generated from field: ortools_wasm.bridge.v1.RoutingSetQuadraticCostSoftSpanUpperBound set_quadratic_cost_soft_span_upper_bound = 12;
    */
   setQuadraticCostSoftSpanUpperBound?: RoutingSetQuadraticCostSoftSpanUpperBoundJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetArcCostEvaluatorOfVehicles set_arc_cost_evaluator_of_vehicles = 13;
+   */
+  setArcCostEvaluatorOfVehicles?: RoutingSetArcCostEvaluatorOfVehiclesJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddNodePrecedence add_node_precedence = 14;
+   */
+  addNodePrecedence?: RoutingAddNodePrecedenceJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetCumulBounds set_cumul_bounds = 15;
+   */
+  setCumulBounds?: RoutingSetCumulBoundsJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetAllowedVehiclesForIndex set_allowed_vehicles_for_index = 16;
+   */
+  setAllowedVehiclesForIndex?: RoutingSetAllowedVehiclesForIndexJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetVehicleValues set_vehicle_values = 17;
+   */
+  setVehicleValues?: RoutingSetVehicleValuesJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetNextValues set_next_values = 18;
+   */
+  setNextValues?: RoutingSetNextValuesJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetSlackBounds set_slack_bounds = 19;
+   */
+  setSlackBounds?: RoutingSetSlackBoundsJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetActiveValues set_active_values = 20;
+   */
+  setActiveValues?: RoutingSetActiveValuesJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetDimensionValue set_dimension_value = 21;
+   */
+  setDimensionValue?: RoutingSetDimensionValueJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetCumulSoftBound set_cumul_soft_bound = 22;
+   */
+  setCumulSoftBound?: RoutingSetCumulSoftBoundJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetMaximumActiveVehicles set_maximum_active_vehicles = 23;
+   */
+  setMaximumActiveVehicles?: RoutingSetMaximumActiveVehiclesJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetFixedVehicleCost set_fixed_vehicle_cost = 24;
+   */
+  setFixedVehicleCost?: RoutingSetFixedVehicleCostJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetAmortizedVehicleCosts set_amortized_vehicle_costs = 25;
+   */
+  setAmortizedVehicleCosts?: RoutingSetAmortizedVehicleCostsJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetVehicleUsedWhenEmpty set_vehicle_used_when_empty = 26;
+   */
+  setVehicleUsedWhenEmpty?: RoutingSetVehicleUsedWhenEmptyJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddSoftSameVehicleConstraint add_soft_same_vehicle_constraint = 27;
+   */
+  addSoftSameVehicleConstraint?: RoutingAddSoftSameVehicleConstraintJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetPickupDeliveryPolicy set_pickup_delivery_policy = 28;
+   */
+  setPickupDeliveryPolicy?: RoutingSetPickupDeliveryPolicyJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddDimensionWithVehicleTransitAndCapacity add_dimension_with_vehicle_transit_and_capacity = 29;
+   */
+  addDimensionWithVehicleTransitAndCapacity?: RoutingAddDimensionWithVehicleTransitAndCapacityJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSetVisitType set_visit_type = 30;
+   */
+  setVisitType?: RoutingSetVisitTypeJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddHardTypeIncompatibility add_hard_type_incompatibility = 31;
+   */
+  addHardTypeIncompatibility?: RoutingAddHardTypeIncompatibilityJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddTemporalTypeIncompatibility add_temporal_type_incompatibility = 32;
+   */
+  addTemporalTypeIncompatibility?: RoutingAddTemporalTypeIncompatibilityJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddTypeRequirement add_type_requirement = 33;
+   */
+  addTypeRequirement?: RoutingAddTypeRequirementJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddFinalizer add_finalizer = 34;
+   */
+  addFinalizer?: RoutingAddFinalizerJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingModifyDomain modify_domain = 35;
+   */
+  modifyDomain?: RoutingModifyDomainJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddLinearConstraint add_linear_constraint = 36;
+   */
+  addLinearConstraint?: RoutingAddLinearConstraintJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddBooleanVariable add_boolean_variable = 37;
+   */
+  addBooleanVariable?: RoutingAddBooleanVariableJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddBooleanConstraint add_boolean_constraint = 38;
+   */
+  addBooleanConstraint?: RoutingAddBooleanConstraintJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingAddIntegerExpression add_integer_expression = 39;
+   */
+  addIntegerExpression?: RoutingAddIntegerExpressionJson;
 };
 
 export type RoutingModelOperationValid = RoutingModelOperation;
@@ -873,7 +2801,7 @@ export type RoutingModelOperationValid = RoutingModelOperation;
  * Use `create(RoutingModelOperationSchema)` to create a new message.
  */
 export const RoutingModelOperationSchema: GenMessage<RoutingModelOperation, {jsonType: RoutingModelOperationJson, validType: RoutingModelOperationValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 13);
+  messageDesc(file_routing, 44);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingRoute
@@ -902,7 +2830,7 @@ export type RoutingRouteValid = RoutingRoute;
  * Use `create(RoutingRouteSchema)` to create a new message.
  */
 export const RoutingRouteSchema: GenMessage<RoutingRoute, {jsonType: RoutingRouteJson, validType: RoutingRouteValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 14);
+  messageDesc(file_routing, 45);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingInitialAssignment
@@ -941,7 +2869,7 @@ export type RoutingInitialAssignmentValid = RoutingInitialAssignment;
  * Use `create(RoutingInitialAssignmentSchema)` to create a new message.
  */
 export const RoutingInitialAssignmentSchema: GenMessage<RoutingInitialAssignment, {jsonType: RoutingInitialAssignmentJson, validType: RoutingInitialAssignmentValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 15);
+  messageDesc(file_routing, 46);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingBridgeRequest
@@ -968,16 +2896,6 @@ export type RoutingBridgeRequest = Message<"ortools_wasm.bridge.v1.RoutingBridge
   ends: number[];
 
   /**
-   * @generated from field: int32 first_solution_strategy = 5;
-   */
-  firstSolutionStrategy: number;
-
-  /**
-   * @generated from field: int64 solution_limit = 6;
-   */
-  solutionLimit: bigint;
-
-  /**
    * @generated from field: ortools_wasm.bridge.v1.RoutingMatrix transit_matrix = 7;
    */
   transitMatrix?: RoutingMatrix | undefined;
@@ -1001,6 +2919,69 @@ export type RoutingBridgeRequest = Message<"ortools_wasm.bridge.v1.RoutingBridge
    * @generated from field: bool interruptible = 11;
    */
   interruptible: boolean;
+
+  /**
+   * Sparse operations_research.RoutingSearchParameters override.
+   *
+   * @generated from field: bytes search_parameters_proto = 12;
+   */
+  searchParametersProto: Uint8Array;
+
+  /**
+   * @generated from field: repeated string search_parameter_fields = 13;
+   */
+  searchParameterFields: string[];
+
+  /**
+   * @generated from field: bytes model_parameters_proto = 14;
+   */
+  modelParametersProto: Uint8Array;
+
+  /**
+   * @generated from field: repeated string model_parameter_fields = 15;
+   */
+  modelParameterFields: string[];
+
+  /**
+   * @generated from field: bool solution_events = 16;
+   */
+  solutionEvents: boolean;
+
+  /**
+   * @generated from field: bool track_unchecked_neighbors = 17;
+   */
+  trackUncheckedNeighbors: boolean;
+
+  /**
+   * Restore and validate initial routes without optimizing them.
+   *
+   * @generated from field: bool read_assignment_only = 18;
+   */
+  readAssignmentOnly: boolean;
+
+  /**
+   * Inspect native domains after replaying model operations, before search.
+   *
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingDomainQuery domain_queries = 19;
+   */
+  domainQueries: RoutingDomainQuery[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingArcCostQuery arc_cost_queries = 20;
+   */
+  arcCostQueries: RoutingArcCostQuery[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResourceGroup resource_groups = 21;
+   */
+  resourceGroups: RoutingResourceGroup[];
+
+  /**
+   * Close the native model and inspect one group without searching.
+   *
+   * @generated from field: optional int32 resource_inspection_group = 22;
+   */
+  resourceInspectionGroup?: number | undefined;
 };
 
 /**
@@ -1028,16 +3009,6 @@ export type RoutingBridgeRequestJson = {
   ends?: number[];
 
   /**
-   * @generated from field: int32 first_solution_strategy = 5;
-   */
-  firstSolutionStrategy?: number;
-
-  /**
-   * @generated from field: int64 solution_limit = 6;
-   */
-  solutionLimit?: string;
-
-  /**
    * @generated from field: ortools_wasm.bridge.v1.RoutingMatrix transit_matrix = 7;
    */
   transitMatrix?: RoutingMatrixJson;
@@ -1061,6 +3032,69 @@ export type RoutingBridgeRequestJson = {
    * @generated from field: bool interruptible = 11;
    */
   interruptible?: boolean;
+
+  /**
+   * Sparse operations_research.RoutingSearchParameters override.
+   *
+   * @generated from field: bytes search_parameters_proto = 12;
+   */
+  searchParametersProto?: string;
+
+  /**
+   * @generated from field: repeated string search_parameter_fields = 13;
+   */
+  searchParameterFields?: string[];
+
+  /**
+   * @generated from field: bytes model_parameters_proto = 14;
+   */
+  modelParametersProto?: string;
+
+  /**
+   * @generated from field: repeated string model_parameter_fields = 15;
+   */
+  modelParameterFields?: string[];
+
+  /**
+   * @generated from field: bool solution_events = 16;
+   */
+  solutionEvents?: boolean;
+
+  /**
+   * @generated from field: bool track_unchecked_neighbors = 17;
+   */
+  trackUncheckedNeighbors?: boolean;
+
+  /**
+   * Restore and validate initial routes without optimizing them.
+   *
+   * @generated from field: bool read_assignment_only = 18;
+   */
+  readAssignmentOnly?: boolean;
+
+  /**
+   * Inspect native domains after replaying model operations, before search.
+   *
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingDomainQuery domain_queries = 19;
+   */
+  domainQueries?: RoutingDomainQueryJson[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingArcCostQuery arc_cost_queries = 20;
+   */
+  arcCostQueries?: RoutingArcCostQueryJson[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResourceGroup resource_groups = 21;
+   */
+  resourceGroups?: RoutingResourceGroupJson[];
+
+  /**
+   * Close the native model and inspect one group without searching.
+   *
+   * @generated from field: optional int32 resource_inspection_group = 22;
+   */
+  resourceInspectionGroup?: number;
 };
 
 export type RoutingBridgeRequestValid = RoutingBridgeRequest;
@@ -1070,7 +3104,7 @@ export type RoutingBridgeRequestValid = RoutingBridgeRequest;
  * Use `create(RoutingBridgeRequestSchema)` to create a new message.
  */
 export const RoutingBridgeRequestSchema: GenMessage<RoutingBridgeRequest, {jsonType: RoutingBridgeRequestJson, validType: RoutingBridgeRequestValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 16);
+  messageDesc(file_routing, 47);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingDimensionValues
@@ -1085,6 +3119,16 @@ export type RoutingDimensionValues = Message<"ortools_wasm.bridge.v1.RoutingDime
    * @generated from field: repeated int64 cumul_values = 2;
    */
   cumulValues: bigint[];
+
+  /**
+   * @generated from field: repeated int64 cumul_mins = 3;
+   */
+  cumulMins: bigint[];
+
+  /**
+   * @generated from field: repeated int64 cumul_maxs = 4;
+   */
+  cumulMaxs: bigint[];
 };
 
 /**
@@ -1100,6 +3144,16 @@ export type RoutingDimensionValuesJson = {
    * @generated from field: repeated int64 cumul_values = 2;
    */
   cumulValues?: string[];
+
+  /**
+   * @generated from field: repeated int64 cumul_mins = 3;
+   */
+  cumulMins?: string[];
+
+  /**
+   * @generated from field: repeated int64 cumul_maxs = 4;
+   */
+  cumulMaxs?: string[];
 };
 
 export type RoutingDimensionValuesValid = RoutingDimensionValues;
@@ -1109,7 +3163,56 @@ export type RoutingDimensionValuesValid = RoutingDimensionValues;
  * Use `create(RoutingDimensionValuesSchema)` to create a new message.
  */
 export const RoutingDimensionValuesSchema: GenMessage<RoutingDimensionValues, {jsonType: RoutingDimensionValuesJson, validType: RoutingDimensionValuesValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 17);
+  messageDesc(file_routing, 48);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAssignmentVariable
+ */
+export type RoutingAssignmentVariable = Message<"ortools_wasm.bridge.v1.RoutingAssignmentVariable"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReference | undefined;
+
+  /**
+   * @generated from field: int64 min = 2;
+   */
+  min: bigint;
+
+  /**
+   * @generated from field: int64 max = 3;
+   */
+  max: bigint;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAssignmentVariable
+ */
+export type RoutingAssignmentVariableJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 1;
+   */
+  variable?: RoutingVariableReferenceJson;
+
+  /**
+   * @generated from field: int64 min = 2;
+   */
+  min?: string;
+
+  /**
+   * @generated from field: int64 max = 3;
+   */
+  max?: string;
+};
+
+export type RoutingAssignmentVariableValid = RoutingAssignmentVariable;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAssignmentVariable.
+ * Use `create(RoutingAssignmentVariableSchema)` to create a new message.
+ */
+export const RoutingAssignmentVariableSchema: GenMessage<RoutingAssignmentVariable, {jsonType: RoutingAssignmentVariableJson, validType: RoutingAssignmentVariableValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 49);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.RoutingBridgeResponse
@@ -1149,6 +3252,53 @@ export type RoutingBridgeResponse = Message<"ortools_wasm.bridge.v1.RoutingBridg
    * @generated from field: repeated ortools_wasm.bridge.v1.RoutingDimensionValues dimensions = 7;
    */
   dimensions: RoutingDimensionValues[];
+
+  /**
+   * @generated from field: string local_search_profile = 8;
+   */
+  localSearchProfile: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSolveEvent solve_event = 9;
+   */
+  solveEvent?: RoutingSolveEvent | undefined;
+
+  /**
+   * Native VehicleVar values by routing index, including -1 for dropped nodes.
+   *
+   * @generated from field: repeated int32 vehicle_values = 10;
+   */
+  vehicleValues: number[];
+
+  /**
+   * @generated from field: optional int32 automatic_first_solution_strategy = 11;
+   */
+  automaticFirstSolutionStrategy?: number | undefined;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingDomainResult domain_results = 12;
+   */
+  domainResults: RoutingDomainResult[];
+
+  /**
+   * @generated from field: repeated int64 arc_costs = 13;
+   */
+  arcCosts: bigint[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingAssignmentVariable assignment_variables = 14;
+   */
+  assignmentVariables: RoutingAssignmentVariable[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResourceAssignment resource_assignments = 15;
+   */
+  resourceAssignments: RoutingResourceAssignment[];
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingResourceInspection resource_inspection = 16;
+   */
+  resourceInspection?: RoutingResourceInspection | undefined;
 };
 
 /**
@@ -1189,6 +3339,53 @@ export type RoutingBridgeResponseJson = {
    * @generated from field: repeated ortools_wasm.bridge.v1.RoutingDimensionValues dimensions = 7;
    */
   dimensions?: RoutingDimensionValuesJson[];
+
+  /**
+   * @generated from field: string local_search_profile = 8;
+   */
+  localSearchProfile?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingSolveEvent solve_event = 9;
+   */
+  solveEvent?: RoutingSolveEventJson;
+
+  /**
+   * Native VehicleVar values by routing index, including -1 for dropped nodes.
+   *
+   * @generated from field: repeated int32 vehicle_values = 10;
+   */
+  vehicleValues?: number[];
+
+  /**
+   * @generated from field: optional int32 automatic_first_solution_strategy = 11;
+   */
+  automaticFirstSolutionStrategy?: number;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingDomainResult domain_results = 12;
+   */
+  domainResults?: RoutingDomainResultJson[];
+
+  /**
+   * @generated from field: repeated int64 arc_costs = 13;
+   */
+  arcCosts?: string[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingAssignmentVariable assignment_variables = 14;
+   */
+  assignmentVariables?: RoutingAssignmentVariableJson[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResourceAssignment resource_assignments = 15;
+   */
+  resourceAssignments?: RoutingResourceAssignmentJson[];
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingResourceInspection resource_inspection = 16;
+   */
+  resourceInspection?: RoutingResourceInspectionJson;
 };
 
 export type RoutingBridgeResponseValid = RoutingBridgeResponse;
@@ -1198,5 +3395,791 @@ export type RoutingBridgeResponseValid = RoutingBridgeResponse;
  * Use `create(RoutingBridgeResponseSchema)` to create a new message.
  */
 export const RoutingBridgeResponseSchema: GenMessage<RoutingBridgeResponse, {jsonType: RoutingBridgeResponseJson, validType: RoutingBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_routing, 18);
+  messageDesc(file_routing, 50);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSolveEvent
+ */
+export type RoutingSolveEvent = Message<"ortools_wasm.bridge.v1.RoutingSolveEvent"> & {
+  /**
+   * @generated from field: int64 objective_value = 1;
+   */
+  objectiveValue: bigint;
+
+  /**
+   * @generated from field: int64 solution_count = 2;
+   */
+  solutionCount: bigint;
+
+  /**
+   * @generated from field: bool unchecked = 3;
+   */
+  unchecked: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingSolveEvent
+ */
+export type RoutingSolveEventJson = {
+  /**
+   * @generated from field: int64 objective_value = 1;
+   */
+  objectiveValue?: string;
+
+  /**
+   * @generated from field: int64 solution_count = 2;
+   */
+  solutionCount?: string;
+
+  /**
+   * @generated from field: bool unchecked = 3;
+   */
+  unchecked?: boolean;
+};
+
+export type RoutingSolveEventValid = RoutingSolveEvent;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingSolveEvent.
+ * Use `create(RoutingSolveEventSchema)` to create a new message.
+ */
+export const RoutingSolveEventSchema: GenMessage<RoutingSolveEvent, {jsonType: RoutingSolveEventJson, validType: RoutingSolveEventValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 51);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResource
+ */
+export type RoutingResource = Message<"ortools_wasm.bridge.v1.RoutingResource"> & {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName: string;
+
+  /**
+   * @generated from field: repeated int64 start_domain = 2;
+   */
+  startDomain: bigint[];
+
+  /**
+   * @generated from field: repeated int64 end_domain = 3;
+   */
+  endDomain: bigint[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResource
+ */
+export type RoutingResourceJson = {
+  /**
+   * @generated from field: string dimension_name = 1;
+   */
+  dimensionName?: string;
+
+  /**
+   * @generated from field: repeated int64 start_domain = 2;
+   */
+  startDomain?: string[];
+
+  /**
+   * @generated from field: repeated int64 end_domain = 3;
+   */
+  endDomain?: string[];
+};
+
+export type RoutingResourceValid = RoutingResource;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingResource.
+ * Use `create(RoutingResourceSchema)` to create a new message.
+ */
+export const RoutingResourceSchema: GenMessage<RoutingResource, {jsonType: RoutingResourceJson, validType: RoutingResourceValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 52);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingVehicleResources
+ */
+export type RoutingVehicleResources = Message<"ortools_wasm.bridge.v1.RoutingVehicleResources"> & {
+  /**
+   * @generated from field: int32 vehicle = 1;
+   */
+  vehicle: number;
+
+  /**
+   * @generated from field: repeated int32 resources = 2;
+   */
+  resources: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingVehicleResources
+ */
+export type RoutingVehicleResourcesJson = {
+  /**
+   * @generated from field: int32 vehicle = 1;
+   */
+  vehicle?: number;
+
+  /**
+   * @generated from field: repeated int32 resources = 2;
+   */
+  resources?: number[];
+};
+
+export type RoutingVehicleResourcesValid = RoutingVehicleResources;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingVehicleResources.
+ * Use `create(RoutingVehicleResourcesSchema)` to create a new message.
+ */
+export const RoutingVehicleResourcesSchema: GenMessage<RoutingVehicleResources, {jsonType: RoutingVehicleResourcesJson, validType: RoutingVehicleResourcesValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 53);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceGroup
+ */
+export type RoutingResourceGroup = Message<"ortools_wasm.bridge.v1.RoutingResourceGroup"> & {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResource resources = 1;
+   */
+  resources: RoutingResource[];
+
+  /**
+   * @generated from field: repeated int32 required_vehicles = 2;
+   */
+  requiredVehicles: number[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingVehicleResources allowed_resources = 3;
+   */
+  allowedResources: RoutingVehicleResources[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceGroup
+ */
+export type RoutingResourceGroupJson = {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResource resources = 1;
+   */
+  resources?: RoutingResourceJson[];
+
+  /**
+   * @generated from field: repeated int32 required_vehicles = 2;
+   */
+  requiredVehicles?: number[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingVehicleResources allowed_resources = 3;
+   */
+  allowedResources?: RoutingVehicleResourcesJson[];
+};
+
+export type RoutingResourceGroupValid = RoutingResourceGroup;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingResourceGroup.
+ * Use `create(RoutingResourceGroupSchema)` to create a new message.
+ */
+export const RoutingResourceGroupSchema: GenMessage<RoutingResourceGroup, {jsonType: RoutingResourceGroupJson, validType: RoutingResourceGroupValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 54);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceAssignment
+ */
+export type RoutingResourceAssignment = Message<"ortools_wasm.bridge.v1.RoutingResourceAssignment"> & {
+  /**
+   * @generated from field: repeated int64 mins = 1;
+   */
+  mins: bigint[];
+
+  /**
+   * @generated from field: repeated int64 maxs = 2;
+   */
+  maxs: bigint[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceAssignment
+ */
+export type RoutingResourceAssignmentJson = {
+  /**
+   * @generated from field: repeated int64 mins = 1;
+   */
+  mins?: string[];
+
+  /**
+   * @generated from field: repeated int64 maxs = 2;
+   */
+  maxs?: string[];
+};
+
+export type RoutingResourceAssignmentValid = RoutingResourceAssignment;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingResourceAssignment.
+ * Use `create(RoutingResourceAssignmentSchema)` to create a new message.
+ */
+export const RoutingResourceAssignmentSchema: GenMessage<RoutingResourceAssignment, {jsonType: RoutingResourceAssignmentJson, validType: RoutingResourceAssignmentValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 55);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingInspectedResource
+ */
+export type RoutingInspectedResource = Message<"ortools_wasm.bridge.v1.RoutingInspectedResource"> & {
+  /**
+   * @generated from field: int32 class_index = 1;
+   */
+  classIndex: number;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResource dimension_attributes = 2;
+   */
+  dimensionAttributes: RoutingResource[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingInspectedResource
+ */
+export type RoutingInspectedResourceJson = {
+  /**
+   * @generated from field: int32 class_index = 1;
+   */
+  classIndex?: number;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResource dimension_attributes = 2;
+   */
+  dimensionAttributes?: RoutingResourceJson[];
+};
+
+export type RoutingInspectedResourceValid = RoutingInspectedResource;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingInspectedResource.
+ * Use `create(RoutingInspectedResourceSchema)` to create a new message.
+ */
+export const RoutingInspectedResourceSchema: GenMessage<RoutingInspectedResource, {jsonType: RoutingInspectedResourceJson, validType: RoutingInspectedResourceValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 56);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceClass
+ */
+export type RoutingResourceClass = Message<"ortools_wasm.bridge.v1.RoutingResourceClass"> & {
+  /**
+   * @generated from field: repeated int32 resource_indices = 1;
+   */
+  resourceIndices: number[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResource dimension_attributes = 2;
+   */
+  dimensionAttributes: RoutingResource[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceClass
+ */
+export type RoutingResourceClassJson = {
+  /**
+   * @generated from field: repeated int32 resource_indices = 1;
+   */
+  resourceIndices?: number[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResource dimension_attributes = 2;
+   */
+  dimensionAttributes?: RoutingResourceJson[];
+};
+
+export type RoutingResourceClassValid = RoutingResourceClass;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingResourceClass.
+ * Use `create(RoutingResourceClassSchema)` to create a new message.
+ */
+export const RoutingResourceClassSchema: GenMessage<RoutingResourceClass, {jsonType: RoutingResourceClassJson, validType: RoutingResourceClassValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 57);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceInspection
+ */
+export type RoutingResourceInspection = Message<"ortools_wasm.bridge.v1.RoutingResourceInspection"> & {
+  /**
+   * @generated from field: repeated string affected_dimensions = 1;
+   */
+  affectedDimensions: string[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingInspectedResource resources = 2;
+   */
+  resources: RoutingInspectedResource[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResourceClass classes = 3;
+   */
+  classes: RoutingResourceClass[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingResourceInspection
+ */
+export type RoutingResourceInspectionJson = {
+  /**
+   * @generated from field: repeated string affected_dimensions = 1;
+   */
+  affectedDimensions?: string[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingInspectedResource resources = 2;
+   */
+  resources?: RoutingInspectedResourceJson[];
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingResourceClass classes = 3;
+   */
+  classes?: RoutingResourceClassJson[];
+};
+
+export type RoutingResourceInspectionValid = RoutingResourceInspection;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingResourceInspection.
+ * Use `create(RoutingResourceInspectionSchema)` to create a new message.
+ */
+export const RoutingResourceInspectionSchema: GenMessage<RoutingResourceInspection, {jsonType: RoutingResourceInspectionJson, validType: RoutingResourceInspectionValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 58);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingBooleanExpression
+ */
+export type RoutingBooleanExpression = Message<"ortools_wasm.bridge.v1.RoutingBooleanExpression"> & {
+  /**
+   * 1: constant, 2: Boolean variable, 3: comparison, 4: AND, 5: OR, 6: NOT.
+   *
+   * @generated from field: int32 kind = 1;
+   */
+  kind: number;
+
+  /**
+   * @generated from field: bool value = 2;
+   */
+  value: boolean;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 3;
+   */
+  variable?: RoutingVariableReference | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearComparison comparison = 4;
+   */
+  comparison?: RoutingLinearComparison | undefined;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingBooleanExpression operands = 5;
+   */
+  operands: RoutingBooleanExpression[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingBooleanExpression
+ */
+export type RoutingBooleanExpressionJson = {
+  /**
+   * 1: constant, 2: Boolean variable, 3: comparison, 4: AND, 5: OR, 6: NOT.
+   *
+   * @generated from field: int32 kind = 1;
+   */
+  kind?: number;
+
+  /**
+   * @generated from field: bool value = 2;
+   */
+  value?: boolean;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingVariableReference variable = 3;
+   */
+  variable?: RoutingVariableReferenceJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingLinearComparison comparison = 4;
+   */
+  comparison?: RoutingLinearComparisonJson;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingBooleanExpression operands = 5;
+   */
+  operands?: RoutingBooleanExpressionJson[];
+};
+
+export type RoutingBooleanExpressionValid = RoutingBooleanExpression;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingBooleanExpression.
+ * Use `create(RoutingBooleanExpressionSchema)` to create a new message.
+ */
+export const RoutingBooleanExpressionSchema: GenMessage<RoutingBooleanExpression, {jsonType: RoutingBooleanExpressionJson, validType: RoutingBooleanExpressionValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 59);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddBooleanVariable
+ */
+export type RoutingAddBooleanVariable = Message<"ortools_wasm.bridge.v1.RoutingAddBooleanVariable"> & {
+  /**
+   * @generated from field: int32 index = 1;
+   */
+  index: number;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingBooleanExpression expression = 2;
+   */
+  expression?: RoutingBooleanExpression | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddBooleanVariable
+ */
+export type RoutingAddBooleanVariableJson = {
+  /**
+   * @generated from field: int32 index = 1;
+   */
+  index?: number;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingBooleanExpression expression = 2;
+   */
+  expression?: RoutingBooleanExpressionJson;
+};
+
+export type RoutingAddBooleanVariableValid = RoutingAddBooleanVariable;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddBooleanVariable.
+ * Use `create(RoutingAddBooleanVariableSchema)` to create a new message.
+ */
+export const RoutingAddBooleanVariableSchema: GenMessage<RoutingAddBooleanVariable, {jsonType: RoutingAddBooleanVariableJson, validType: RoutingAddBooleanVariableValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 60);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddBooleanConstraint
+ */
+export type RoutingAddBooleanConstraint = Message<"ortools_wasm.bridge.v1.RoutingAddBooleanConstraint"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingBooleanExpression expression = 1;
+   */
+  expression?: RoutingBooleanExpression | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddBooleanConstraint
+ */
+export type RoutingAddBooleanConstraintJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.RoutingBooleanExpression expression = 1;
+   */
+  expression?: RoutingBooleanExpressionJson;
+};
+
+export type RoutingAddBooleanConstraintValid = RoutingAddBooleanConstraint;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddBooleanConstraint.
+ * Use `create(RoutingAddBooleanConstraintSchema)` to create a new message.
+ */
+export const RoutingAddBooleanConstraintSchema: GenMessage<RoutingAddBooleanConstraint, {jsonType: RoutingAddBooleanConstraintJson, validType: RoutingAddBooleanConstraintValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 61);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddIntegerExpression
+ */
+export type RoutingAddIntegerExpression = Message<"ortools_wasm.bridge.v1.RoutingAddIntegerExpression"> & {
+  /**
+   * @generated from field: int32 index = 1;
+   */
+  index: number;
+
+  /**
+   * 1: product (two operands), 2: absolute value (one), 3: minimum, 4: maximum.
+   *
+   * @generated from field: int32 kind = 2;
+   */
+  kind: number;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingLinearExpression operands = 3;
+   */
+  operands: RoutingLinearExpression[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.RoutingAddIntegerExpression
+ */
+export type RoutingAddIntegerExpressionJson = {
+  /**
+   * @generated from field: int32 index = 1;
+   */
+  index?: number;
+
+  /**
+   * 1: product (two operands), 2: absolute value (one), 3: minimum, 4: maximum.
+   *
+   * @generated from field: int32 kind = 2;
+   */
+  kind?: number;
+
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.RoutingLinearExpression operands = 3;
+   */
+  operands?: RoutingLinearExpressionJson[];
+};
+
+export type RoutingAddIntegerExpressionValid = RoutingAddIntegerExpression;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.RoutingAddIntegerExpression.
+ * Use `create(RoutingAddIntegerExpressionSchema)` to create a new message.
+ */
+export const RoutingAddIntegerExpressionSchema: GenMessage<RoutingAddIntegerExpression, {jsonType: RoutingAddIntegerExpressionJson, validType: RoutingAddIntegerExpressionValid}> = /*@__PURE__*/
+  messageDesc(file_routing, 62);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingDimensionValueKind
+ */
+export enum RoutingDimensionValueKind {
+  /**
+   * @generated from enum value: ROUTING_DIMENSION_VALUE_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ROUTING_DIMENSION_VALUE_KIND_SPAN_UPPER_BOUND = 1;
+   */
+  SPAN_UPPER_BOUND = 1,
+
+  /**
+   * @generated from enum value: ROUTING_DIMENSION_VALUE_KIND_SPAN_COST = 2;
+   */
+  SPAN_COST = 2,
+
+  /**
+   * @generated from enum value: ROUTING_DIMENSION_VALUE_KIND_SLACK_COST = 3;
+   */
+  SLACK_COST = 3,
+
+  /**
+   * @generated from enum value: ROUTING_DIMENSION_VALUE_KIND_GLOBAL_SPAN_COST = 4;
+   */
+  GLOBAL_SPAN_COST = 4,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingDimensionValueKind
+ */
+export type RoutingDimensionValueKindJson = "ROUTING_DIMENSION_VALUE_KIND_UNSPECIFIED" | "ROUTING_DIMENSION_VALUE_KIND_SPAN_UPPER_BOUND" | "ROUTING_DIMENSION_VALUE_KIND_SPAN_COST" | "ROUTING_DIMENSION_VALUE_KIND_SLACK_COST" | "ROUTING_DIMENSION_VALUE_KIND_GLOBAL_SPAN_COST";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.RoutingDimensionValueKind.
+ */
+export const RoutingDimensionValueKindSchema: GenEnum<RoutingDimensionValueKind, RoutingDimensionValueKindJson> = /*@__PURE__*/
+  enumDesc(file_routing, 0);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingTypeRequirementKind
+ */
+export enum RoutingTypeRequirementKind {
+  /**
+   * @generated from enum value: SAME_VEHICLE = 0;
+   */
+  SAME_VEHICLE = 0,
+
+  /**
+   * @generated from enum value: WHEN_ADDING = 1;
+   */
+  WHEN_ADDING = 1,
+
+  /**
+   * @generated from enum value: WHEN_REMOVING = 2;
+   */
+  WHEN_REMOVING = 2,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingTypeRequirementKind
+ */
+export type RoutingTypeRequirementKindJson = "SAME_VEHICLE" | "WHEN_ADDING" | "WHEN_REMOVING";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.RoutingTypeRequirementKind.
+ */
+export const RoutingTypeRequirementKindSchema: GenEnum<RoutingTypeRequirementKind, RoutingTypeRequirementKindJson> = /*@__PURE__*/
+  enumDesc(file_routing, 1);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingFinalizerKind
+ */
+export enum RoutingFinalizerKind {
+  /**
+   * @generated from enum value: ROUTING_FINALIZER_UNSPECIFIED = 0;
+   */
+  ROUTING_FINALIZER_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ROUTING_FINALIZER_MINIMIZE = 1;
+   */
+  ROUTING_FINALIZER_MINIMIZE = 1,
+
+  /**
+   * @generated from enum value: ROUTING_FINALIZER_MAXIMIZE = 2;
+   */
+  ROUTING_FINALIZER_MAXIMIZE = 2,
+
+  /**
+   * @generated from enum value: ROUTING_FINALIZER_TARGET = 3;
+   */
+  ROUTING_FINALIZER_TARGET = 3,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingFinalizerKind
+ */
+export type RoutingFinalizerKindJson = "ROUTING_FINALIZER_UNSPECIFIED" | "ROUTING_FINALIZER_MINIMIZE" | "ROUTING_FINALIZER_MAXIMIZE" | "ROUTING_FINALIZER_TARGET";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.RoutingFinalizerKind.
+ */
+export const RoutingFinalizerKindSchema: GenEnum<RoutingFinalizerKind, RoutingFinalizerKindJson> = /*@__PURE__*/
+  enumDesc(file_routing, 2);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingVariableKind
+ */
+export enum RoutingVariableKind {
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_UNSPECIFIED = 0;
+   */
+  ROUTING_VARIABLE_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_CUMUL = 1;
+   */
+  ROUTING_VARIABLE_CUMUL = 1,
+
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_SLACK = 2;
+   */
+  ROUTING_VARIABLE_SLACK = 2,
+
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_NEXT = 3;
+   */
+  ROUTING_VARIABLE_NEXT = 3,
+
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_VEHICLE = 4;
+   */
+  ROUTING_VARIABLE_VEHICLE = 4,
+
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_ACTIVE = 5;
+   */
+  ROUTING_VARIABLE_ACTIVE = 5,
+
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_TRANSIT = 6;
+   */
+  ROUTING_VARIABLE_TRANSIT = 6,
+
+  /**
+   * @generated from enum value: ROUTING_VARIABLE_FIXED_TRANSIT = 7;
+   */
+  ROUTING_VARIABLE_FIXED_TRANSIT = 7,
+
+  /**
+   * index is a vehicle ID rather than a routing index.
+   *
+   * @generated from enum value: ROUTING_VARIABLE_ACTIVE_VEHICLE = 8;
+   */
+  ROUTING_VARIABLE_ACTIVE_VEHICLE = 8,
+
+  /**
+   * index is a vehicle ID rather than a routing index.
+   *
+   * @generated from enum value: ROUTING_VARIABLE_ROUTE_CONSIDERED = 9;
+   */
+  ROUTING_VARIABLE_ROUTE_CONSIDERED = 9,
+
+  /**
+   * index is a vehicle ID; resource_group identifies the group.
+   *
+   * @generated from enum value: ROUTING_VARIABLE_RESOURCE = 10;
+   */
+  ROUTING_VARIABLE_RESOURCE = 10,
+
+  /**
+   * index identifies a registered reified Boolean variable.
+   *
+   * @generated from enum value: ROUTING_VARIABLE_BOOLEAN = 11;
+   */
+  ROUTING_VARIABLE_BOOLEAN = 11,
+
+  /**
+   * index identifies a registered native nonlinear expression variable.
+   *
+   * @generated from enum value: ROUTING_VARIABLE_EXPRESSION = 12;
+   */
+  ROUTING_VARIABLE_EXPRESSION = 12,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingVariableKind
+ */
+export type RoutingVariableKindJson = "ROUTING_VARIABLE_UNSPECIFIED" | "ROUTING_VARIABLE_CUMUL" | "ROUTING_VARIABLE_SLACK" | "ROUTING_VARIABLE_NEXT" | "ROUTING_VARIABLE_VEHICLE" | "ROUTING_VARIABLE_ACTIVE" | "ROUTING_VARIABLE_TRANSIT" | "ROUTING_VARIABLE_FIXED_TRANSIT" | "ROUTING_VARIABLE_ACTIVE_VEHICLE" | "ROUTING_VARIABLE_ROUTE_CONSIDERED" | "ROUTING_VARIABLE_RESOURCE" | "ROUTING_VARIABLE_BOOLEAN" | "ROUTING_VARIABLE_EXPRESSION";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.RoutingVariableKind.
+ */
+export const RoutingVariableKindSchema: GenEnum<RoutingVariableKind, RoutingVariableKindJson> = /*@__PURE__*/
+  enumDesc(file_routing, 3);
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingDomainAction
+ */
+export enum RoutingDomainAction {
+  /**
+   * @generated from enum value: ROUTING_DOMAIN_UNSPECIFIED = 0;
+   */
+  ROUTING_DOMAIN_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ROUTING_DOMAIN_RANGE = 1;
+   */
+  ROUTING_DOMAIN_RANGE = 1,
+
+  /**
+   * @generated from enum value: ROUTING_DOMAIN_VALUES = 2;
+   */
+  ROUTING_DOMAIN_VALUES = 2,
+
+  /**
+   * @generated from enum value: ROUTING_DOMAIN_REMOVE_INTERVAL = 3;
+   */
+  ROUTING_DOMAIN_REMOVE_INTERVAL = 3,
+
+  /**
+   * @generated from enum value: ROUTING_DOMAIN_REMOVE_VALUES = 4;
+   */
+  ROUTING_DOMAIN_REMOVE_VALUES = 4,
+}
+
+/**
+ * @generated from enum ortools_wasm.bridge.v1.RoutingDomainAction
+ */
+export type RoutingDomainActionJson = "ROUTING_DOMAIN_UNSPECIFIED" | "ROUTING_DOMAIN_RANGE" | "ROUTING_DOMAIN_VALUES" | "ROUTING_DOMAIN_REMOVE_INTERVAL" | "ROUTING_DOMAIN_REMOVE_VALUES";
+
+/**
+ * Describes the enum ortools_wasm.bridge.v1.RoutingDomainAction.
+ */
+export const RoutingDomainActionSchema: GenEnum<RoutingDomainAction, RoutingDomainActionJson> = /*@__PURE__*/
+  enumDesc(file_routing, 4);
 

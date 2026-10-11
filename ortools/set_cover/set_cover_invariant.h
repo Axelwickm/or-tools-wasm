@@ -247,6 +247,8 @@ class SetCoverInvariant {
   void ImportSolutionFromProto(const SetCoverSolutionResponse& message);
 
  private:
+  void UpdateCost(Cost delta);
+
   // Computes the cost and the coverage vector for the given choices.
   // Temporarily uses |E| BaseInts.
   std::tuple<Cost, ElementToIntVector> ComputeCostAndCoverage(

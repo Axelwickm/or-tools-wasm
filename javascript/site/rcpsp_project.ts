@@ -1,6 +1,8 @@
 import {
   type ExecutorConfiguration,
   RcpspModelBuilder,
+  RcpspProblem,
+  type RcpspProblemProto,
   type RcpspScheduleTask,
 } from 'or-tools-wasm/rcpsp';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
@@ -34,6 +36,9 @@ const timelineEl = requiredElement('timeline', 'div');
 const activitiesEl = requiredElement('activities', 'div');
 const executorSelector = requiredElement('solver-executor', 'select');
 const workersInput = requiredElement('workers', 'input');
+const variantSelector = requiredElement('variant', 'select');
+const variantButton = requiredElement('run-variant', 'button');
+const variantResult = requiredElement('variant-result', 'pre');
 
 let scheduleTasks: DisplayScheduleTask[] = [];
 let makespan: number | null = null;
@@ -41,7 +46,44 @@ let hoveredActivity: string | null = null;
 
 function setRunning(running: boolean) {
   runButton.disabled = running;
+  variantButton.disabled = running;
   runButton.textContent = running ? 'Solving...' : 'Solve Schedule';
+}
+
+async function solveVariant() {
+  setRunning(true);
+  variantResult.textContent = 'Solving...';
+  const problem: RcpspProblemProto = variantSelector.value === 'investment' ? {
+    isResourceInvestment: true, deadline: 2,
+    resources: [{ name: 'crew', maxCapacity: -1, unitCost: 4 }],
+    tasks: [
+      { name: 'foundation', recipes: [{ duration: 2, demands: [2] }] },
+      { name: 'delivery', recipes: [{ duration: 2, demands: [3] }] },
+    ],
+  } : {
+    isConsumerProducer: true, isRcpspMax: true,
+    resources: [{ name: 'stock', minCapacity: 0, maxCapacity: 5 }],
+    tasks: [
+      { name: 'produce', recipes: [{ demands: [5] }], successors: [1],
+        successorDelays: [{ recipeDelays: [{ minDelays: [2] }] }] },
+      { name: 'consume', recipes: [{ demands: [-4] }] },
+    ],
+  };
+  try {
+    const result = await RcpspProblem.fromProto(problem).solve({
+      executor: selectedExecutor() as ExecutorConfiguration,
+      numWorkers: readPositiveInteger(workersInput, 1), maxTimeInSeconds: 5,
+    });
+    variantResult.textContent = [
+      `Status: ${result.statusName}`,
+      `Makespan: ${result.makespan ?? '-'}`,
+      `Objective (${problem.isResourceInvestment ? 'capacity cost' : 'makespan'}): ${result.objectiveValue ?? '-'}`,
+      ...(result.resourceCapacities ? [`Purchased crew capacity: ${result.resourceCapacities.join(', ')}`] : []),
+      ...result.tasks.map(task => `${task.name}: ${task.start}-${task.end}, demand ${task.demands.join(', ')}`),
+    ].join('\n');
+  } catch (error) {
+    variantResult.textContent = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;
+  } finally { setRunning(false); }
 }
 
 function appendStatus(message: string) {
@@ -252,6 +294,8 @@ timelineEl.addEventListener('pointerout', (event) => {
   setHoveredActivity(null);
 });
 runButton.addEventListener('click', () => void solve());
+variantButton.addEventListener('click', () => void solveVariant());
+variantSelector.addEventListener('change', () => { variantResult.textContent = 'Run the solver to view the solution.'; });
 
 renderActivities();
 renderTimeline();

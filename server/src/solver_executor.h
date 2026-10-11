@@ -2,6 +2,7 @@
 #define ORTOOLS_WASM_SERVER_SOLVER_EXECUTOR_H_
 
 #include <functional>
+#include <optional>
 #include <string>
 
 #include "server/src/job_scheduler.h"
@@ -12,6 +13,8 @@ struct SolverExecutorRequest {
   uint32_t request_id = 0;
   std::string solver;
   std::string payload;
+  // Invoked synchronously by native solvers. A missing reply stops the solve.
+  std::function<std::optional<std::string>(const std::string&)> callback;
 };
 
 enum class SolverExecutionFailureKind {

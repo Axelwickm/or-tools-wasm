@@ -35,6 +35,27 @@ test('MathOpt result accessors and deferred incremental initialization failures'
       } }],
     });
     const { MathOpt, MathOptIncrementalSolver, MathOptSolverType } = await import(outfile);
+    responses.push(Uint8Array.of(18, 1, 49));
+    const nameless = new MathOptIncrementalSolver(MathOpt.Model(), MathOptSolverType.GLOP, {
+      executor: 'direct', removeNames: true,
+    });
+    try {
+      const rejectedOptions: import('../lib/mathopt/api.ts').MathOptIncrementalSolveOptions = {
+        // @ts-expect-error Name removal is a constructor option only.
+        removeNames: false,
+      };
+      responses.push(Uint8Array.of(10, 0));
+      await assert.rejects(nameless.solve(rejectedOptions), /removeNames is fixed at construction/);
+      assert.equal(responses.length, 1, 'Changing name removal rejects before native dispatch');
+      await nameless.solve();
+      assert.equal(responses.length, 0, 'The rejected option leaves the session reusable');
+      const capture = nameless.model.snapshot;
+      let snapshots = 0;
+      nameless.model.snapshot = function () { ++snapshots; return capture.call(this); };
+      responses.push(Uint8Array.of(10, 0));
+      await nameless.solve();
+      assert.equal(snapshots, 1, 'Encoding the fallback model and update shares one captured snapshot');
+    } finally { responses.push(new Uint8Array()); await nameless.close(); }
     const incremental = new MathOptIncrementalSolver(MathOpt.Model(), MathOptSolverType.GLOP, {
       executor: { type: 'server', url: 'http://unused.invalid', fetch: async () => {
         throw new Error('initialization unavailable');

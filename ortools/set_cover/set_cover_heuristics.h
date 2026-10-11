@@ -181,14 +181,15 @@ class SubsetListBasedSolutionGenerator : public SetCoverSolutionGenerator {
   bool NextSolution() final { return NextSolution(model()->all_subsets()); }
 
   bool NextSolution(const SubsetBoolVector& in_focus) final {
-    return NextSolution(MakeSubsetIndexSpan(in_focus));
+    const auto indices = MakeSubsetIndices(in_focus);
+    return NextSolution(absl::MakeConstSpan(indices));
   }
 
  private:
   // Converts a vector of Booleans to a vector of subset indices.
   // TODO(user): this should not be, but a better iterator system should be
   // implemented.
-  absl::Span<const SubsetIndex> MakeSubsetIndexSpan(
+  std::vector<SubsetIndex> MakeSubsetIndices(
       const SubsetBoolVector& in_focus) {
     std::vector<SubsetIndex> result;
     result.reserve(in_focus.size());
@@ -197,8 +198,9 @@ class SubsetListBasedSolutionGenerator : public SetCoverSolutionGenerator {
       if (bit) {
         result.push_back(i);
       }
+      ++i;
     }
-    return absl::MakeConstSpan(result);
+    return result;
   }
 };
 

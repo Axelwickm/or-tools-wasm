@@ -302,6 +302,11 @@ if(BUILD_GLPK)
     GIT_SHALLOW TRUE
   )
   FetchContent_MakeAvailable(glpk)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    # OR-Tools frees GLPK's environment when each native job thread exits.
+    # A process-global environment races with other active solver instances.
+    target_compile_definitions(GLPK PRIVATE TLS=_Thread_local)
+  endif()
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
 endif()
@@ -392,8 +397,9 @@ if(BUILD_SCIP)
     GIT_REPOSITORY "https://github.com/scipopt/scip.git"
     GIT_TAG        "v10.0.0"
     GIT_SHALLOW TRUE
-    PATCH_COMMAND git apply --ignore-whitespace
-    "${CMAKE_CURRENT_LIST_DIR}/../../patches/scip-v10.0.0.patch"
+    PATCH_COMMAND ${CMAKE_COMMAND}
+    "-DPATCH_DIRECTORY=${CMAKE_CURRENT_LIST_DIR}/../../patches"
+    -P "${CMAKE_CURRENT_LIST_DIR}/../apply_scip_patches.cmake"
   )
   set(SHARED ${BUILD_SHARED_LIBS} CACHE BOOL "Scip param" FORCE)
   set(ZLIB ON CACHE BOOL "Scip param" FORCE)

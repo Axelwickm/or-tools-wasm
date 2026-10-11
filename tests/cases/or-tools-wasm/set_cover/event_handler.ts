@@ -4,7 +4,7 @@ type SetCoverEventHandlerApi = {
     addElementToLastSubset(element: number): void;
   };
   SetCoverInvariant: new (model: any) => {
-    numUncoveredElements(): number;
+    numUncoveredElements(): Promise<number>;
   };
   GreedySolutionGenerator: new (invariant: any) => {
     nextSolution(focus: undefined, options: {
@@ -41,7 +41,7 @@ async function assertCallbackRecovery(
     throw new Error(`${executor}: expected original callback error, got ${String(thrown)}`);
   }
   await generator.nextSolution(undefined, { executor });
-  if (invariant.numUncoveredElements() !== 0) {
+  if (await invariant.numUncoveredElements() !== 0) {
     throw new Error(`${executor}: expected a feasible solution after recovery`);
   }
 }

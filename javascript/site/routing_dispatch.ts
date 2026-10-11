@@ -1,6 +1,7 @@
 import {
   FirstSolutionStrategy,
   RoutingIndexManager,
+  RoutingBoolExpr,
   RoutingModel,
 } from 'or-tools-wasm/routing';
 import {
@@ -44,6 +45,10 @@ const deliveryCountInput = document.getElementById('delivery-count') as HTMLInpu
 const vehicleCountInput = document.getElementById('vehicle-count') as HTMLInputElement | null;
 const vehicleCapacityInput = document.getElementById('vehicle-capacity') as HTMLInputElement | null;
 const distanceCapInput = document.getElementById('distance-cap') as HTMLInputElement | null;
+const resourceSlotsInput = document.getElementById('resource-slots') as HTMLInputElement | null;
+const useResourcesInput = document.getElementById('use-resources') as HTMLInputElement | null;
+const deliveryChoiceInput = document.getElementById('delivery-choice') as HTMLInputElement | null;
+const deliveryOrderInput = document.getElementById('delivery-order') as HTMLInputElement | null;
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 
@@ -182,6 +187,10 @@ const setControlsDisabled = (disabled: boolean) => {
   if (vehicleCountInput) vehicleCountInput.disabled = disabled;
   if (vehicleCapacityInput) vehicleCapacityInput.disabled = disabled;
   if (distanceCapInput) distanceCapInput.disabled = disabled;
+  if (deliveryOrderInput) deliveryOrderInput.disabled = disabled;
+  if (deliveryChoiceInput) deliveryChoiceInput.disabled = disabled;
+  if (resourceSlotsInput) resourceSlotsInput.disabled = disabled;
+  if (useResourcesInput) useResourcesInput.disabled = disabled;
 };
 
 const routeLoad = (route: RouteSummary) =>
@@ -370,11 +379,44 @@ async function runDispatch() {
       );
       if (!capacityAdded) throw new Error('Could not add vehicle capacity dimension.');
 
-      const distanceAdded = routing.addDimension(distanceCallbackIndex, 0, distanceCap(), true, 'distance');
+      const distanceAdded = routing.addDimension(distanceCallbackIndex, 0, (1n << 63n) - 1n, true, 'distance');
       if (!distanceAdded) throw new Error('Could not add route distance dimension.');
+
+      const routeDistance = routing.getDimensionOrDie('distance');
+      for (let vehicle = 0; vehicle < vehicleTotal; ++vehicle) {
+        const endDistance = routeDistance.cumulVar(routing.end(vehicle));
+        // Apply the budget before native search/filter construction.
+        endDistance.removeInterval(BigInt(distanceCap()) + 1n, (1n << 63n) - 1n);
+        routing.addVariableMinimizedByFinalizer(endDistance);
+      }
+
+      const longestRoute = routing.max(...Array.from({ length: vehicleTotal }, (_, vehicle) => routeDistance.cumulVar(routing.end(vehicle))));
 
       for (let node = vehicleTotal; node < stops.length; node++) {
         routing.addDisjunction([manager.nodeToIndex(node)], priorityPenalty[stops[node].priority]);
+      }
+
+      if (deliveryOrderInput?.checked && stops.length >= vehicleTotal + 2) {
+        const first = manager.nodeToIndex(vehicleTotal), second = manager.nodeToIndex(vehicleTotal + 1);
+        routing.addConstraints(routeDistance.cumulVar(first).le(routeDistance.cumulVar(second)).onlyEnforceIf(
+          routing.activeVar(first).eq(1), routing.activeVar(second).eq(1),
+          routing.vehicleVar(first).eq(routing.vehicleVar(second)),
+        ));
+      }
+
+      const deliveryChoice = deliveryChoiceInput?.checked ? routing.reify(RoutingBoolExpr.or(
+        ...stops.slice(vehicleTotal, vehicleTotal + 2).map((_, offset) => routing.activeVar(manager.nodeToIndex(vehicleTotal + offset))),
+      )) : null;
+      if (deliveryChoice) deliveryChoice.setValue(1);
+
+      const resources = useResourcesInput?.checked ? routing.addResourceGroup() : null;
+      if (resources) {
+        const slots = Number(resourceSlotsInput?.value ?? 2);
+        if (!Number.isSafeInteger(slots) || slots < 1 || slots > 8) throw new RangeError('Resource slots must be between 1 and 8.');
+        for (let slot = 0; slot < slots; ++slot) resources.addResource({
+          startDomain: [[0, 0]], endDomain: [[0, distanceCap()]],
+        }, 'distance');
+        for (let vehicle = 0; vehicle < vehicleTotal; ++vehicle) resources.notifyVehicleRequiresAResource(vehicle);
       }
 
       appendStatus(statusEl, 'Solving capacitated multi-depot vehicle routes...');
@@ -390,12 +432,16 @@ async function runDispatch() {
         return;
       }
 
-      const routes = enrichRoutes(extractRoutes(manager, routing, assignment));
+      const routes = enrichRoutes(await extractRoutes(manager, routing, assignment));
       const dropped = droppedStops(routes);
       renderDispatchSummary(routes, dropped);
       renderDispatchRoutes(routes, dropped);
       renderMap(routes, dropped, true);
+      if (deliveryChoice) appendStatus(statusEl, `Required delivery choice: ${assignment.value(deliveryChoice) === 1 ? 'satisfied' : 'unsatisfied'}.`);
       appendStatus(statusEl, `Objective: ${assignment.objectiveValue()}`);
+      if (resources) appendStatus(statusEl, `Native resource classes: ${await resources.getResourceClassesCount({ executor: currentRoutingExecutionOptions().executor })}`);
+      if (resources) appendStatus(statusEl, `Resource slots: ${routes.map(route => `${vehicles[route.vehicle].name}: slot ${assignment.value(routing.resourceVar(route.vehicle, resources)) + 1}`).join(', ')}`);
+      appendStatus(statusEl, `Longest route: ${assignment.value(longestRoute)}m`);
       appendStatus(statusEl, `Total distance: ${routes.reduce((sum, route) => sum + route.distance, 0)}m`);
       appendStatus(statusEl, `Vehicle loads: ${routes.map((route) => `${route.load}/${route.capacity}`).join(', ')}`);
       appendStatus(statusEl, `Dropped stops: ${dropped.length}`);

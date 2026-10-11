@@ -2,6 +2,9 @@ import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import type { SolverBridgeCodec } from '../solver_bridge.js';
 import type { SolverExecutor, SolverJob } from '../solver_executor.js';
 import {
+  PdlpSolveEventSchema,
+  PdlpIterationEventSchema,
+  type PdlpIterationEvent,
   PdlpBridgeRequestSchema,
   PdlpBridgeResponseSchema,
   PdlpFromMpModelRequestSchema,
@@ -29,6 +32,7 @@ export type PdlpOperation =
     model: Uint8Array;
     relaxIntegerVariables: boolean;
     includeNames: boolean;
+    inputFormat?: number;
   }
   | { type: 'toMpModel'; quadraticProgram: PdlpQuadraticProgram }
   | {
@@ -36,6 +40,7 @@ export type PdlpOperation =
     quadraticProgram: PdlpQuadraticProgram;
     parameters: PdlpSolveParameters;
     initialSolution?: PdlpInitialSolution;
+    callbackFlags?: number;
   };
 
 export type PdlpResult =
@@ -45,7 +50,11 @@ export type PdlpResult =
   | { type: 'toMpModel'; model: Uint8Array }
   | { type: 'solve'; result: PdlpSolverResult };
 
-export type PdlpExecutor = SolverExecutor<PdlpOperation, PdlpResult, never>;
+export type PdlpSolverEvent =
+  | { type: 'log'; message: string }
+  | { type: 'iteration'; info: PdlpIterationEvent };
+
+export type PdlpExecutor = SolverExecutor<PdlpOperation, PdlpResult, PdlpSolverEvent>;
 export type PdlpJob = SolverJob<PdlpResult>;
 
 function decodeOperation(payload: Uint8Array): PdlpOperation {
@@ -73,6 +82,7 @@ function decodeOperation(payload: Uint8Array): PdlpOperation {
         model: request.payload.value.mpModelProto,
         relaxIntegerVariables: request.payload.value.relaxIntegerVariables,
         includeNames: request.payload.value.includeNames,
+        inputFormat: request.payload.value.inputFormat,
       };
     case 'toMpModel':
       if (!request.payload.value.quadraticProgram) {
@@ -91,6 +101,7 @@ function decodeOperation(payload: Uint8Array): PdlpOperation {
         quadraticProgram: request.payload.value.quadraticProgram,
         parameters: request.payload.value.parameters ?? create(PdlpSolveParametersSchema),
         initialSolution: request.payload.value.initialSolution,
+        callbackFlags: request.payload.value.callbackFlags,
       };
     default:
       throw new Error('PDLP bridge request has no operation.');
@@ -168,7 +179,7 @@ function decodeResult(payload: Uint8Array): PdlpResult {
   }
 }
 
-export const pdlpProtocol: SolverBridgeCodec<PdlpOperation, PdlpResult, never> = {
+export const pdlpProtocol: SolverBridgeCodec<PdlpOperation, PdlpResult, PdlpSolverEvent> = {
   solver: 'pdlp',
   label: 'PDLP',
   encodeRequest: (operation) => {
@@ -197,6 +208,7 @@ export const pdlpProtocol: SolverBridgeCodec<PdlpOperation, PdlpResult, never> =
             mpModelProto: operation.model,
             relaxIntegerVariables: operation.relaxIntegerVariables,
             includeNames: operation.includeNames,
+            inputFormat: operation.inputFormat ?? 0,
           }),
         };
         break;
@@ -215,6 +227,7 @@ export const pdlpProtocol: SolverBridgeCodec<PdlpOperation, PdlpResult, never> =
             quadraticProgram: operation.quadraticProgram,
             parameters: operation.parameters,
             initialSolution: operation.initialSolution,
+            callbackFlags: operation.callbackFlags ?? 0,
           }),
         };
         break;
@@ -227,4 +240,19 @@ export const pdlpProtocol: SolverBridgeCodec<PdlpOperation, PdlpResult, never> =
   decodeRequest: decodeOperation,
   encodeResult,
   decodeResult,
+  encodeEvent: event => toBinary(PdlpBridgeResponseSchema,
+    create(PdlpBridgeResponseSchema, { payload: {
+      case: 'solveEvent', value: create(PdlpSolveEventSchema, { payload:
+        event.type === 'log' ? { case: 'log', value: event.message }
+          : { case: 'iteration', value: create(PdlpIterationEventSchema, event.info) },
+      }),
+    } })),
+  decodeEvent: payload => {
+    const response = fromBinary(PdlpBridgeResponseSchema, payload);
+    if (response.payload.case !== 'solveEvent') return null;
+    const event = response.payload.value.payload;
+    if (event.case === 'log') return { type: 'log', message: event.value };
+    if (event.case === 'iteration') return { type: 'iteration', info: event.value };
+    return null;
+  },
 };

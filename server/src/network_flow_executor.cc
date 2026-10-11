@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "network_flow.pb.h"
+#include "javascript/network_flow_validation.h"
 #include "ortools/graph/assignment.h"
 #include "ortools/graph/max_flow.h"
 #include "ortools/graph/min_cost_flow.h"
@@ -48,6 +49,10 @@ SolverExecutorResult SolveMaxFlow(const bridge::MaxFlowRequest& request) {
   if (!SameSize(request.tails(), request.heads(), request.capacities())) {
     return Error("SimpleMaxFlow input arrays must have equal lengths.");
   }
+  const auto error = ValidateNetworkFlowEndpoints(
+      request.tails().data(), request.heads().data(), request.tails_size(),
+      kMaxFlowNode);
+  if (!error.empty()) return Error(error);
   SimpleMaxFlow solver;
   for (int arc = 0; arc < request.tails_size(); ++arc) {
     solver.AddArcWithCapacity(request.tails(arc), request.heads(arc), request.capacities(arc));
@@ -77,6 +82,13 @@ SolverExecutorResult SolveMinCostFlow(const bridge::MinCostFlowRequest& request)
   if (!SameSize(request.tails(), request.heads(), request.capacities(),
                 request.unit_costs())) {
     return Error("SimpleMinCostFlow arc arrays must have equal lengths.");
+  }
+  const auto error = ValidateNetworkFlowEndpoints(
+      request.tails().data(), request.heads().data(), request.tails_size(),
+      kMinCostFlowNode);
+  if (!error.empty()) return Error(error);
+  if (request.supplies_size() > kMinCostFlowNode + 1) {
+    return Error("SimpleMinCostFlow: too many supply nodes.");
   }
   SimpleMinCostFlow solver;
   for (int arc = 0; arc < request.tails_size(); ++arc) {
@@ -109,6 +121,10 @@ SolverExecutorResult SolveAssignment(
   if (!SameSize(request.left_nodes(), request.right_nodes(), request.costs())) {
     return Error("SimpleLinearSumAssignment input arrays must have equal lengths.");
   }
+  const auto error = ValidateNetworkFlowEndpoints(
+      request.left_nodes().data(), request.right_nodes().data(),
+      request.left_nodes_size(), kAssignmentNode);
+  if (!error.empty()) return Error(error);
   SimpleLinearSumAssignment solver;
   solver.ReserveArcs(request.left_nodes_size());
   for (int arc = 0; arc < request.left_nodes_size(); ++arc) {

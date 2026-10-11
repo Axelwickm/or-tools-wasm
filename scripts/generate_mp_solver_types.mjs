@@ -1,0 +1,45 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+const repository = path.resolve(import.meta.dirname, '..');
+const require = createRequire(path.join(repository, 'javascript/package.json'));
+const protobuf = require('protobufjs');
+const root = new protobuf.Root();
+root.resolvePath = (_, target) => path.join(repository, target);
+root.loadSync('ortools/linear_solver/linear_solver.proto').resolveAll();
+const name = object => object.fullName.replace(/^\.operations_research\./, '').replaceAll('.', '_');
+const reachable = new Map();
+function visit(object) {
+  if (reachable.has(object.fullName)) return;
+  reachable.set(object.fullName, object);
+  if (object instanceof protobuf.Type) for (const field of object.fieldsArray) if (field.resolvedType) visit(field.resolvedType);
+}
+visit(root.lookupType('operations_research.MPModelRequest'));
+const inputTypes = new Set(reachable.keys());
+visit(root.lookupType('operations_research.MPSolutionResponse'));
+const output = ['// Generated from vendored MPSolver model/request/response schemas by scripts/generate_mp_solver_types.mjs.', 'export type MPSolverProtoInt64 = number | bigint;', ''];
+const primitives = { double: 'number', float: 'number', int32: 'number', uint32: 'number', sint32: 'number', fixed32: 'number', sfixed32: 'number', int64: 'MPSolverProtoInt64', uint64: 'MPSolverProtoInt64', sint64: 'MPSolverProtoInt64', fixed64: 'MPSolverProtoInt64', sfixed64: 'MPSolverProtoInt64', bool: 'boolean', string: 'string', bytes: 'Uint8Array' };
+for (const object of reachable.values()) {
+  const typeName = name(object);
+  if (object instanceof protobuf.Enum) {
+    output.push(`export enum ${typeName} {`);
+    for (const [key, value] of Object.entries(object.values)) output.push(`  ${key} = ${value},`);
+    output.push('}', `export type ${typeName}_Name = ${Object.keys(object.values).map(key => JSON.stringify(key)).join(' | ')};`, '');
+  } else if (object instanceof protobuf.Type) {
+    output.push(`export type ${typeName} = {`);
+    for (const field of object.fieldsArray) {
+      let type = primitives[field.type];
+      if (field.resolvedType) {
+        type = name(field.resolvedType);
+        if (field.resolvedType instanceof protobuf.Enum) type = `number | ${type}_Name`;
+      }
+      if (!type) throw new Error(`Unresolved field ${field.fullName}: ${field.type}`);
+      if (field.map) type = `Record<string, ${type}>`;
+      else if (field.repeated) type = `${inputTypes.has(object.fullName) ? 'ReadonlyArray' : 'Array'}<${type}>`;
+      output.push(`  ${field.name}?: ${type};`);
+    }
+    output.push('};', '');
+  }
+}
+fs.writeFileSync(path.join(repository, 'javascript/lib/generated/mp_solver_types.ts'), output.join('\n'));
+console.log(`Generated MPSolver proto types (${reachable.size} reachable message/enum types).`);

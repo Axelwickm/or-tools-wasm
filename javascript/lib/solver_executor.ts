@@ -32,6 +32,7 @@ export type SolverJob<Response> = {
   readonly requestId: number;
   readonly result: Promise<Response>;
   cancel(): Promise<void>;
+  interrupt?(): Promise<void>;
 };
 
 export class SolverExecutorBusyError extends Error {
@@ -55,13 +56,21 @@ export class SolverCancellationUnsupportedError extends Error {
   }
 }
 
+export class SolverCallbackTransportError extends Error {
+  constructor(message: string) { super(message); this.name = 'SolverCallbackTransportError'; }
+}
+
 export type SolverResourceRequest = {
   threads?: number;
 };
 
 export type SolverExecutionOptions<Event> = {
   resources?: SolverResourceRequest;
+  /** Local executors identify their runtime immediately before dispatch, so callers can guard native handles. */
+  onDispatch?: (runtime: object) => void;
   onEvent: SolverExecutorEventHandler<SolverJobEvent | Event>;
+  /** A native callback requires a synchronous response before search continues. */
+  onCallback?: (payload: Uint8Array) => Uint8Array;
 };
 
 export type SolverExecutor<Request, Response, Event> = {

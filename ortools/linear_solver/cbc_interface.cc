@@ -24,6 +24,7 @@
 #include "ortools/base/logging.h"
 #include "ortools/base/timer.h"
 #include "ortools/linear_solver/linear_solver.h"
+#include "ortools/linear_solver/coin_message_callback.h"
 
 #undef PACKAGE
 #undef VERSION
@@ -60,6 +61,7 @@ class CBCInterface : public MPSolverInterface {
   // ----- Solve -----
   // Solve the problem using the parameter values specified.
   MPSolver::ResultStatus Solve(const MPSolverParameters& param) override;
+  bool SupportsMessageCallbacks() const override { return true; }
 
   // TODO(user): separate the solve from the model extraction.
   virtual void ExtractModel() {}
@@ -339,10 +341,10 @@ MPSolver::ResultStatus CBCInterface::Solve(const MPSolverParameters& param) {
   ResetBestObjectiveBound();
 
   // Solve
+  CoinMessageCallback message_handler(message_callback_);
   CbcModel model(osi_);
 
   // Set log level.
-  CoinMessageHandler message_handler;
   model.passInMessageHandler(&message_handler);
   if (quiet_) {
     message_handler.setLogLevel(0, 0);  // Coin messages

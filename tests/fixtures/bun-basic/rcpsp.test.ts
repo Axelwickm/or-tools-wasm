@@ -1,3 +1,5 @@
+import * as RcpspControlApi from 'or-tools-wasm/rcpsp';
+import { runRcpspModelCorrectnessCases } from '../../cases/or-tools-wasm/rcpsp/model_correctness.ts';
 import * as RcpspApi from 'or-tools-wasm/rcpsp';
 import { runRcpspCases } from '../../cases/python-parity/rcpsp/index.ts';
 import { runRcpspConcurrencyCase } from '../../cases/or-tools-wasm/rcpsp/concurrency.ts';
@@ -6,6 +8,7 @@ import { runRcpspWorkerLifecycleCase } from '../../cases/or-tools-wasm/rcpsp/wor
 import { assertAllCases, runBunFixture } from './shared.ts';
 
 await runBunFixture(async () => {
+  await runRcpspModelCorrectnessCases(RcpspControlApi as never);
   const rcpspResults = await runRcpspCases(RcpspApi);
   assertAllCases('bun RCPSP', rcpspResults);
   await runRcpspConcurrencyCase(RcpspApi);

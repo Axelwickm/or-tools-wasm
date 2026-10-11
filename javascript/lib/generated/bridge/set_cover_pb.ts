@@ -10,7 +10,66 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file set_cover.proto.
  */
 export const file_set_cover: GenFile = /*@__PURE__*/
-  fileDesc("Cg9zZXRfY292ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi0gEKFVNldENvdmVyQnJpZGdlUmVxdWVzdBI8CglvcGVyYXRpb24YASABKA4yKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyT3BlcmF0aW9uEg0KBWNvc3RzGAIgAygBEg4KBnN0YXJ0cxgDIAMoBRIQCghlbGVtZW50cxgEIAMoBRIQCghzZWxlY3RlZBgFIAMoCBINCgVmb2N1cxgGIAMoCBIRCgloYXNfZm9jdXMYByABKAgSFgoObWF4X2l0ZXJhdGlvbnMYCCABKAEi1gEKFlNldENvdmVyQnJpZGdlUmVzcG9uc2USFQoNbmV4dF9zb2x1dGlvbhgBIAEoCBIMCgRjb3N0GAIgASgBEh4KFm51bV91bmNvdmVyZWRfZWxlbWVudHMYAyABKAUSEAoIc2VsZWN0ZWQYBCADKAgSEAoIY292ZXJhZ2UYBSADKAUSGQoRbnVtX2ZyZWVfZWxlbWVudHMYBiADKAUSIgoabnVtX2NvdmVyYWdlX2xlXzFfZWxlbWVudHMYByADKAUSFAoMaXNfcmVkdW5kYW50GAggAygIKtsCChFTZXRDb3Zlck9wZXJhdGlvbhIjCh9TRVRfQ09WRVJfT1BFUkFUSU9OX1VOU1BFQ0lGSUVEEAASHwobU0VUX0NPVkVSX09QRVJBVElPTl9UUklWSUFMEAESHgoaU0VUX0NPVkVSX09QRVJBVElPTl9HUkVFRFkQAhImCiJTRVRfQ09WRVJfT1BFUkFUSU9OX0VMRU1FTlRfREVHUkVFEAMSKwonU0VUX0NPVkVSX09QRVJBVElPTl9MQVpZX0VMRU1FTlRfREVHUkVFEAQSHgoaU0VUX0NPVkVSX09QRVJBVElPTl9SQU5ET00QBRIgChxTRVRfQ09WRVJfT1BFUkFUSU9OX1NURUVQRVNUEAYSJAogU0VUX0NPVkVSX09QRVJBVElPTl9HVUlERURfTE9DQUwQBxIjCh9TRVRfQ09WRVJfT1BFUkFUSU9OX0dVSURFRF9UQUJVEAhiBnByb3RvMw");
+  fileDesc("Cg9zZXRfY292ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi1gEKHFNldENvdmVyR3VpZGVkVGFidVBhcmFtZXRlcnMSHgoRbGFncmFuZ2lhbl9mYWN0b3IYASABKAFIAIgBARIUCgdlcHNpbG9uGAIgASgBSAGIAQESGwoOcGVuYWx0eV9mYWN0b3IYAyABKAFIAogBARIbCg50YWJ1X2xpc3Rfc2l6ZRgEIAEoBUgDiAEBQhQKEl9sYWdyYW5naWFuX2ZhY3RvckIKCghfZXBzaWxvbkIRCg9fcGVuYWx0eV9mYWN0b3JCEQoPX3RhYnVfbGlzdF9zaXplIswEChVTZXRDb3ZlckJyaWRnZVJlcXVlc3QSPAoJb3BlcmF0aW9uGAEgASgOMikub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3Zlck9wZXJhdGlvbhINCgVjb3N0cxgCIAMoARIOCgZzdGFydHMYAyADKAUSEAoIZWxlbWVudHMYBCADKAUSEAoIc2VsZWN0ZWQYBSADKAgSDQoFZm9jdXMYBiADKAgSEQoJaGFzX2ZvY3VzGAcgASgIEhYKDm1heF9pdGVyYXRpb25zGAggASgBEh8KEnRpbWVfbGltaXRfc2Vjb25kcxgJIAEoAUgAiAEBEhUKDWZvY3VzX2luZGljZXMYCyADKAUSFwoPc3RhdGlzdGljc19raW5kGAwgASgFElQKFmd1aWRlZF90YWJ1X3BhcmFtZXRlcnMYDSABKAsyNC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyR3VpZGVkVGFidVBhcmFtZXRlcnMSFgoOc2Vzc2lvbl9oYW5kbGUYDiABKAQSRAoRc2Vzc2lvbl9hbGdvcml0aG0YDyABKA4yKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyT3BlcmF0aW9uEjQKBXRyYWNlGBAgASgLMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3ZlclRyYWNlEhMKC251bV9zdWJzZXRzGBEgASgFQhUKE190aW1lX2xpbWl0X3NlY29uZHNKBAgKEAtSC2NvbnNpc3RlbmN5IjkKFVNldENvdmVyVHJhY2VEZWNpc2lvbhIOCgZzdWJzZXQYASABKAUSEAoIc2VsZWN0ZWQYAiABKAgiUQoNU2V0Q292ZXJUcmFjZRJACglkZWNpc2lvbnMYASADKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyVHJhY2VEZWNpc2lvbiJpChJTZXRDb3ZlclN0YXRpc3RpY3MSCwoDbWluGAEgASgBEgsKA21heBgCIAEoARIOCgZtZWRpYW4YAyABKAESDAoEbWVhbhgEIAEoARIOCgZzdGRkZXYYBSABKAESCwoDaXFyGAYgASgBIqwEChZTZXRDb3ZlckJyaWRnZVJlc3BvbnNlEhUKDW5leHRfc29sdXRpb24YASABKAgSDAoEY29zdBgCIAEoARIeChZudW1fdW5jb3ZlcmVkX2VsZW1lbnRzGAMgASgFEhAKCHNlbGVjdGVkGAQgAygIEhAKCGNvdmVyYWdlGAUgAygFEhkKEW51bV9mcmVlX2VsZW1lbnRzGAYgAygFEiIKGm51bV9jb3ZlcmFnZV9sZV8xX2VsZW1lbnRzGAcgAygFEhQKDGlzX3JlZHVuZGFudBgIIAMoCBIbChNjb21wdXRlZF9yZWR1bmRhbmN5GAogAygIEhgKEGNvc3RfbG93ZXJfYm91bmQYCyABKAESFgoOZm9jdXNfY292ZXJhZ2UYDCADKAUSPgoKc3RhdGlzdGljcxgNIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU2V0Q292ZXJTdGF0aXN0aWNzEg8KB2RlY2lsZXMYDiADKAMSVAoWZ3VpZGVkX3RhYnVfcGFyYW1ldGVycxgPIAEoCzI0Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU2V0Q292ZXJHdWlkZWRUYWJ1UGFyYW1ldGVycxIWCg5zZXNzaW9uX2hhbmRsZRgQIAEoBBI0CgV0cmFjZRgRIAEoCzIlLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU2V0Q292ZXJUcmFjZUoECAkQClIKY29uc2lzdGVudCqaBQoRU2V0Q292ZXJPcGVyYXRpb24SIwofU0VUX0NPVkVSX09QRVJBVElPTl9VTlNQRUNJRklFRBAAEh8KG1NFVF9DT1ZFUl9PUEVSQVRJT05fVFJJVklBTBABEh4KGlNFVF9DT1ZFUl9PUEVSQVRJT05fR1JFRURZEAISJgoiU0VUX0NPVkVSX09QRVJBVElPTl9FTEVNRU5UX0RFR1JFRRADEisKJ1NFVF9DT1ZFUl9PUEVSQVRJT05fTEFaWV9FTEVNRU5UX0RFR1JFRRAEEh4KGlNFVF9DT1ZFUl9PUEVSQVRJT05fUkFORE9NEAUSIAocU0VUX0NPVkVSX09QRVJBVElPTl9TVEVFUEVTVBAGEiQKIFNFVF9DT1ZFUl9PUEVSQVRJT05fR1VJREVEX0xPQ0FMEAcSIwofU0VUX0NPVkVSX09QRVJBVElPTl9HVUlERURfVEFCVRAIEh8KG1NFVF9DT1ZFUl9PUEVSQVRJT05fSU5TUEVDVBAJEiIKHlNFVF9DT1ZFUl9PUEVSQVRJT05fU1RBVElTVElDUxAKEi4KKlNFVF9DT1ZFUl9PUEVSQVRJT05fR1VJREVEX1RBQlVfUEFSQU1FVEVSUxALEiYKIlNFVF9DT1ZFUl9PUEVSQVRJT05fU0VTU0lPTl9DUkVBVEUQDBIkCiBTRVRfQ09WRVJfT1BFUkFUSU9OX1NFU1NJT05fTkVYVBANEioKJlNFVF9DT1ZFUl9PUEVSQVRJT05fU0VTU0lPTl9JTklUSUFMSVpFEA4SJgoiU0VUX0NPVkVSX09QRVJBVElPTl9TRVNTSU9OX0RFTEVURRAPEiYKIlNFVF9DT1ZFUl9PUEVSQVRJT05fQ09NUFJFU1NfVFJBQ0UQEGIGcHJvdG8z");
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters
+ */
+export type SetCoverGuidedTabuParameters = Message<"ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters"> & {
+  /**
+   * @generated from field: optional double lagrangian_factor = 1;
+   */
+  lagrangianFactor?: number | undefined;
+
+  /**
+   * @generated from field: optional double epsilon = 2;
+   */
+  epsilon?: number | undefined;
+
+  /**
+   * @generated from field: optional double penalty_factor = 3;
+   */
+  penaltyFactor?: number | undefined;
+
+  /**
+   * @generated from field: optional int32 tabu_list_size = 4;
+   */
+  tabuListSize?: number | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters
+ */
+export type SetCoverGuidedTabuParametersJson = {
+  /**
+   * @generated from field: optional double lagrangian_factor = 1;
+   */
+  lagrangianFactor?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: optional double epsilon = 2;
+   */
+  epsilon?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: optional double penalty_factor = 3;
+   */
+  penaltyFactor?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: optional int32 tabu_list_size = 4;
+   */
+  tabuListSize?: number;
+};
+
+export type SetCoverGuidedTabuParametersValid = SetCoverGuidedTabuParameters;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters.
+ * Use `create(SetCoverGuidedTabuParametersSchema)` to create a new message.
+ */
+export const SetCoverGuidedTabuParametersSchema: GenMessage<SetCoverGuidedTabuParameters, {jsonType: SetCoverGuidedTabuParametersJson, validType: SetCoverGuidedTabuParametersValid}> = /*@__PURE__*/
+  messageDesc(file_set_cover, 0);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverBridgeRequest
@@ -55,6 +114,48 @@ export type SetCoverBridgeRequest = Message<"ortools_wasm.bridge.v1.SetCoverBrid
    * @generated from field: double max_iterations = 8;
    */
   maxIterations: number;
+
+  /**
+   * @generated from field: optional double time_limit_seconds = 9;
+   */
+  timeLimitSeconds?: number | undefined;
+
+  /**
+   * @generated from field: repeated int32 focus_indices = 11;
+   */
+  focusIndices: number[];
+
+  /**
+   * 0: costs, 1: rows, 2: columns, 3: row deciles, 4: column deciles.
+   *
+   * @generated from field: int32 statistics_kind = 12;
+   */
+  statisticsKind: number;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters guided_tabu_parameters = 13;
+   */
+  guidedTabuParameters?: SetCoverGuidedTabuParameters | undefined;
+
+  /**
+   * @generated from field: uint64 session_handle = 14;
+   */
+  sessionHandle: bigint;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverOperation session_algorithm = 15;
+   */
+  sessionAlgorithm: SetCoverOperation;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverTrace trace = 16;
+   */
+  trace?: SetCoverTrace | undefined;
+
+  /**
+   * @generated from field: int32 num_subsets = 17;
+   */
+  numSubsets: number;
 };
 
 /**
@@ -100,6 +201,48 @@ export type SetCoverBridgeRequestJson = {
    * @generated from field: double max_iterations = 8;
    */
   maxIterations?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: optional double time_limit_seconds = 9;
+   */
+  timeLimitSeconds?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: repeated int32 focus_indices = 11;
+   */
+  focusIndices?: number[];
+
+  /**
+   * 0: costs, 1: rows, 2: columns, 3: row deciles, 4: column deciles.
+   *
+   * @generated from field: int32 statistics_kind = 12;
+   */
+  statisticsKind?: number;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters guided_tabu_parameters = 13;
+   */
+  guidedTabuParameters?: SetCoverGuidedTabuParametersJson;
+
+  /**
+   * @generated from field: uint64 session_handle = 14;
+   */
+  sessionHandle?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverOperation session_algorithm = 15;
+   */
+  sessionAlgorithm?: SetCoverOperationJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverTrace trace = 16;
+   */
+  trace?: SetCoverTraceJson;
+
+  /**
+   * @generated from field: int32 num_subsets = 17;
+   */
+  numSubsets?: number;
 };
 
 export type SetCoverBridgeRequestValid = SetCoverBridgeRequest;
@@ -109,7 +252,154 @@ export type SetCoverBridgeRequestValid = SetCoverBridgeRequest;
  * Use `create(SetCoverBridgeRequestSchema)` to create a new message.
  */
 export const SetCoverBridgeRequestSchema: GenMessage<SetCoverBridgeRequest, {jsonType: SetCoverBridgeRequestJson, validType: SetCoverBridgeRequestValid}> = /*@__PURE__*/
-  messageDesc(file_set_cover, 0);
+  messageDesc(file_set_cover, 1);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverTraceDecision
+ */
+export type SetCoverTraceDecision = Message<"ortools_wasm.bridge.v1.SetCoverTraceDecision"> & {
+  /**
+   * @generated from field: int32 subset = 1;
+   */
+  subset: number;
+
+  /**
+   * @generated from field: bool selected = 2;
+   */
+  selected: boolean;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverTraceDecision
+ */
+export type SetCoverTraceDecisionJson = {
+  /**
+   * @generated from field: int32 subset = 1;
+   */
+  subset?: number;
+
+  /**
+   * @generated from field: bool selected = 2;
+   */
+  selected?: boolean;
+};
+
+export type SetCoverTraceDecisionValid = SetCoverTraceDecision;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SetCoverTraceDecision.
+ * Use `create(SetCoverTraceDecisionSchema)` to create a new message.
+ */
+export const SetCoverTraceDecisionSchema: GenMessage<SetCoverTraceDecision, {jsonType: SetCoverTraceDecisionJson, validType: SetCoverTraceDecisionValid}> = /*@__PURE__*/
+  messageDesc(file_set_cover, 2);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverTrace
+ */
+export type SetCoverTrace = Message<"ortools_wasm.bridge.v1.SetCoverTrace"> & {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.SetCoverTraceDecision decisions = 1;
+   */
+  decisions: SetCoverTraceDecision[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverTrace
+ */
+export type SetCoverTraceJson = {
+  /**
+   * @generated from field: repeated ortools_wasm.bridge.v1.SetCoverTraceDecision decisions = 1;
+   */
+  decisions?: SetCoverTraceDecisionJson[];
+};
+
+export type SetCoverTraceValid = SetCoverTrace;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SetCoverTrace.
+ * Use `create(SetCoverTraceSchema)` to create a new message.
+ */
+export const SetCoverTraceSchema: GenMessage<SetCoverTrace, {jsonType: SetCoverTraceJson, validType: SetCoverTraceValid}> = /*@__PURE__*/
+  messageDesc(file_set_cover, 3);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverStatistics
+ */
+export type SetCoverStatistics = Message<"ortools_wasm.bridge.v1.SetCoverStatistics"> & {
+  /**
+   * @generated from field: double min = 1;
+   */
+  min: number;
+
+  /**
+   * @generated from field: double max = 2;
+   */
+  max: number;
+
+  /**
+   * @generated from field: double median = 3;
+   */
+  median: number;
+
+  /**
+   * @generated from field: double mean = 4;
+   */
+  mean: number;
+
+  /**
+   * @generated from field: double stddev = 5;
+   */
+  stddev: number;
+
+  /**
+   * @generated from field: double iqr = 6;
+   */
+  iqr: number;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverStatistics
+ */
+export type SetCoverStatisticsJson = {
+  /**
+   * @generated from field: double min = 1;
+   */
+  min?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double max = 2;
+   */
+  max?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double median = 3;
+   */
+  median?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double mean = 4;
+   */
+  mean?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double stddev = 5;
+   */
+  stddev?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: double iqr = 6;
+   */
+  iqr?: number | "NaN" | "Infinity" | "-Infinity";
+};
+
+export type SetCoverStatisticsValid = SetCoverStatistics;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SetCoverStatistics.
+ * Use `create(SetCoverStatisticsSchema)` to create a new message.
+ */
+export const SetCoverStatisticsSchema: GenMessage<SetCoverStatistics, {jsonType: SetCoverStatisticsJson, validType: SetCoverStatisticsValid}> = /*@__PURE__*/
+  messageDesc(file_set_cover, 4);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverBridgeResponse
@@ -154,6 +444,46 @@ export type SetCoverBridgeResponse = Message<"ortools_wasm.bridge.v1.SetCoverBri
    * @generated from field: repeated bool is_redundant = 8;
    */
   isRedundant: boolean[];
+
+  /**
+   * @generated from field: repeated bool computed_redundancy = 10;
+   */
+  computedRedundancy: boolean[];
+
+  /**
+   * @generated from field: double cost_lower_bound = 11;
+   */
+  costLowerBound: number;
+
+  /**
+   * @generated from field: repeated int32 focus_coverage = 12;
+   */
+  focusCoverage: number[];
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverStatistics statistics = 13;
+   */
+  statistics?: SetCoverStatistics | undefined;
+
+  /**
+   * @generated from field: repeated int64 deciles = 14;
+   */
+  deciles: bigint[];
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters guided_tabu_parameters = 15;
+   */
+  guidedTabuParameters?: SetCoverGuidedTabuParameters | undefined;
+
+  /**
+   * @generated from field: uint64 session_handle = 16;
+   */
+  sessionHandle: bigint;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverTrace trace = 17;
+   */
+  trace?: SetCoverTrace | undefined;
 };
 
 /**
@@ -199,6 +529,46 @@ export type SetCoverBridgeResponseJson = {
    * @generated from field: repeated bool is_redundant = 8;
    */
   isRedundant?: boolean[];
+
+  /**
+   * @generated from field: repeated bool computed_redundancy = 10;
+   */
+  computedRedundancy?: boolean[];
+
+  /**
+   * @generated from field: double cost_lower_bound = 11;
+   */
+  costLowerBound?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: repeated int32 focus_coverage = 12;
+   */
+  focusCoverage?: number[];
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverStatistics statistics = 13;
+   */
+  statistics?: SetCoverStatisticsJson;
+
+  /**
+   * @generated from field: repeated int64 deciles = 14;
+   */
+  deciles?: string[];
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters guided_tabu_parameters = 15;
+   */
+  guidedTabuParameters?: SetCoverGuidedTabuParametersJson;
+
+  /**
+   * @generated from field: uint64 session_handle = 16;
+   */
+  sessionHandle?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverTrace trace = 17;
+   */
+  trace?: SetCoverTraceJson;
 };
 
 export type SetCoverBridgeResponseValid = SetCoverBridgeResponse;
@@ -208,7 +578,7 @@ export type SetCoverBridgeResponseValid = SetCoverBridgeResponse;
  * Use `create(SetCoverBridgeResponseSchema)` to create a new message.
  */
 export const SetCoverBridgeResponseSchema: GenMessage<SetCoverBridgeResponse, {jsonType: SetCoverBridgeResponseJson, validType: SetCoverBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_set_cover, 1);
+  messageDesc(file_set_cover, 5);
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SetCoverOperation
@@ -258,12 +628,52 @@ export enum SetCoverOperation {
    * @generated from enum value: SET_COVER_OPERATION_GUIDED_TABU = 8;
    */
   GUIDED_TABU = 8,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_INSPECT = 9;
+   */
+  INSPECT = 9,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_STATISTICS = 10;
+   */
+  STATISTICS = 10,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_GUIDED_TABU_PARAMETERS = 11;
+   */
+  GUIDED_TABU_PARAMETERS = 11,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_SESSION_CREATE = 12;
+   */
+  SESSION_CREATE = 12,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_SESSION_NEXT = 13;
+   */
+  SESSION_NEXT = 13,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_SESSION_INITIALIZE = 14;
+   */
+  SESSION_INITIALIZE = 14,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_SESSION_DELETE = 15;
+   */
+  SESSION_DELETE = 15,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_COMPRESS_TRACE = 16;
+   */
+  COMPRESS_TRACE = 16,
 }
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SetCoverOperation
  */
-export type SetCoverOperationJson = "SET_COVER_OPERATION_UNSPECIFIED" | "SET_COVER_OPERATION_TRIVIAL" | "SET_COVER_OPERATION_GREEDY" | "SET_COVER_OPERATION_ELEMENT_DEGREE" | "SET_COVER_OPERATION_LAZY_ELEMENT_DEGREE" | "SET_COVER_OPERATION_RANDOM" | "SET_COVER_OPERATION_STEEPEST" | "SET_COVER_OPERATION_GUIDED_LOCAL" | "SET_COVER_OPERATION_GUIDED_TABU";
+export type SetCoverOperationJson = "SET_COVER_OPERATION_UNSPECIFIED" | "SET_COVER_OPERATION_TRIVIAL" | "SET_COVER_OPERATION_GREEDY" | "SET_COVER_OPERATION_ELEMENT_DEGREE" | "SET_COVER_OPERATION_LAZY_ELEMENT_DEGREE" | "SET_COVER_OPERATION_RANDOM" | "SET_COVER_OPERATION_STEEPEST" | "SET_COVER_OPERATION_GUIDED_LOCAL" | "SET_COVER_OPERATION_GUIDED_TABU" | "SET_COVER_OPERATION_INSPECT" | "SET_COVER_OPERATION_STATISTICS" | "SET_COVER_OPERATION_GUIDED_TABU_PARAMETERS" | "SET_COVER_OPERATION_SESSION_CREATE" | "SET_COVER_OPERATION_SESSION_NEXT" | "SET_COVER_OPERATION_SESSION_INITIALIZE" | "SET_COVER_OPERATION_SESSION_DELETE" | "SET_COVER_OPERATION_COMPRESS_TRACE";
 
 /**
  * Describes the enum ortools_wasm.bridge.v1.SetCoverOperation.

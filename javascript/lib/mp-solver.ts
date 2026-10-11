@@ -1,4 +1,5 @@
 export {
+  findErrorInModelProto,
   DoubleParam,
   IncrementalityValues,
   IntegerParam,
@@ -6,7 +7,9 @@ export {
   MPConstraint,
   MPObjective,
   MPSolver,
+  MPSolverIncrementalSolver,
   MpModel,
+  MpIncrementalSolver,
   MpResult,
   MPSolverParameters,
   MPSolverResultStatus,
@@ -17,6 +20,7 @@ export {
 } from './mp_solver/api.js';
 export type {
   LinearSolverSchemas,
+  MPSolverModelProto,
   MPSolverModelRequest,
   MPSolverProtoSolveOptions,
   MPSolverProtoSolveResult,
@@ -24,7 +28,13 @@ export type {
   MPSolverEvent,
   MPSolverExecutionOptions,
   MPSolverSolveOptions,
+  MPSolverIISOptions,
+  MPSolverIISResult,
+  MPSolverIncrementalSolverOptions,
+  MPSolverIncrementalSolveOptions,
   MpSolveOptions,
+  MpIncrementalSolveOptions,
+  MPSolverNativeMetadata,
   MpSolveParameters,
 } from './mp_solver/api.js';
 export type {
@@ -33,3 +43,5 @@ export type {
 } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';
 export { setCloudNoticeEnabled } from './cloud_notice.js';
+
+export type * from './generated/mp_solver_types.js';

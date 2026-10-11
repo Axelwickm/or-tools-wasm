@@ -1,11 +1,11 @@
 #ifndef ORTOOLS_WASM_SERVER_MATHOPT_EXECUTOR_H_
 #define ORTOOLS_WASM_SERVER_MATHOPT_EXECUTOR_H_
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include "absl/random/random.h"
 
 #include "server/src/solver_executor.h"
 
@@ -25,7 +25,7 @@ class MathOptExecutor final : public SolverExecutor {
   struct Session;
   std::shared_ptr<Session> FindSession(uint64_t handle);
 
-  std::atomic<uint64_t> next_handle_{1};
+  absl::BitGen random_;
   std::mutex sessions_mutex_;
   std::unordered_map<uint64_t, std::shared_ptr<Session>> sessions_;
 };

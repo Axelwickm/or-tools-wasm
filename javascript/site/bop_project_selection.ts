@@ -286,7 +286,7 @@ async function runBopProjectSelection() {
       appendStatus(statusEl, `Solving with BOP via ${currentMPSolverExecutor()}, requested solver threads=${solverThreads}...`);
       const status = await solver.solve(executionOptions);
       if (status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${status}`);
-      if (!solver.verifySolution(1e-7, true)) throw new Error('solution verification failed');
+      if (!await solver.verifySolution(1e-7, true, executionOptions)) throw new Error('solution verification failed');
 
       optimalSelection = new Set(projects
         .filter((project) => variables[project.key].solutionValue() > 0.5)

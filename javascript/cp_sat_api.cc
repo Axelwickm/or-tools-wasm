@@ -1,8 +1,13 @@
+#include "javascript/cp_sat_statistics.h"
+#include "javascript/cp_sat_model_export.h"
 // Minimal C API surface for CP-SAT over WASM.
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
+#include <thread>
 #include <string>
 #include <string_view>
 
@@ -15,6 +20,7 @@
 #include "ortools/sat/model.h"
 #include "ortools/util/logging.h"
 #include "ortools/util/time_limit.h"
+
 
 namespace {
 
@@ -189,6 +195,28 @@ uint8_t* CopyStringToBuffer(const std::string& message, size_t* out_len) {
   return buffer;
 }
 
+EM_JS(int, CpSatWorkerCapacity, (), {
+  return PThread.unusedWorkers.length;
+});
+
+// The outer JavaScript worker owns responsiveness. Native solver workers remain
+// available for parallel search; no additional search orchestration thread.
+CpSolverResponse SolveWithWorkerCapacity(const CpModelProto& proto, Model* model) {
+  auto* parameters = model->GetOrCreate<SatParameters>();
+  const int capacity = CpSatWorkerCapacity();
+  const int requested = parameters->num_workers() != 0
+      ? parameters->num_workers() : parameters->num_search_workers();
+  if (requested > capacity) {
+    return MakeInvalidResponse("CP-SAT requests more solver workers than the WASM runtime capacity (" +
+        std::to_string(capacity) + ").");
+  }
+  if (parameters->num_workers() == 0 && parameters->num_search_workers() == 0 &&
+      !parameters->enumerate_all_solutions() && proto.assumptions().empty()) {
+    parameters->set_num_workers(std::min(capacity, std::max<int>(std::thread::hardware_concurrency(), 1)));
+  }
+  return SolveCpModel(proto, model);
+}
+
 void EmitCallbackEvent(int callback_id, CallbackEventType event_type,
                        std::string_view payload) {
   MAIN_THREAD_EM_ASM(
@@ -268,7 +296,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model_with_callback_events(
             });
   }
 
-  const CpSolverResponse response = SolveCpModel(model_proto, &model);
+  const CpSolverResponse response = SolveWithWorkerCapacity(model_proto, &model);
   return SerializeResponse(response, out_len);
 }
 
@@ -306,7 +334,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* solve_model(const uint8_t* model_data,
   model.Add(NewSatParameters(sat_params));
   RegisterInterrupt(&model);
 
-  const CpSolverResponse response = SolveCpModel(model_proto, &model);
+  const CpSolverResponse response = SolveWithWorkerCapacity(model_proto, &model);
   return SerializeResponse(response, out_len);
 }
 
@@ -340,5 +368,47 @@ EMSCRIPTEN_KEEPALIVE uint8_t* validate_model(const uint8_t* model_data,
   if (validation.empty()) return nullptr;
   return CopyStringToBuffer(validation, out_len);
 }
+
+// Shared with model/response statistics requests; access is serialized by the runtime lock.
+static bool statistics_failed = false;
+EMSCRIPTEN_KEEPALIVE uint8_t* cp_sat_statistics(const uint8_t* data, int length,
+                                                int response, size_t* out_len) {
+  statistics_failed = false;
+  if (out_len == nullptr) { statistics_failed = true; return nullptr; }
+  *out_len = 0;
+  const OriginCheckResult& origin = CheckOriginAllowed();
+  if (!origin.allowed) { statistics_failed = true; return CopyStringToBuffer(origin.error, out_len); }
+  if (length < 0 || (length > 0 && data == nullptr)) {
+    statistics_failed = true;
+    return CopyStringToBuffer("Invalid CP-SAT statistics buffer.", out_len);
+  }
+  const std::string bytes = length == 0 ? std::string() : std::string(reinterpret_cast<const char*>(data), length);
+  const auto result = ortools_wasm::CpSatStatistics(bytes, response != 0);
+  statistics_failed = !result.error.empty();
+  return CopyStringToBuffer(statistics_failed ? result.error : result.report, out_len);
+}
+EMSCRIPTEN_KEEPALIVE int cp_sat_statistics_failed() { return statistics_failed ? 1 : 0; }
+
+static bool model_text_failed = false;
+EMSCRIPTEN_KEEPALIVE uint8_t* cp_sat_export_model_text(const uint8_t* data,
+                                                     int length, size_t* out_len) {
+  model_text_failed = false;
+  if (out_len == nullptr) { model_text_failed = true; return nullptr; }
+  *out_len = 0;
+  const auto& origin = CheckOriginAllowed();
+  if (!origin.allowed) { model_text_failed = true; return CopyStringToBuffer(origin.error, out_len); }
+  if (length < 0 || (length > 0 && data == nullptr)) {
+    model_text_failed = true;
+    return CopyStringToBuffer("Invalid CP-SAT model export buffer.", out_len);
+  }
+  const std::string input = length == 0 ? std::string() : std::string(reinterpret_cast<const char*>(data), length);
+  const auto result = ortools_wasm::ExportCpSatModelText(input);
+  model_text_failed = !result.error.empty();
+  const std::string& text = model_text_failed ? result.error : result.text;
+  auto* output = CopyStringToBuffer(text, out_len);
+  if (output == nullptr && !text.empty()) model_text_failed = true;
+  return output;
+}
+EMSCRIPTEN_KEEPALIVE int cp_sat_model_text_failed() { return model_text_failed ? 1 : 0; }
 
 }  // extern "C"

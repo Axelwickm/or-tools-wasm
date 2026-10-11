@@ -25,6 +25,9 @@ TypeScript API.
 [![Deno 2.9.7](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno%202.9.7&nameFilter=Deno%202.9.7%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Bun 1.4.2](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Bun%201.4.2&nameFilter=Bun%201.4.2%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 
+- **Supported runtimes:** Chromium, Firefox, Node.js, Deno, Bun, and the native C++ server.
+- **Tested bundlers:** Vite, Webpack, and Rollup.
+
 [Try online in your browser](https://axelwickman.com/or-tools-wasm?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=try_online)
 
 Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in)
@@ -41,6 +44,8 @@ Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_
 <p>
   <img src="docs/media/calendar_scheduling.gif" alt="CP-SAT calendar scheduling: moving tasks, resolving conflicts, and changing the deadline" width="800">
 </p>
+
+The next major release includes breaking native-operation and report changes; see the [migration guide](docs/migration.md).
 
 ## What is it?
 
@@ -139,7 +144,7 @@ See [benchmarking/](benchmarking/).
 | --- | --- | --- |
 | CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
 | Routing | ✅ | Vehicle routing (VRP), TSP, pickup-delivery, capacity constraints, and route dimensions. |
-| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, BOP MIP, Knapsack MIP, and SAT MIP backends. |
+| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, PDLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, BOP MIP, Knapsack MIP, and SAT MIP backends. |
 | MathOpt API | ✅ | Unified modeling and solve API with incremental solving and callback support; this package includes GLOP, GLPK, GSCIP, CP-SAT, and PDLP backends. |
 | GLOP | ✅ | Google's simplex linear programming solver. |
 | PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
@@ -166,6 +171,42 @@ an options object and return an independent result. CP-SAT also preserves the
 serialized-model path through `CpSat.solveProto()`. Specialized stateful APIs,
 including `CpSolver`, the `pywraplp`-style MPSolver interface, and incremental
 MathOpt, remain available; see the API reference for their contracts.
+
+Each solver has a [dedicated API section](docs/api.md) and an example on the site:
+
+- [CP-SAT](docs/api.md#cp-sat): integer/logical/scheduling models, exact bigint
+  values, live callbacks, detached proto snapshots and native diagnostics/export.
+- [Routing](docs/api.md#routing): time windows, vehicle eligibility and costs,
+  pickup/delivery, visit types, dimensions, native expressions and finalizers.
+  Route restoration and domain/cost inspection are awaitable native operations.
+  Assignments retain their own values and bounds after later model edits.
+- [Routing resource groups](docs/api.md#routing-resource-groups): resource slots
+  with start/end domains, vehicle eligibility and native assignment/class inspection.
+- [MPSolver](docs/api.md#mpsolver): editable LP/MIP models, native validation,
+  model/solution import/export and awaitable verification. `MpModel.incremental()`
+  retains native state and returns independent `MpResult` answers with native
+  diagnostics. The Python-style `IncrementalSolver`
+  retains native state across edits and supports SCIP solution-pool enumeration.
+- [MathOpt](docs/api.md#mathopt): editable or raw protobuf models, native callbacks,
+  filtered/full results, validated imports and native MPS conversion.
+  `IncrementalSolver` tracks editable-model changes; `ProtoIncrementalSolver`
+  accepts explicit native updates. Close persistent sessions in `finally`.
+- [Knapsack](docs/api.md#knapsack) and [Network Flow](docs/api.md#network-flow):
+  specialized builders with exact integer results and independent solve snapshots.
+- [Set Cover](docs/api.md#set-cover): native invariant queries, trace compression,
+  heuristic construction and retained guided search. Native queries are awaitable;
+  construction generators ignore iteration limits; the pinned heuristics do not
+  enforce time settings.
+- [RCPSP](docs/api.md#rcpsp): standard renewable-resource scheduling and PSPLIB parsing.
+  Parsed advanced variants currently require their own model translation.
+- [PDLP](docs/api.md#pdlp): LP/convex diagonal QP models, native model import and
+  typed logs/iteration events. It is also available through MPSolver and MathOpt.
+
+Select execution with `executor` on each operation. Direct, worker and native
+server execution use the same model/result APIs; cloud execution is reserved.
+GLPK persistent sessions work locally but require a stable thread and are not
+supported on the server. See [execution options](docs/api.md#executor-selection)
+for cancellation, callbacks and runtime requirements.
 
 The worker script and WebAssembly files are emitted automatically from package
 imports, with no manual copying into `public/` or `static/` required.

@@ -1,5 +1,6 @@
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
-import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
+import { allocateWasmBytes, readWasmResult, withWasmAllocations } from '../wasm_memory.js';
+import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import { loadRuntime } from '../runtime_loader.js';
 import {
   createSolverFailureEvent,
@@ -71,6 +72,19 @@ function cpSatCallbackEvent(eventType: number, payload: Uint8Array): CpSatSolver
   return null;
 }
 
+async function nativeStatistics(module: OrToolsWasmModule, input: Uint8Array, response: boolean): Promise<string> {
+  const pointer = allocateWasmBytes(module, input);
+  try {
+    const bytes = await readWasmResult(module, length => module.ccall('cp_sat_statistics', 'number',
+      ['number', 'number', 'number', 'number'], [pointer, input.length, response ? 1 : 0, length]) as number,
+      pointer => module._free_buffer(pointer));
+    const report = new TextDecoder().decode(bytes);
+    if (module.ccall('cp_sat_statistics_failed', 'number', [], [])) throw new Error(report || 'Failed to generate CP-SAT statistics.');
+    if (!report) throw new Error('Failed to generate CP-SAT statistics.');
+    return report;
+  } finally { module._free(pointer); }
+}
+
 function nowMs() {
   return BigInt(Date.now());
 }
@@ -100,7 +114,7 @@ export class DirectCpSatExecutor implements CpSatExecutor {
   readonly solver = 'cp-sat';
 
   private nextRequestId = 1;
-  private activeJob: object | null = null;
+  private activeJob: { cancelled: boolean; nativeRunning: boolean } | null = null;
 
   constructor(private readonly loadModuleImpl: () => Promise<OrToolsWasmModule> = loadRuntime) {}
 
@@ -118,15 +132,26 @@ export class DirectCpSatExecutor implements CpSatExecutor {
   ): CpSatJob {
     if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextCpSatRequestId();
-    const state = {};
+    const state = { cancelled: false, nativeRunning: false };
     this.activeJob = state;
     return {
       requestId,
       result: this.run(requestId, payload, options.onEvent).finally(() => {
         if (this.activeJob === state) this.activeJob = null;
       }),
-      cancel: () => Promise.reject(new SolverCancellationUnsupportedError(this.solver)),
+      cancel: async () => {
+        if (payload.type !== 'solve') throw new SolverCancellationUnsupportedError(this.solver);
+        if (this.activeJob !== state) return;
+        state.cancelled = true;
+        const module = await this.module();
+        if (this.activeJob === state && state.nativeRunning) this.interrupt(module);
+      },
     };
+  }
+
+  private interrupt(module: OrToolsWasmModule) {
+    const address = module.ccall('cp_sat_interrupt_address', 'number', [], []) as number;
+    Atomics.store(module.HEAPU8, address, 1);
   }
 
   private async run(
@@ -149,6 +174,29 @@ export class DirectCpSatExecutor implements CpSatExecutor {
             terminalState: SolverJobState.SUCCEEDED,
           };
           break;
+        case 'exportModelText': {
+          const module = await this.module();
+          const text = await withWasmRuntimeLock(module, async () => {
+            const pointer = allocateWasmBytes(module, payload.input);
+            try {
+              const bytes = await readWasmResult(module, length => module.ccall('cp_sat_export_model_text', 'number',
+                ['number', 'number', 'number'], [pointer, payload.input.length, length]) as number,
+                pointer => module._free_buffer(pointer));
+              const text = new TextDecoder().decode(bytes);
+              if (module.ccall('cp_sat_model_text_failed', 'number', [], [])) throw new Error(text || 'Failed to export CP-SAT model text.');
+              return text;
+            } finally { module._free(pointer); }
+          });
+          result = { response: { type: 'modelText', text }, terminalState: SolverJobState.SUCCEEDED };
+          break;
+        }
+        case 'modelStats':
+        case 'responseStats': {
+          const module = await this.module();
+          const report = await withWasmRuntimeLock(module, () => nativeStatistics(module, payload.input, payload.type === 'responseStats'));
+          result = { response: { type: 'statistics', report }, terminalState: SolverJobState.SUCCEEDED };
+          break;
+        }
         case 'validate':
           result = {
             response: await this.validate(requestId, payload, createdAtMs, onEvent),
@@ -201,55 +249,64 @@ export class DirectCpSatExecutor implements CpSatExecutor {
     const modelBytes = solveRequest.model;
     const paramsBytes = solveRequest.parameters;
     const flags = callbackFlags(solveRequest.callbacks);
-    const modelPtr = allocateWasmBytes(module, modelBytes);
-    const paramsPtr = allocateWasmBytes(module, paramsBytes);
-    let callbackId = 0;
     let callbackError: unknown = null;
     const pendingCallbacks: Promise<void>[] = [];
+    const bytes = await withWasmRuntimeLock(module, () => withWasmAllocations(module, async allocate => {
+      const modelPtr = allocate(modelBytes);
+      const paramsPtr = allocate(paramsBytes);
+      let callbackId = 0;
 
-    try {
-      const bytes = await readWasmResult(module, async (lengthPointer) => {
-        if (!flags) {
+      const state = this.activeJob;
+      if (!state) throw new Error('CP-SAT solve has no active job.');
+      state.nativeRunning = true;
+      if (state.cancelled) this.interrupt(module);
+      try {
+        const bytes = await readWasmResult(module, async (lengthPointer) => {
+          if (!flags) {
+            return await module.ccall(
+              'solve_model',
+              'number',
+              ['number', 'number', 'number', 'number', 'number'],
+              [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, lengthPointer],
+              { async: true },
+            ) as number;
+          }
+          const callbacks = cpSatWasmCallbacks(module);
+          callbackId = callbacks.nextId++;
+          callbacks.sinks.set(callbackId, (eventType, payload) => {
+            const event = cpSatCallbackEvent(eventType, payload);
+            if (!event || callbackError) return;
+            try {
+              const pending = onEvent(event);
+              if (pending) {
+                pendingCallbacks.push(Promise.resolve(pending).catch((error) => {
+                  callbackError ??= error;
+                }));
+              }
+            } catch (error) {
+              callbackError ??= error;
+            }
+          });
           return await module.ccall(
-            'solve_model',
+            'solve_model_with_callback_events',
             'number',
-            ['number', 'number', 'number', 'number', 'number'],
-            [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, lengthPointer],
+            ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+            [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, flags, callbackId, lengthPointer],
             { async: true },
           ) as number;
-        }
-        const callbacks = cpSatWasmCallbacks(module);
-        callbackId = callbacks.nextId++;
-        callbacks.sinks.set(callbackId, (eventType, payload) => {
-          const event = cpSatCallbackEvent(eventType, payload);
-          if (!event || callbackError) return;
-          try {
-            const pending = onEvent(event);
-            if (pending) {
-              pendingCallbacks.push(Promise.resolve(pending).catch((error) => {
-                callbackError ??= error;
-              }));
-            }
-          } catch (error) {
-            callbackError ??= error;
-          }
-        });
-        return await module.ccall(
-          'solve_model_with_callback_events',
-          'number',
-          ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
-          [modelPtr, modelBytes.length, paramsPtr, paramsBytes.length, flags, callbackId, lengthPointer],
-          { async: true },
-        ) as number;
-      }, (pointer) => module._free_buffer(pointer));
-      await Promise.all(pendingCallbacks);
-      if (callbackError) throw callbackError;
-      return { type: 'solve', response: bytes };
-    } finally {
-      if (callbackId) cpSatWasmCallbacks(module).sinks.delete(callbackId);
-      if (modelPtr) module._free(modelPtr);
-      if (paramsPtr) module._free(paramsPtr);
-    }
+        }, (pointer) => module._free_buffer(pointer));
+        state.nativeRunning = false;
+        return { bytes, statistics: await nativeStatistics(module, bytes, true) };
+      } finally {
+        state.nativeRunning = false;
+        if (callbackId) cpSatWasmCallbacks(module).sinks.delete(callbackId);
+      }
+    }));
+    // Release native access before awaiting callbacks: a callback may await
+    // another entry point that uses this same runtime.
+    await Promise.all(pendingCallbacks);
+    if (callbackError) throw callbackError;
+    return { type: 'solve', response: bytes.bytes, statistics: bytes.statistics };
   }
 
   private async validate(
@@ -266,27 +323,29 @@ export class DirectCpSatExecutor implements CpSatExecutor {
       createdAtMs,
       startedAtMs,
     ));
-    const modelBytes = validateRequest.model;
-    const modelPtr = allocateWasmBytes(module, modelBytes);
+    return withWasmRuntimeLock(module, async () => {
+      const modelBytes = validateRequest.model;
+      const modelPtr = allocateWasmBytes(module, modelBytes);
 
-    try {
-      const bytes = await readWasmResult(
-        module,
-        (lengthPointer) => module.ccall(
-          'validate_model',
-          'number',
-          ['number', 'number', 'number'],
-          [modelPtr, modelBytes.length, lengthPointer],
-          { async: true },
-        ) as number | Promise<number>,
-        (pointer) => module._free_buffer(pointer),
-      );
-      const message = new TextDecoder().decode(bytes);
+      try {
+        const bytes = await readWasmResult(
+          module,
+          (lengthPointer) => module.ccall(
+            'validate_model',
+            'number',
+            ['number', 'number', 'number'],
+            [modelPtr, modelBytes.length, lengthPointer],
+            { async: true },
+          ) as number | Promise<number>,
+          (pointer) => module._free_buffer(pointer),
+        );
+        const message = new TextDecoder().decode(bytes);
 
-      return { type: 'validate', ok: message.length === 0, message };
-    } finally {
-      if (modelPtr) module._free(modelPtr);
-    }
+        return { type: 'validate', ok: message.length === 0, message };
+      } finally {
+        if (modelPtr) module._free(modelPtr);
+      }
+    });
   }
 
 }

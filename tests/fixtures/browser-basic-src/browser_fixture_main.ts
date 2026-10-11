@@ -1,9 +1,27 @@
+import { runMathOptCallbackCases } from '../../cases/or-tools-wasm/mathopt/callbacks.ts';
+import { runMathOptModelImportCases } from '../../cases/or-tools-wasm/mathopt/model_import.ts';
+import { runMathOptMpsCases } from '../../cases/or-tools-wasm/mathopt/mps.ts';
+import { runMathOptIndicatorCases } from '../../cases/or-tools-wasm/mathopt/indicators.ts';
+import { runMathOptAdmissionCases } from '../../cases/or-tools-wasm/mathopt/admission.ts';
+import { runMpSolverCancellationCases } from '../../cases/or-tools-wasm/mp_solver/cancellation.ts';
+import { runMpSolverModelImportCases } from '../../cases/or-tools-wasm/mp_solver/model_import.ts';
+import { runMpSolverModelValidationCases } from '../../cases/or-tools-wasm/mp_solver/model_validation.ts';
+import { runMpSolverModelReuseCases } from '../../cases/or-tools-wasm/mp_solver/model_reuse.ts';
+import { runMathOptCancellationCases } from '../../cases/or-tools-wasm/mathopt/cancellation.ts';
+import { runRcpspModelCorrectnessCases } from '../../cases/or-tools-wasm/rcpsp/model_correctness.ts';
+import { runRoutingControlCases } from '../../cases/or-tools-wasm/routing/controls.ts';
+import { runPdlpControlCases } from '../../cases/or-tools-wasm/pdlp/controls.ts';
+import { runMpSolverProtoValidationCases } from '../../cases/or-tools-wasm/mp_solver/proto_validation.ts';
 import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
 import { cpSatCases } from '../../cases/python-parity/cp_sat/cases.ts';
 import { runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
 import { runCpSatSubsolverCases } from '../../cases/or-tools-wasm/cp_sat/subsolver.ts';
 import { runCpSatSolverStructureCases } from '../../cases/or-tools-wasm/cp_sat/solver_structure.ts';
 import { runCpSatHighLevelContractCases } from '../../cases/or-tools-wasm/cp_sat/high_level_contract.ts';
+import { runCpSatStatisticsCases } from '../../cases/or-tools-wasm/cp_sat/statistics.ts';
+import { runCpSatModelExportCases } from '../../cases/or-tools-wasm/cp_sat/model_export.ts';
+import { runCpSatMutationCases } from '../../cases/or-tools-wasm/cp_sat/mutation.ts';
+import { runCpSatExpressionHelperCases } from '../../cases/or-tools-wasm/cp_sat/expression_helpers.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';
 import { runCpSatConcurrencyCase } from '../../cases/or-tools-wasm/cp_sat/concurrency.ts';
 import { runCpSatThreadReuseCase } from '../../cases/or-tools-wasm/cp_sat/thread_reuse.ts';
@@ -327,15 +345,28 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     defaultRoutingModelParameters: RoutingApiModule.defaultRoutingModelParameters,
     defaultRoutingSearchParameters: RoutingApiModule.defaultRoutingSearchParameters,
     FirstSolutionStrategy: RoutingApiModule.FirstSolutionStrategy,
+    PickupAndDeliveryPolicy: RoutingApiModule.PickupAndDeliveryPolicy,
+    VisitTypePolicy: RoutingApiModule.VisitTypePolicy,
+    PenaltyCostBehavior: RoutingApiModule.PenaltyCostBehavior,
     LocalSearchMetaheuristic: RoutingApiModule.LocalSearchMetaheuristic,
     RoutingIndexManager: RoutingApiModule.RoutingIndexManager,
     RoutingModel: RoutingApiModule.RoutingModel,
+    RoutingResourceGroup: RoutingApiModule.RoutingResourceGroup,
+    RoutingLinearExpr: RoutingApiModule.RoutingLinearExpr,
+    RoutingBoolExpr: RoutingApiModule.RoutingBoolExpr,
+    RoutingSearchStatus: RoutingApiModule.RoutingSearchStatus,
   };
   const highLevelCpSat = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat-high-level', () =>
     runWithWorkerStats(workerSpy, () => runCpSatHighLevelParityCasesForPackage(CpSatApi as never))
   );
   const highLevelCpSatContract = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat-high-level-contract', () =>
-    runWithWorkerStats(workerSpy, () => runCpSatHighLevelContractCases(CpSatApi as never))
+    runWithWorkerStats(workerSpy, async () => {
+      await runCpSatStatisticsCases(CpSatApi as never);
+      await runCpSatModelExportCases(CpSatApi as never);
+      await runCpSatMutationCases(CpSatApi as never);
+      await runCpSatExpressionHelperCases(CpSatApi as never);
+      return runCpSatHighLevelContractCases(CpSatApi as never);
+    })
   );
   const cpSat = await runSelectedGroup(selectedGroup, 'cp-sat', 'cp-sat', () =>
     runWithWorkerStats(workerSpy, () =>
@@ -351,10 +382,13 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     () => runCpSatSubsolverCases(typedCpSat as never),
   );
   const routing = await runSelectedGroup(selectedGroup, 'routing', 'routing', () =>
-    runWithWorkerStats(workerSpy, () => runRoutingCases(routingApi as never, {
-      modes: executorFixtureModes,
-      onProgress: (caseName, mode) => setStatus({ ok: false, phase: 'routing', caseName, mode }),
-    }))
+    runWithWorkerStats(workerSpy, async () => {
+      await runRoutingControlCases(routingApi as never);
+      return runRoutingCases(routingApi as never, {
+        modes: executorFixtureModes,
+        onProgress: (caseName, mode) => setStatus({ ok: false, phase: 'routing', caseName, mode }),
+      });
+    })
   );
   const mpSolver = await runSelectedGroup(selectedGroup, 'mp-solver', 'mp-solver', () =>
     runWithWorkerStats(workerSpy, () => runMPSolverCases({
@@ -363,6 +397,13 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     }, {
       modes: executorFixtureModes,
       onProgress: (caseName, context) => setStatus({ ok: false, phase: 'mp-solver', caseName, ...context }),
+    }).then(async results => {
+      await runMpSolverProtoValidationCases(MPSolverApi as never);
+      await runMpSolverCancellationCases(MPSolverApi as never);
+      await runMpSolverModelReuseCases(MPSolverApi as never);
+      await runMpSolverModelImportCases(MPSolverApi as never);
+      await runMpSolverModelValidationCases(MPSolverApi as never);
+      return results;
     }))
   );
   const knapsack = await runSelectedGroup(selectedGroup, 'knapsack', 'knapsack', () =>
@@ -385,19 +426,30 @@ export async function runBrowserFixture(apis: BrowserFixtureApis) {
     runWithWorkerStats(workerSpy, () => runSetCoverCases(SetCoverApi as never, { modes: executorFixtureModes }))
   );
   const rcpsp = await runSelectedGroup(selectedGroup, 'rcpsp', 'rcpsp', () =>
-    runWithWorkerStats(workerSpy, () => runRcpspCases(RcpspApi as never, { modes: executorFixtureModes }))
+    runWithWorkerStats(workerSpy, async () => {
+      await runRcpspModelCorrectnessCases(RcpspApi as never);
+      return runRcpspCases(RcpspApi as never, { modes: executorFixtureModes });
+    })
   );
   const mathOpt = await runSelectedGroup(selectedGroup, 'mathopt', 'mathopt', () =>
-    runWithWorkerStats(workerSpy, () => runMathOptCases({
-      MathOpt: MathOptApi.MathOpt,
-    }, {
-      modes: executorFixtureModes,
-      onProgress: (caseName, mode, threads) =>
-        setStatus({ ok: false, phase: 'mathopt', caseName, mode, threads }),
-    }))
+    runWithWorkerStats(workerSpy, async () => {
+      await runMathOptIndicatorCases(MathOptApi as never);
+      await runMathOptCallbackCases(MathOptApi as never);
+      await runMathOptModelImportCases(MathOptApi as never);
+      await runMathOptMpsCases(MathOptApi as never);
+      await runMathOptAdmissionCases(MathOptApi as never);
+      await runMathOptCancellationCases(MathOptApi as never);
+      return runMathOptCases({ MathOpt: MathOptApi.MathOpt } as never, {
+        modes: executorFixtureModes,
+        onProgress: (caseName, mode, threads) => setStatus({ ok: false, phase: 'mathopt', caseName, mode, threads }),
+      });
+    })
   );
   const pdlp = await runSelectedGroup(selectedGroup, 'pdlp', 'pdlp', () =>
-    runWithWorkerStats(workerSpy, () => runPdlpCases(PdlpApi as never, { modes: executorFixtureModes }))
+    runWithWorkerStats(workerSpy, async () => {
+      await runPdlpControlCases(PdlpApi as never);
+      return runPdlpCases(PdlpApi as never, { modes: executorFixtureModes });
+    })
   );
   const cpSatSolverStructure = await runSelectedGroup(
     selectedGroup,

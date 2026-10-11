@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file cp_sat.proto.
  */
 export const file_cp_sat: GenFile = /*@__PURE__*/
-  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEinQEKEkNwU2F0QnJpZGdlUmVxdWVzdBI6CgVzb2x2ZRgKIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlcXVlc3RIABJACgh2YWxpZGF0ZRgLIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlcXVlc3RIAEIJCgdwYXlsb2FkIuoBChNDcFNhdEJyaWRnZVJlc3BvbnNlEkAKDHNvbHZlX3Jlc3VsdBgKIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlc3VsdEgAEj4KC3NvbHZlX2V2ZW50GAsgASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlRXZlbnRIABJGCg92YWxpZGF0ZV9yZXN1bHQYDCABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0VmFsaWRhdGVSZXN1bHRIAEIJCgdwYXlsb2FkIosBChFDcFNhdFNvbHZlUmVxdWVzdBIWCg5jcF9tb2RlbF9wcm90bxgBIAEoDBIcChRzYXRfcGFyYW1ldGVyc19wcm90bxgCIAEoDBJACg1jYWxsYmFja19tYXNrGAMgASgLMikub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdENhbGxiYWNrTWFzayJGChFDcFNhdENhbGxiYWNrTWFzaxIQCghzb2x1dGlvbhgBIAEoCBISCgpiZXN0X2JvdW5kGAIgASgIEgsKA2xvZxgDIAEoCCI0ChBDcFNhdFNvbHZlUmVzdWx0EiAKGGNwX3NvbHZlcl9yZXNwb25zZV9wcm90bxgBIAEoDCJbCg9DcFNhdFNvbHZlRXZlbnQSGAoOc29sdXRpb25fcHJvdG8YASABKAxIABIUCgpiZXN0X2JvdW5kGAIgASgBSAASDQoDbG9nGAMgASgJSABCCQoHcGF5bG9hZCIuChRDcFNhdFZhbGlkYXRlUmVxdWVzdBIWCg5jcF9tb2RlbF9wcm90bxgBIAEoDCIyChNDcFNhdFZhbGlkYXRlUmVzdWx0EgoKAm9rGAEgASgIEg8KB21lc3NhZ2UYAiABKAliBnByb3RvMw");
+  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi6wEKEkNwU2F0QnJpZGdlUmVxdWVzdBI6CgVzb2x2ZRgKIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlcXVlc3RIABJACgh2YWxpZGF0ZRgLIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlcXVlc3RIABIVCgttb2RlbF9zdGF0cxgMIAEoDEgAEhgKDnJlc3BvbnNlX3N0YXRzGA0gASgMSAASGwoRZXhwb3J0X21vZGVsX3RleHQYDiABKAxIAEIJCgdwYXlsb2FkIpYCChNDcFNhdEJyaWRnZVJlc3BvbnNlEkAKDHNvbHZlX3Jlc3VsdBgKIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlc3VsdEgAEj4KC3NvbHZlX2V2ZW50GAsgASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlRXZlbnRIABJGCg92YWxpZGF0ZV9yZXN1bHQYDCABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0VmFsaWRhdGVSZXN1bHRIABIUCgpzdGF0aXN0aWNzGA0gASgJSAASFAoKbW9kZWxfdGV4dBgOIAEoCUgAQgkKB3BheWxvYWQiiwEKEUNwU2F0U29sdmVSZXF1ZXN0EhYKDmNwX21vZGVsX3Byb3RvGAEgASgMEhwKFHNhdF9wYXJhbWV0ZXJzX3Byb3RvGAIgASgMEkAKDWNhbGxiYWNrX21hc2sYAyABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0Q2FsbGJhY2tNYXNrIkYKEUNwU2F0Q2FsbGJhY2tNYXNrEhAKCHNvbHV0aW9uGAEgASgIEhIKCmJlc3RfYm91bmQYAiABKAgSCwoDbG9nGAMgASgIIm4KEENwU2F0U29sdmVSZXN1bHQSIAoYY3Bfc29sdmVyX3Jlc3BvbnNlX3Byb3RvGAEgASgMEiAKE3Jlc3BvbnNlX3N0YXRpc3RpY3MYAiABKAlIAIgBAUIWChRfcmVzcG9uc2Vfc3RhdGlzdGljcyJbCg9DcFNhdFNvbHZlRXZlbnQSGAoOc29sdXRpb25fcHJvdG8YASABKAxIABIUCgpiZXN0X2JvdW5kGAIgASgBSAASDQoDbG9nGAMgASgJSABCCQoHcGF5bG9hZCIuChRDcFNhdFZhbGlkYXRlUmVxdWVzdBIWCg5jcF9tb2RlbF9wcm90bxgBIAEoDCIyChNDcFNhdFZhbGlkYXRlUmVzdWx0EgoKAm9rGAEgASgIEg8KB21lc3NhZ2UYAiABKAliBnByb3RvMw");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.CpSatBridgeRequest
@@ -31,6 +31,24 @@ export type CpSatBridgeRequest = Message<"ortools_wasm.bridge.v1.CpSatBridgeRequ
      */
     value: CpSatValidateRequest;
     case: "validate";
+  } | {
+    /**
+     * @generated from field: bytes model_stats = 12;
+     */
+    value: Uint8Array;
+    case: "modelStats";
+  } | {
+    /**
+     * @generated from field: bytes response_stats = 13;
+     */
+    value: Uint8Array;
+    case: "responseStats";
+  } | {
+    /**
+     * @generated from field: bytes export_model_text = 14;
+     */
+    value: Uint8Array;
+    case: "exportModelText";
   } | { case: undefined; value?: undefined };
 };
 
@@ -47,6 +65,21 @@ export type CpSatBridgeRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.CpSatValidateRequest validate = 11;
    */
   validate?: CpSatValidateRequestJson;
+
+  /**
+   * @generated from field: bytes model_stats = 12;
+   */
+  modelStats?: string;
+
+  /**
+   * @generated from field: bytes response_stats = 13;
+   */
+  responseStats?: string;
+
+  /**
+   * @generated from field: bytes export_model_text = 14;
+   */
+  exportModelText?: string;
 };
 
 export type CpSatBridgeRequestValid = CpSatBridgeRequest;
@@ -83,6 +116,18 @@ export type CpSatBridgeResponse = Message<"ortools_wasm.bridge.v1.CpSatBridgeRes
      */
     value: CpSatValidateResult;
     case: "validateResult";
+  } | {
+    /**
+     * @generated from field: string statistics = 13;
+     */
+    value: string;
+    case: "statistics";
+  } | {
+    /**
+     * @generated from field: string model_text = 14;
+     */
+    value: string;
+    case: "modelText";
   } | { case: undefined; value?: undefined };
 };
 
@@ -104,6 +149,16 @@ export type CpSatBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.CpSatValidateResult validate_result = 12;
    */
   validateResult?: CpSatValidateResultJson;
+
+  /**
+   * @generated from field: string statistics = 13;
+   */
+  statistics?: string;
+
+  /**
+   * @generated from field: string model_text = 14;
+   */
+  modelText?: string;
 };
 
 export type CpSatBridgeResponseValid = CpSatBridgeResponse;
@@ -221,6 +276,11 @@ export type CpSatSolveResult = Message<"ortools_wasm.bridge.v1.CpSatSolveResult"
    * @generated from field: bytes cp_solver_response_proto = 1;
    */
   cpSolverResponseProto: Uint8Array;
+
+  /**
+   * @generated from field: optional string response_statistics = 2;
+   */
+  responseStatistics?: string | undefined;
 };
 
 /**
@@ -231,6 +291,11 @@ export type CpSatSolveResultJson = {
    * @generated from field: bytes cp_solver_response_proto = 1;
    */
   cpSolverResponseProto?: string;
+
+  /**
+   * @generated from field: optional string response_statistics = 2;
+   */
+  responseStatistics?: string;
 };
 
 export type CpSatSolveResultValid = CpSatSolveResult;

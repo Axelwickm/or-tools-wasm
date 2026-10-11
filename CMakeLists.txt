@@ -224,6 +224,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
   set(MP_SOLVER_BROWSER_SOURCES
     "${PROJECT_SOURCE_DIR}/javascript/mp_solver_api.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/pdlp_interface.cc"
+    "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/pdlp_proto_solver.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/glop_interface.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/glop_proto_solver.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/preprocessor.cc"
@@ -231,6 +233,27 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc"
     "${PROTO_SCHEMA_HEADER}")
+  # Stateful MPSolver commands share the exact bridge wire format with the
+  # native server. Generate only this independent bridge schema for WASM.
+  set(MP_SESSION_PROTO_DIR "${PROJECT_BINARY_DIR}/mp_session_bridge")
+  if(OR_TOOLS_PROTOC_EXECUTABLE)
+    set(MP_SESSION_PROTOC "${OR_TOOLS_PROTOC_EXECUTABLE}")
+  elseif(TARGET host_protoc)
+    set(MP_SESSION_PROTOC host_protoc)
+  else()
+    set(MP_SESSION_PROTOC protobuf::protoc)
+  endif()
+  add_custom_command(
+    OUTPUT "${MP_SESSION_PROTO_DIR}/mp_solver.pb.cc" "${MP_SESSION_PROTO_DIR}/mp_solver.pb.h"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MP_SESSION_PROTO_DIR}"
+    COMMAND ${MP_SESSION_PROTOC} --proto_path=${PROJECT_SOURCE_DIR}/bridge-types
+            --cpp_out=${MP_SESSION_PROTO_DIR} ${PROJECT_SOURCE_DIR}/bridge-types/mp_solver.proto
+    DEPENDS "${PROJECT_SOURCE_DIR}/bridge-types/mp_solver.proto" ${MP_SESSION_PROTOC}
+    VERBATIM)
+  add_library(ortools_wasm_mp_session_bridge STATIC
+    "${MP_SESSION_PROTO_DIR}/mp_solver.pb.cc" "${MP_SESSION_PROTO_DIR}/mp_solver.pb.h")
+  target_include_directories(ortools_wasm_mp_session_bridge PUBLIC "${MP_SESSION_PROTO_DIR}")
+  target_link_libraries(ortools_wasm_mp_session_bridge PUBLIC protobuf::libprotobuf)
   if(ORTOOLS_WASM_USE_CLP)
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/clp_interface.cc")
@@ -348,54 +371,105 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     solve_model_with_callback_events
     validate_model)
   set(ROUTING_JSPI_EXPORTS
+    routing_resource_classes_count routing_resource_class_index routing_resources_in_class routing_resource_attributes routing_resource_dimension_affected
+    routing_add_resource_group routing_add_resource routing_require_resource routing_allow_resources routing_assignment_resource_bounds
     routing_create_index_manager_starts_ends
     routing_create_model
+    routing_create_model_with_parameters
     routing_delete_index_manager
     routing_delete_model
     routing_register_matrix_transit_callback
     routing_read_assignment_from_routes
-    routing_solve_from_assignment_with_parameters
+    routing_read_assignment_from_routes_proto
     routing_set_arc_cost_evaluator_of_all_vehicles
+    routing_set_arc_cost_evaluator_of_vehicle
     routing_add_dimension
     routing_add_dimension_with_vehicle_capacity
     routing_add_dimension_with_vehicle_transits
+    routing_add_dimension_with_vehicle_transit_and_capacity
     routing_add_constant_dimension
+    routing_add_constant_dimension_with_slack
     routing_add_vector_dimension
     routing_add_matrix_dimension
     routing_add_disjunction
+    routing_add_disjunction_with_options
+    routing_add_soft_same_vehicle_constraint
+    routing_set_pickup_delivery_policy
+    routing_set_visit_type
+    routing_add_hard_type_incompatibility
+    routing_add_temporal_type_incompatibility
+    routing_add_type_requirement
     routing_add_pickup_and_delivery
     routing_add_vehicle_equality_constraint
     routing_add_dimension_cumul_less_or_equal_constraint
+    routing_set_vehicle_values
+    routing_modify_domain
+    routing_inspect_variable
+    routing_capture_assignment_variables
+    routing_assignment_variable_bounds
+    routing_create_integer_expression routing_register_integer_variable
+    routing_create_boolean_expression routing_register_boolean_variable routing_add_boolean_constraint
+    routing_create_linear_expression
+    routing_add_linear_constraint
+    routing_add_conditional_linear_constraint
+    routing_add_finalizer
+    routing_set_next_values
+    routing_set_allowed_vehicles_for_index
+    routing_dimension_set_cumul_bounds
+    routing_dimension_set_slack_bounds
+    routing_dimension_set_value
+    routing_set_active_values
+    routing_dimension_add_node_precedence
+    routing_get_automatic_first_solution_strategy
+    routing_set_maximum_active_vehicles
+    routing_set_fixed_vehicle_cost
+    routing_set_amortized_vehicle_costs
+    routing_set_vehicle_used_when_empty
+    routing_dimension_set_cumul_soft_bound
     routing_dimension_set_soft_span_upper_bound
     routing_dimension_set_quadratic_cost_soft_span_upper_bound
-    routing_solve_with_parameters_ext
+    routing_solve_with_parameters_proto
     routing_status
     routing_assignment_objective_value
+    routing_assignment_vehicle_value
     routing_start
     routing_is_end
     routing_next_value
-    routing_assignment_dimension_cumul_value)
+    routing_assignment_dimension_cumul_value
+    routing_assignment_dimension_cumul_max)
   set(MP_SOLVER_JSPI_EXPORTS
+    mp_solver_session_request
+    mp_solver_model_query_request
+    mp_solver_solve_bridge_request
+    mp_solver_compute_iis_request
+    mp_solver_verify_solution_proto
+    mp_solver_validate_solver_specific_parameters
+    mp_solver_import_model
     mp_solver_solve_model_request
     mp_solver_solve_model_request_with_threads
     mp_solver_solve_model_request_with_parameters
     knapsack_solve_serialized)
   set(MATHOPT_JSPI_EXPORTS
+    mathopt_validate_result
+    mathopt_convert_result_proto
     mathopt_solve_request
     mathopt_incremental_create
     mathopt_incremental_solve
+    mathopt_incremental_update
     mathopt_incremental_delete)
   set(PDLP_JSPI_EXPORTS
     pdlp_validate_quadratic_program
     pdlp_is_linear_program
+    pdlp_read_quadratic_program
     pdlp_qp_from_mpmodel_proto
     pdlp_qp_to_mpmodel_proto
-    pdlp_primal_dual_hybrid_gradient)
+    pdlp_primal_dual_hybrid_gradient
+    pdlp_primal_dual_hybrid_gradient_with_callbacks)
   set(GRAPH_JSPI_EXPORTS
     graph_max_flow_solve_serialized
     graph_min_cost_flow_solve_serialized
     graph_linear_sum_assignment_solve_serialized)
-  set(SET_COVER_JSPI_EXPORTS set_cover_next_solution_serialized)
+  set(SET_COVER_JSPI_EXPORTS set_cover_compress_trace set_cover_statistics set_cover_next_solution_serialized set_cover_next_solution_with_limits set_cover_guided_tabu_parameters set_cover_session_create set_cover_session_next set_cover_session_initialize set_cover_session_delete)
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")
@@ -484,14 +558,33 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       endforeach()
     endif()
 
+    if(RUNTIME_NAME STREQUAL "pdlp_runtime")
+      foreach(PDLP_TARGET ${RUNTIME_NAME} ${RUNTIME_NAME}_asyncify
+          ${RUNTIME_NAME}_node ${RUNTIME_NAME}_node_asyncify)
+        target_link_options(${PDLP_TARGET} PRIVATE
+          "-sEXPORTED_FUNCTIONS=['_malloc','_free','_pdlp_interrupt_address']")
+      endforeach()
+    endif()
+
     if(RUNTIME_NAME STREQUAL "mp_solver_runtime")
       foreach(MP_SOLVER_TARGET
           ${RUNTIME_NAME}
           ${RUNTIME_NAME}_asyncify
           ${RUNTIME_NAME}_node
           ${RUNTIME_NAME}_node_asyncify)
+        target_link_libraries(${MP_SOLVER_TARGET} PRIVATE ortools_wasm_mp_session_bridge)
         target_link_options(${MP_SOLVER_TARGET} PRIVATE
+          "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency+1"
           "-sEXPORTED_FUNCTIONS=['_malloc','_free','_mp_solver_interrupt_address']")
+      endforeach()
+    endif()
+
+    if(RUNTIME_NAME STREQUAL "mathopt_runtime")
+      foreach(MATHOPT_TARGET ${RUNTIME_NAME} ${RUNTIME_NAME}_asyncify
+          ${RUNTIME_NAME}_node ${RUNTIME_NAME}_node_asyncify)
+        target_link_options(${MATHOPT_TARGET} PRIVATE
+          "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency+1"
+          "-sEXPORTED_FUNCTIONS=['_malloc','_free','_mathopt_interrupt_address']")
       endforeach()
     endif()
 
@@ -502,6 +595,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
           ${RUNTIME_NAME}_node
           ${RUNTIME_NAME}_node_asyncify)
         target_link_options(${ROUTING_TARGET} PRIVATE
+          "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency+1"
           "-sEXPORTED_FUNCTIONS=['_malloc','_free','_routing_interrupt_address']")
       endforeach()
     endif()

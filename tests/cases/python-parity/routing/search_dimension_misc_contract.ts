@@ -1,3 +1,4 @@
+import type { RoutingConstraint, RoutingIntVar } from 'or-tools-wasm/routing';
 type RoutingApi = {
   defaultRoutingSearchParameters: () => RoutingSearchParameters;
   defaultRoutingModelParameters?: () => unknown;
@@ -29,6 +30,8 @@ type RoutingSearchParameters = {
 };
 
 type RoutingAssignmentLike = {
+  automaticFirstSolutionStrategy: number | null;
+  localSearchProfile: string | null;
   objectiveValue(): bigint;
   value(index: number): number;
 };
@@ -40,24 +43,12 @@ type RoutingDimensionLike = {
   getQuadraticCostSoftSpanUpperBoundForVehicle?(vehicle: number): BoundCostLike | null;
   hasSoftSpanUpperBounds?(): boolean;
   hasQuadraticCostSoftSpanUpperBounds?(): boolean;
-  cumulVar?(index: number): unknown;
+  cumulVar?(index: number): RoutingIntVar;
   setRange?(
     indexOrLow: number,
     indexOrHigh?: number,
     highMaybe?: number,
   ): void;
-};
-
-type RoutingSolverLike = {
-  parameters?: () => {
-    tracePropagation?: boolean;
-  };
-  localSearchProfile?: () => string;
-  add?: (...constraints: unknown[]) => void;
-};
-
-type RoutingCostVarLike = {
-  max(): bigint;
 };
 
 type BoundCostLike = {
@@ -68,16 +59,15 @@ type BoundCostLike = {
 type RoutingModelLike = {
   registerTransitCallback(callback: (fromIndex: number, toIndex: number) => number): number;
   setArcCostEvaluatorOfAllVehicles(callbackIndex: number): void;
-  solve(options?: unknown): Promise<{ status: number; hasSolution: boolean; assignment: RoutingAssignmentLike | null }>;
+  solve(options?: unknown): Promise<{ status: number; hasSolution: boolean; assignment: RoutingAssignmentLike | null; localSearchProfile: string | null }>;
   solveWithParameters(parameters: RoutingSearchParameters, options?: unknown): Promise<RoutingAssignmentLike | null>;
   solveFromAssignmentWithParameters?(
     assignment: RoutingAssignmentLike,
     parameters: RoutingSearchParameters,
     options?: unknown,
   ): Promise<RoutingAssignmentLike | null>;
-  readAssignmentFromRoutes?(routes: number[][], closeRoutes: boolean): RoutingAssignmentLike;
-  getAutomaticFirstSolutionStrategy?(): number;
-  addAtSolutionCallback?(callback: (() => void) | { __call__(): void }): void;
+  readAssignmentFromRoutes?(routes: number[][], ignoreInactiveIndices: boolean, options?: unknown): Promise<RoutingAssignmentLike | null>;
+  addAtSolutionCallback?(callback: (event: { objectiveValue: bigint }) => void): void;
   addDimension?(
     transitIndex: number,
     slackMax: number,
@@ -122,22 +112,17 @@ type RoutingModelLike = {
   vehicles(): number;
   isEnd(index: number): boolean;
   nextVar(index: number): number;
-  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): bigint;
-  vehicleVar?(index: number): unknown;
-  cumulVar?(index: number): unknown;
-  solver?(): RoutingSolverLike;
-  costVar?(): RoutingCostVarLike;
+  getArcCostForVehicle(fromIndex: number, toIndex: number, vehicle: number): Promise<bigint>;
+  vehicleVar?(index: number): RoutingIntVar;
+  cumulVar?(index: number): RoutingIntVar;
+  addConstraints(...constraints: RoutingConstraint[]): void;
+  getModelParameters(): { solverParameters?: { tracePropagation?: boolean } };
 };
 
 type RoutingCase = {
   name: string;
   source: string;
   run(routingApi: RoutingApi): Promise<string>;
-};
-
-type AtSolutionCallback = {
-  __call__(): void;
-  costs?: bigint[];
 };
 
 const PYTHON_SOURCE = 'ortools/constraint_solver/python/pywraprouting_test.py';
@@ -178,9 +163,9 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
 
       const parameters = createParameters();
       const solverParameters =
-        (parameters as { solverParameters?: { copyFrom?: (value: unknown) => void; tracePropagation?: boolean } })
+        (parameters as { solverParameters?: { tracePropagation?: boolean } })
           .solverParameters;
-      if (!solverParameters || typeof solverParameters.copyFrom !== 'function') {
+      if (!solverParameters) {
         return unsupported(
           'TestPyWrapRoutingModel.testRoutingModelParameters requires solver parameter accessors on routing model parameters',
         );
@@ -195,11 +180,10 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
         `TestPyWrapRoutingModel.testRoutingModelParameters expected 1 vehicle, got ${routing.vehicles()}`,
       );
 
-      const getSolver = routing.solver?.();
-      const solverParametersCopy = getSolver?.parameters?.();
+      const solverParametersCopy = routing.getModelParameters().solverParameters;
       if (!solverParametersCopy || solverParametersCopy.tracePropagation !== true) {
         return unsupported(
-          'TestPyWrapRoutingModel.testRoutingModelParameters needs solver().parameters().tracePropagation check support in TS routing API',
+          'TestPyWrapRoutingModel.testRoutingModelParameters needs getModelParameters().solverParameters.tracePropagation check support in TS routing API',
         );
       }
       return 'TestPyWrapRoutingModel.testRoutingModelParameters PASS';
@@ -236,10 +220,10 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
           'TestPyWrapRoutingModel.testRoutingLocalSearchFiltering needs routing.solve(routingExecutionOptions()) in TS bindings',
         );
       }
-      const profile = routing.solver?.().localSearchProfile?.();
+      const profile = solveResult.localSearchProfile;
       if (typeof profile !== 'string' || profile.length === 0) {
         return unsupported(
-          'TestPyWrapRoutingModel.testRoutingLocalSearchFiltering needs solver().localSearchProfile() and non-empty profile support',
+          'TestPyWrapRoutingModel.testRoutingLocalSearchFiltering needs RoutingResult.localSearchProfile and non-empty profile support',
         );
       }
       return 'TestPyWrapRoutingModel.testRoutingLocalSearchFiltering PASS';
@@ -255,22 +239,14 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
       routing.setArcCostEvaluatorOfAllVehicles(transitIdx);
 
       const addCallback = routing.addAtSolutionCallback;
-      if (typeof addCallback !== 'function' || !routing.costVar) {
+      if (typeof addCallback !== 'function') {
         return unsupported(
-          'TestPyWrapRoutingModel.testCallback needs addAtSolutionCallback and costVar in TS bindings',
+          'TestPyWrapRoutingModel.testCallback needs addAtSolutionCallback event data in TS bindings',
         );
       }
 
-      const callback: AtSolutionCallback = {
-        __call__() {
-          const costVar = routing.costVar?.();
-          if (costVar && typeof costVar.max === 'function') {
-            callback.costs?.push(costVar.max());
-          }
-        },
-      };
-      callback.costs = [];
-      addCallback.call(routing, callback);
+      const callback = { costs: [] as bigint[] };
+      addCallback.call(routing, event => callback.costs.push(event.objectiveValue));
 
       const searchParameters = routingApi.defaultRoutingSearchParameters();
       searchParameters.firstSolutionStrategy = routingApi.FirstSolutionStrategy?.PATH_CHEAPEST_ARC ?? 3;
@@ -317,7 +293,8 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
         ],
         [manager.nodeToIndex(7), manager.nodeToIndex(9), manager.nodeToIndex(8)],
       ];
-      const assignment = readAssignment.call(routing, routes, false);
+      const assignment = await readAssignment.call(routing, routes, false, routingExecutionOptions());
+      assert(assignment, 'TestPyWrapRoutingModel.testReadAssignment must restore a feasible assignment');
       const searchParameters = routingApi.defaultRoutingSearchParameters();
       searchParameters.solutionLimit = 1;
       const solution = await solveFromAssignment.call(
@@ -361,16 +338,9 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
       );
       assert(assignment, 'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_simple did not return a solution');
 
-      const getAutomaticStrategy = routing.getAutomaticFirstSolutionStrategy;
-      if (typeof getAutomaticStrategy !== 'function') {
-        return unsupported(
-          'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_simple requires getAutomaticFirstSolutionStrategy in TS bindings',
-        );
-      }
-
-      const strategy = getAutomaticStrategy.call(routing);
+      const strategy = assignment.automaticFirstSolutionStrategy;
       assertNumber(
-        strategy,
+        strategy ?? NaN,
         routingApi.FirstSolutionStrategy?.PATH_CHEAPEST_ARC ?? 3,
         'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_simple expected PATH_CHEAPEST_ARC',
       );
@@ -391,13 +361,11 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
       const addDimension = routing.addDimension;
       const addPickupAndDelivery =
         (routing as { addPickupAndDelivery?: (pickup: number, delivery: number) => void }).addPickupAndDelivery;
-      const solver = routing.solver?.();
       const getDimensionOrDie = routing.getDimensionOrDie?.bind(routing);
       if (
         typeof addDimension !== 'function' ||
         typeof addPickupAndDelivery !== 'function' ||
         typeof routing.vehicleVar !== 'function' ||
-        !solver ||
         !getDimensionOrDie
       ) {
         return unsupported(
@@ -420,16 +388,8 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
         const pickupIndex = manager.nodeToIndex(2 * i);
         const deliveryIndex = manager.nodeToIndex(2 * i + 1);
         addPickupAndDelivery.call(routing, pickupIndex, deliveryIndex);
-        solver.add?.({
-          type: 'routingVehicleEquality',
-          left: routing.vehicleVar(pickupIndex),
-          right: routing.vehicleVar(deliveryIndex),
-        });
-        solver.add?.({
-          type: 'routingCumulLessOrEqual',
-          left: dimension.cumulVar(pickupIndex),
-          right: dimension.cumulVar(deliveryIndex),
-        });
+        routing.addConstraints(routing.vehicleVar(pickupIndex).eq(routing.vehicleVar(deliveryIndex)),
+          dimension.cumulVar(pickupIndex).le(dimension.cumulVar(deliveryIndex)));
       }
 
       const assignment = await routing.solveWithParameters(
@@ -438,15 +398,9 @@ export const searchDimensionMiscContractCases: RoutingCase[] = [
       );
       assert(assignment, 'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd did not return a solution');
 
-      const getAutomaticStrategy = routing.getAutomaticFirstSolutionStrategy;
-      if (typeof getAutomaticStrategy !== 'function') {
-        return unsupported(
-          'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd requires getAutomaticFirstSolutionStrategy in TS bindings',
-        );
-      }
-      const strategy = getAutomaticStrategy.call(routing);
+      const strategy = assignment.automaticFirstSolutionStrategy;
       assertNumber(
-        strategy,
+        strategy ?? NaN,
         routingApi.FirstSolutionStrategy?.PARALLEL_CHEAPEST_INSERTION ?? 8,
         'TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_pd expected PARALLEL_CHEAPEST_INSERTION',
       );

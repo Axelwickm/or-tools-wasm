@@ -55,7 +55,6 @@ async function runSimpleGlop() {
 
       const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
       appendStatus(statusEl, `Solving with ${solverId}, requested solver threads=${solverThreads}...`);
-      const started = performance.now();
       const result = await MPSolver.solve(model, { ...executionOptions, solverType, threads: solverThreads });
       if (result.status !== MPSolver.OPTIMAL) throw new Error(`expected OPTIMAL, got ${result.status}`);
 
@@ -66,10 +65,13 @@ async function runSimpleGlop() {
         y: result.value(y),
         variables: model.numVariables(),
         constraints: model.numConstraints(),
-        wallTime: Math.round(performance.now() - started),
+        wallTime: result.wallTimeMs,
+        iterations: result.iterations ?? undefined,
         executor: currentMPSolverExecutor(),
         solverThreads,
       });
+      if (result.solverVersion) appendStatus(statusEl, `Solver: ${result.solverVersion}`);
+      appendStatus(statusEl, `Basis: x=${result.basisStatus(x)}, y=${result.basisStatus(y)}`);
       appendStatus(statusEl, `Objective: ${formatNumber(result.objectiveValue ?? 0)}`);
       appendStatus(statusEl, `x = ${formatNumber(result.value(x))}`);
       appendStatus(statusEl, `y = ${formatNumber(result.value(y))}`);

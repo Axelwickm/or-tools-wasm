@@ -95,6 +95,7 @@
     </nav>
     <h1>Knapsack - dedicated solver</h1>
     <p><em>Problem: choose the most valuable subset of items without exceeding the knapsack weight capacity.</em></p>
+    <p>Values, resource weights and capacities are nonnegative integers. Zero-weight items are allowed.</p>
     <div class="code-toggle">
       <details>
         <summary>Show code</summary>
@@ -134,9 +135,21 @@ console.log(result.profit, packedItems, result.optimal);</code></pre>
       <li>Each resource row is something selected items consume, such as weight, volume, time, or budget.</li>
       <li>The capacity cell at the right is the limit for that resource.</li>
       <li>Add a resource when the same items must satisfy another limit at the same time.</li>
+      <li>CP-SAT supports the worker setting; the other backends use one worker.</li>
       <li>After solving, selected item columns are highlighted and the solution reports total value, packed item ids, and resource usage.</li>
     </ul>
     <div class="controls">
+      <label>Backend
+        <select id="backend">
+          <option value="5">Branch and bound</option>
+          <option value="10">CP-SAT</option>
+          <option value="6">SCIP</option>
+          <option value="3">CBC</option>
+        </select>
+      </label>
+      <label>Workers (CP-SAT)
+        <input id="num-workers" type="number" min="1" step="1" value="1" disabled>
+      </label>
       <label>Executor
         <select id="solver-executor">
           <option value="direct">Direct</option>

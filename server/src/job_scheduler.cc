@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <map>
 
 namespace ortools_wasm::server {
 namespace {
@@ -42,38 +43,32 @@ class JobCancellationState {
       throw std::invalid_argument("Cancellation handler must be callable.");
     }
     std::lock_guard lock(mutex_);
-    if (handler_) {
-      throw std::logic_error("A cancellation handler is already registered.");
-    }
     if (requested()) {
       handler();
       return 0;
     }
-    handler_id_ = next_handler_id_++;
-    handler_ = std::move(handler);
-    return handler_id_;
+    const auto id = next_handler_id_++;
+    handlers_.emplace(id, std::move(handler));
+    return id;
   }
 
   void Unregister(uint64_t handler_id) {
     if (handler_id == 0) return;
     std::lock_guard lock(mutex_);
-    if (handler_id_ != handler_id) return;
-    handler_ = {};
-    handler_id_ = 0;
+    handlers_.erase(handler_id);
   }
 
   void Request() {
     if (requested_.exchange(true, std::memory_order_relaxed)) return;
     std::lock_guard lock(mutex_);
-    if (handler_) handler_();
+    for (const auto& [id, handler] : handlers_) handler();
   }
 
  private:
   std::atomic_bool requested_{false};
   std::mutex mutex_;
   uint64_t next_handler_id_ = 1;
-  uint64_t handler_id_ = 0;
-  std::function<void()> handler_;
+  std::map<uint64_t, std::function<void()>> handlers_;
 };
 
 struct JobScheduler::JobRecord {
@@ -86,6 +81,8 @@ struct JobScheduler::JobRecord {
   JobState state = JobState::kQueued;
   std::string message;
   std::shared_ptr<JobCancellationState> cancellation =
+      std::make_shared<JobCancellationState>();
+  std::shared_ptr<JobCancellationState> interruption =
       std::make_shared<JobCancellationState>();
   std::promise<JobResult> promise;
   std::shared_future<JobResult> future;
@@ -150,12 +147,14 @@ void CancellationRegistration::Reset() {
 
 JobContext::JobContext(uint64_t job_id, std::string solver, int requested_threads,
                        int allocated_threads,
-                       std::shared_ptr<JobCancellationState> cancellation)
+                       std::shared_ptr<JobCancellationState> cancellation,
+                       std::shared_ptr<JobCancellationState> interruption)
     : job_id_(job_id),
       solver_(std::move(solver)),
       requested_threads_(requested_threads),
       allocated_threads_(allocated_threads),
-      cancellation_(std::move(cancellation)) {}
+      cancellation_(std::move(cancellation)),
+      interruption_(std::move(interruption)) {}
 
 bool JobContext::cancellation_requested() const {
   return cancellation_->requested();
@@ -167,12 +166,19 @@ CancellationRegistration JobContext::OnCancellation(
                                   cancellation_->Register(std::move(handler)));
 }
 
+bool JobContext::interruption_requested() const { return interruption_->requested(); }
+CancellationRegistration JobContext::OnInterruption(std::function<void()> handler) const {
+  return CancellationRegistration(interruption_, interruption_->Register(std::move(handler)));
+}
+
 JobHandle::JobHandle(uint64_t job_id, std::shared_future<JobResult> result,
-                     std::function<JobStatus()> status, std::function<bool()> cancel)
+                     std::function<JobStatus()> status, std::function<bool()> cancel,
+                     std::function<bool()> interrupt)
     : job_id_(job_id),
       result_(std::move(result)),
       status_(std::move(status)),
-      cancel_(std::move(cancel)) {}
+      cancel_(std::move(cancel)),
+      interrupt_(std::move(interrupt)) {}
 
 uint64_t JobHandle::job_id() const { return job_id_; }
 
@@ -185,6 +191,8 @@ JobStatus JobHandle::status() const {
 bool JobHandle::Cancel() {
   return cancel_ ? cancel_() : false;
 }
+
+bool JobHandle::Interrupt() { return interrupt_ ? interrupt_() : false; }
 
 JobScheduler::JobScheduler(SchedulerOptions options)
     : state_(std::make_shared<State>(options)) {}
@@ -222,7 +230,14 @@ JobHandle JobScheduler::Submit(JobSpec spec, JobFunction job, StatusCallback on_
   return JobHandle(
       record->id, record->future,
       [state, record] { return JobScheduler::StatusForState(state, record); },
-      [state, record] { return JobScheduler::CancelRecord(state, record); });
+      [state, record] { return JobScheduler::CancelRecord(state, record); },
+      [state, record] {
+        { std::lock_guard lock(state->mutex);
+          if (JobScheduler::IsTerminal(record->state)) return false;
+        }
+        record->interruption->Request();
+        return true;
+      });
 }
 
 SchedulerStats JobScheduler::Stats() const {
@@ -372,7 +387,7 @@ void JobScheduler::Run(const std::shared_ptr<State>& state,
   JobResult result;
   try {
     JobContext context(record->id, record->spec.solver, record->spec.requested_threads,
-                       record->allocated_threads, record->cancellation);
+                       record->allocated_threads, record->cancellation, record->interruption);
     JobFunction job;
     {
       std::lock_guard lock(state->mutex);
