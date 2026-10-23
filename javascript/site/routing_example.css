@@ -1,0 +1,32 @@
+.example-notes {
+				max-width: 56rem;
+			}
+			.route-visual-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 960px) minmax(14rem, 22rem);
+				gap: 1rem;
+				align-items: start;
+				margin: 1rem 0;
+			}
+			#route-map {
+				display: block;
+				width: 100%;
+				max-width: 960px;
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				background: #f6f8fa;
+			}
+			.route-panel {
+				border: 1px solid #d0d7de;
+				border-radius: 6px;
+				padding: 0.75rem;
+				background: #fff;
+			}
+			.route-panel h2 {
+				margin-top: 0;
+			}
+			#route-output { margin: 0.75rem 0 0; }
+			#status { min-height: 9rem; }
+      @media (max-width: 760px) {
+        .route-visual-layout { grid-template-columns: minmax(0, 1fr); }
+      }

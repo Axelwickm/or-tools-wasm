@@ -25,6 +25,7 @@ message CpSatBridgeRequest {
     bytes model_stats = 12;
     bytes response_stats = 13;
     bytes export_model_text = 14;
+    CpSatCheckSolutionRequest check_solution = 15;
   }
 }
 
@@ -35,6 +36,7 @@ message CpSatBridgeResponse {
     CpSatValidateResult validate_result = 12;
     string statistics = 13;
     string model_text = 14;
+    bool solution_feasible = 15;
   }
 }
 
@@ -70,4 +72,9 @@ message CpSatValidateRequest {
 message CpSatValidateResult {
   bool ok = 1;
   string message = 2;
+}
+
+message CpSatCheckSolutionRequest {
+  bytes cp_model_proto = 1;
+  repeated int64 variable_values = 2;
 }

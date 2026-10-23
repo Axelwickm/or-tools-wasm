@@ -79,75 +79,34 @@
       }
 		</style>
 	</head>
-	<body>
+	<body class="example-page">
 		<nav>
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>Routing - Dispatch Map</h1>
 		<p><em>Problem: assign pallet deliveries to trucks from multiple depots while respecting truck capacity and route length.</em></p>
-		<div class="code-toggle">
-			<details>
-				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import {
-  FirstSolutionStrategy,
-  RoutingIndexManager,
-  RoutingModel,
-} from 'or-tools-wasm/routing';
 
-
-const starts = [0, 1, 2, 3];
-const manager = new RoutingIndexManager(stops.length, starts.length, starts, starts);
-const routing = new RoutingModel(manager);
-const transit = routing.registerTransitCallback((from, to) =&gt; {
-  const a = stops[manager.indexToNode(from)];
-  const b = stops[manager.indexToNode(to)];
-  return Math.round(Math.hypot(a.x - b.x, a.y - b.y));
-});
-routing.setArcCostEvaluatorOfAllVehicles(transit);
-
-const demand = routing.registerUnaryTransitCallback((from) =&gt;
-  stops[manager.indexToNode(from)].demand,
-);
-routing.addDimensionWithVehicleCapacity(demand, 0, vehicleCapacities, true, 'load');
-routing.addDimension(transit, 0, routeDistanceCap, true, 'distance');
-
-deliveryNodes.forEach((node) =&gt; {
-  routing.addDisjunction([manager.nodeToIndex(node)], dropPenaltyFor(node));
-});
-
-const result = await routing.solve({
-  firstSolutionStrategy: FirstSolutionStrategy.PATH_CHEAPEST_ARC,
-  solutionLimit: 1,
-  executor: 'worker',
-});
-console.log(result.status, result.assignment?.objectiveValue());</code></pre>
-			</details>
-		</div>
 		<ul class="example-notes">
-			<li>Several trucks start and end at separate depots.</li>
-			<li>Each delivery has a random pallet demand and priority.</li>
-			<li>Delivery border color shows priority: gray is standard, amber is express, and red is critical.</li>
-			<li>Each truck has the same pallet capacity and a route distance cap.</li>
-			<li>An optional delivery choice requires at least one of the first two deliveries to be served.</li>
-			<li>Optional resource slots limit how many trucks can serve deliveries; each used truck needs its own slot.</li>
-			<li>Drop penalties allow impossible or inefficient deliveries to be left unserved, with critical stops penalized most.</li>
-			<li>Results show the longest planned route alongside the total fleet distance.</li>
-			<li>Before solving, the map shows generated depots and deliveries; after solving, each color is one truck route.</li>
-		</ul>
+        <li>Deliver goods from several depots using trucks with limited capacity and range.</li>
+        <li>Higher-priority deliveries cost more to leave unserved.</li>
+        <li>The map shows each truck’s route and any deliveries left behind.</li>
+</ul>
 		<div class="controls">
-			<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-			<label>Deliveries <input id="delivery-count" class="short-number" type="number" min="1" value="60"></label>
-			<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
-			<label>Capacity <input id="vehicle-capacity" class="short-number" type="number" min="1" value="100"></label>
-			<label>Distance cap <input id="distance-cap" class="short-number" type="number" min="1" value="1600"></label>
-			<label><input id="use-resources" type="checkbox"> Assign used trucks to resource slots</label>
-            <label>Resource slots <input id="resource-slots" class="short-number" type="number" value="2" min="1" max="8"></label>
-            <label><input id="delivery-choice" type="checkbox"> Serve at least one of the first two deliveries</label>
-            <label><input id="delivery-order" type="checkbox"> Deliver 1 before 2 when both use the same truck</label>
-			<button id="randomize" type="button">Randomize</button>
-			<button id="run">Plan dispatch</button>
-		</div>
+<label>Deliveries <input id="delivery-count" class="short-number" type="number" min="1" value="60"></label>
+<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
+<label>Capacity <input id="vehicle-capacity" class="short-number" type="number" min="1" value="100"></label>
+<label>Distance cap <input id="distance-cap" class="short-number" type="number" min="1" value="1600"></label>
+<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+
+<div class="control-actions"><button id="run">Plan dispatch</button><button id="randomize" type="button">Randomize</button></div>
+</div>
+<details class="advanced-settings"><summary>Advanced settings</summary><div class="option-grid"><label title="Assign used trucks to resource slots"><input id="use-resources" type="checkbox"> Limit available trucks</label>
+<label hidden>Resource slots <input id="resource-slots" class="short-number" type="number" value="2" min="1" max="8"></label>
+<label title="Serve at least one of the first two deliveries"><input id="delivery-choice" type="checkbox"> Require a delivery</label>
+<label title="Deliver 1 before 2 when both use the same truck"><input id="delivery-order" type="checkbox"> Order the first two deliveries</label>
+</div></details>
+
 		<div id="dispatch-summary"></div>
 		<div class="route-visual-layout">
 			<svg id="dispatch-map" viewBox="0 0 960 620" role="img" aria-label="Dispatch routing map"></svg>
@@ -156,10 +115,17 @@ console.log(result.status, result.assignment?.objectiveValue());</code></pre>
 				<div id="route-output">Run the solver to animate dispatch routes.</div>
 			</section>
 		</div>
-		<p>Status / Response:</p>
-		<pre id="status"></pre>
+		<details class="solve-log" open><summary>Solve log</summary><pre id="status" aria-live="polite"></pre></details>
 
-		<script type="module" src="./code_highlight.ts"></script>
+		<div class="code-toggle code-samples">
+			<details>
+				<summary title="Updates when you change the example settings.">Show code</summary>
+				<pre class="code-block"><code data-highlight="ts"></code></pre>
+			</details>
+		</div>
+    <script type="module" src="./example_controls.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./routing_dispatch.ts"></script>
-	</body>
+	  <script type="module" src="./live_example_code.ts"></script>
+</body>
 </html>

@@ -1,4 +1,5 @@
 import { CpSat } from './api.js';
+import { synchronousCallbackResult } from '../callback_validation.js';
 import {
   CpSolverStatus,
   type ConstraintProto,
@@ -36,6 +37,7 @@ export type LiteralLike = number | boolean | IntVar | NotBoolVar;
 export type CpSolverSolveOptions = CpSatSolverParameters & {
   executor?: ExecutorSelection;
   solutionCallback?: CpSolverSolutionCallback;
+  /** Progress observer; may return a Promise. */
   onEvent?: CpSatEventHandler;
   eventMask?: CpSatEventMask;
   signal?: AbortSignal;
@@ -1984,6 +1986,11 @@ export class CpModel {
     return CpSat.createModel(liveModelProto(this));
   }
 
+  /** Check explicit values in native variable-index order, including constants. */
+  solutionIsFeasible(values: Iterable<IntValue>, options: CpSatValidateOptions = {}): Promise<boolean> {
+    return CpSat.solutionIsFeasibleProto(liveModelProto(this), values, options);
+  }
+
   exportModelText(options: CpSatValidateOptions = {}): Promise<string> {
     return CpSat.exportModelText(liveModelProto(this), options);
   }
@@ -2096,6 +2103,7 @@ export class CpSolverSolutionCallback {
 
   private currentResponse: CpSolverResponse | null = null;
 
+  /** Must return synchronously; use solve options.onEvent for asynchronous observers. */
   onSolutionCallback() {}
 
   value(expression: IntVar | NotBoolVar): bigint;
@@ -2139,7 +2147,8 @@ export class CpSolverSolutionCallback {
     setCallbackStopAction = (callback, action) => { callback.stopAction = action; };
     runSolutionCallback = (callback, response) => {
       callback.currentResponse = structuredClone(response);
-      callback.onSolutionCallback();
+      synchronousCallbackResult(callback.onSolutionCallback(),
+        'CP-SAT onSolutionCallback must return synchronously; use onEvent for asynchronous observers.');
     };
   }
 
@@ -2268,7 +2277,9 @@ export class CpSolver {
   private lastResponseStatistics: string | null = null;
   private solving = false;
   readonly parameters: CpSatSolverParameters = {};
+  /** Must return synchronously; use solve options.onEvent for asynchronous observers. */
   bestBoundCallback: ((bound: number) => void) | null = null;
+  /** Must return synchronously; use solve options.onEvent for asynchronous observers. */
   logCallback: ((message: string) => void) | null = null;
 
   async solve(model: CpModel, options: CpSolverSolveOptions = {}) {
@@ -2294,43 +2305,37 @@ export class CpSolver {
     } = options;
     const controller = new AbortController();
     let stopped = false;
-    let observedResponse: CpSolverResponse | null = null;
-    const stopReason = new Error('CP-SAT search stopped.');
-    stopReason.name = 'AbortError';
-    const externalAbort = () => controller.abort(signal?.reason);
-    signal?.addEventListener('abort', externalAbort, { once: true });
-    if (signal?.aborted) externalAbort();
     this.lastResponse = null;
     this.lastResponseStatistics = null;
-    this.stopAction = () => { stopped = true; controller.abort(stopReason); };
+    this.stopAction = () => { stopped = true; controller.abort(); };
     if (solutionCallback) setCallbackStopAction(solutionCallback, this.stopAction);
     try {
       const mergedParams = { ...this.parameters, ...solverParameters };
       const modelBytes = await CpSat.createModel(liveModelProto(model));
-      // Observe candidates internally so stopSearch() can return the last feasible solution.
-      // User event subscriptions keep their requested mask.
       const userEventMask = requestedEventMask ?? (onEvent
         ? { solution: true, bestBound: true, log: true }
         : {});
       const eventMask = {
-        solution: true,
+        solution: Boolean(solutionCallback) || Boolean(userEventMask.solution),
         bestBound: Boolean(this.bestBoundCallback) || Boolean(userEventMask.bestBound),
         log: Boolean(this.logCallback) || Boolean(userEventMask.log),
       };
       const result = await CpSat.solveProto(modelBytes, {
         ...mergedParams,
         executor,
-        signal: controller.signal,
+        signal,
+        interruptSignal: controller.signal,
         eventMask,
         onEvent: async (event) => {
               if (stopped && (event.type === 'solution' || event.type === 'bestBound' || event.type === 'log')) return;
               if (event.type === 'solution') {
-                observedResponse = structuredClone(event.response);
                 if (solutionCallback) runSolutionCallback(solutionCallback, event.response);
               } else if (event.type === 'bestBound') {
-                this.bestBoundCallback?.(event.bound);
+                synchronousCallbackResult(this.bestBoundCallback?.(event.bound),
+                  'CP-SAT bestBoundCallback must return synchronously; use onEvent for asynchronous observers.');
               } else if (event.type === 'log') {
-                this.logCallback?.(event.message);
+                synchronousCallbackResult(this.logCallback?.(event.message),
+                  'CP-SAT logCallback must return synchronously; use onEvent for asynchronous observers.');
               }
               if (event.type !== 'solution' && event.type !== 'bestBound' && event.type !== 'log'
                 || userEventMask[event.type]) await onEvent?.(event);
@@ -2339,15 +2344,7 @@ export class CpSolver {
       this.lastResponse = result.response;
       this.lastResponseStatistics = result.statistics ?? null;
       return result.response?.status;
-    } catch (error) {
-      if (!stopped || signal?.aborted || !(error instanceof Error) || error.name !== 'AbortError') throw error;
-      this.lastResponse = observedResponse
-        ? { ...(observedResponse as CpSolverResponse), status: CpSolverStatus.FEASIBLE }
-        : { status: CpSolverStatus.UNKNOWN };
-      this.lastResponseStatistics = await CpSat.responseStats(this.lastResponse, { executor });
-      return this.lastResponse.status;
     } finally {
-      signal?.removeEventListener('abort', externalAbort);
       this.stopAction = null;
       if (solutionCallback) setCallbackStopAction(solutionCallback, null);
     }

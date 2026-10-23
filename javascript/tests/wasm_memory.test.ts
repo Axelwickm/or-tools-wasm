@@ -28,6 +28,14 @@ test('WASM allocations fail before native access and release earlier buffers', a
     { name: 'Set Cover', allocations: 5, run: (module: any) => new api.DirectSetCoverExecutor(async () => module).execute({
       type: 'nextSolution', algorithm: 'greedy', costs: [1], starts: [0, 1], elements: [0], selected: [false], focus: [true], maxIterations: 1,
     }, events).result },
+    { name: 'Set Cover CFT', allocations: 3, run: (module: any) => new api.DirectSetCoverExecutor(async () => module).execute({
+      type: 'cft', costs: [1], starts: [0, 1], elements: [0],
+    }, events).result },
+    { name: 'Set Cover MIP runtime', allocations: 5, run: (module: any) => new api.DirectSetCoverExecutor(
+      async () => { throw new Error('MIP must use the MPSolver runtime'); }, async () => module).execute({
+      type: 'mip', costs: [1], starts: [0, 1], elements: [0], selected: [false], focusIndices: [0],
+      lpRelaxation: false, timeLimitSeconds: 0,
+    }, events).result },
     { name: 'CP-SAT', allocations: 3, run: (module: any) => new api.DirectCpSatExecutor(async () => module).execute({
       type: 'solve', model: Uint8Array.of(1), parameters: Uint8Array.of(1), callbacks: { solution: false, bestBound: false, log: false },
     }, events).result },

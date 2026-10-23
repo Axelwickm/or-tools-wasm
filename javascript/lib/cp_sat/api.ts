@@ -30,6 +30,7 @@ import type { CpModelProto, CpSolverResponse } from '../generated/cp_model.js';
 import type { SatParameters } from '../generated/sat_parameters.js';
 import * as protobufModule from 'protobufjs';
 import { solveCpModel } from './high_level_api.js';
+import { toInt64, type IntValue } from '../int64.js';
 
 export {
   CpSolverStatus,
@@ -84,6 +85,8 @@ export type CpSatSolveOptions = CpSatSolverParameters & {
   onEvent?: CpSatEventHandler;
   eventMask?: CpSatEventMask;
   signal?: AbortSignal;
+  /** Stop native search and return its response; signal cancels and rejects instead. */
+  interruptSignal?: AbortSignal;
 };
 
 export type CpSatValidateOptions = {
@@ -92,6 +95,8 @@ export type CpSatValidateOptions = {
 };
 
 export type CpSatApi = {
+  solutionIsFeasible(model: import('./high_level_api.js').CpModel, values: Iterable<IntValue>, options?: CpSatValidateOptions): Promise<boolean>;
+  solutionIsFeasibleProto(model: Uint8Array | CpModelProto, values: Iterable<IntValue>, options?: CpSatValidateOptions): Promise<boolean>;
   solve(model: import('./high_level_api.js').CpModel, options?: import('./high_level_api.js').CpSolverSolveOptions): Promise<import('./high_level_api.js').CpResult>;
   solveProto(model: Uint8Array, options?: CpSatSolveOptions): Promise<CpSatSolveResult>;
   validate(
@@ -269,6 +274,21 @@ async function createModel(model: CpModelProto): Promise<Uint8Array> {
   return type.encode(message).finish();
 }
 
+async function solutionIsFeasible(model: import('./high_level_api.js').CpModel,
+  values: Iterable<IntValue>, options: CpSatValidateOptions = {}): Promise<boolean> {
+  return model.solutionIsFeasible(values, options);
+}
+
+async function solutionIsFeasibleProto(model: Uint8Array | CpModelProto,
+  values: Iterable<IntValue>, options: CpSatValidateOptions = {}): Promise<boolean> {
+  const captured = Array.from(values, value => toInt64(value, 'solution value'));
+  const bytes = model instanceof Uint8Array ? new Uint8Array(model) : await createModel(model);
+  const result = await executeSolverJob(createCpSatExecutor(options.executor),
+    { type: 'checkSolution', model: bytes, values: captured }, { onEvent: ignoreCpSatProgress, signal: options.signal });
+  if (result.type !== 'solutionFeasible') throw new Error('CP-SAT executor returned the wrong solution-check payload.');
+  return result.feasible;
+}
+
 async function exportModelText(model: Uint8Array | CpModelProto, options: CpSatValidateOptions = {}): Promise<string> {
   const bytes = model instanceof Uint8Array ? new Uint8Array(model) : await createModel(model);
   const result = await executeSolverJob(createCpSatExecutor(options.executor), { type: 'exportModelText', input: bytes }, {
@@ -311,6 +331,7 @@ type CpSatExecuteOptions = {
   onEvent?: CpSatEventHandler;
   eventMask?: CpSatEventMask;
   signal?: AbortSignal;
+  interruptSignal?: AbortSignal;
 };
 
 async function executeSolve(
@@ -341,6 +362,7 @@ async function executeSolve(
     resources: options.resources,
     onEvent,
     signal: options.signal,
+    interruptSignal: options.interruptSignal,
   });
   if (response.type !== 'solve') {
     throw new Error('CP-SAT executor returned the wrong solve payload.');
@@ -364,6 +386,7 @@ async function solveProto(
     onEvent,
     eventMask,
     signal,
+    interruptSignal,
     ...solverParameters
   } = options;
   if ((solverParameters as SatParameters).numSearchWorkers !== undefined) {
@@ -379,9 +402,11 @@ async function solveProto(
     eventMask,
     resources: schedulerResourcesFromParameters(solverParameters),
     signal,
+    interruptSignal,
   });
   const bytes = result.response;
-  const response = bytes.length > 0 ? toCpSolverResponse(responseType, bytes) : null;
+  // An empty protobuf is a valid native UNKNOWN response (for example, an early stop).
+  const response = toCpSolverResponse(responseType, bytes);
   return { bytes, response, statistics: result.statistics };
 }
 
@@ -417,6 +442,8 @@ async function validate(
 }
 
 export const CpSat: CpSatApi = {
+  solutionIsFeasible,
+  solutionIsFeasibleProto,
   solve,
   solveProto,
   validate,

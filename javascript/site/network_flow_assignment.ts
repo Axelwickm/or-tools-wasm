@@ -4,6 +4,8 @@ import {
   SimpleLinearSumAssignment,
 } from 'or-tools-wasm/network-flow';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
+import { highlightCodeBlocks } from './code_highlight.js';
+import { executor } from './code_samples/controls.js';
 import { requiredElement } from './site_support.js';
 
 const solutionOutput = requiredElement('solution-output', 'div');
@@ -61,7 +63,26 @@ function generateCosts(size = assignmentSize()) {
   );
 }
 
+function updateCode() {
+  const code = document.querySelector<HTMLElement>('.code-samples code');
+  if (!code) return;
+  code.textContent = `import { SimpleLinearSumAssignment } from 'or-tools-wasm/network-flow';
+
+const costs = ${JSON.stringify(costs, null, 2)};
+const assignment = new SimpleLinearSumAssignment();
+for (let worker = 0; worker < costs.length; worker++) {
+  for (let task = 0; task < costs[worker].length; task++) {
+    assignment.addArcWithCost(worker, task, costs[worker][task]);
+  }
+}
+const result = await assignment.solve({ executor: ${executor()} });
+console.log(result.optimalCost);`;
+  delete code.dataset.highlighted;
+  highlightCodeBlocks(code.parentElement!);
+}
+
 function resetView() {
+  updateCode();
   statusEl.textContent = '';
   solutionOutput.textContent = 'Run the solver to view the assignment.';
   renderGraph();
@@ -172,3 +193,6 @@ sizeInput.addEventListener('change', () => {
 });
 resetView();
 readNetworkFlowExecutor = configureSolverExecutorSelector(executorSelector);
+document.addEventListener('change', updateCode);
+document.addEventListener('input', updateCode);
+updateCode();

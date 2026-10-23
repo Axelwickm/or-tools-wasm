@@ -8,6 +8,7 @@
 #include "cp_sat.pb.h"
 #include "javascript/cp_sat_statistics.h"
 #include "javascript/cp_sat_model_export.h"
+#include "javascript/cp_sat_solution_check.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_checker.h"
 #include "ortools/sat/cp_model_solver.h"
@@ -107,6 +108,8 @@ SolverExecutorResult Solve(const bridge::CpSatSolveRequest& request,
   model.Add(sat::NewSatParameters(parameters));
   auto cancellation =
       context.OnCancellation([&model] { sat::StopSearch(&model); });
+  auto interruption =
+      context.OnInterruption([&model] { sat::StopSearch(&model); });
   if (context.cancellation_requested()) {
     return Error("CP-SAT solve was cancelled before it started.",
                  SolverExecutionFailureKind::kCancelled);
@@ -204,6 +207,15 @@ SolverExecutorResult CpSatExecutor::Execute(const SolverExecutorRequest& request
       return Solve(cp_sat_request.solve(), context, emit_event);
     case bridge::CpSatBridgeRequest::kValidate:
       return Validate(cp_sat_request.validate());
+    case bridge::CpSatBridgeRequest::kCheckSolution: {
+      const auto& input = cp_sat_request.check_solution();
+      const auto checked = ortools_wasm::CheckCpSatSolution(input.cp_model_proto(),
+          {input.variable_values().data(), static_cast<size_t>(input.variable_values_size())});
+      if (!checked.error.empty()) return Error(checked.error);
+      bridge::CpSatBridgeResponse response;
+      response.set_solution_feasible(checked.feasible);
+      return Response(response);
+    }
     case bridge::CpSatBridgeRequest::kExportModelText: {
       const auto exported = ortools_wasm::ExportCpSatModelText(cp_sat_request.export_model_text());
       if (!exported.error.empty()) return Error(exported.error);

@@ -12,9 +12,14 @@
 #include <chrono>
 #include <thread>
 #include "javascript/mathopt_thread_budget.h"
+#include "javascript/mathopt_incremental.h"
 #include "javascript/mathopt_mps_conversion.h"
 #include "javascript/mathopt_result_validation.h"
 #include "javascript/mathopt_result_conversion.h"
+#include "javascript/mathopt_feasibility.h"
+#include "javascript/mathopt_expression_bounds.h"
+#include "javascript/mathopt_solution_improvement.h"
+#include "javascript/mathopt_model_transform.h"
 
 #include <emscripten/emscripten.h>
 
@@ -22,6 +27,7 @@
 #include "ortools/math_opt/core/solver.h"
 #include "ortools/math_opt/core/solver_interface.h"
 #include "ortools/math_opt/rpc.pb.h"
+#include "mathopt_iis.pb.h"
 #include "ortools/math_opt/solvers/cp_sat_solver.h"
 #include "ortools/math_opt/solvers/glop_solver.h"
 #include "ortools/math_opt/solvers/pdlp_solver.h"
@@ -108,7 +114,8 @@ absl::Status ConfigureMathOptCallbacks(const uint8_t* data, size_t length, int c
   return absl::OkStatus();
 }
 
-Solver::MessageCallback MathOptMessages(SolveResponse* response, int message_id) {
+template <typename Response>
+Solver::MessageCallback MathOptMessages(Response* response, int message_id) {
   return [response, message_id](const std::vector<std::string>& messages) {
     SolveResponse batch;
     for (const auto& message : messages) {
@@ -157,7 +164,8 @@ uint8_t* CopyProtoToBuffer(const google::protobuf::MessageLite& message,
   return buffer;
 }
 
-void SetStatus(SolveResponse* response, const absl::Status& status) {
+template <typename Response>
+void SetStatus(Response* response, const absl::Status& status) {
   auto* proto_status = response->mutable_status();
   proto_status->set_code(static_cast<int>(status.code()));
   proto_status->set_message(std::string(status.message()));
@@ -305,6 +313,8 @@ uint8_t* mathopt_incremental_solve_impl(
     return CopyProtoToBuffer(response, out_len);
   }
 
+  const auto backend = ortools_wasm::CheckMathOptSessionBackend(request, it->second.solver_type);
+  if (!backend.ok()) { SetStatus(&response, backend); return CopyProtoToBuffer(response, out_len); }
   EnsureMathOptSolversRegistered();
   try {
     if (use_update != 0) {
@@ -314,19 +324,11 @@ uint8_t* mathopt_incremental_solve_impl(
                                "Could not parse MathOpt ModelUpdateProto."));
         return CopyProtoToBuffer(response, out_len);
       }
-      auto updated = it->second.solver->Update(std::move(update));
+      const auto updated = ortools_wasm::UpdateMathOptSolver(it->second.solver, request,
+          it->second.solver_type, it->second.init_args, std::move(update));
       if (!updated.ok()) {
-        SetStatus(&response, updated.status());
+        SetStatus(&response, updated);
         return CopyProtoToBuffer(response, out_len);
-      }
-      if (!*updated) {
-        auto replacement = Solver::New(request.solver_type(), request.model(),
-                                       {.streamable = request.initializer()});
-        if (!replacement.ok()) {
-          SetStatus(&response, replacement.status());
-          return CopyProtoToBuffer(response, out_len);
-        }
-        it->second.solver = std::move(*replacement);
       }
     }
 
@@ -363,6 +365,59 @@ uint8_t* mathopt_incremental_solve_impl(
 
 EMSCRIPTEN_KEEPALIVE uintptr_t mathopt_interrupt_address() {
   return reinterpret_cast<uintptr_t>(&g_mathopt_interrupt_requested);
+}
+EMSCRIPTEN_KEEPALIVE uint8_t* mathopt_compute_infeasible_subsystem(const uint8_t* data,
+    size_t length, int use_interrupter, int interrupted, size_t* out_len, int message_id,
+    int handle, const uint8_t* update_data, size_t update_len, int use_update) {
+  ortools_wasm::bridge::v1::MathOptInfeasibleSubsystemResponse response;
+  struct ResetInterrupt { ~ResetInterrupt() { g_mathopt_interrupt_requested.store(false); } } reset;
+  try {
+    SolveRequest request;
+    if (!data || !request.ParseFromArray(data, static_cast<int>(length))) {
+      SetStatus(&response, absl::InvalidArgumentError("Could not parse MathOpt IIS request."));
+    } else {
+      EnsureMathOptSolversRegistered();
+      Solver* retained = nullptr;
+      if (handle >= 0) {
+        const auto found = IncrementalSolvers().find(handle);
+        if (found == IncrementalSolvers().end()) {
+          SetStatus(&response, absl::FailedPreconditionError("MathOpt IncrementalSolver is closed."));
+          return CopyProtoToBuffer(response, out_len);
+        }
+        const auto backend = ortools_wasm::CheckMathOptSessionBackend(request, found->second.solver_type);
+        if (!backend.ok()) { SetStatus(&response, backend); return CopyProtoToBuffer(response, out_len); }
+        if (use_update) {
+          ModelUpdateProto update;
+          if (!update.ParseFromArray(update_data, static_cast<int>(update_len))) {
+            SetStatus(&response, absl::InvalidArgumentError("Could not parse MathOpt ModelUpdateProto."));
+            return CopyProtoToBuffer(response, out_len);
+          }
+          const auto status = ortools_wasm::UpdateMathOptSolver(found->second.solver, request,
+              found->second.solver_type, found->second.init_args, std::move(update));
+          if (!status.ok()) { SetStatus(&response, status); return CopyProtoToBuffer(response, out_len); }
+        }
+        retained = found->second.solver.get();
+      } else if (use_update) {
+        SetStatus(&response, absl::InvalidArgumentError("MathOpt IIS model updates require a retained solver."));
+        return CopyProtoToBuffer(response, out_len);
+      }
+      const auto capacity = CheckMathOptWorkerCapacity(request, use_interrupter != 0);
+      if (!capacity.ok()) { SetStatus(&response, capacity); return CopyProtoToBuffer(response, out_len); }
+      ortools_wasm::BindMathOptAutomaticWorkers(&request, ortools_wasm::MathOptThreadRequirement(request));
+      MathOptInterruptScope interrupter(use_interrupter != 0, interrupted != 0);
+      Solver::ComputeInfeasibleSubsystemArgs arguments;
+      arguments.parameters = request.parameters();
+      if (request.parameters().enable_output()) arguments.message_callback = MathOptMessages(&response, message_id);
+      arguments.interrupter = use_interrupter ? interrupter.get() : nullptr;
+      const auto result = retained ? retained->ComputeInfeasibleSubsystem(arguments)
+          : Solver::NonIncrementalComputeInfeasibleSubsystem(request.model(), request.solver_type(),
+              {.streamable = request.initializer()}, arguments);
+      if (!result.ok()) SetStatus(&response, result.status());
+      else response.set_result_proto(result->SerializeAsString());
+    }
+  } catch (const std::exception& error) { SetStatus(&response, absl::InternalError(error.what())); }
+  catch (...) { SetStatus(&response, absl::InternalError("MathOpt IIS threw an unknown exception.")); }
+  return CopyProtoToBuffer(response, out_len);
 }
 EMSCRIPTEN_KEEPALIVE uint8_t* mathopt_solve_request(const uint8_t* request_data, size_t request_len, int use_interrupter, int interrupt_at_start, size_t* out_len, const uint8_t* callback_data, size_t callback_len, int callback_id, int message_id) {
   struct ResetInterrupt { ~ResetInterrupt() { g_mathopt_interrupt_requested.store(false); } } reset;
@@ -427,6 +482,93 @@ EMSCRIPTEN_KEEPALIVE const char* mathopt_validate_model(const uint8_t* input, in
   if (length < 0 || (length && !input)) error = "Invalid MathOpt model buffer.";
   else error = ortools_wasm::ValidateMathOptModelBytes(length ? std::string(reinterpret_cast<const char*>(input), length) : std::string());
   return error.c_str();
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mathopt_formulate_indicator_constraint_as_mip(
+    const uint8_t* input, int length, int64_t indicator_id, size_t* out_len) {
+  if (!out_len) return nullptr;
+  *out_len = 0;
+  ortools_wasm::bridge::v1::MathOptModelTransformationResponse response;
+  try {
+    if (length < 0 || (length && !input)) throw std::invalid_argument("Invalid MathOpt model buffer.");
+    const auto result = ortools_wasm::FormulateMathOptIndicatorAsMip(
+        length ? std::string(reinterpret_cast<const char*>(input), length) : std::string(), indicator_id);
+    if (result.ok()) response.set_model_proto(result->SerializeAsString());
+    else response.set_error(result.status().ToString());
+  } catch (const std::exception& error) { response.set_error(error.what()); }
+  const auto bytes = response.SerializeAsString();
+  auto* buffer = static_cast<uint8_t*>(std::malloc(bytes.size() + 1));
+  if (!buffer) return nullptr;
+  std::memcpy(buffer, bytes.data(), bytes.size()); *out_len = bytes.size();
+  return buffer;
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mathopt_add_robust_constraint(
+    const uint8_t* input, int length, size_t* out_len) {
+  if (!out_len) return nullptr;
+  *out_len = 0;
+  ortools_wasm::bridge::v1::MathOptModelTransformationResponse response;
+  try {
+    if (length < 0 || (length && !input)) throw std::invalid_argument("Invalid MathOpt model buffer.");
+    ortools_wasm::bridge::v1::MathOptRobustConstraintRequest request;
+    if (!request.ParseFromArray(input, length)) throw std::invalid_argument("Invalid MathOpt robust constraint request.");
+    const auto result = ortools_wasm::AddMathOptRobustConstraint(request);
+    if (result.ok()) response.set_model_proto(result->SerializeAsString());
+    else response.set_error(result.status().ToString());
+  } catch (const std::exception& error) { response.set_error(error.what()); }
+  const auto bytes = response.SerializeAsString();
+  auto* buffer = static_cast<uint8_t*>(std::malloc(bytes.size() + 1));
+  if (!buffer) return nullptr;
+  std::memcpy(buffer, bytes.data(), bytes.size()); *out_len = bytes.size();
+  return buffer;
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mathopt_check_primal_feasibility(const uint8_t* input, int length, size_t* out_len) {
+  if (!out_len) return nullptr;
+  *out_len = 0;
+  std::string output;
+  try {
+    if (length < 0 || (length && !input)) throw std::invalid_argument("Invalid MathOpt feasibility buffer.");
+    output = ortools_wasm::CheckMathOptFeasibilityBytes(length ? std::string(reinterpret_cast<const char*>(input), length) : std::string());
+  } catch (const std::exception& error) {
+    ortools_wasm::bridge::v1::MathOptFeasibilityResponse response; response.set_error(error.what()); output = response.SerializeAsString();
+  }
+  auto* buffer = static_cast<uint8_t*>(std::malloc(output.size() + 1));
+  if (!buffer) return nullptr;
+  std::memcpy(buffer, output.data(), output.size()); *out_len = output.size();
+  return buffer;
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mathopt_expression_bounds(const uint8_t* input, int length, size_t* out_len) {
+  if (!out_len) return nullptr;
+  *out_len = 0;
+  std::string output;
+  try {
+    if (length < 0 || (length && !input)) throw std::invalid_argument("Invalid MathOpt expression bounds buffer.");
+    output = ortools_wasm::MathOptExpressionBoundsBytes(length ? std::string(reinterpret_cast<const char*>(input), length) : std::string());
+  } catch (const std::exception& error) {
+    ortools_wasm::bridge::v1::MathOptExpressionBoundsResponse response; response.set_error(error.what()); output = response.SerializeAsString();
+  }
+  auto* buffer = static_cast<uint8_t*>(std::malloc(output.size() + 1));
+  if (!buffer) return nullptr;
+  std::memcpy(buffer, output.data(), output.size()); *out_len = output.size();
+  return buffer;
+}
+
+EMSCRIPTEN_KEEPALIVE uint8_t* mathopt_improve_solution(const uint8_t* input, int length, size_t* out_len) {
+  if (!out_len) return nullptr;
+  *out_len = 0;
+  std::string output;
+  try {
+    if (length < 0 || (length && !input)) throw std::invalid_argument("Invalid MathOpt solution improvement buffer.");
+    output = ortools_wasm::ImproveMathOptSolutionBytes(length ? std::string(reinterpret_cast<const char*>(input), length) : std::string());
+  } catch (const std::exception& error) {
+    ortools_wasm::bridge::v1::MathOptSolutionImprovementResponse response; response.set_error(error.what()); output = response.SerializeAsString();
+  }
+  auto* buffer = static_cast<uint8_t*>(std::malloc(output.size() + 1));
+  if (!buffer) return nullptr;
+  std::memcpy(buffer, output.data(), output.size()); *out_len = output.size();
+  return buffer;
 }
 
 static bool result_validation_failed = false;

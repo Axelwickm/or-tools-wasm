@@ -1,5 +1,6 @@
 #include "javascript/cp_sat_statistics.h"
 #include "javascript/cp_sat_model_export.h"
+#include "javascript/cp_sat_solution_check.h"
 // Minimal C API surface for CP-SAT over WASM.
 #include <algorithm>
 #include <atomic>
@@ -367,6 +368,28 @@ EMSCRIPTEN_KEEPALIVE uint8_t* validate_model(const uint8_t* model_data,
       operations_research::sat::ValidateCpModel(model_proto);
   if (validation.empty()) return nullptr;
   return CopyStringToBuffer(validation, out_len);
+}
+
+// Returns an owned error buffer, or nullptr on success. The explicit output
+// distinguishes an infeasible assignment from malformed input/allocation errors.
+EMSCRIPTEN_KEEPALIVE uint8_t* cp_sat_solution_is_feasible(
+    const uint8_t* data, int length, const int64_t* values, int count,
+    int* feasible, size_t* out_len) {
+  if (out_len == nullptr || feasible == nullptr) return nullptr;
+  *out_len = 0;
+  *feasible = -1;
+  const auto& origin = CheckOriginAllowed();
+  if (!origin.allowed) return CopyStringToBuffer(origin.error, out_len);
+  if (length < 0 || count < 0 || (length > 0 && data == nullptr) ||
+      (count > 0 && values == nullptr)) {
+    return CopyStringToBuffer("Invalid CP-SAT solution-check buffer.", out_len);
+  }
+  const std::string bytes = length == 0 ? std::string() :
+      std::string(reinterpret_cast<const char*>(data), length);
+  const auto result = ortools_wasm::CheckCpSatSolution(bytes, {values, static_cast<size_t>(count)});
+  if (!result.error.empty()) return CopyStringToBuffer(result.error, out_len);
+  *feasible = result.feasible ? 1 : 0;
+  return nullptr;
 }
 
 // Shared with model/response statistics requests; access is serialized by the runtime lock.

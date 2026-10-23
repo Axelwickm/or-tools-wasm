@@ -15,9 +15,14 @@
 #include "ortools/set_cover/set_cover_invariant.h"
 #include "ortools/set_cover/set_cover_model.h"
 #include "set_cover_statistics.h"
+#include "set_cover_lagrangian.h"
+#include "set_cover_cft.h"
+#include "set_cover_wasm_model.h"
 #include "set_cover_guided_tabu.h"
 #include "set_cover_guided_session.h"
 #include "set_cover_trace.h"
+#include "set_cover_mutations.h"
+#include "set_cover_formats.h"
 
 namespace {
 
@@ -27,6 +32,7 @@ using operations_research::GreedySolutionGenerator;
 using operations_research::GuidedLocalSearch;
 using operations_research::GuidedTabuSearch;
 using operations_research::LazyElementDegreeSolutionGenerator;
+using operations_research::LazySteepestSearch;
 using operations_research::RandomSolutionGenerator;
 using operations_research::SetCoverInvariant;
 using operations_research::SetCoverModel;
@@ -34,6 +40,8 @@ using operations_research::SteepestSearch;
 using operations_research::SubsetBoolVector;
 using operations_research::SubsetIndex;
 using operations_research::TrivialSolutionGenerator;
+
+using namespace ortools_wasm::set_cover_wasm;
 
 std::string g_set_cover_string_result;
 ortools_wasm::SetCoverGuidedSessions g_guided_sessions;
@@ -91,32 +99,6 @@ const char* ErrorResult(const std::string& message) {
   return StoreString(out.str());
 }
 
-BaseInt NumberToBaseInt(double value, const char* field, int index) {
-  if (!std::isfinite(value) || std::trunc(value) != value ||
-      value < static_cast<double>(std::numeric_limits<BaseInt>::min()) ||
-      value > static_cast<double>(std::numeric_limits<BaseInt>::max())) {
-    std::ostringstream out;
-    out << field << "[" << index << "] must be a finite int32 value.";
-    throw std::invalid_argument(out.str());
-  }
-  return static_cast<BaseInt>(value);
-}
-
-void WriteBoolVector(std::ostringstream& out, const std::vector<bool>& values) {
-  out << "[";
-  for (int i = 0; i < static_cast<int>(values.size()); ++i) {
-    if (i > 0) out << ",";
-    out << (values[i] ? "true" : "false");
-  }
-  out << "]";
-}
-
-void WriteJsonNumber(std::ostream& out, double value) {
-  if (std::isnan(value)) out << "\"NaN\"";
-  else if (std::isinf(value)) out << (value > 0 ? "\"Infinity\"" : "\"-Infinity\"");
-  else out << value;
-}
-
 template <typename T>
 void WriteVector(std::ostringstream& out, const std::vector<T>& values) {
   out << "[";
@@ -125,47 +107,6 @@ void WriteVector(std::ostringstream& out, const std::vector<T>& values) {
     out << values[i];
   }
   out << "]";
-}
-
-SetCoverModel BuildModel(const double* costs_data, const double* starts_data,
-                         const double* elements_data, int num_subsets,
-                         int num_elements_data) {
-  if (!starts_data || NumberToBaseInt(starts_data[0], "starts", 0) != 0 ||
-      NumberToBaseInt(starts_data[num_subsets], "starts", num_subsets) != num_elements_data)
-    throw std::invalid_argument("Set Cover offsets must span the complete element array.");
-  SetCoverModel model;
-  for (int subset = 0; subset < num_subsets; ++subset) {
-    const double cost = costs_data[subset];
-    if (!std::isfinite(cost)) {
-      std::ostringstream out;
-      out << "costs[" << subset << "] must be finite.";
-      throw std::invalid_argument(out.str());
-    }
-    model.AddEmptySubset(cost);
-    const BaseInt start = NumberToBaseInt(starts_data[subset], "starts", subset);
-    const BaseInt end =
-        NumberToBaseInt(starts_data[subset + 1], "starts", subset + 1);
-    if (start < 0 || end < start || end > num_elements_data) {
-      throw std::invalid_argument("SetCoverModel: invalid subset start offsets.");
-    }
-    for (BaseInt index = start; index < end; ++index) {
-      const BaseInt element = NumberToBaseInt(elements_data[index], "elements", index);
-      if (element < 0 || element == std::numeric_limits<BaseInt>::max()) {
-        throw std::invalid_argument("Set Cover element index is out of range.");
-      }
-      model.AddElementToLastSubset(element);
-    }
-  }
-  model.CreateSparseRowView();
-  return model;
-}
-
-SubsetBoolVector ReadSolution(const double* selected_data, int num_subsets) {
-  SubsetBoolVector solution(SubsetIndex(num_subsets), false);
-  for (int subset = 0; subset < num_subsets; ++subset) {
-    solution[SubsetIndex(subset)] = selected_data[subset] != 0.0;
-  }
-  return solution;
 }
 
 SubsetBoolVector ReadFocus(const double* focus_data, int num_subsets) {
@@ -205,11 +146,13 @@ bool RunListFocusGenerator(Generator* generator, const double* focus_data,
 
 const char* SessionResult(ortools_wasm::SetCoverGuidedSession& session, bool next = false, uint64_t handle = 0) {
   auto& invariant = session.invariant;
+  const auto timing = session.RunTime();
   invariant.Recompute(SetCoverInvariant::ConsistencyLevel::kRedundancy);
   const auto exported = invariant.ExportSolutionAsProto();
   std::ostringstream out; out << std::setprecision(17) << "{\"ok\":true,\"nextSolution\":" << (next ? "true" : "false")
       << ",\"cost\":";
   WriteJsonNumber(out, invariant.cost());
+  out << ",\"runTimeSeconds\":" << timing.first << ",\"runTimeMicroseconds\":" << timing.second;
   out << ",\"numUncoveredElements\":" << invariant.num_uncovered_elements()
       << ",\"costLowerBound\":";
   WriteJsonNumber(out, exported.cost_lower_bound());
@@ -234,6 +177,62 @@ const char* SessionResult(ortools_wasm::SetCoverGuidedSession& session, bool nex
 }  // namespace
 
 extern "C" {
+EMSCRIPTEN_KEEPALIVE const char* set_cover_read_model(const char* input, int size, int format) {
+  try {
+    if (!input || size < 0) return ErrorResult("Invalid Set Cover text input.");
+    const auto model = ortools_wasm::ReadSetCoverText(std::string(input, size), format);
+    return StoreString("{\"ok\":true,\"modelProtoJson\":\"" + JsonEscape(ortools_wasm::SetCoverModelJson(model)) + "\"}");
+  } catch (const std::exception& error) { return ErrorResult(error.what()); }
+}
+EMSCRIPTEN_KEEPALIVE const char* set_cover_write_model(const double* costs, const double* starts, const double* elements, int subsets, int size, int format) {
+  try {
+    if (subsets < 0 || size < 0 || !starts || (subsets && !costs) || (size && !elements)) return ErrorResult("Invalid Set Cover export buffers.");
+    const auto model = BuildModel(costs, starts, elements, subsets, size);
+    return StoreString("{\"ok\":true,\"text\":\"" + JsonEscape(ortools_wasm::WriteSetCoverText(model, format)) + "\"}");
+  } catch (const std::exception& error) { return ErrorResult(error.what()); }
+}
+
+EMSCRIPTEN_KEEPALIVE const char* set_cover_mutate(
+    const double* costs, const double* starts, const double* elements, int num_subsets,
+    int num_elements, const double* selected, const double* focus, int focus_count,
+    int operation, int count, int subset, int select) {
+  try {
+    if (num_subsets < 0 || num_elements < 0 || !starts ||
+        (num_subsets && (!costs || !selected)) || (num_elements && !elements) ||
+        focus_count < -1 || (focus_count > 0 && !focus) || operation < 0 || operation > 2 || (select != 0 && select != 1))
+      throw std::invalid_argument("Invalid Set Cover mutation input buffers.");
+    auto model = BuildModel(costs, starts, elements, num_subsets, num_elements);
+    SetCoverInvariant invariant(&model);
+    invariant.LoadSolution(ReadSolution(selected, num_subsets));
+    std::vector<SubsetIndex> indices;
+    for (int i = 0; i < focus_count; ++i) indices.push_back(SubsetIndex(NumberToBaseInt(focus[i], "focus", i)));
+    const auto result = ortools_wasm::MutateSetCover(invariant, static_cast<ortools_wasm::SetCoverMutation>(operation),
+        count, indices, focus_count >= 0, subset, select != 0);
+    std::ostringstream out;
+    out << "{\"ok\":true,\"selected\":";
+    WriteBoolVector(out, invariant.is_selected().get());
+    out << ",\"trace\":[";
+    for (size_t i = 0; i < invariant.trace().size(); ++i) {
+      if (i) out << ',';
+      const auto& decision = invariant.trace()[i];
+      out << "{\"subset\":" << decision.subset().value() << ",\"selected\":" << (decision.decision() ? "true" : "false") << '}';
+    }
+    out << ']';
+    auto write_indices = [&out](const auto& values) {
+      out << '[';
+      for (size_t i = 0; i < values.size(); ++i) { if (i) out << ','; out << values[i].value(); }
+      out << ']';
+    };
+    if (operation == 2) {
+      out << ",\"removability\":{\"changed\":" << (result.changed ? "true" : "false") << ",\"newlyRemovableSubsets\":";
+      write_indices(result.newly_removable);
+      out << ",\"newlyNonRemovableSubsets\":"; write_indices(result.newly_non_removable); out << '}';
+    } else {
+      out << ",\"perturbationFocus\":"; write_indices(result.focus);
+    }
+    out << '}'; return StoreString(out.str());
+  } catch (const std::exception& error) { return ErrorResult(error.what()); }
+}
 
 EMSCRIPTEN_KEEPALIVE const char* set_cover_compress_trace(int num_subsets, const double* decisions, int count) {
   try {
@@ -298,6 +297,17 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_session_create(
   } catch (const std::exception& error) { return ErrorResult(error.what()); }
 }
 
+EMSCRIPTEN_KEEPALIVE const char* set_cover_session_statistics(uint32_t low, uint32_t high) {
+  try {
+    const auto session = g_guided_sessions.Find(SessionHandle(low, high));
+    std::lock_guard lock(session->mutex);
+    const auto timing = session->RunTime(); std::ostringstream out;
+    out << std::setprecision(17) << "{\"ok\":true,\"runTimeSeconds\":" << timing.first
+        << ",\"runTimeMicroseconds\":" << timing.second << '}';
+    return StoreString(out.str());
+  } catch (const std::exception& error) { return ErrorResult(error.what()); }
+}
+
 EMSCRIPTEN_KEEPALIVE const char* set_cover_session_initialize(uint32_t low, uint32_t high,
     const double* selected, int count, int mask, double lagrangian, double epsilon, double penalty, int tabu_size) {
   try {
@@ -327,6 +337,54 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_session_next(uint32_t low, uint32_t h
 EMSCRIPTEN_KEEPALIVE const char* set_cover_session_delete(uint32_t low, uint32_t high) {
   g_guided_sessions.Delete(SessionHandle(low, high));
   return StoreString("{\"ok\":true}");
+}
+
+EMSCRIPTEN_KEEPALIVE const char* set_cover_cft(const double* costs, const double* starts,
+    const double* elements, int num_subsets, int num_elements_data, const double* selected, int selection_size) {
+  try {
+    if (num_subsets < 0 || num_elements_data < 0 || !starts || (num_subsets && !costs) || (num_elements_data && !elements))
+      return ErrorResult("Invalid Set Cover CFT buffers.");
+    auto model = BuildModel(costs, starts, elements, num_subsets, num_elements_data);
+    if (selection_size < -1 || (selection_size >= 0 && (selection_size != num_subsets || (selection_size && !selected))))
+      return ErrorResult("Set Cover CFT initial selection dimensions do not match.");
+    SubsetBoolVector initial(num_subsets, false);
+    for (int i = 0; i < selection_size; ++i) initial[SubsetIndex(i)] = selected[i] != 0;
+    const auto result = ortools_wasm::RunSetCoverCft(model, selection_size < 0 ? nullptr : &initial);
+    const auto& dual = result.state.dual_state;
+    std::ostringstream out; out << std::setprecision(17) << "{\"ok\":true,\"cost\":";
+    WriteJsonNumber(out, result.state.solution.cost());
+    out << ",\"numUncoveredElements\":" << result.uncovered << ",\"selected\":";
+    WriteBoolVector(out, result.selected.get());
+    out << ",\"cftDual\":{\"lowerBound\":"; WriteJsonNumber(out, dual.lower_bound());
+    const auto write_vector = [&](const auto& values) {
+      out << '['; bool first = true;
+      for (double value : values) { if (!first) out << ','; first = false; WriteJsonNumber(out, value); }
+      out << ']';
+    };
+    out << ",\"reducedCosts\":"; write_vector(dual.reduced_costs());
+    out << ",\"multipliers\":"; write_vector(dual.multipliers());
+    out << "}}"; return StoreString(out.str());
+  } catch (const std::exception& error) { return ErrorResult(error.what()); }
+}
+
+EMSCRIPTEN_KEEPALIVE const char* set_cover_lagrangian_bound(const double* costs, const double* starts,
+    const double* elements, int num_subsets, int num_elements_data, double upper_bound) {
+  try {
+    if (num_subsets < 0 || num_elements_data < 0 || !starts || (num_subsets && !costs) || (num_elements_data && !elements))
+      return ErrorResult("Invalid Set Cover Lagrangian buffers.");
+    auto model = BuildModel(costs, starts, elements, num_subsets, num_elements_data);
+    const auto [bound, reduced, multipliers] = ortools_wasm::ComputeSetCoverLagrangianBound(model, upper_bound);
+    std::ostringstream out; out << std::setprecision(17) << "{\"ok\":true,\"lagrangianBound\":{\"lowerBound\":";
+    WriteJsonNumber(out, bound);
+    const auto write_vector = [&](const auto& values) {
+      out << '['; bool first = true;
+      for (double value : values) { if (!first) out << ','; first = false; WriteJsonNumber(out, value); }
+      out << ']';
+    };
+    out << ",\"reducedCosts\":"; write_vector(reduced);
+    out << ",\"multipliers\":"; write_vector(multipliers);
+    out << "}}"; return StoreString(out.str());
+  } catch (const std::exception& error) { return ErrorResult(error.what()); }
 }
 
 EMSCRIPTEN_KEEPALIVE const char* set_cover_statistics(const double* costs, const double* starts,
@@ -401,6 +459,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
             : std::numeric_limits<int64_t>::max();
 
     bool next = false;
+    std::optional<std::pair<double, double>> timing;
     std::optional<ortools_wasm::GuidedTabuParameters> effective_parameters;
     switch (operation) {
       case 8: break;
@@ -409,6 +468,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunListFocusGenerator(&generator, focus_data, focus_indices);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       case 1: {
@@ -416,6 +476,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunListFocusGenerator(&generator, focus_data, focus_indices);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       case 2: {
@@ -423,6 +484,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunBoolFocusGenerator(&generator, focus_data, focus);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       case 3: {
@@ -430,6 +492,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunBoolFocusGenerator(&generator, focus_data, focus);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       case 4: {
@@ -437,6 +500,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunListFocusGenerator(&generator, focus_data, focus_indices);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       case 5: {
@@ -444,6 +508,15 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunBoolFocusGenerator(&generator, focus_data, focus);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
+        break;
+      }
+      case 9: {
+        LazySteepestSearch generator(&invariant);
+        generator.SetMaxIterations(max_iters);
+        generator.SetTimeLimitInSeconds(time_limit_seconds);
+        next = RunBoolFocusGenerator(&generator, focus_data, focus);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       case 6: {
@@ -451,6 +524,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunListFocusGenerator(&generator, focus_data, focus_indices);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       case 7: {
@@ -461,6 +535,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
         generator.SetMaxIterations(max_iters);
         generator.SetTimeLimitInSeconds(time_limit_seconds);
         next = RunListFocusGenerator(&generator, focus_data, focus_indices);
+        timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
         break;
       }
       default:
@@ -502,6 +577,7 @@ EMSCRIPTEN_KEEPALIVE const char* set_cover_next_solution_with_limits(
           << ",\"selected\":" << (decision.decision() ? "true" : "false") << '}';
     }
     out << ']';
+    if (timing) out << ",\"runTimeSeconds\":" << timing->first << ",\"runTimeMicroseconds\":" << timing->second;
     if (effective_parameters) { out << ",\"guidedTabuParameters\":"; WriteGuidedTabuParameters(out, *effective_parameters); }
     out << "}";
     return StoreString(out.str());

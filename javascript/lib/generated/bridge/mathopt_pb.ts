@@ -4,13 +4,15 @@
 
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { MathOptIndicatorToMipRequest, MathOptIndicatorToMipRequestJson, MathOptRobustConstraintRequest, MathOptRobustConstraintRequestJson } from "./mathopt_model_transform_pb.js";
+import { file_mathopt_model_transform } from "./mathopt_model_transform_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file mathopt.proto.
  */
 export const file_mathopt: GenFile = /*@__PURE__*/
-  fileDesc("Cg1tYXRob3B0LnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIsoBChNNYXRoT3B0U29sdmVSZXF1ZXN0EhsKE3NvbHZlX3JlcXVlc3RfcHJvdG8YASABKAwSFwoPdXNlX2ludGVycnVwdGVyGAIgASgIEhoKEmludGVycnVwdF9hdF9zdGFydBgDIAEoCBIoChtjYWxsYmFja19yZWdpc3RyYXRpb25fcHJvdG8YBCABKAxIAIgBARIXCg9zdHJlYW1fbWVzc2FnZXMYBSABKAhCHgocX2NhbGxiYWNrX3JlZ2lzdHJhdGlvbl9wcm90byI+Ch9NYXRoT3B0SW5jcmVtZW50YWxDcmVhdGVSZXF1ZXN0EhsKE3NvbHZlX3JlcXVlc3RfcHJvdG8YASABKAwinQIKHk1hdGhPcHRJbmNyZW1lbnRhbFNvbHZlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgCIAEoDBIfChJtb2RlbF91cGRhdGVfcHJvdG8YAyABKAxIAIgBARIXCg91c2VfaW50ZXJydXB0ZXIYBCABKAgSGgoSaW50ZXJydXB0X2F0X3N0YXJ0GAUgASgIEigKG2NhbGxiYWNrX3JlZ2lzdHJhdGlvbl9wcm90bxgGIAEoDEgBiAEBEhcKD3N0cmVhbV9tZXNzYWdlcxgHIAEoCEIVChNfbW9kZWxfdXBkYXRlX3Byb3RvQh4KHF9jYWxsYmFja19yZWdpc3RyYXRpb25fcHJvdG8iMQofTWF0aE9wdEluY3JlbWVudGFsRGVsZXRlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQiTQofTWF0aE9wdEluY3JlbWVudGFsVXBkYXRlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQSGgoSbW9kZWxfdXBkYXRlX3Byb3RvGAIgASgMIlEKHE1hdGhPcHRWYWxpZGF0ZVJlc3VsdFJlcXVlc3QSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgBIAEoDBIUCgxyZXN1bHRfcHJvdG8YAiABKAwiVQobTWF0aE9wdENvbnZlcnRSZXN1bHRSZXF1ZXN0EgwKBGtpbmQYASABKAUSEwoLbW9kZWxfcHJvdG8YAiABKAwSEwoLaW5wdXRfcHJvdG8YAyABKAwirwUKFE1hdGhPcHRCcmlkZ2VSZXF1ZXN0EjwKBXNvbHZlGAEgASgLMisub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0U29sdmVSZXF1ZXN0SAASVQoSaW5jcmVtZW50YWxfY3JlYXRlGAIgASgLMjcub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0SW5jcmVtZW50YWxDcmVhdGVSZXF1ZXN0SAASUwoRaW5jcmVtZW50YWxfc29sdmUYAyABKAsyNi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRJbmNyZW1lbnRhbFNvbHZlUmVxdWVzdEgAElUKEmluY3JlbWVudGFsX2RlbGV0ZRgEIAEoCzI3Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdEluY3JlbWVudGFsRGVsZXRlUmVxdWVzdEgAEhwKEm1vZGVsX3Byb3RvX3RvX21wcxgFIAEoDEgAEhwKEm1wc190b19tb2RlbF9wcm90bxgGIAEoCUgAEhgKDnZhbGlkYXRlX21vZGVsGAcgASgMSAASTwoPdmFsaWRhdGVfcmVzdWx0GAggASgLMjQub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0VmFsaWRhdGVSZXN1bHRSZXF1ZXN0SAASVQoSaW5jcmVtZW50YWxfdXBkYXRlGAkgASgLMjcub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0SW5jcmVtZW50YWxVcGRhdGVSZXF1ZXN0SAASTQoOY29udmVydF9yZXN1bHQYCiABKAsyMy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRDb252ZXJ0UmVzdWx0UmVxdWVzdEgAQgkKB3BheWxvYWQiyAEKFU1hdGhPcHRCcmlkZ2VSZXNwb25zZRIcChRzb2x2ZV9yZXNwb25zZV9wcm90bxgBIAEoDBINCgNtcHMYAiABKAlIABIVCgttb2RlbF9wcm90bxgDIAEoDEgAEhoKEHZhbGlkYXRpb25fZXJyb3IYBCABKAlIABIgChZ2YWxpZGF0ZWRfcmVzdWx0X3Byb3RvGAUgASgMSAASGAoOdXBkYXRlX2FwcGxpZWQYBiABKAhIAEITChFjb252ZXJzaW9uX3Jlc3VsdCIjCg9NYXRoT3B0TG9nRXZlbnQSEAoIbWVzc2FnZXMYAiADKAliBnByb3RvMw");
+  fileDesc("Cg1tYXRob3B0LnByb3RvEhZvcnRvb2xzX3dhc20uYnJpZGdlLnYxIsoBChNNYXRoT3B0U29sdmVSZXF1ZXN0EhsKE3NvbHZlX3JlcXVlc3RfcHJvdG8YASABKAwSFwoPdXNlX2ludGVycnVwdGVyGAIgASgIEhoKEmludGVycnVwdF9hdF9zdGFydBgDIAEoCBIoChtjYWxsYmFja19yZWdpc3RyYXRpb25fcHJvdG8YBCABKAxIAIgBARIXCg9zdHJlYW1fbWVzc2FnZXMYBSABKAhCHgocX2NhbGxiYWNrX3JlZ2lzdHJhdGlvbl9wcm90byI+Ch9NYXRoT3B0SW5jcmVtZW50YWxDcmVhdGVSZXF1ZXN0EhsKE3NvbHZlX3JlcXVlc3RfcHJvdG8YASABKAwinQIKHk1hdGhPcHRJbmNyZW1lbnRhbFNvbHZlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgCIAEoDBIfChJtb2RlbF91cGRhdGVfcHJvdG8YAyABKAxIAIgBARIXCg91c2VfaW50ZXJydXB0ZXIYBCABKAgSGgoSaW50ZXJydXB0X2F0X3N0YXJ0GAUgASgIEigKG2NhbGxiYWNrX3JlZ2lzdHJhdGlvbl9wcm90bxgGIAEoDEgBiAEBEhcKD3N0cmVhbV9tZXNzYWdlcxgHIAEoCEIVChNfbW9kZWxfdXBkYXRlX3Byb3RvQh4KHF9jYWxsYmFja19yZWdpc3RyYXRpb25fcHJvdG8iMQofTWF0aE9wdEluY3JlbWVudGFsRGVsZXRlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQiTQofTWF0aE9wdEluY3JlbWVudGFsVXBkYXRlUmVxdWVzdBIOCgZoYW5kbGUYASABKAQSGgoSbW9kZWxfdXBkYXRlX3Byb3RvGAIgASgMIlEKHE1hdGhPcHRWYWxpZGF0ZVJlc3VsdFJlcXVlc3QSGwoTc29sdmVfcmVxdWVzdF9wcm90bxgBIAEoDBIUCgxyZXN1bHRfcHJvdG8YAiABKAwiVQobTWF0aE9wdENvbnZlcnRSZXN1bHRSZXF1ZXN0EgwKBGtpbmQYASABKAUSEwoLbW9kZWxfcHJvdG8YAiABKAwSEwoLaW5wdXRfcHJvdG8YAyABKAwi5gEKIU1hdGhPcHRJbmZlYXNpYmxlU3Vic3lzdGVtUmVxdWVzdBIbChNzb2x2ZV9yZXF1ZXN0X3Byb3RvGAEgASgMEhcKD3VzZV9pbnRlcnJ1cHRlchgCIAEoCBIaChJpbnRlcnJ1cHRfYXRfc3RhcnQYAyABKAgSFwoPc3RyZWFtX21lc3NhZ2VzGAQgASgIEhMKBmhhbmRsZRgFIAEoBEgAiAEBEh8KEm1vZGVsX3VwZGF0ZV9wcm90bxgGIAEoDEgBiAEBQgkKB19oYW5kbGVCFQoTX21vZGVsX3VwZGF0ZV9wcm90byKvCAoUTWF0aE9wdEJyaWRnZVJlcXVlc3QSPAoFc29sdmUYASABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRTb2x2ZVJlcXVlc3RIABJVChJpbmNyZW1lbnRhbF9jcmVhdGUYAiABKAsyNy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRJbmNyZW1lbnRhbENyZWF0ZVJlcXVlc3RIABJTChFpbmNyZW1lbnRhbF9zb2x2ZRgDIAEoCzI2Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdEluY3JlbWVudGFsU29sdmVSZXF1ZXN0SAASVQoSaW5jcmVtZW50YWxfZGVsZXRlGAQgASgLMjcub3J0b29sc193YXNtLmJyaWRnZS52MS5NYXRoT3B0SW5jcmVtZW50YWxEZWxldGVSZXF1ZXN0SAASHAoSbW9kZWxfcHJvdG9fdG9fbXBzGAUgASgMSAASHAoSbXBzX3RvX21vZGVsX3Byb3RvGAYgASgJSAASGAoOdmFsaWRhdGVfbW9kZWwYByABKAxIABJPCg92YWxpZGF0ZV9yZXN1bHQYCCABKAsyNC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRWYWxpZGF0ZVJlc3VsdFJlcXVlc3RIABJVChJpbmNyZW1lbnRhbF91cGRhdGUYCSABKAsyNy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLk1hdGhPcHRJbmNyZW1lbnRhbFVwZGF0ZVJlcXVlc3RIABJNCg5jb252ZXJ0X3Jlc3VsdBgKIAEoCzIzLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdENvbnZlcnRSZXN1bHRSZXF1ZXN0SAASYQocY29tcHV0ZV9pbmZlYXNpYmxlX3N1YnN5c3RlbRgLIAEoCzI5Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdEluZmVhc2libGVTdWJzeXN0ZW1SZXF1ZXN0SAASIgoYY2hlY2tfcHJpbWFsX2ZlYXNpYmlsaXR5GAwgASgMSAASGgoQaW1wcm92ZV9zb2x1dGlvbhgPIAEoDEgAEhsKEWV4cHJlc3Npb25fYm91bmRzGBAgASgMSAASZQolZm9ybXVsYXRlX2luZGljYXRvcl9jb25zdHJhaW50X2FzX21pcBgNIAEoCzI0Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdEluZGljYXRvclRvTWlwUmVxdWVzdEgAElcKFWFkZF9yb2J1c3RfY29uc3RyYWludBgOIAEoCzI2Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuTWF0aE9wdFJvYnVzdENvbnN0cmFpbnRSZXF1ZXN0SABCCQoHcGF5bG9hZCKeAgoVTWF0aE9wdEJyaWRnZVJlc3BvbnNlEhwKFHNvbHZlX3Jlc3BvbnNlX3Byb3RvGAEgASgMEg0KA21wcxgCIAEoCUgAEhUKC21vZGVsX3Byb3RvGAMgASgMSAASGgoQdmFsaWRhdGlvbl9lcnJvchgEIAEoCUgAEiAKFnZhbGlkYXRlZF9yZXN1bHRfcHJvdG8YBSABKAxIABIYCg51cGRhdGVfYXBwbGllZBgGIAEoCEgAEhwKEnByaW1hbF9mZWFzaWJpbGl0eRgHIAEoDEgAEhkKD2ltcHJvdmVkX3ZhbHVlcxgIIAEoDEgAEhsKEWV4cHJlc3Npb25fYm91bmRzGAkgASgMSABCEwoRY29udmVyc2lvbl9yZXN1bHQiIwoPTWF0aE9wdExvZ0V2ZW50EhAKCG1lc3NhZ2VzGAIgAygJYgZwcm90bzM", [file_mathopt_model_transform]);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MathOptSolveRequest
@@ -362,6 +364,85 @@ export const MathOptConvertResultRequestSchema: GenMessage<MathOptConvertResultR
   messageDesc(file_mathopt, 6);
 
 /**
+ * @generated from message ortools_wasm.bridge.v1.MathOptInfeasibleSubsystemRequest
+ */
+export type MathOptInfeasibleSubsystemRequest = Message<"ortools_wasm.bridge.v1.MathOptInfeasibleSubsystemRequest"> & {
+  /**
+   * @generated from field: bytes solve_request_proto = 1;
+   */
+  solveRequestProto: Uint8Array;
+
+  /**
+   * @generated from field: bool use_interrupter = 2;
+   */
+  useInterrupter: boolean;
+
+  /**
+   * @generated from field: bool interrupt_at_start = 3;
+   */
+  interruptAtStart: boolean;
+
+  /**
+   * @generated from field: bool stream_messages = 4;
+   */
+  streamMessages: boolean;
+
+  /**
+   * @generated from field: optional uint64 handle = 5;
+   */
+  handle?: bigint | undefined;
+
+  /**
+   * @generated from field: optional bytes model_update_proto = 6;
+   */
+  modelUpdateProto?: Uint8Array | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.MathOptInfeasibleSubsystemRequest
+ */
+export type MathOptInfeasibleSubsystemRequestJson = {
+  /**
+   * @generated from field: bytes solve_request_proto = 1;
+   */
+  solveRequestProto?: string;
+
+  /**
+   * @generated from field: bool use_interrupter = 2;
+   */
+  useInterrupter?: boolean;
+
+  /**
+   * @generated from field: bool interrupt_at_start = 3;
+   */
+  interruptAtStart?: boolean;
+
+  /**
+   * @generated from field: bool stream_messages = 4;
+   */
+  streamMessages?: boolean;
+
+  /**
+   * @generated from field: optional uint64 handle = 5;
+   */
+  handle?: string;
+
+  /**
+   * @generated from field: optional bytes model_update_proto = 6;
+   */
+  modelUpdateProto?: string;
+};
+
+export type MathOptInfeasibleSubsystemRequestValid = MathOptInfeasibleSubsystemRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.MathOptInfeasibleSubsystemRequest.
+ * Use `create(MathOptInfeasibleSubsystemRequestSchema)` to create a new message.
+ */
+export const MathOptInfeasibleSubsystemRequestSchema: GenMessage<MathOptInfeasibleSubsystemRequest, {jsonType: MathOptInfeasibleSubsystemRequestJson, validType: MathOptInfeasibleSubsystemRequestValid}> = /*@__PURE__*/
+  messageDesc(file_mathopt, 7);
+
+/**
  * @generated from message ortools_wasm.bridge.v1.MathOptBridgeRequest
  */
 export type MathOptBridgeRequest = Message<"ortools_wasm.bridge.v1.MathOptBridgeRequest"> & {
@@ -428,6 +509,42 @@ export type MathOptBridgeRequest = Message<"ortools_wasm.bridge.v1.MathOptBridge
      */
     value: MathOptConvertResultRequest;
     case: "convertResult";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MathOptInfeasibleSubsystemRequest compute_infeasible_subsystem = 11;
+     */
+    value: MathOptInfeasibleSubsystemRequest;
+    case: "computeInfeasibleSubsystem";
+  } | {
+    /**
+     * @generated from field: bytes check_primal_feasibility = 12;
+     */
+    value: Uint8Array;
+    case: "checkPrimalFeasibility";
+  } | {
+    /**
+     * @generated from field: bytes improve_solution = 15;
+     */
+    value: Uint8Array;
+    case: "improveSolution";
+  } | {
+    /**
+     * @generated from field: bytes expression_bounds = 16;
+     */
+    value: Uint8Array;
+    case: "expressionBounds";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MathOptIndicatorToMipRequest formulate_indicator_constraint_as_mip = 13;
+     */
+    value: MathOptIndicatorToMipRequest;
+    case: "formulateIndicatorConstraintAsMip";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.MathOptRobustConstraintRequest add_robust_constraint = 14;
+     */
+    value: MathOptRobustConstraintRequest;
+    case: "addRobustConstraint";
   } | { case: undefined; value?: undefined };
 };
 
@@ -484,6 +601,36 @@ export type MathOptBridgeRequestJson = {
    * @generated from field: ortools_wasm.bridge.v1.MathOptConvertResultRequest convert_result = 10;
    */
   convertResult?: MathOptConvertResultRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MathOptInfeasibleSubsystemRequest compute_infeasible_subsystem = 11;
+   */
+  computeInfeasibleSubsystem?: MathOptInfeasibleSubsystemRequestJson;
+
+  /**
+   * @generated from field: bytes check_primal_feasibility = 12;
+   */
+  checkPrimalFeasibility?: string;
+
+  /**
+   * @generated from field: bytes improve_solution = 15;
+   */
+  improveSolution?: string;
+
+  /**
+   * @generated from field: bytes expression_bounds = 16;
+   */
+  expressionBounds?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MathOptIndicatorToMipRequest formulate_indicator_constraint_as_mip = 13;
+   */
+  formulateIndicatorConstraintAsMip?: MathOptIndicatorToMipRequestJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.MathOptRobustConstraintRequest add_robust_constraint = 14;
+   */
+  addRobustConstraint?: MathOptRobustConstraintRequestJson;
 };
 
 export type MathOptBridgeRequestValid = MathOptBridgeRequest;
@@ -493,7 +640,7 @@ export type MathOptBridgeRequestValid = MathOptBridgeRequest;
  * Use `create(MathOptBridgeRequestSchema)` to create a new message.
  */
 export const MathOptBridgeRequestSchema: GenMessage<MathOptBridgeRequest, {jsonType: MathOptBridgeRequestJson, validType: MathOptBridgeRequestValid}> = /*@__PURE__*/
-  messageDesc(file_mathopt, 7);
+  messageDesc(file_mathopt, 8);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MathOptBridgeResponse
@@ -537,6 +684,24 @@ export type MathOptBridgeResponse = Message<"ortools_wasm.bridge.v1.MathOptBridg
      */
     value: boolean;
     case: "updateApplied";
+  } | {
+    /**
+     * @generated from field: bytes primal_feasibility = 7;
+     */
+    value: Uint8Array;
+    case: "primalFeasibility";
+  } | {
+    /**
+     * @generated from field: bytes improved_values = 8;
+     */
+    value: Uint8Array;
+    case: "improvedValues";
+  } | {
+    /**
+     * @generated from field: bytes expression_bounds = 9;
+     */
+    value: Uint8Array;
+    case: "expressionBounds";
   } | { case: undefined; value?: undefined };
 };
 
@@ -573,6 +738,21 @@ export type MathOptBridgeResponseJson = {
    * @generated from field: bool update_applied = 6;
    */
   updateApplied?: boolean;
+
+  /**
+   * @generated from field: bytes primal_feasibility = 7;
+   */
+  primalFeasibility?: string;
+
+  /**
+   * @generated from field: bytes improved_values = 8;
+   */
+  improvedValues?: string;
+
+  /**
+   * @generated from field: bytes expression_bounds = 9;
+   */
+  expressionBounds?: string;
 };
 
 export type MathOptBridgeResponseValid = MathOptBridgeResponse;
@@ -582,7 +762,7 @@ export type MathOptBridgeResponseValid = MathOptBridgeResponse;
  * Use `create(MathOptBridgeResponseSchema)` to create a new message.
  */
 export const MathOptBridgeResponseSchema: GenMessage<MathOptBridgeResponse, {jsonType: MathOptBridgeResponseJson, validType: MathOptBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_mathopt, 8);
+  messageDesc(file_mathopt, 9);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.MathOptLogEvent
@@ -615,5 +795,5 @@ export type MathOptLogEventValid = MathOptLogEvent;
  * Use `create(MathOptLogEventSchema)` to create a new message.
  */
 export const MathOptLogEventSchema: GenMessage<MathOptLogEvent, {jsonType: MathOptLogEventJson, validType: MathOptLogEventValid}> = /*@__PURE__*/
-  messageDesc(file_mathopt, 9);
+  messageDesc(file_mathopt, 10);
 

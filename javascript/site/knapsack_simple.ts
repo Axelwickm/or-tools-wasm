@@ -1,3 +1,4 @@
+import { setControlAvailable } from './example_controls.js';
 import {
   type ExecutorConfiguration,
   KnapsackSolver,
@@ -206,9 +207,11 @@ async function runKnapsack() {
   }
 }
 
-backendSelector.addEventListener('change', () => {
-  workerCount.disabled = backendSelector.value !== String(KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER);
-});
+function updateWorkerControl() {
+  setControlAvailable(workerCount, backendSelector.value === String(KnapsackSolverType.KNAPSACK_MULTIDIMENSION_CP_SAT_SOLVER));
+}
+backendSelector.addEventListener('change', updateWorkerControl);
+updateWorkerControl();
 
 function addItem() {
   syncFromInputs();

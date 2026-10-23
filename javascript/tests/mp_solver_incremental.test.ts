@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
@@ -111,4 +112,84 @@ test('retained MPSolver sessions snapshot, acknowledge ordered edits and reject 
     delete state.__mpSessionTest;
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('abandoned server MPSolver creation drains its handle and closes the native session', { timeout: 10_000 }, async t => {
+  const directory = await mkdtemp(fileURLToPath(new URL('.mp-abandoned-', import.meta.url)));
+  try {
+    const linearSchema = await readFile(new URL('../../ortools/linear_solver/linear_solver.proto', import.meta.url), 'utf8');
+    const optionalSchema = await readFile(new URL('../../ortools/util/optional_boolean.proto', import.meta.url), 'utf8');
+    const outfile = `${directory}/api.mjs`;
+    await build({ stdin: { resolveDir: fileURLToPath(new URL('../lib', import.meta.url)), contents: `
+      export * from './mp_solver/api.ts';
+      export { mpSolverProtocol } from './mp_solver/protocol.ts';
+      export * from './solver_bridge.ts';
+      export { createSolverJobStatusEvent, SolverJobState } from './solver_executor.ts';
+    ` }, outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external' });
+    const api = await import(outfile);
+    for (const modern of [false, true]) for (const stage of ['headers', 'body', 'result', 'normal-close']) {
+      await t.test(`${modern ? 'result-first' : 'Python-style'} ${stage}`, async () => {
+        const controller = new AbortController(), reason = new Error('creation cancelled');
+        const handles = new Set<bigint>(), controls: string[] = [];
+        let closed = 0, accept!: Uint8Array, terminal!: Uint8Array;
+        let deliver!: (response: Response) => void, body!: ReadableStreamDefaultController<Uint8Array>;
+        let resultStream!: ReadableStreamDefaultController<Uint8Array>;
+        let started!: () => void;
+        const created = new Promise<void>(resolve => { started = resolve; });
+        const executor = { type: 'server', url: 'http://unused.invalid', fetch: async (url: URL, init?: RequestInit) => {
+          if (url.pathname === '/jobs') {
+            const outer = api.decodeSolverBridgeRequest(new Uint8Array(init!.body as ArrayBuffer));
+            const operation = api.mpSolverProtocol.decodeRequest(outer.operation.value);
+            const response = (result: unknown) => new Response(api.encodeSolverBridgeResult(outer.requestId, 'mp-solver', api.mpSolverProtocol.encodeResult(result)));
+            if (operation.type === 'schema') return response({ type: 'schema', linearSolverProtoSchema: linearSchema, optionalBooleanProtoSchema: optionalSchema, backendVersions: {} });
+            if (operation.type === 'sessionClose') {
+              assert.equal(operation.handle, 77n);
+              assert.ok(handles.delete(77n), 'Native session closes exactly once'); ++closed;
+              return response({ type: 'sessionResult', hasSolution: false, response: new Uint8Array() });
+            }
+            assert.equal(operation.type, 'sessionCreate'); handles.add(77n);
+            accept = api.encodeSolverBridgeStatus(outer.requestId, 'mp-solver',
+              api.createSolverJobStatusEvent('mp-solver', outer.requestId, api.SolverJobState.RUNNING, 0n).status, 7n, 1n);
+            terminal = api.encodeSolverBridgeResult(outer.requestId, 'mp-solver', api.mpSolverProtocol.encodeResult({ type: 'sessionCreate', handle: 77n }), 7n, 2n);
+            started();
+            if (stage === 'headers') return new Promise<Response>(resolve => { deliver = resolve; });
+            if (stage === 'body') return new Response(new ReadableStream<Uint8Array>({ start(controller) { body = controller; } }), { status: 202 });
+            return new Response(new Uint8Array(accept), { status: 202 });
+          }
+          if (url.pathname.endsWith('/cancel') || url.pathname.endsWith('/interrupt')) {
+            controls.push(url.pathname);
+            throw new Error('Stopping creation would discard its native handle');
+          }
+          if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+          if (url.pathname.endsWith('/stream')) return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+            resultStream = controller;
+            if (stage !== 'result') {
+              controller.enqueue(new TextEncoder().encode(`data: ${Buffer.from(terminal).toString('base64')}\n\n`)); controller.close();
+            }
+          } }), { headers: { 'content-type': 'text/event-stream' } });
+          throw new Error(`Unexpected request: ${url}`);
+        } };
+        const options = { executor, signal: controller.signal, solverType: api.OptimizationProblemType.GLOP_LINEAR_PROGRAMMING };
+        const session = modern ? new api.MpModel('modern').incremental(options)
+          : new api.MPSolver.IncrementalSolver(new api.MPSolver('legacy', api.MPSolver.GLOP_LINEAR_PROGRAMMING), options);
+        await created;
+        if (stage === 'normal-close') await session.close();
+        else {
+          const failed = stage === 'body' ? Promise.resolve() : assert.rejects(session.solve(), error => error === reason);
+          if (stage === 'result') for (let turn = 0; !resultStream && turn < 20; ++turn) await nextTurn();
+          controller.abort(reason); await failed;
+          await session.close(); await session.close();
+          assert.equal(handles.size, 1, 'Creation completed natively before acceptance reached the caller');
+          if (stage === 'headers') deliver(new Response(new Uint8Array(accept), { status: 202 }));
+          if (stage === 'body') { body.enqueue(accept); body.close(); }
+          if (stage === 'result') {
+            resultStream.enqueue(new TextEncoder().encode(`data: ${Buffer.from(terminal).toString('base64')}\n\n`)); resultStream.close();
+          }
+          for (let turn = 0; closed === 0 && turn < 30; ++turn) await nextTurn();
+        }
+        assert.equal(closed, 1); assert.equal(handles.size, 0);
+        assert.deepEqual(controls, [], 'Creation is drained, not cancelled by the server scheduler');
+      });
+    }
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

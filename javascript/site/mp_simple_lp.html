@@ -10,40 +10,65 @@
       #status { min-height: 8rem; }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
-    <h1>MPSolver - frontend sample</h1>
+    <h1>MPSolver — two choices</h1>
     <p><em>Problem: solve one small linear model through MPSolver while switching between available LP and integer backends.</em></p>
-    <div class="code-toggle">
+
+    <p>
+      MPSolver routes one tiny linear model through selectable backends. GLOP, CLP,
+      and GLPK_LP solve it as a continuous LP; SAT, GLPK, SCIP, CBC, BOP, and Knapsack solve the same model with integral variables.
+    </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Choose values for x and y without exceeding the shared capacity.</li>
+        <li>The objective rewards x twice as much as y.</li>
+        <li>Compare the answers from different solvers in the result table.</li>
+      </ul>
+    </div>
+    <div class="controls">
+<label>
+        Backend
+        <select id="solver">
+          <option value="GLOP">GLOP</option>
+          <option value="CLP">CLP</option>
+          <option value="GLPK_LP">GLPK LP</option>
+          <option value="GLPK">GLPK MIP</option>
+          <option value="SCIP">SCIP MIP</option>
+          <option value="CBC">CBC MIP</option>
+          <option value="BOP">BOP MIP</option>
+          <option value="KNAPSACK">Knapsack MIP</option>
+          <option value="SAT">SAT</option>
+        </select>
+      </label>
+<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+<label>Threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+
+<div class="control-actions"><button id="run" data-idle-label="Solve model">Solve model</button></div>
+</div>
+<details class="advanced-settings" id="advanced-settings"><summary>Advanced settings</summary>
+<section class="settings-group"><h3>Warm starts and callbacks</h3><div class="option-grid"><label title="GLOP can start from an explicit native basis; SCIP callbacks can add a lazy constraint during search."><input id="warm-start" type="checkbox"> Warm-start basis</label>
+<label hidden title="GLOP can start from an explicit native basis; SCIP callbacks can add a lazy constraint during search."><input id="lazy-limit" type="checkbox"> Lazy constraint</label>
+<label title="Optional bound clamping returns a new sample response; it does not verify constraints or update objective/status certificates."><input id="incremental" type="checkbox"> Update x and solve again</label>
+<label title="Optional bound clamping returns a new sample response; it does not verify constraints or update objective/status certificates."><input id="clamp-sample" type="checkbox"> Clamp a sample point</label>
+</div></section>
+<section class="settings-group"><h3>Solver settings</h3><div class="option-grid"><label>Solver-specific parameters <input id="solver-parameters" type="text" placeholder="Optional backend settings"></label>
+</div></section>
+</details>
+
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the solution.</div>
+    </section>
+    <details class="solve-log" open><summary>Solve log</summary><pre id="status" aria-live="polite"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
-        <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { MpModel, MPSolver } from 'or-tools-wasm/mp-solver';
-
-const solver = MPSolver.createSolver('GLOP');
-if (!solver) throw new Error('GLOP is unavailable');
-solver.setNumThreads(4);
-
-const x = solver.addNumVariable(0, 1, 'x');
-const y = solver.addNumVariable(0, 1, 'y');
-const c0 = solver.addConstraint(-solver.infinity(), 1);
-c0.setCoefficient(x, 1);
-c0.setCoefficient(y, 1);
-
-const objective = solver.objective();
-objective.setCoefficient(x, 2);
-objective.setCoefficient(y, 1);
-objective.setMaximization();
-
-await solver.solveWithProto({ executor: 'worker',
-  messageCallback: messages => messages.forEach(message => console.log(message)),
-});
-if (!await solver.verifySolution(1e-7, true, { executor: 'worker' })) {
-  throw new Error('Solution verification failed');
-}
-console.log(x.solutionValue(), y.solutionValue());</code></pre>
+        <summary title="Updates when you change the example settings.">Show code</summary>
+        <pre class="code-block"><code data-highlight="ts"></code></pre>
         <pre class="code-block"><code data-highlight="ts">const model = new MpModel('retained answers');
 const retainedX = model.addNumVariable(0, 1, 'x');
 model.objective().setCoefficient(retainedX, 2);
@@ -60,58 +85,11 @@ try {
 } finally {
   await session.close();
 }</code></pre>
-        <pre class="code-block"><code data-highlight="ts">const conflict = new MpModel('conflicting limits');
-const limit = conflict.addNumVariable(0, 10, 'x');
-conflict.addConstraint(2, Infinity).setCoefficient(limit, 1);
-conflict.addConstraint(-Infinity, 1).setCoefficient(limit, 1);
-const iis = await conflict.computeIrreducibleInfeasibleSubset({
-  executor: 'worker', timeLimitSeconds: 5,
-});
-console.log(iis.isInfeasible, iis.constraintIndices);</code></pre>
       </details>
     </div>
-    <p>
-      MPSolver routes one tiny linear model through selectable backends. GLOP, CLP,
-      and GLPK_LP solve it as a continuous LP; SAT, GLPK, SCIP, CBC, BOP, and Knapsack solve the same model with integral variables.
-    </p>
-    <div class="example-explanation">
-      <h2>Model</h2>
-      <ul>
-        <li>The model has two variables, one capacity constraint, and one linear objective.</li>
-        <li>The solver menu changes which MPSolver backend receives the model.</li>
-        <li>LP backends solve continuous variables; integer backends solve integral variables.</li>
-        <li>The result compares objective value, variable values, iterations, and branch-and-bound nodes.</li>
-        <li>Native solver messages appear in the log for supported backends.</li>
-        <li>SCIP can diagnose conflicting limits, returning the source constraints and bounds in its native infeasible subsystem.</li>
-        <li>Retained sessions solve twice on the same native solver, applying a bound change through native setters. GLPK server sessions are unavailable because its environment belongs to the creating job thread.</li>
-      </ul>
-    </div>
-    <div class="controls">
-      <label>
-        Backend
-        <select id="solver">
-          <option value="GLOP">GLOP</option>
-          <option value="CLP">CLP</option>
-          <option value="GLPK_LP">GLPK LP</option>
-          <option value="GLPK">GLPK MIP</option>
-          <option value="SCIP">SCIP MIP</option>
-          <option value="CBC">CBC MIP</option>
-          <option value="BOP">BOP MIP</option>
-          <option value="KNAPSACK">Knapsack MIP</option>
-          <option value="SAT">SAT</option>
-        </select>
-      </label>
-      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <label>Solver-specific parameters <input id="solver-parameters" type="text" placeholder="Optional backend settings"></label>
-      <label><input id="incremental" type="checkbox"> Retain solver and update x upper bound to 0</label>
-      <button id="run" data-idle-label="Solve model">Solve model</button>
-      <button id="diagnose">Diagnose conflicting limits (SCIP)</button>
-    </div>
-    <div id="solution-output">Run the solver to view the solution.</div>
-    <p>Status / Response:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./mp_simple_lp.ts"></script>
-  </body>
+    <script type="module" src="./live_example_code.ts"></script>
+</body>
 </html>

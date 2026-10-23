@@ -26,6 +26,7 @@ export type MinCostFlowOperation = {
   unitCosts: bigint[];
   supplies: bigint[];
   solveMaxFlowWithMinCost: boolean;
+  priceScaling?: boolean;
 };
 
 export type LinearSumAssignmentOperation = {
@@ -73,7 +74,12 @@ function decodeOperation(payload: Uint8Array): NetworkFlowOperation {
   const request = fromBinary(NetworkFlowBridgeRequestSchema, payload);
   switch (request.payload.case) {
     case 'maxFlow': return { type: 'maxFlow', ...request.payload.value };
-    case 'minCostFlow': return { type: 'minCostFlow', ...request.payload.value };
+    case 'minCostFlow': {
+      const value = request.payload.value;
+      return { type: 'minCostFlow', tails: value.tails, heads: value.heads, capacities: value.capacities,
+        unitCosts: value.unitCosts, supplies: value.supplies, solveMaxFlowWithMinCost: value.solveMaxFlowWithMinCost,
+        ...(value.priceScaling === undefined ? {} : { priceScaling: value.priceScaling }) };
+    }
     case 'linearSumAssignment': return { type: 'linearSumAssignment', ...request.payload.value };
     default: throw new Error('Network Flow bridge request has no operation.');
   }

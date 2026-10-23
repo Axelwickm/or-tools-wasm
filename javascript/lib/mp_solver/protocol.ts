@@ -5,10 +5,11 @@ import type { SolverExecutor, SolverJob } from '../solver_executor.js';
 import {
   MpSolverBridgeRequestSchema,
   MpSolverLogEventSchema,
-  MpSolverIisRequestSchema,
-  MpSolverIisResultSchema,
+  MpSolverCallbackRegistrationSchema,
   MpSolverBridgeResponseSchema,
   MpSolverSchemaRequestSchema,
+  MpSolverCapabilitiesRequestSchema,
+  MpSolverCapabilitiesResultSchema,
   MpSolverImportModelRequestSchema,
   MpSolverImportModelResultSchema,
   MpSolverValidateModelRequestSchema,
@@ -25,12 +26,17 @@ import {
   MpSolverActivitiesRequestSchema,
   MpSolverActivitiesResultSchema,
   MpSolverLoadSolutionRequestSchema,
+  MpSolverClampSolutionRequestSchema,
   MpSolverLoadSolutionResultSchema,
 } from '../generated/bridge/mp_solver_pb.js';
 
 export type MpSolverEdit = MessageInitShape<typeof MpSolverEditSchema>;
 export { MpSolverEdit_Kind, MpSolverSessionRunRequest_Action } from '../generated/bridge/mp_solver_pb.js';
-export type MpSolverSessionRun = {
+export type MpSolverSearchOptions = {
+  startingBasis?: { variableStatuses: number[]; constraintStatuses: number[] };
+  callbackRegistration?: MessageInitShape<typeof MpSolverCallbackRegistrationSchema>;
+};
+export type MpSolverSessionRun = MpSolverSearchOptions & {
   type: 'sessionRun'; handle: bigint; action: number; edits: MpSolverEdit[];
   request: Uint8Array; numThreads: number; interruptible: boolean;
   streamMessages?: boolean;
@@ -38,10 +44,12 @@ export type MpSolverSessionRun = {
 };
 
 export type MpSolverOperation =
+  | { type: 'clampSolution'; model: Uint8Array; solution: Uint8Array; solverType: number }
+  | { type: 'capabilities'; solverType: number }
   | { type: 'sessionCreate'; request: Uint8Array }
   | MpSolverSessionRun
   | { type: 'sessionClose'; handle: bigint }
-  | {
+  | (MpSolverSearchOptions & {
     type: 'solve';
     request: Uint8Array;
     numThreads: number;
@@ -49,8 +57,7 @@ export type MpSolverOperation =
     streamMessages?: boolean;
     editableSnapshot?: boolean;
     parameters?: { doubleParams: Record<number, number>; integerParams: Record<number, number> };
-  }
-  | { type: 'iis'; model: Uint8Array; solverType: number; solverSpecificParameters: string; timeLimitSeconds?: number; nodeLimit?: bigint; interruptible: boolean }
+  })
   | { type: 'validateModel'; model: Uint8Array }
   | { type: 'validateParameters'; solverType: number; parameters: string }
   | { type: 'verifySolution'; model: Uint8Array; solution: Uint8Array; solverType: number; tolerance: number; logErrors: boolean }
@@ -69,16 +76,10 @@ export type MpSolverNativeMetadata = {
   exactConditionNumber?: number;
 };
 
-export type MpSolverIISResult = {
-  isInfeasible: boolean;
-  isIrreducible: boolean;
-  timeSeconds: number;
-  nodes: bigint;
-  constraintIndices: number[];
-  variableBounds: Array<{ variableIndex: number; lowerBoundIncluded: boolean; upperBoundIncluded: boolean }>;
-};
 
 export type MpSolverResult =
+  | { type: 'clampSolution'; solution: Uint8Array }
+  | { type: 'capabilities'; supportsCallbacks: boolean; supportsMessageCallbacks: boolean }
   | { type: 'sessionCreate'; handle: bigint }
   | { type: 'sessionResult'; hasSolution: boolean; response: Uint8Array; metadata?: MpSolverNativeMetadata }
   | { type: 'solve'; response: Uint8Array; metadata?: MpSolverNativeMetadata }
@@ -88,7 +89,6 @@ export type MpSolverResult =
   | { type: 'exportModel'; text: string }
   | { type: 'loadSolution'; loaded: boolean; solution: Uint8Array }
   | { type: 'activities'; activities: number[] }
-  | { type: 'iis'; result: MpSolverIISResult }
   | { type: 'importModel'; model: Uint8Array; status: number; error: string }
   | {
     type: 'schema';
@@ -102,7 +102,13 @@ export type MpSolverExecutor = SolverExecutor<MpSolverOperation, MpSolverResult,
 export type MpSolverJob = SolverJob<MpSolverResult>;
 
 function encodeOperation(operation: MpSolverOperation): Uint8Array {
-  const payload = operation.type === 'loadSolution'
+  const payload = operation.type === 'clampSolution'
+    ? { case: 'clampSolution' as const, value: create(MpSolverClampSolutionRequestSchema, {
+      modelProto: operation.model, solutionProto: operation.solution, solverType: operation.solverType,
+    }) }
+    : operation.type === 'capabilities'
+    ? { case: 'capabilities' as const, value: create(MpSolverCapabilitiesRequestSchema, { solverType: operation.solverType }) }
+    : operation.type === 'loadSolution'
     ? { case: 'loadSolution' as const, value: create(MpSolverLoadSolutionRequestSchema, {
       modelProto: operation.model, solutionProto: operation.solution, solverType: operation.solverType, tolerance: operation.tolerance,
     }) }
@@ -114,10 +120,6 @@ function encodeOperation(operation: MpSolverOperation): Uint8Array {
     ? { case: 'activities' as const, value: create(MpSolverActivitiesRequestSchema, {
       modelProto: operation.model, solutionProto: operation.solution, solverType: operation.solverType,
     }) }
-    : operation.type === 'iis'
-    ? { case: 'iis' as const, value: create(MpSolverIisRequestSchema, { modelProto: operation.model,
-      solverType: operation.solverType, solverSpecificParameters: operation.solverSpecificParameters,
-      timeLimitSeconds: operation.timeLimitSeconds, nodeLimit: operation.nodeLimit, interruptible: operation.interruptible }) }
     : operation.type === 'sessionCreate'
     ? { case: 'sessionCreate' as const, value: create(MpSolverSessionCreateRequestSchema, { requestProto: operation.request }) }
     : operation.type === 'sessionClose'
@@ -126,7 +128,8 @@ function encodeOperation(operation: MpSolverOperation): Uint8Array {
     ? { case: 'sessionRun' as const, value: create(MpSolverSessionRunRequestSchema, {
       handle: operation.handle, action: operation.action, edits: operation.edits,
       solve: { requestProto: operation.request, numThreads: operation.numThreads,
-        interruptible: operation.interruptible, parameters: operation.parameters, streamMessages: operation.streamMessages },
+        interruptible: operation.interruptible, parameters: operation.parameters, streamMessages: operation.streamMessages,
+        startingBasis: operation.startingBasis, callbackRegistration: operation.callbackRegistration },
     }) }
     : operation.type === 'solve'
     ? {
@@ -138,6 +141,7 @@ function encodeOperation(operation: MpSolverOperation): Uint8Array {
         parameters: operation.parameters,
         streamMessages: operation.streamMessages,
         editableSnapshot: operation.editableSnapshot,
+        startingBasis: operation.startingBasis, callbackRegistration: operation.callbackRegistration,
       }),
     }
     : operation.type === 'verifySolution'
@@ -166,6 +170,8 @@ function encodeOperation(operation: MpSolverOperation): Uint8Array {
 function decodeOperation(payload: Uint8Array): MpSolverOperation {
   const request = fromBinary(MpSolverBridgeRequestSchema, payload);
   switch (request.payload.case) {
+    case 'capabilities': return { type: 'capabilities', solverType: request.payload.value.solverType };
+    case 'clampSolution': { const value = request.payload.value; return { type: 'clampSolution', model: value.modelProto, solution: value.solutionProto, solverType: value.solverType }; }
     case 'loadSolution': { const value = request.payload.value; return { type: 'loadSolution', model: value.modelProto, solution: value.solutionProto, solverType: value.solverType, tolerance: value.tolerance }; }
     case 'exportModel': { const value = request.payload.value;
       if (value.format !== 0 && value.format !== 1) throw new Error('Unknown MPSolver export format.');
@@ -173,9 +179,6 @@ function decodeOperation(payload: Uint8Array): MpSolverOperation {
     case 'activities': { const value = request.payload.value; return {
       type: 'activities', model: value.modelProto, solution: value.solutionProto, solverType: value.solverType,
     }; }
-    case 'iis': { const value = request.payload.value; return { type: 'iis', model: value.modelProto,
-      solverType: value.solverType, solverSpecificParameters: value.solverSpecificParameters,
-      timeLimitSeconds: value.timeLimitSeconds, nodeLimit: value.nodeLimit, interruptible: value.interruptible }; }
     case 'sessionCreate': return { type: 'sessionCreate', request: request.payload.value.requestProto };
     case 'sessionClose': return { type: 'sessionClose', handle: request.payload.value.handle };
     case 'sessionRun': {
@@ -183,7 +186,8 @@ function decodeOperation(payload: Uint8Array): MpSolverOperation {
       if (!value.solve) throw new Error('MPSolver session has no execution options.');
       return { type: 'sessionRun', handle: value.handle, action: value.action, edits: value.edits,
         request: value.solve.requestProto, numThreads: value.solve.numThreads,
-        interruptible: value.solve.interruptible, parameters: value.solve.parameters, streamMessages: value.solve.streamMessages };
+        interruptible: value.solve.interruptible, parameters: value.solve.parameters, streamMessages: value.solve.streamMessages,
+        startingBasis: value.solve.startingBasis, callbackRegistration: value.solve.callbackRegistration };
     }
     case 'solve':
       return {
@@ -194,6 +198,7 @@ function decodeOperation(payload: Uint8Array): MpSolverOperation {
         parameters: request.payload.value.parameters,
         streamMessages: request.payload.value.streamMessages,
         editableSnapshot: request.payload.value.editableSnapshot,
+        startingBasis: request.payload.value.startingBasis, callbackRegistration: request.payload.value.callbackRegistration,
       };
     case 'verifySolution': { const value = request.payload.value; return {
       type: 'verifySolution', model: value.modelProto, solution: value.solutionProto, solverType: value.solverType,
@@ -210,14 +215,16 @@ function decodeOperation(payload: Uint8Array): MpSolverOperation {
 }
 
 function encodeResult(result: MpSolverResult): Uint8Array {
-  const payload = result.type === 'loadSolution'
+  const payload = result.type === 'clampSolution'
+    ? { case: 'clampedSolution' as const, value: result.solution }
+    : result.type === 'capabilities'
+    ? { case: 'capabilities' as const, value: create(MpSolverCapabilitiesResultSchema, result) }
+    : result.type === 'loadSolution'
     ? { case: 'loadSolution' as const, value: create(MpSolverLoadSolutionResultSchema, { loaded: result.loaded, solutionProto: result.solution }) }
     : result.type === 'exportModel'
     ? { case: 'exportedModel' as const, value: result.text }
     : result.type === 'activities'
     ? { case: 'activities' as const, value: create(MpSolverActivitiesResultSchema, { activities: result.activities }) }
-    : result.type === 'iis'
-    ? { case: 'iis' as const, value: create(MpSolverIisResultSchema, result.result) }
     : result.type === 'sessionCreate'
     ? { case: 'sessionHandle' as const, value: result.handle }
     : result.type === 'sessionResult'
@@ -251,15 +258,12 @@ function encodeResult(result: MpSolverResult): Uint8Array {
 function decodeResult(payload: Uint8Array): MpSolverResult {
   const response = fromBinary(MpSolverBridgeResponseSchema, payload);
   switch (response.payload.case) {
+    case 'capabilities': return { type: 'capabilities', supportsCallbacks: response.payload.value.supportsCallbacks,
+      supportsMessageCallbacks: response.payload.value.supportsMessageCallbacks };
+    case 'clampedSolution': return { type: 'clampSolution', solution: response.payload.value };
     case 'loadSolution': return { type: 'loadSolution', loaded: response.payload.value.loaded, solution: response.payload.value.solutionProto };
     case 'exportedModel': return { type: 'exportModel', text: response.payload.value };
     case 'activities': return { type: 'activities', activities: response.payload.value.activities };
-    case 'iis': { const value = response.payload.value; return { type: 'iis', result: {
-      isInfeasible: value.isInfeasible, isIrreducible: value.isIrreducible,
-      timeSeconds: value.timeSeconds, nodes: value.nodes, constraintIndices: value.constraintIndices,
-      variableBounds: value.variableBounds.map(bound => ({ variableIndex: bound.variableIndex,
-        lowerBoundIncluded: bound.lowerBoundIncluded, upperBoundIncluded: bound.upperBoundIncluded })),
-    } }; }
     case 'sessionHandle': return { type: 'sessionCreate', handle: response.payload.value };
     case 'sessionResult': return { type: 'sessionResult', hasSolution: response.payload.value.hasSolution,
       response: response.payload.value.responseProto, metadata: response.payload.value.metadata };

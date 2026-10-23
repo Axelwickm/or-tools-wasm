@@ -126,6 +126,9 @@ async function runMagicSquare() {
       showSolutionMessage('No solution entries returned.');
       return;
     }
+    const feasible = await model.solutionIsFeasible(response.solution ?? [], { executor: selectedExecutor(), signal });
+    append(`Native solution check: ${feasible ? 'feasible' : 'infeasible'}`);
+    if (!feasible) throw new Error('Native checker rejected the returned square.');
     renderSolution(size, cells.map((cell) => result.value(cell).toString()));
   } catch (error) {
     if (signal.aborted) {

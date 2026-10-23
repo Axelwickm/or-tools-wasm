@@ -14,6 +14,7 @@ export type SetCoverAlgorithm =
   | 'lazyElementDegree'
   | 'random'
   | 'steepest'
+  | 'lazySteepest'
   | 'guidedLocal'
   | 'guidedTabu';
 
@@ -38,16 +39,52 @@ export type SetCoverSearchOperation = {
   guidedTabuParameters?: Partial<GuidedTabuParameters>;
 };
 
+export type SetCoverLagrangianBound = { lowerBound: number; reducedCosts: number[]; multipliers: number[] };
+
 export type SetCoverOperation = SetCoverSearchOperation | {
+  type: 'cft'; costs: number[]; starts: number[]; elements: number[]; selected?: boolean[];
+} | {
+  type: 'mip'; costs: number[]; starts: number[]; elements: number[]; selected: boolean[];
+  focusIndices?: number[]; lpRelaxation: boolean; timeLimitSeconds: number;
+} | {
+  type: 'lagrangianBound'; costs: number[]; starts: number[]; elements: number[]; upperBound: number;
+} | {
+  type: 'readModel'; input: Uint8Array; format: number;
+} | {
+  type: 'writeModel'; costs: number[]; starts: number[]; elements: number[]; format: number;
+} | {
   type: 'compressTrace'; numSubsets: number; trace: Array<{ subset: number; selected: boolean }>;
 } | {
   type: 'statistics'; kind: number; costs: number[]; starts: number[]; elements: number[];
 } | { type: 'guidedTabuParameters'; parameters: Partial<GuidedTabuParameters>; handle?: bigint }
   | { type: 'sessionNext'; handle: bigint; focus: boolean[] | null; maxIterations: number; timeLimitSeconds?: number; guidedTabuParameters?: Partial<GuidedTabuParameters> }
   | { type: 'sessionInitialize'; handle: bigint; selected: boolean[]; guidedTabuParameters?: Partial<GuidedTabuParameters> }
-  | { type: 'sessionDelete'; handle: bigint };
+  | { type: 'sessionStatistics'; handle: bigint }
+  | { type: 'sessionDelete'; handle: bigint } | SetCoverMutationOperation;
+
+export type SetCoverMutationOperation = {
+  costs: number[]; starts: number[]; elements: number[]; selected: boolean[];
+} & (SetCoverPerturbationOperation
+  | { type: 'updateSelection'; subset: number; select: boolean });
+
+type SetCoverPerturbationOperation = {
+  [K in 'clearRandomSubsets' | 'clearMostCoveredElements']: { type: K; numSubsets: number; focusIndices?: number[] }
+}['clearRandomSubsets' | 'clearMostCoveredElements'];
+
+export type SetCoverRemovability = {
+  changed: boolean;
+  newlyRemovableSubsets: number[];
+  newlyNonRemovableSubsets: number[];
+};
 
 export type SetCoverResult = {
+  cftDual?: SetCoverLagrangianBound;
+  mip?: { subproblemStatus: number; objectiveValue?: number };
+  lagrangianBound?: SetCoverLagrangianBound;
+  runTimeSeconds?: number;
+  runTimeMicroseconds?: number;
+  modelProtoJson?: string;
+  text?: string;
   sessionHandle?: bigint;
   trace?: Array<{ subset: number; selected: boolean }>;
   guidedTabuParameters?: GuidedTabuParameters;
@@ -64,6 +101,8 @@ export type SetCoverResult = {
   computedRedundancy?: boolean[];
   costLowerBound?: number;
   focusCoverage?: number[];
+  removability?: SetCoverRemovability;
+  perturbationFocus?: number[];
 };
 
 export type SetCoverExecutor = SolverExecutor<SetCoverOperation, SetCoverResult, never>;
@@ -77,6 +116,7 @@ const bridgeAlgorithm: Record<SetCoverSearchOperation['algorithm'], BridgeSetCov
   lazyElementDegree: BridgeSetCoverOperation.LAZY_ELEMENT_DEGREE,
   random: BridgeSetCoverOperation.RANDOM,
   steepest: BridgeSetCoverOperation.STEEPEST,
+  lazySteepest: BridgeSetCoverOperation.LAZY_STEEPEST,
   guidedLocal: BridgeSetCoverOperation.GUIDED_LOCAL,
   guidedTabu: BridgeSetCoverOperation.GUIDED_TABU,
 };
@@ -86,6 +126,31 @@ const algorithmByBridge = new Map(
 );
 
 function encodeOperation(operation: SetCoverOperation): Uint8Array {
+  if (operation.type === 'cft') return toBinary(SetCoverBridgeRequestSchema, create(SetCoverBridgeRequestSchema, {
+    ...operation, operation: BridgeSetCoverOperation.CFT,
+  }));
+  if (operation.type === 'mip') return toBinary(SetCoverBridgeRequestSchema, create(SetCoverBridgeRequestSchema, {
+    ...operation, operation: BridgeSetCoverOperation.MIP, hasFocus: operation.focusIndices !== undefined,
+  }));
+  if (operation.type === 'lagrangianBound') return toBinary(SetCoverBridgeRequestSchema, create(SetCoverBridgeRequestSchema, {
+    operation: BridgeSetCoverOperation.LAGRANGIAN_BOUND, costs: operation.costs, starts: operation.starts,
+    elements: operation.elements, upperBound: operation.upperBound,
+  }));
+  if (operation.type === 'sessionStatistics') return toBinary(SetCoverBridgeRequestSchema, create(SetCoverBridgeRequestSchema, { operation: BridgeSetCoverOperation.SESSION_STATISTICS, sessionHandle: operation.handle }));
+  if (operation.type === 'readModel' || operation.type === 'writeModel') return toBinary(SetCoverBridgeRequestSchema, create(SetCoverBridgeRequestSchema, {
+    operation: operation.type === 'readModel' ? BridgeSetCoverOperation.READ_MODEL : BridgeSetCoverOperation.WRITE_MODEL,
+    format: operation.format,
+    ...(operation.type === 'readModel' ? { input: operation.input } : { costs: operation.costs, starts: operation.starts, elements: operation.elements }),
+  }));
+  if (operation.type === 'clearRandomSubsets' || operation.type === 'clearMostCoveredElements' || operation.type === 'updateSelection') {
+    return toBinary(SetCoverBridgeRequestSchema, create(SetCoverBridgeRequestSchema, {
+      operation: operation.type === 'clearRandomSubsets' ? BridgeSetCoverOperation.CLEAR_RANDOM_SUBSETS :
+        operation.type === 'clearMostCoveredElements' ? BridgeSetCoverOperation.CLEAR_MOST_COVERED_ELEMENTS : BridgeSetCoverOperation.UPDATE_SELECTION,
+      costs: operation.costs, starts: operation.starts, elements: operation.elements, selected: operation.selected,
+      ...(operation.type === 'updateSelection' ? { subsetIndex: operation.subset, subsetSelected: operation.select } :
+        { perturbationCount: operation.numSubsets, focusIndices: operation.focusIndices, hasFocus: operation.focusIndices !== undefined }),
+    }));
+  }
   if (operation.type === 'compressTrace') return toBinary(SetCoverBridgeRequestSchema, create(SetCoverBridgeRequestSchema, {
     operation: BridgeSetCoverOperation.COMPRESS_TRACE, numSubsets: operation.numSubsets, trace: { decisions: operation.trace },
   }));
@@ -125,6 +190,26 @@ function encodeOperation(operation: SetCoverOperation): Uint8Array {
 
 function decodeOperation(payload: Uint8Array): SetCoverOperation {
   const request = fromBinary(SetCoverBridgeRequestSchema, payload);
+  if (request.operation === BridgeSetCoverOperation.CFT) return { type: 'cft', costs: request.costs, starts: request.starts, elements: request.elements,
+    ...(request.selected.length ? { selected: request.selected } : {}) };
+  if (request.operation === BridgeSetCoverOperation.MIP) return {
+    type: 'mip', costs: request.costs, starts: request.starts, elements: request.elements, selected: request.selected,
+    focusIndices: request.hasFocus ? request.focusIndices : undefined, lpRelaxation: request.lpRelaxation, timeLimitSeconds: request.timeLimitSeconds ?? 0,
+  };
+  if (request.operation === BridgeSetCoverOperation.LAGRANGIAN_BOUND) return {
+    type: 'lagrangianBound', costs: request.costs, starts: request.starts, elements: request.elements, upperBound: request.upperBound,
+  };
+  if (request.operation === BridgeSetCoverOperation.SESSION_STATISTICS) return { type: 'sessionStatistics', handle: request.sessionHandle };
+  if (request.operation === BridgeSetCoverOperation.READ_MODEL) return { type: 'readModel', input: request.input, format: request.format };
+  if (request.operation === BridgeSetCoverOperation.WRITE_MODEL) return { type: 'writeModel', costs: request.costs, starts: request.starts, elements: request.elements, format: request.format };
+  if (request.operation === BridgeSetCoverOperation.CLEAR_RANDOM_SUBSETS ||
+      request.operation === BridgeSetCoverOperation.CLEAR_MOST_COVERED_ELEMENTS || request.operation === BridgeSetCoverOperation.UPDATE_SELECTION) {
+    const model = { costs: request.costs, starts: request.starts, elements: request.elements, selected: request.selected };
+    return request.operation === BridgeSetCoverOperation.UPDATE_SELECTION ?
+      { ...model, type: 'updateSelection', subset: request.subsetIndex, select: request.subsetSelected } :
+      { ...model, type: request.operation === BridgeSetCoverOperation.CLEAR_RANDOM_SUBSETS ? 'clearRandomSubsets' : 'clearMostCoveredElements',
+        numSubsets: request.perturbationCount, ...(request.hasFocus ? { focusIndices: request.focusIndices } : {}) };
+  }
   if (request.operation === BridgeSetCoverOperation.COMPRESS_TRACE) return {
     type: 'compressTrace', numSubsets: request.numSubsets, trace: request.trace?.decisions ?? [],
   };
@@ -168,7 +253,12 @@ function encodeResult(result: SetCoverResult): Uint8Array {
 function decodeResult(payload: Uint8Array): SetCoverResult {
   const result = fromBinary(SetCoverBridgeResponseSchema, payload);
   return {
+    cftDual: result.cftDual,
+    mip: result.mip,
+    lagrangianBound: result.lagrangianBound,
+    runTimeSeconds: result.runTimeSeconds, runTimeMicroseconds: result.runTimeMicroseconds,
     sessionHandle: result.sessionHandle || undefined,
+    modelProtoJson: result.modelProtoJson, text: result.text,
     trace: result.trace?.decisions.map(({ subset, selected }) => ({ subset, selected })),
     guidedTabuParameters: result.guidedTabuParameters as GuidedTabuParameters | undefined,
     statistics: result.statistics, deciles: result.deciles,
@@ -181,6 +271,9 @@ function decodeResult(payload: Uint8Array): SetCoverResult {
     numCoverageLe1Elements: result.numCoverageLe1Elements,
     isRedundant: result.isRedundant,
     computedRedundancy: result.computedRedundancy, costLowerBound: result.costLowerBound, focusCoverage: result.focusCoverage,
+    removability: result.removability && { changed: result.removability.changed,
+      newlyRemovableSubsets: result.removability.newlyRemovableSubsets, newlyNonRemovableSubsets: result.removability.newlyNonRemovableSubsets },
+    perturbationFocus: result.perturbationFocus,
   };
 }
 

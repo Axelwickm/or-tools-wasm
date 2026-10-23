@@ -193,6 +193,43 @@ void RunningSolveObservesCancellation() {
            "running CP-SAT cancellation is reported truthfully");
 }
 
+void InterruptionRetainsNativeResponseWithoutSolutionEvents() {
+  using namespace std::chrono_literals;
+  for (const bool before_start : {true, false}) {
+    CpSatExecutor executor;
+    JobScheduler scheduler({1, 8});
+    std::promise<void> entered, proceed;
+    auto ready = entered.get_future();
+    auto gate = proceed.get_future();
+    SolverExecutorResult execution;
+    int events = 0;
+    auto handle = scheduler.Submit(JobSpec{"cp-sat", 1}, [&](JobContext& context) {
+      entered.set_value();
+      gate.wait();
+      execution = executor.Execute(LongEnumerationRequest(), context, [&](std::string) { ++events; });
+      return execution.ok ? JobResult::Succeeded() : JobResult::Failed(execution.error_message);
+    });
+    ready.wait();
+    if (before_start) handle.Interrupt();
+    proceed.set_value();
+    if (!before_start) {
+      std::this_thread::sleep_for(30ms);
+      handle.Interrupt();
+    }
+    ExpectEq(handle.result().wait_for(2s), std::future_status::ready, "Native interruption finishes promptly");
+    ExpectEq(handle.result().get().state, JobState::kSucceeded, "Interruption preserves the executor result");
+    bridge::CpSatBridgeResponse reply;
+    sat::CpSolverResponse response;
+    Expect(execution.ok && reply.ParseFromString(execution.payload) && reply.has_solve_result() &&
+        response.ParseFromString(reply.solve_result().cp_solver_response_proto()), "Native stopped response parses");
+    Expect(response.status() == sat::FEASIBLE || response.status() == sat::UNKNOWN,
+        "Incomplete enumeration retains native stopped status");
+    ExpectEq(reply.solve_result().response_statistics(), sat::CpSolverResponseStats(response),
+        "Returned statistics describe the native final response");
+    ExpectEq(events, 0, "Retaining the native result requires no solution events");
+  }
+}
+
 SolverExecutorResult DiagnosticRequest(const bridge::CpSatBridgeRequest& request) {
   JobScheduler scheduler({1, 8}); CpSatExecutor executor;
   SolverExecutorResult result;
@@ -257,8 +294,56 @@ void ReturnsExactNativeStatisticsAndRejectsMalformedInputs() {
 
 using TestFn = void (*)();
 
+SolverExecutorResult CheckSolutionRequest(const sat::CpModelProto& model,
+                                         const std::vector<int64_t>& values) {
+  bridge::CpSatBridgeRequest input;
+  input.mutable_check_solution()->set_cp_model_proto(model.SerializeAsString());
+  for (auto value : values) input.mutable_check_solution()->add_variable_values(value);
+  return DiagnosticRequest(input);
+}
+
+void ChecksCompleteNativeSolutions() {
+  sat::CpModelProto model;
+  auto* x = model.add_variables(); x->add_domain(-9007199254740993LL); x->add_domain(9007199254740993LL);
+  auto* y = model.add_variables(); y->add_domain(0); y->add_domain(1);
+  auto* constraint = model.add_constraints();
+  constraint->add_enforcement_literal(1);
+  auto* row = constraint->mutable_linear(); row->add_vars(0); row->add_coeffs(1);
+  row->add_domain(9007199254740993LL); row->add_domain(9007199254740993LL);
+  const auto check = [&](const std::vector<int64_t>& values) {
+    const auto result = CheckSolutionRequest(model, values);
+    bridge::CpSatBridgeResponse response;
+    Expect(result.ok && response.ParseFromString(result.payload) && response.has_solution_feasible(), "Native checker returns Boolean oneof, including false");
+    return response.solution_feasible();
+  };
+  Expect(check({9007199254740993LL, 1}), "Exact large point is feasible");
+  Expect(!check({9007199254740992LL, 1}), "One-unit violation above JS precision remains distinguishable");
+  Expect(check({-9007199254740993LL, 0}), "Disabled constraint is ignored natively");
+  Expect(!check({9007199254740994LL, 0}), "Native bound violation");
+  Expect(!check({0}) && !check({0, 0, 0}), "Native short and long vectors return false");
+  model.add_assumptions(1);
+  Expect(check({0, 0}), "Native feasibility checker does not apply solve-time assumptions");
+  Expect(CheckSolutionRequest({}, {}).ok, "Empty model/point is valid");
+}
+
+void RejectsInvalidSolutionCheckModels() {
+  sat::CpModelProto model;
+  model.add_variables()->add_domain(0);
+  Expect(!CheckSolutionRequest(model, {0}).ok, "Invalid domain rejects before native evaluator");
+  model.mutable_variables(0)->add_domain(1);
+  auto* row = model.add_constraints()->mutable_linear();
+  row->add_vars(8); row->add_coeffs(1); row->add_domain(0); row->add_domain(1);
+  Expect(!CheckSolutionRequest(model, {0}).ok, "Out-of-range constraint reference rejects safely");
+  bridge::CpSatBridgeRequest request;
+  request.mutable_check_solution()->set_cp_model_proto(std::string(1, static_cast<char>(0xff)));
+  Expect(!DiagnosticRequest(request).ok, "Malformed model bytes reject");
+  Expect(CheckSolutionRequest({}, {}).ok, "Checker recovers after invalid inputs");
+}
+
 int RunAllTests() {
   const std::vector<std::pair<std::string, TestFn>> tests = {
+      {"ChecksCompleteNativeSolutions", ChecksCompleteNativeSolutions},
+      {"RejectsInvalidSolutionCheckModels", RejectsInvalidSolutionCheckModels},
       {"ExportsCompleteNativeTextIncludingInvalidModels", ExportsCompleteNativeTextIncludingInvalidModels},
       {"ReturnsExactNativeStatisticsAndRejectsMalformedInputs", ReturnsExactNativeStatisticsAndRejectsMalformedInputs},
       {"ResolvesThreadsWithoutChangingSolverParameters",
@@ -267,6 +352,7 @@ int RunAllTests() {
        AutomaticWorkersReserveServerCapacity},
       {"EmitsOnlyNativeEnumerationCallbacks", EmitsOnlyNativeEnumerationCallbacks},
       {"RunningSolveObservesCancellation", RunningSolveObservesCancellation},
+      {"InterruptionRetainsNativeResponseWithoutSolutionEvents", InterruptionRetainsNativeResponseWithoutSolutionEvents},
   };
   for (const auto& [name, test] : tests) {
     try {

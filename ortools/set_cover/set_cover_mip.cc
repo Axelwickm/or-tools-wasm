@@ -116,7 +116,7 @@ bool SetCoverMip::NextSolution(absl::Span<const SubsetIndex> focus) {
   solver.set_time_limit(static_cast<int64_t>(time_limit_in_seconds() * 1000));
 
   // Call the solver.
-  solve_status_ = solver.Solve();
+  solve_status_ = solve_function_ ? solve_function_(solver) : solver.Solve();
   switch (solve_status_) {
     case MPSolver::OPTIMAL:
       break;

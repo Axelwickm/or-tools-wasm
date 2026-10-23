@@ -7,6 +7,11 @@
 #include "javascript/routing_index_validation.h"
 
 namespace ortools_wasm {
+inline bool AddRoutingSameActivityGroup(operations_research::RoutingModel& model, absl::Span<const int> indices) {
+  for (int index : indices) if (!IsRoutingIndexValid(model, index, false)) return false;
+  model.AddSameActivityGroup(indices);
+  return true;
+}
 inline int AddRoutingDisjunction(operations_research::RoutingModel& model,
                                  absl::Span<const int64_t> indices, int64_t penalty,
                                  int64_t maximum, int behavior) {

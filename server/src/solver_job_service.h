@@ -16,12 +16,18 @@
 
 namespace ortools_wasm::server {
 
+struct EventHistoryLimits {
+  size_t max_events = 4096;
+  size_t max_bytes = 16 * 1024 * 1024;
+};
+
 class SolverJobService {
  public:
   // The scheduler must outlive the service. Destroying the service shuts the
   // scheduler down and waits for active jobs before destroying its executors.
   SolverJobService(JobScheduler& scheduler,
-                   std::chrono::milliseconds completed_job_retention);
+                   std::chrono::milliseconds completed_job_retention,
+                   EventHistoryLimits event_history_limits = {});
   ~SolverJobService();
 
   SolverJobService(const SolverJobService&) = delete;
@@ -61,6 +67,7 @@ class SolverJobService {
                                     uint64_t job_id, const std::string& payload) const;
 
   JobScheduler& scheduler_;
+  EventHistoryLimits event_history_limits_;
   std::chrono::milliseconds completed_job_retention_;
   mutable std::mutex mutex_;
   std::unordered_map<std::string, std::unique_ptr<SolverExecutor>> executors_;

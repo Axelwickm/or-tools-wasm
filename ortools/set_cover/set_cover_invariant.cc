@@ -14,7 +14,6 @@
 #include "ortools/set_cover/set_cover_invariant.h"
 
 #include <algorithm>
-#include <cmath>
 #include <limits>
 #include <tuple>
 #include <vector>
@@ -222,17 +221,6 @@ std::tuple<Cost, ElementToIntVector> SetCoverInvariant::ComputeCostAndCoverage(
   return {cst, cvrg};
 }
 
-void SetCoverInvariant::UpdateCost(Cost delta) {
-  const Cost previous_cost = cost_;
-  cost_ += delta;
-  // Subtraction from an overflowing or heavily cancelled total can discard the
-  // remaining cost. Reuse the native recomputation instead of maintaining a
-  // second numerical data structure. Ordinary updates keep the scalar fast path.
-  if (!std::isfinite(cost_) || std::abs(cost_) < std::abs(previous_cost) / 2) {
-    cost_ = std::get<0>(ComputeCostAndCoverage(is_selected_));
-  }
-}
-
 ElementToIntVector SetCoverInvariant::ComputeCoverageInFocus(
     const absl::Span<const SubsetIndex> focus) const {
   ElementToIntVector coverage(coverage_.size());
@@ -367,7 +355,8 @@ bool SetCoverInvariant::Select(SubsetIndex subset,
   DCHECK(CheckConsistency(target_consistency));
   trace_.push_back(SetCoverDecision(subset, true));
   is_selected_[subset] = true;
-  UpdateCost(model_->subset_costs()[subset]);
+  const SubsetCostVector& subset_costs = model_->subset_costs();
+  cost_ += subset_costs[subset];
   const SparseColumnView& columns = model_->columns();
   const SparseRowView& rows = model_->rows();
   // Fast path for kCostAndCoverage.
@@ -434,7 +423,8 @@ bool SetCoverInvariant::Deselect(SubsetIndex subset,
   DCHECK(is_selected_[subset]);
   trace_.push_back(SetCoverDecision(subset, false));
   is_selected_[subset] = false;
-  UpdateCost(-model_->subset_costs()[subset]);
+  const SubsetCostVector& subset_costs = model_->subset_costs();
+  cost_ -= subset_costs[subset];
   const SparseColumnView& columns = model_->columns();
   const SparseRowView& rows = model_->rows();
   // Fast path for kCostAndCoverage.

@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
-#include "absl/container/flat_hash_set.h"
 #include "absl/cleanup/cleanup.h"
 #include "absl/flags/flag.h"
 #include "absl/status/status.h"
@@ -50,11 +49,6 @@
 #include "scip/scip_general.h"
 #include "scip/scip_message.h"
 #include "scip/pub_message.h"
-#include "scip/pub_iisfinder.h"
-#include "scip/scip_iisfinder.h"
-#include "scip/pub_misc.h"
-#include "scip/scip_event.h"
-#include "scip/pub_event.h"
 #include "scip/scip_numerics.h"
 #include "scip/scip_param.h"
 #include "scip/scip_prob.h"
@@ -87,41 +81,6 @@ struct EmptyStruct {};
 // transformed model or solution pool. With no observer, delegate to SCIP's
 // original handler, preserving its native output behavior.
 namespace {
-constexpr SCIP_EVENTTYPE kIisInterruptEvents = SCIP_EVENTTYPE_PRESOLVEROUND |
-    SCIP_EVENTTYPE_NODEFOCUSED | SCIP_EVENTTYPE_LPSOLVED | SCIP_EVENTTYPE_BESTSOLFOUND;
-SCIP_RETCODE IncludeIisInterruptHandler(
-    SCIP* scip, const std::atomic<bool>* const* flag);
-SCIP_DECL_EVENTEXEC(IisInterruptExec) {
-  const auto* flag = reinterpret_cast<const std::atomic<bool>* const*>(
-      SCIPeventhdlrGetData(eventhdlr));
-  if (*flag && (*flag)->load(std::memory_order_relaxed))
-    SCIP_CALL(SCIPinterruptSolve(scip));
-  return SCIP_OKAY;
-}
-SCIP_DECL_EVENTCOPY(IisInterruptCopy) {
-  return IncludeIisInterruptHandler(scip,
-      reinterpret_cast<const std::atomic<bool>* const*>(SCIPeventhdlrGetData(eventhdlr)));
-}
-SCIP_DECL_EVENTINIT(IisInterruptInit) {
-  SCIP_CALL(SCIPcatchEvent(scip, kIisInterruptEvents, eventhdlr, nullptr, nullptr));
-  return IisInterruptExec(scip, eventhdlr, nullptr, nullptr);
-}
-SCIP_DECL_EVENTEXIT(IisInterruptExit) {
-  return SCIPdropEvent(scip, kIisInterruptEvents, eventhdlr, nullptr, -1);
-}
-SCIP_RETCODE IncludeIisInterruptHandler(
-    SCIP* scip, const std::atomic<bool>* const* flag) {
-  SCIP_EVENTHDLR* handler = nullptr;
-  SCIP_CALL(SCIPincludeEventhdlrBasic(scip, &handler, "mpsolver_iis_interrupt",
-      "Forward an external interruption flag into native IIS sub-SCIPs",
-      IisInterruptExec, reinterpret_cast<SCIP_EVENTHDLRDATA*>(const_cast<void*>(
-          static_cast<const void*>(flag)))));
-  SCIP_CALL(SCIPsetEventhdlrCopy(scip, handler, IisInterruptCopy));
-  SCIP_CALL(SCIPsetEventhdlrInit(scip, handler, IisInterruptInit));
-  SCIP_CALL(SCIPsetEventhdlrExit(scip, handler, IisInterruptExit));
-  return SCIP_OKAY;
-}
-
 struct SolverMessageData {
   const std::function<void(const std::string&)>* callback;
   SCIP_MESSAGEHDLR* original;
@@ -165,9 +124,6 @@ class SCIPInterface : public MPSolverInterface {
   void SetOptimizationDirection(bool maximize) override;
   MPSolver::ResultStatus Solve(const MPSolverParameters& param) override;
   bool SupportsMessageCallbacks() const override { return true; }
-  absl::StatusOr<MPSolver::InfeasibleSubsystem> ComputeIrreducibleInfeasibleSubset(
-      const std::atomic<bool>* interrupt, std::optional<double> time_limit_seconds,
-      std::optional<int64_t> node_limit) override;
 
 
   bool SupportsDirectlySolveProto(std::atomic<bool>* interrupt) const override;
@@ -303,7 +259,6 @@ class SCIPInterface : public MPSolverInterface {
   absl::Status status_;
 
   SCIP* scip_;
-  const std::atomic<bool>* iis_interrupt_ = nullptr;
   std::vector<SCIP_VAR*> scip_variables_;
   std::vector<SCIP_CONS*> scip_constraints_;
   int current_solution_index_ = 0;
@@ -391,7 +346,6 @@ void SCIPInterface::Reset() {
 absl::Status SCIPInterface::CreateSCIP() {
   RETURN_IF_SCIP_ERROR(SCIPcreate(&scip_));
   RETURN_IF_SCIP_ERROR(SCIPincludeDefaultPlugins(scip_));
-  RETURN_IF_SCIP_ERROR(IncludeIisInterruptHandler(scip_, &iis_interrupt_));
   auto data = std::make_unique<SolverMessageData>(SolverMessageData{
       &message_callback_, SCIPgetMessagehdlr(scip_)});
   SCIPmessagehdlrCapture(data->original);
@@ -981,50 +935,6 @@ void SCIPInterface::SetSolution(SCIP_SOL* solution) {
   }
 }
 
-absl::StatusOr<MPSolver::InfeasibleSubsystem>
-SCIPInterface::ComputeIrreducibleInfeasibleSubset(
-    const std::atomic<bool>* interrupt, std::optional<double> time_limit_seconds,
-    std::optional<int64_t> node_limit) {
-  RETURN_IF_ERROR(status_);
-  if (interrupt && interrupt->load()) return absl::CancelledError("IIS was cancelled.");
-  ExtractModel();
-  RETURN_IF_ERROR(status_);
-  if (time_limit_seconds) RETURN_IF_SCIP_ERROR(
-      SCIPsetRealParam(scip_, "iis/time", *time_limit_seconds));
-  if (node_limit) RETURN_IF_SCIP_ERROR(
-      SCIPsetLongintParam(scip_, "iis/nodes", *node_limit));
-  iis_interrupt_ = interrupt;
-  const absl::Cleanup clear_interrupt = [&] { iis_interrupt_ = nullptr; };
-  RETURN_IF_SCIP_ERROR(SCIPgenerateIIS(scip_));
-  if (interrupt && interrupt->load()) return absl::CancelledError("IIS was cancelled.");
-  SCIP_IIS* const iis = SCIPgetIIS(scip_);
-  SCIP* const subset = SCIPiisGetSubscip(iis);
-  MPSolver::InfeasibleSubsystem result;
-  result.is_infeasible = SCIPiisIsSubscipInfeasible(iis);
-  result.is_irreducible = SCIPiisIsSubscipIrreducible(iis);
-  result.time_seconds = SCIPiisGetTime(iis);
-  result.nodes = SCIPiisGetNNodes(iis);
-  if (!subset) return result;
-  absl::flat_hash_set<SCIP_CONS*> constraints;
-  absl::flat_hash_set<SCIP_VAR*> variables;
-  for (int i = 0; i < SCIPgetNOrigConss(subset); ++i)
-    constraints.insert(SCIPgetOrigConss(subset)[i]);
-  for (int i = 0; i < SCIPgetNOrigVars(subset); ++i)
-    variables.insert(SCIPgetOrigVars(subset)[i]);
-  for (int index = 0; index < scip_constraints_.size(); ++index) {
-    auto* copied = static_cast<SCIP_CONS*>(
-        SCIPhashmapGetImage(SCIPiisGetConssMap(iis), scip_constraints_[index]));
-    if (constraints.contains(copied)) result.constraint_indices.push_back(index);
-  }
-  for (int index = 0; index < scip_variables_.size(); ++index) {
-    auto* copied = static_cast<SCIP_VAR*>(
-        SCIPhashmapGetImage(SCIPiisGetVarsMap(iis), scip_variables_[index]));
-    if (variables.contains(copied)) result.variable_bounds.push_back({index,
-        !SCIPisInfinity(subset, -SCIPvarGetLbOriginal(copied)),
-        !SCIPisInfinity(subset, SCIPvarGetUbOriginal(copied))});
-  }
-  return result;
-}
 
 bool SCIPInterface::SupportsDirectlySolveProto(
     std::atomic<bool>* interrupt) const {

@@ -1,15 +1,21 @@
+import { synchronousCallbackResult } from '../callback_validation.js';
 import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
 import { resolveExecutorConfiguration } from '../executor_configuration.js';
-import type { SolverJobEvent } from '../solver_executor.js';
+import type { SolverJobEvent, SolverResourceRequest } from '../solver_executor.js';
 import { createAbortError, executeSolverJob } from '../solver_job.js';
 import { SolverServerExecutor } from '../solver_server_executor.js';
 import { SolverWorkerExecutor, type SolverWorkerLike } from '../worker_helpers.js';
 import { DirectRoutingExecutor } from './direct_executor.js';
+import { routingRouteCallback, type RoutingRouteEvaluator } from './route_callbacks.js';
+export type { RoutingRouteEvaluator } from './route_callbacks.js';
 import {
-  routingProtocol,
+  routingProtocol, type RoutingDimensionQuery, type RoutingDimensionInspection,
+  RoutingModelQueryKind, type RoutingModelQuery,
+  RoutingAssignmentAction, type RoutingWorkflow, type RoutingSearchStatistics,
   routingVariableKey,
   type RoutingAssignmentVariable,
+  type RoutingAssignmentSnapshot,
   type RoutingResourceGroupData,
   type RoutingResourceData,
   RoutingTypeRequirementKind,
@@ -23,6 +29,9 @@ import {
   type RoutingLinearComparison,
   type RoutingBooleanExpressionData,
   type RoutingSolveRequest,
+  type RoutingBreakIntervalData,
+  type RoutingActivityGroupInspection,
+  type RoutingStateDependentMatrix,
   type RoutingExecutor,
   type RoutingModelOperation,
   type RoutingDimensionSetting,
@@ -35,6 +44,29 @@ import { encodeRoutingSearchParameters, encodeRoutingModelParameters } from './s
 import { RoutingLinearExpr, RoutingBoolExpr, type RoutingBooleanOperand, type RoutingLinearOperand, type RoutingLinearConstraint } from './expressions.js';
 
 export type RoutingDomainOptions = Pick<RoutingSolveOptions, 'executor' | 'signal'>;
+export type { RoutingActivityGroupInspection } from './protocol.js';
+export type RoutingBreakIntervalOptions = { startMin: IntValue; startMax: IntValue; duration: IntValue; optional?: boolean; name?: string };
+export type RoutingBreakTravelOptions = { preTravelEvaluator?: number; postTravelEvaluator?: number };
+export type RoutingPickupDeliveryPosition = { pairIndex: number; alternativeIndex: number };
+export type RoutingBreakConfiguration = { hasBreakConstraints: boolean; intervals: RoutingBreakInterval[];
+  distanceDuration: Array<{ distance: bigint; duration: bigint }>; preTravelEvaluator?: number; postTravelEvaluator?: number };
+export type RoutingBreakSnapshot = { performed: boolean | null; startMin?: bigint; startMax?: bigint; endMin?: bigint; endMax?: bigint };
+export type RoutingIntervalRange = { start: bigint; end: bigint };
+export type RoutingPiecewiseLinearCostSegment<T extends IntValue = IntValue> = { pointX: T; pointY: T; slope: T; otherPointX: T };
+export type RoutingPiecewiseLinearFunction = { x: readonly IntValue[]; y: readonly IntValue[] };
+export type RoutingStateDependentTransitOptions = { domainStart: IntValue; domainEnd: IntValue };
+const breakIntervalRecords = new WeakMap<RoutingBreakInterval, RoutingBreakIntervalData>();
+let createBreakInterval: (model: RoutingModel, data: RoutingBreakIntervalData) => RoutingBreakInterval;
+export class RoutingBreakInterval {
+  private constructor(readonly model: RoutingModel, private readonly data: RoutingBreakIntervalData) { breakIntervalRecords.set(this, data); }
+  static { createBreakInterval = (model, data) => new RoutingBreakInterval(model, data); }
+  get index(): number { return this.data.index; }
+  get name(): string { return this.data.name; }
+  get startMin(): bigint { return this.data.startMin; }
+  get startMax(): bigint { return this.data.startMax; }
+  get duration(): bigint { return this.data.duration; }
+  get optional(): boolean { return this.data.optional; }
+}
 export type RoutingVariableDomain = RoutingDomainResult;
 type RoutingVariableMethods = {
   setMin(value: IntValue): void;
@@ -134,7 +166,8 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): R
 }
 
 export type RoutingSolutionEvent = { type: 'solution'; objectiveValue: bigint; solutionCount: bigint; unchecked: boolean };
-export type RoutingEvent = SolverJobEvent | RoutingSolutionEvent;
+export type RoutingSearchEntryCallback = () => void | Promise<void>;
+export type RoutingEvent = SolverJobEvent | RoutingSolutionEvent | { type: 'searchEntered' };
 export type RoutingSolutionCallback = (event: RoutingSolutionEvent) => void | Promise<void>;
 export type RoutingConstraint = RoutingBooleanOperand;
 export type RoutingSolveOptions = RoutingSearchParameters & {
@@ -189,6 +222,23 @@ export enum VisitTypePolicy {
   TYPE_ON_VEHICLE_UP_TO_VISIT = 2,
   TYPE_SIMULTANEOUSLY_ADDED_AND_REMOVED = 3,
 }
+
+/** Native presence relationships for dimension node precedences. */
+export enum RoutingPrecedencePerformedConstraint {
+  FIRST_AND_SECOND_INDEPENDENT = 0,
+  SECOND_IMPLIES_FIRST = 1,
+  FIRST_IMPLIES_SECOND = 2,
+  FIRST_AND_SECOND_EQUAL = 3,
+}
+/** Native registered transit-sign metadata. */
+export enum RoutingTransitEvaluatorSign {
+  UNKNOWN = 0,
+  POSITIVE_OR_ZERO = 1,
+  NEGATIVE_OR_ZERO = 2,
+}
+export type RoutingNodePrecedence = {
+  first: number; second: number; offset: bigint; performedConstraint: RoutingPrecedencePerformedConstraint;
+};
 
 export enum PenaltyCostBehavior {
   PENALIZE_ONCE = 0,
@@ -418,7 +468,10 @@ export class RoutingIndexManager {
   }
 }
 
+export type RoutingPickupToDeliveryLimitFunction = (pickupAlternative: number, deliveryAlternative: number) => IntValue;
+
 type RoutingDimensionState = {
+  pickupToDeliveryLimits?: Map<number, RoutingPickupToDeliveryLimitFunction>;
   cumulSoftUpperBounds?: Map<number, BoundCost>;
   cumulSoftLowerBounds?: Map<number, BoundCost>;
   dimensionValues?: Map<string, bigint>;
@@ -427,18 +480,40 @@ type RoutingDimensionState = {
 };
 
 let createRoutingDimension: (model: RoutingModel, name: string, state: RoutingDimensionState,
-  record: (operation: RoutingModelOperation) => void, maximumIndex: number) => RoutingDimension;
+  record: (operation: RoutingModelOperation) => void, maximumIndex: number,
+  configureBreaks: (intervals: readonly RoutingBreakInterval[], vehicle: number, options: RoutingBreakTravelOptions) => void,
+  configurePairLimit: (limit: RoutingPickupToDeliveryLimitFunction, pairIndex: number) => void,
+  inspect: (query: RoutingDimensionQuery, options: RoutingDomainOptions, assignment?: RoutingAssignmentSnapshot) => Promise<RoutingDimensionInspection>) => RoutingDimension;
 
 export class RoutingDimension {
   private constructor(
     private readonly model: RoutingModel,
-    private readonly name: string,
+    readonly name: string,
     private readonly state: RoutingDimensionState,
     private readonly record: (operation: RoutingModelOperation) => void,
     private readonly maximumIndex: number,
+    private readonly configureBreaks: (intervals: readonly RoutingBreakInterval[], vehicle: number, options: RoutingBreakTravelOptions) => void,
+    private readonly configurePairLimit: (limit: RoutingPickupToDeliveryLimitFunction, pairIndex: number) => void,
+    private readonly inspect: (query: RoutingDimensionQuery, options: RoutingDomainOptions, assignment?: RoutingAssignmentSnapshot) => Promise<RoutingDimensionInspection>,
   ) {}
 
   static { createRoutingDimension = (...args) => new RoutingDimension(...args); }
+
+  setPickupToDeliveryLimitFunctionForPair(limit: RoutingPickupToDeliveryLimitFunction, pairIndex: number): void {
+    this.configurePairLimit(limit, pairIndex);
+  }
+
+  hasPickupToDeliveryLimits(): boolean { return Boolean(this.state.pickupToDeliveryLimits?.size); }
+
+  /** Native limit for an alternative pair; an unset limit is INT64_MAX. */
+  async getPickupToDeliveryLimitForPair(pairIndex: number, pickupAlternativeIndex: number, deliveryAlternativeIndex: number,
+      options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.query(9, 0, {
+      pairIndex: toIndex(pairIndex, 'Routing pickup/delivery pair', INT32_MAX),
+      pickupAlternativeIndex: toIndex(pickupAlternativeIndex, 'Routing pickup alternative', INT32_MAX),
+      deliveryAlternativeIndex: toIndex(deliveryAlternativeIndex, 'Routing delivery alternative', INT32_MAX),
+    }, options)).value!;
+  }
 
   cumulVar(index: number): RoutingCumulVar {
     return dimensionVariable('routingCumulVar', this.model, this.name,
@@ -467,6 +542,28 @@ export class RoutingDimension {
   setCumulVarRange(index: number, lower: IntValue, upper: IntValue): void {
     this.cumulVar(index).setRange(lower, upper);
   }
+
+  setBreakIntervalsOfVehicle(intervals: readonly RoutingBreakInterval[], vehicle: number, options: RoutingBreakTravelOptions = {}): void {
+    this.configureBreaks(intervals, vehicle, options);
+  }
+  setBreakDistanceDurationOfVehicle(distance: IntValue, duration: IntValue, vehicle: number): void {
+    const exactDistance = toInt64(distance, 'Routing break distance'), exactDuration = toInt64(duration, 'Routing break duration');
+    if (exactDistance < 0n || exactDuration < 0n) throw new RangeError('Routing break distance and duration must be nonnegative.');
+    this.record({ type: 'setBreakDistanceDuration', dimensionName: this.name,
+      vehicle: toIndex(vehicle, 'Routing break vehicle', this.model.vehicles() - 1), distance: exactDistance, duration: exactDuration });
+  }
+
+  inspectBreaks(vehicle: number, options: RoutingDomainOptions = {}): Promise<RoutingBreakConfiguration> { return this.model.inspectBreaks(this.name, vehicle, options); }
+  async hasBreakConstraints(options: RoutingDomainOptions = {}): Promise<boolean> { return (await this.inspectBreaks(0, options)).hasBreakConstraints; }
+  private async initializedBreaks(vehicle: number, options: RoutingDomainOptions) {
+    const data = await this.inspectBreaks(vehicle, options);
+    if (!data.hasBreakConstraints) throw new Error('Routing break constraints are not initialized.');
+    return data;
+  }
+  async getBreakIntervalsOfVehicle(vehicle: number, options: RoutingDomainOptions = {}): Promise<RoutingBreakInterval[]> { return (await this.initializedBreaks(vehicle, options)).intervals; }
+  async getBreakDistanceDurationOfVehicle(vehicle: number, options: RoutingDomainOptions = {}): Promise<Array<{ distance: bigint; duration: bigint }>> { return (await this.initializedBreaks(vehicle, options)).distanceDuration; }
+  async getPreTravelEvaluatorOfVehicle(vehicle: number, options: RoutingDomainOptions = {}): Promise<number> { return (await this.initializedBreaks(vehicle, options)).preTravelEvaluator!; }
+  async getPostTravelEvaluatorOfVehicle(vehicle: number, options: RoutingDomainOptions = {}): Promise<number> { return (await this.initializedBreaks(vehicle, options)).postTravelEvaluator!; }
 
   setSpanUpperBoundForVehicle(value: IntValue, vehicle: number): void {
     this.setDimensionValue('spanUpperBound', value, vehicle);
@@ -527,6 +624,80 @@ export class RoutingDimension {
     return this.state.dimensionValues?.get(`${setting}:${index ?? ''}`) ?? fallback;
   }
 
+  setCumulVarPiecewiseLinearCost(index: number, segments: readonly RoutingPiecewiseLinearCostSegment[]): void {
+    if (segments.length === 0) throw new RangeError('Routing piecewise cost requires at least one segment.');
+    this.record({ type: 'setPiecewiseCost', dimensionName: this.name,
+      index: BigInt(toIndex(index, 'Routing piecewise cumul index', this.maximumIndex)),
+      segments: segments.map(segment => ({ pointX: toInt64(segment.pointX), pointY: toInt64(segment.pointY),
+        slope: toInt64(segment.slope), otherPointX: toInt64(segment.otherPointX) })) });
+  }
+  async hasCumulVarPiecewiseLinearCost(index: number, options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.query(6, index, {}, options)).hasPiecewiseLinearCost;
+  }
+  async getCumulVarPiecewiseLinearCost(index: number, options: RoutingDomainOptions = {}): Promise<RoutingPiecewiseLinearCostSegment<bigint>[] | null> {
+    const result = await this.query(6, index, {}, options);
+    return result.hasPiecewiseLinearCost ? result.costSegments : null;
+  }
+  async getTransitValue(fromIndex: number, toIndexValue: number, vehicle: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.query(0, fromIndex, { otherIndex: BigInt(toIndex(toIndexValue, 'Routing transit destination', this.maximumIndex)),
+      vehicleOrClass: toIndex(vehicle, 'Routing vehicle', this.model.vehicles() - 1) }, options)).value!;
+  }
+  async getTransitValueFromClass(fromIndex: number, toIndexValue: number, vehicleClass: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.query(1, fromIndex, { otherIndex: BigInt(toIndex(toIndexValue, 'Routing transit destination', this.maximumIndex)),
+      vehicleOrClass: toIndex(vehicleClass, 'Routing dimension vehicle class', INT32_MAX) }, options)).value!;
+  }
+  async vehicleToClass(vehicle: number, options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.query(7, 0, { vehicleOrClass: toIndex(vehicle, 'Routing vehicle', this.model.vehicles() - 1) }, options)).value!);
+  }
+  async isUnary(options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.query(8, 0, {}, options)).value === 1n;
+  }
+  /** Native sign metadata; does not evaluate every arc. */
+  async areVehicleTransitsPositive(vehicle: number, options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.query(11, 0, { vehicleOrClass: toIndex(vehicle, 'Routing vehicle', this.model.vehicles() - 1) }, options)).value === 1n;
+  }
+  async getTransitEvaluatorSign(vehicle: number, options: RoutingDomainOptions = {}): Promise<RoutingTransitEvaluatorSign> {
+    return Number((await this.query(12, 0, { vehicleOrClass: toIndex(vehicle, 'Routing vehicle', this.model.vehicles() - 1) }, options)).value!);
+  }
+  /** Query a self-dependent dimension in the supplied assignment's restored native state.
+   * The current cumul and route variables must be bound; no completion is performed.
+   */
+  async shortestTransitionSlack(assignment: Assignment, index: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    const snapshot = snapshotForAssignment(assignment, this.model);
+    return (await this.inspect({ dimensionName: this.name, kind: 13,
+      index: BigInt(toIndex(index, 'Routing slack index', this.maximumIndex - this.model.vehicles())),
+      otherIndex: 0n, vehicleOrClass: 0, lower: 0n, upper: 0n }, options, snapshot)).value!;
+  }
+  async getNodePrecedences(options: RoutingDomainOptions = {}): Promise<RoutingNodePrecedence[]> {
+    return (await this.query(10, 0, {}, options)).nodePrecedences.map(({ first, second, offset, performedConstraint }) =>
+      ({ first: Number(first), second: Number(second), offset, performedConstraint }));
+  }
+  addForbiddenIntervals(index: number, intervals: readonly { start: IntValue; end: IntValue }[]): void {
+    const values = intervals.map(interval => {
+      const start = toInt64(interval.start), end = toInt64(interval.end);
+      if (start > end) throw new RangeError('Routing forbidden interval start exceeds end.');
+      return { start, end };
+    });
+    this.record({ type: 'addForbiddenIntervals', dimensionName: this.name,
+      index: BigInt(toIndex(index, 'Routing cumul index', this.maximumIndex)), intervals: values });
+  }
+  async getAllowedIntervalsInRange(index: number, lower: IntValue, upper: IntValue, options: RoutingDomainOptions = {}): Promise<RoutingIntervalRange[]> {
+    return (await this.query(2, index, { lower: toInt64(lower), upper: toInt64(upper) }, options)).intervals;
+  }
+  async getForbiddenIntervals(index: number, options: RoutingDomainOptions = {}): Promise<RoutingIntervalRange[]> {
+    return (await this.query(3, index, {}, options)).intervals;
+  }
+  async getFirstPossibleGreaterOrEqualValueForNode(index: number, value: IntValue, options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.query(4, index, { lower: toInt64(value) }, options)).value!;
+  }
+  async getLastPossibleLessOrEqualValueForNode(index: number, value: IntValue, options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.query(5, index, { upper: toInt64(value) }, options)).value!;
+  }
+  private query(kind: RoutingDimensionQuery['kind'], index: number, values: Partial<RoutingDimensionQuery>, options: RoutingDomainOptions) {
+    return this.inspect({ dimensionName: this.name, kind, otherIndex: 0n, vehicleOrClass: 0,
+      lower: 0n, upper: 0n, ...values, index: BigInt(toIndex(index, 'Routing dimension index', this.maximumIndex)) }, options);
+  }
+
   setCumulVarSoftUpperBound(index: number, bound: IntValue, coefficient: IntValue): void {
     this.setCumulSoftBound(index, bound, coefficient, false);
   }
@@ -562,10 +733,13 @@ export class RoutingDimension {
   }
 
   /** Require the second routing index's cumul to be at least first + offset. */
-  addNodePrecedence(first: number, second: number, offset: IntValue): void {
+  addNodePrecedence(first: number, second: number, offset: IntValue,
+    performedConstraint = RoutingPrecedencePerformedConstraint.FIRST_AND_SECOND_INDEPENDENT): void {
+    if (this.model.isEnd(first) || this.model.isEnd(second)) throw new RangeError('Routing node precedences cannot reference end indices.');
     this.record({ type: 'addNodePrecedence', dimensionName: this.name,
       first: toIndex(first, 'Routing precedence first index', this.maximumIndex),
-      second: toIndex(second, 'Routing precedence second index', this.maximumIndex), offset: toInt64(offset) });
+      second: toIndex(second, 'Routing precedence second index', this.maximumIndex), offset: toInt64(offset),
+      performedConstraint: toIndex(performedConstraint, 'Routing precedence performed constraint', 3) });
   }
 
   hasSoftSpanUpperBounds(): boolean {
@@ -603,6 +777,36 @@ export class RoutingDimension {
   }
 }
 
+const seedStates = new WeakMap<RoutingAssignmentSeed, { routing: RoutingModel; snapshot: RoutingAssignmentSnapshot }>();
+let createAssignmentSeed: (model: RoutingModel, snapshot: RoutingAssignmentSnapshot) => RoutingAssignmentSeed;
+
+/** An owned partial route assignment for warm starts; contains no solved schedule or objective value. */
+export class RoutingAssignmentSeed {
+  private readonly values: Map<string, RoutingAssignmentVariable>;
+  private constructor(private readonly routing: RoutingModel, snapshot: RoutingAssignmentSnapshot) {
+    const owned = structuredClone(snapshot);
+    seedStates.set(this, { routing, snapshot: owned });
+    this.values = new Map(owned.variables.map(value => [routingVariableKey(value.variable), value]));
+  }
+  static { createAssignmentSeed = (model, snapshot) => new RoutingAssignmentSeed(model, snapshot); }
+
+  value(variable: number | RoutingNextVar | RoutingVehicleVar): number {
+    let kind = RoutingVariableKind.ROUTING_VARIABLE_NEXT;
+    let index: number;
+    if (typeof variable === 'number') index = toIndex(variable, 'Routing seed successor index');
+    else {
+      if (variable.model !== this.routing) throw new Error('Variable belongs to a different Routing model.');
+      if (variable.kind !== 'routingNextVar' && variable.kind !== 'routingVehicleVar')
+        throw new TypeError('Routing seeds contain only successor and vehicle variables.');
+      if (variable.kind === 'routingVehicleVar') kind = RoutingVariableKind.ROUTING_VARIABLE_VEHICLE;
+      index = variable.index;
+    }
+    const value = this.values.get(routingVariableKey({ kind, index, dimensionName: '' }));
+    if (!value || value.min !== value.max) throw new RangeError('Routing seed has no bound value for this variable.');
+    return Number(value.min);
+  }
+}
+
 const assignmentStates = new WeakMap<Assignment, { routing: RoutingModel; result: RoutingSolveResult }>();
 type RoutingSolveDiagnostics = { localSearchProfile: string | null; automaticFirstSolutionStrategy: FirstSolutionStrategy | null };
 let createAssignment: (model: RoutingModel, result: RoutingSolveResult, diagnostics?: RoutingSolveDiagnostics) => Assignment;
@@ -626,6 +830,15 @@ export class Assignment {
   }
 
   static { createAssignment = (model, result, diagnostics) => new Assignment(model, result, diagnostics); }
+
+  breakInterval(interval: RoutingBreakInterval): RoutingBreakSnapshot {
+    if (!breakIntervalRecords.has(interval) || interval.model !== this.routing) throw new Error('Break interval belongs to a different Routing model.');
+    const value = this.result.breakAssignments?.find(value => value.index === interval.index);
+    if (!value) throw new RangeError('Assignment has no value for this break interval.');
+    return { performed: value.performedMin === value.performedMax ? value.performedMin === 1n : null,
+      ...(value.performedMax === 0n ? {} : { startMin: value.startMin, startMax: value.startMax, endMin: value.endMin, endMax: value.endMax }) };
+  }
+
 
   resourceIndex(vehicle: number, group: number | RoutingResourceGroup): number {
     const index = typeof group === 'number' ? group : group.index;
@@ -717,7 +930,10 @@ export class Assignment {
   }
 }
 
-/** The status and optional assignment from one routing solve. */
+export type { RoutingSearchStatistics } from './protocol.js';
+export type RoutingPackingResult = { assignment: Assignment | null; timeLimitReached: boolean };
+
+/** Native solve status, owned assignments and native search metadata. */
 export class RoutingResult {
   readonly hasSolution: boolean;
 
@@ -726,38 +942,53 @@ export class RoutingResult {
     readonly assignment: Assignment | null,
     readonly localSearchProfile: string | null = null,
     readonly automaticFirstSolutionStrategy: FirstSolutionStrategy | null = null,
+    readonly collectedAssignments: readonly Assignment[] = [],
+    readonly searchStatistics: RoutingSearchStatistics | null = null,
+    readonly objectiveLowerBound: bigint | null = null,
+    readonly timeLimitReached: boolean | null = null,
   ) {
     this.hasSolution = assignment !== null;
   }
 }
 
 
-function initialRoutesForAssignment(
-  assignment: Assignment,
+function snapshotForAssignment(
+  assignment: Assignment | RoutingAssignmentSeed,
   routing: RoutingModel,
-): { routes: number[][]; ignoreInactiveIndices: boolean } {
+  allowSeed = false,
+): RoutingAssignmentSnapshot {
+  if (assignment instanceof RoutingAssignmentSeed) {
+    if (!allowSeed) throw new TypeError('This Routing operation requires a restored assignment, not a route seed.');
+    const state = seedStates.get(assignment);
+    if (!state || state.routing !== routing) throw new Error('Routing seed belongs to another model or is not registered.');
+    return structuredClone(state.snapshot);
+  }
   const state = assignmentStates.get(assignment);
   if (!state || state.routing !== routing) {
-    throw new Error('RoutingModel.solveFromAssignmentWithParameters: assignment belongs to another model.');
+    throw new Error('Routing assignment belongs to another model or is not registered.');
   }
   const result = state.result;
-  const routes = result.starts.map((start, vehicle) => {
-    const route: number[] = [];
-    const end = result.ends[vehicle];
-    let index = result.nextValues[start];
-    const visited = new Set<number>();
-    while (index !== end) {
-      if (!Number.isInteger(index) || visited.has(index)) {
-        throw new Error('RoutingModel.solveFromAssignmentWithParameters: assignment contains an invalid route.');
-      }
-      visited.add(index);
-      route.push(index);
-      index = result.nextValues[index];
-    }
-    return route;
-  });
-  return { routes, ignoreInactiveIndices: false };
+  const variables = [...(result.assignmentVariables ?? [])];
+  const add = (kind: RoutingVariableKind, index: number, min: bigint, max = min, dimensionName = '', resourceGroup?: number) =>
+    variables.push({ variable: { kind, index, dimensionName, ...(resourceGroup === undefined ? {} : { resourceGroup }) }, min, max });
+  for (let index = 0; index < result.nextValues.length - routing.vehicles(); ++index) add(RoutingVariableKind.ROUTING_VARIABLE_NEXT, index, BigInt(result.nextValues[index]));
+  result.vehicleValues?.forEach((value, index) => add(RoutingVariableKind.ROUTING_VARIABLE_VEHICLE, index, BigInt(value)));
+  for (const [name, values] of Object.entries(result.dimensionCumulValues)) {
+    values.forEach((value, index) => add(RoutingVariableKind.ROUTING_VARIABLE_CUMUL, index,
+      result.dimensionCumulMins?.[name]?.[index] ?? value, result.dimensionCumulMaxs?.[name]?.[index] ?? value, name));
+  }
+  result.resourceAssignments?.forEach((group, resourceGroup) => group.mins.forEach((min, vehicle) =>
+    add(RoutingVariableKind.ROUTING_VARIABLE_RESOURCE, vehicle, min, group.maxs[vehicle], '', resourceGroup)));
+  return structuredClone({ variables, intervals: result.breakAssignments ?? [], objectiveValue: result.objectiveValue });
 }
+
+export type RoutingPreAssignment = { nextValues: ReadonlyMap<number, number> };
+type RoutingInitialAssignment = RoutingSolveRequest['initialAssignment'];
+type PreparedRoutingExecution = {
+  readonly request: RoutingSolveRequest;
+  readonly resources: SolverResourceRequest | undefined;
+  readonly callbacks: readonly RoutingRouteEvaluator[];
+};
 
 export type RoutingResourceAttributes = {
   startDomain?: ReadonlyArray<readonly [IntValue, IntValue]>;
@@ -872,6 +1103,12 @@ export class RoutingResourceGroup {
 }
 
 export class RoutingModel {
+  private secondaryModel: { model: RoutingModel; parameters: RoutingSearchParameters } | undefined;
+  private routeLocks: RoutingSolveRequest['routeLocks'];
+  private firstSolutionHint: Assignment | null = null;
+  private readonly routeEvaluators: RoutingRouteEvaluator[] = [];
+  private firstSolutionEvaluatorIndex: number | undefined;
+  private primaryConstrainedDimension = '';
   private solving = false;
   private arcCostEvaluatorIndex: number | null = null;
   private readonly vehicleArcCostEvaluators = new Map<number, number>();
@@ -892,9 +1129,17 @@ export class RoutingModel {
   private readonly temporalTypeIncompatibilities = new Map<number, Set<number>>();
   private readonly typeRequirements: Map<number, number[][]>[] = [new Map(), new Map(), new Map()];
   private readonly pickupDeliveryPolicies = new Map<number, PickupAndDeliveryPolicy>();
-  private readonly disjunctions: Array<{ penalty: bigint; maxCardinality: bigint; penaltyCostBehavior: PenaltyCostBehavior; size: number }> = [];
+  private readonly pickupDeliveryPairs: Array<{ pickups: number; deliveries: number }> = [];
+  private readonly disjunctions: Array<{ penalty: bigint; penaltyCostBehavior: PenaltyCostBehavior; size: number }> = [];
   private readonly indexDisjunctions = new Map<number, number[]>();
   private readonly dimensions = new Map<string, RoutingDimensionState>();
+  private readonly breakIntervals: RoutingBreakIntervalData[] = [];
+  private readonly unaryEvaluators = new Set<number>();
+  private readonly stateDependentEvaluators = new Map<number, {
+    callback: (fromIndex: number, toIndex: number) => RoutingPiecewiseLinearFunction;
+    domainStart: bigint; domainEnd: bigint;
+  }>();
+  private readonly enterSearchCallbacks: RoutingSearchEntryCallback[] = [];
   private readonly atSolutionCallbacks: Array<{ callback: RoutingSolutionCallback; trackUncheckedNeighbors: boolean }> = [];
   private lastStatus: RoutingSearchStatus | null = null;
   constructor(private readonly manager: RoutingIndexManager, private readonly parameters?: RoutingModelParameters) {
@@ -905,6 +1150,29 @@ export class RoutingModel {
   addResourceGroup(): RoutingResourceGroup {
     const group = createResourceGroup(this, this.resourceGroups.length);
     this.resourceGroups.push(group); return group;
+  }
+
+  addBreakInterval(options: RoutingBreakIntervalOptions): RoutingBreakInterval {
+    const startMin = toInt64(options.startMin, 'Routing break start minimum'), startMax = toInt64(options.startMax, 'Routing break start maximum');
+    const duration = toInt64(options.duration, 'Routing break duration');
+    if (startMin > startMax || duration < 0n || startMax > INT64_MAX - duration) throw new RangeError('Invalid Routing break start range or duration.');
+    const data: RoutingBreakIntervalData = { index: this.breakIntervals.length, startMin, startMax, duration,
+      optional: options.optional ?? false, name: options.name ?? '' };
+    this.breakIntervals.push(data); this.operations.push({ type: 'addBreakInterval', ...data });
+    return createBreakInterval(this, data);
+  }
+  private setDimensionBreakIntervals(dimensionName: string, intervals: readonly RoutingBreakInterval[], vehicle: number, options: RoutingBreakTravelOptions): void {
+    this.getDimensionOrDie(dimensionName);
+    const indices = intervals.map(interval => {
+      const data = breakIntervalRecords.get(interval);
+      if (!data || interval.model !== this || this.breakIntervals[data.index] !== data) throw new Error('Break interval belongs to a different Routing model or is not registered.');
+      return data.index;
+    });
+    this.operations.push({ type: 'setBreakIntervals', dimensionName, intervals: indices,
+      vehicle: toIndex(vehicle, 'Routing break vehicle', this.vehicles() - 1),
+      preTravel: options.preTravelEvaluator === undefined || options.preTravelEvaluator === -1 ? undefined : [...this.buildTransitMatrixForEvaluator(options.preTravelEvaluator)],
+      postTravel: options.postTravelEvaluator === undefined || options.postTravelEvaluator === -1 ? undefined : [...this.buildTransitMatrixForEvaluator(options.postTravelEvaluator)],
+      preTravelHandle: options.preTravelEvaluator, postTravelHandle: options.postTravelEvaluator });
   }
   getResourceGroup(index: number): RoutingResourceGroup { return this.resourceGroups[toIndex(index, 'Routing resource group', this.resourceGroups.length - 1)]; }
   getResourceGroups(): RoutingResourceGroup[] { return [...this.resourceGroups]; }
@@ -930,6 +1198,31 @@ export class RoutingModel {
     this.vehicleArcCostEvaluators.clear();
   }
 
+  setFirstSolutionEvaluator(evaluatorIndex: number): void {
+    this.callbackForEvaluatorIndex(evaluatorIndex);
+    this.firstSolutionEvaluatorIndex = evaluatorIndex;
+  }
+
+  setPrimaryConstrainedDimension(dimensionName: string): void {
+    if (dimensionName !== '') this.getDimensionOrDie(dimensionName);
+    this.primaryConstrainedDimension = dimensionName;
+  }
+
+  getPrimaryConstrainedDimension(): string { return this.primaryConstrainedDimension; }
+
+  setSecondaryModel(model: RoutingModel | null, parameters: RoutingSearchParameters = {}): void {
+    if (model === null) { this.secondaryModel = undefined; return; }
+    if (!(model instanceof RoutingModel)) throw new TypeError('Routing secondary model must be a RoutingModel or null.');
+    for (let current: RoutingModel | undefined = model; current; current = current.secondaryModel?.model) {
+      if (current === this) throw new Error('Routing secondary models must not form a cycle.');
+    }
+    if (model.manager.numLocations !== this.manager.numLocations || model.manager.numVehicles !== this.manager.numVehicles
+      || model.manager.starts.some((value, index) => value !== this.manager.starts[index])
+      || model.manager.ends.some((value, index) => value !== this.manager.ends[index]))
+      throw new Error('Routing secondary model must use the same index-manager layout.');
+    this.secondaryModel = { model, parameters: structuredClone(parameters) };
+  }
+
   setArcCostEvaluatorOfVehicle(evaluatorIndex: number, vehicle: number): void {
     toIndex(vehicle, 'Routing vehicle', this.vehicles() - 1);
     this.callbackForEvaluatorIndex(evaluatorIndex);
@@ -939,24 +1232,33 @@ export class RoutingModel {
   private async solveWithExecutor(
     parameters: RoutingSearchParameters,
     options: RoutingSolveOptions,
-    initialAssignment?: { routes: number[][]; ignoreInactiveIndices: boolean },
+    initialAssignment?: RoutingInitialAssignment,
     readAssignmentOnly = false,
+    workflow: RoutingWorkflow = {},
   ): Promise<RoutingResult> {
     if (this.solving) throw new Error('RoutingModel.solve() is already in progress.');
     this.solving = true;
     try {
-      return await this.executeSolve(parameters, options, initialAssignment, readAssignmentOnly);
+      return await this.executeSolve(parameters, options, initialAssignment, readAssignmentOnly, workflow);
     } finally {
       this.solving = false;
     }
   }
 
   private createRequest(parameters: RoutingSearchParameters, options: RoutingSolveOptions,
-    initialAssignment?: { routes: number[][]; ignoreInactiveIndices: boolean }, readAssignmentOnly = false): RoutingSolveRequest {
+    initialAssignment?: RoutingInitialAssignment, readAssignmentOnly = false,
+    callbacks = this.routeEvaluators): PreparedRoutingExecution {
     if (options.signal?.aborted) throw createAbortError(options.signal);
+    if (this.secondaryModel && (this.routeEvaluators.length || this.secondaryModel.model.routeEvaluators.length))
+      throw new Error('Native Routing secondary-model optimization does not safely support whole-route callbacks.');
     const dimension = this.manager.getNumberOfIndices();
+    const capturedCallbacks = [...callbacks];
     const encodedParameters = encodeRoutingSearchParameters(parameters);
     const encodedModelParameters = encodeRoutingModelParameters(this.parameters ?? {});
+    const secondary = this.secondaryModel?.model.createRequest(this.secondaryModel.parameters, {});
+    const ownWorkers = encodedParameters.numWorkers;
+    const threads = ownWorkers <= 0 || (secondary && secondary.resources === undefined)
+      ? undefined : Math.max(ownWorkers, secondary?.resources?.threads ?? 1);
     const vehicleGroups = new Map<number, number[]>();
     for (const [vehicle, evaluatorIndex] of this.vehicleArcCostEvaluators) {
       if (evaluatorIndex === this.arcCostEvaluatorIndex) continue;
@@ -964,9 +1266,13 @@ export class RoutingModel {
       vehicles.push(vehicle);
       vehicleGroups.set(evaluatorIndex, vehicles);
     }
-    return {
+    const request: RoutingSolveRequest = {
+      ...(secondary ? { secondaryModel: secondary.request } : {}),
+      ...(this.routeLocks ? { routeLocks: structuredClone(this.routeLocks) } : {}),
+      ...(this.firstSolutionHint ? { firstSolutionHint: snapshotForAssignment(this.firstSolutionHint, this) } : {}),
       readAssignmentOnly,
       ...(this.resourceGroups.length ? { resourceGroups: this.resourceGroups.map(group => resourceGroupSnapshots.get(group)!()) } : {}),
+      searchEntryEvents: Boolean(options.onEvent) || this.enterSearchCallbacks.length > 0,
       solutionEvents: Boolean(options.onEvent) || this.atSolutionCallbacks.length > 0,
       trackUncheckedNeighbors: options.trackUncheckedNeighbors === true
         || this.atSolutionCallbacks.some(entry => entry.trackUncheckedNeighbors),
@@ -982,6 +1288,11 @@ export class RoutingModel {
       transitMatrixDimension: dimension,
       operations: structuredClone([
         ...this.operations,
+        ...this.pickupToDeliveryLimitOperations(),
+        ...(this.firstSolutionEvaluatorIndex === undefined ? [] : [{ type: 'setFirstSolutionEvaluator' as const,
+          transitMatrix: this.buildTransitMatrixForEvaluator(this.firstSolutionEvaluatorIndex) }]),
+        ...(this.primaryConstrainedDimension === '' ? [] : [{ type: 'setPrimaryConstrainedDimension' as const,
+          dimensionName: this.primaryConstrainedDimension }]),
         ...[...vehicleGroups].map(([evaluatorIndex, vehicles]): RoutingModelOperation => ({
           type: 'setArcCostEvaluatorOfVehicles', vehicles,
           transitMatrix: this.buildTransitMatrixForEvaluator(evaluatorIndex),
@@ -992,46 +1303,70 @@ export class RoutingModel {
         ? {
           routes: initialAssignment.routes.map((indices) => [...indices]),
           ignoreInactiveIndices: initialAssignment.ignoreInactiveIndices,
+          ...(initialAssignment.snapshot ? { snapshot: structuredClone(initialAssignment.snapshot) } : {}),
         }
         : undefined,
     };
+    return { request, resources: threads === undefined ? undefined : { threads }, callbacks: capturedCallbacks };
   }
 
   private async executeSolve(
     parameters: RoutingSearchParameters,
     options: RoutingSolveOptions,
-    initialAssignment?: { routes: number[][]; ignoreInactiveIndices: boolean },
+    initialAssignment?: RoutingInitialAssignment,
     readAssignmentOnly = false,
+    workflow: RoutingWorkflow = {},
   ): Promise<RoutingResult> {
-    const request = this.createRequest(parameters, options, initialAssignment, readAssignmentOnly);
+    const prepared = this.createRequest(parameters, options, initialAssignment, readAssignmentOnly);
+    const { request } = prepared;
+    Object.assign(request, structuredClone(workflow));
     this.lastStatus = null;
+    const response = await this.executeNative(prepared, options);
+    const ownedAssignment = (result: RoutingNativeResult['solution']) => {
+      if (!result) return null;
+      if (request.resourceGroups?.length && (result.resourceAssignments?.length !== request.resourceGroups.length
+        || result.resourceAssignments.some(value => value.mins.length !== request.numVehicles || value.maxs.length !== request.numVehicles)))
+        throw new Error('Routing executor did not return the requested resource assignments.');
+      return createAssignment(this, result, { localSearchProfile: response.localSearchProfile ?? null,
+        automaticFirstSolutionStrategy: response.automaticFirstSolutionStrategy ?? null });
+    };
+    this.lastStatus = response.status;
+    const assignment = ownedAssignment(response.solution);
+    const collectedAssignments = (response.collectedSolutions ?? []).map(result => ownedAssignment(result)!);
+    const action = request.assignmentAction ?? RoutingAssignmentAction.SOLVE;
+    // Native's single collected assignment is the returned best assignment.
+    // Reuse its owned snapshot rather than serializing it a second time.
+    if (assignment && collectedAssignments.length === 0 && !parameters.useIteratedLocalSearch && (parameters.numberOfSolutionsToCollect ?? 1) === 1
+      && (action === RoutingAssignmentAction.SOLVE || action === RoutingAssignmentAction.MULTIPLE_STARTS))
+      collectedAssignments.push(assignment);
+    return new RoutingResult(response.status, assignment, response.localSearchProfile ?? null,
+      response.automaticFirstSolutionStrategy ?? null, collectedAssignments,
+      response.searchStatistics ?? null, response.objectiveLowerBound ?? null, response.timeLimitReached ?? null);
+  }
+
+  private async executeNative({ request, resources, callbacks }: PreparedRoutingExecution,
+      options: RoutingSolveOptions): Promise<RoutingNativeResult> {
     const executor = createRoutingExecutor(options.executor);
-    const requestedWorkers = parameters.satParameters?.numWorkers ?? 1;
-    const response = await executeSolverJob(
+    const entryCallbacks = [...this.enterSearchCallbacks];
+    return await executeSolverJob(
       executor,
       { type: 'solve', request, interruptible: Boolean(options.signal) },
       {
         showCloudNotice: !(executor instanceof SolverServerExecutor),
+        onCallback: callbacks.length ? routingRouteCallback(callbacks) : undefined,
         onEvent: async event => {
+          if (event.type === 'searchEntered') {
+            for (const callback of entryCallbacks) await callback();
+          }
           if (event.type === 'solution') {
             await this.runAtSolutionCallbacks(event);
           }
           await options.onEvent?.(event);
         },
         signal: options.signal,
-        resources: requestedWorkers > 0 ? { threads: requestedWorkers } : undefined,
+        resources,
       },
     );
-    const result = response.solution;
-    if (result && request.resourceGroups?.length && (result.resourceAssignments?.length !== request.resourceGroups.length
-      || result.resourceAssignments.some(value => value.mins.length !== request.numVehicles || value.maxs.length !== request.numVehicles))) {
-      throw new Error('Routing executor did not return the requested resource assignments.');
-    }
-    this.lastStatus = response.status;
-    if (!result) return new RoutingResult(response.status, null, response.localSearchProfile ?? null, response.automaticFirstSolutionStrategy ?? null);
-    const assignment = createAssignment(this, result, { localSearchProfile: response.localSearchProfile ?? null,
-      automaticFirstSolutionStrategy: response.automaticFirstSolutionStrategy ?? null });
-    return new RoutingResult(response.status, assignment, response.localSearchProfile ?? null, response.automaticFirstSolutionStrategy ?? null);
   }
 
   async solveWithParameters(
@@ -1067,6 +1402,18 @@ export class RoutingModel {
     const value = this.vehicleCost(cost);
     this.operations.push({ type: 'setFixedVehicleCost', cost: value, vehicle: index });
     this.fixedVehicleCosts.set(index, value);
+  }
+
+  setPathEnergyCostOfVehicle(force: string, distance: string, costPerUnit: IntValue, vehicle: number): void {
+    this.setPathEnergyCostsOfVehicle(force, distance, 0, 0, costPerUnit, vehicle);
+  }
+
+  setPathEnergyCostsOfVehicle(force: string, distance: string, threshold: IntValue,
+    costBelow: IntValue, costAbove: IntValue, vehicle: number): void {
+    this.getDimensionOrDie(force); this.getDimensionOrDie(distance);
+    this.operations.push({ type: 'setPathEnergyCosts', force, distance, threshold: this.vehicleCost(threshold),
+      costBelow: this.vehicleCost(costBelow), costAbove: this.vehicleCost(costAbove),
+      vehicle: toIndex(vehicle, 'Routing energy-cost vehicle', this.vehicles() - 1) });
   }
 
   setFixedCostOfAllVehicles(cost: IntValue): void {
@@ -1149,13 +1496,64 @@ export class RoutingModel {
   }
 
   registerUnaryTransitCallback(callback: (fromIndex: number) => IntValue): number {
-    return this.registerTransitCallback((fromIndex) => callback(fromIndex));
+    const index = this.registerTransitCallback((fromIndex) => callback(fromIndex));
+    this.unaryEvaluators.add(index); return index;
   }
 
   registerUnaryTransitVector(values: IntValue[]): number {
     if (values.length !== this.manager.getNumberOfNodes()) throw new RangeError('Routing transit vector must contain one value per node.');
     const snapshot = Array.from(values, value => toInt64(value));
     return this.registerUnaryTransitCallback(fromIndex => snapshot[this.manager.indexToNode(fromIndex)]);
+  }
+
+  /** Register per-arc native piecewise-linear transit over [domainStart, domainEnd). */
+  registerStateDependentTransitCallback(
+    callback: (fromIndex: number, toIndex: number) => RoutingPiecewiseLinearFunction,
+    options: RoutingStateDependentTransitOptions,
+  ): number {
+    if (typeof callback !== 'function') throw new TypeError('Routing state-dependent callback must be a function.');
+    const domainStart = toInt64(options.domainStart), domainEnd = toInt64(options.domainEnd);
+    if (domainStart < 0n || domainStart >= domainEnd || domainEnd > BigInt(INT32_MAX))
+      throw new RangeError('Routing state-dependent domain must satisfy 0 <= start < end <= 2147483647.');
+    const index = this.stateDependentEvaluators.size;
+    this.stateDependentEvaluators.set(index, { callback, domainStart, domainEnd });
+    return index;
+  }
+
+  addDimensionDependentDimensionWithVehicleCapacity(
+    transitIndices: readonly number[], dependentTransitIndices: readonly number[], baseDimension: string | null,
+    slackMax: IntValue, capacities: readonly IntValue[], fixStartCumulToZero: boolean, name: string,
+  ): boolean {
+    this.validateDimensionOptions(fixStartCumulToZero, name);
+    if (this.dimensions.has(name)) return false;
+    if (baseDimension !== null) this.getDimensionOrDie(baseDimension);
+    if (transitIndices.length !== this.vehicles() || dependentTransitIndices.length !== this.vehicles() || capacities.length !== this.vehicles())
+      throw new RangeError('Routing dependent dimension requires one fixed evaluator, dependent evaluator and capacity per vehicle.');
+    const slack = this.dimensionLimit(slackMax, 'Routing dimension slack');
+    const limits = Array.from(capacities, value => this.dimensionLimit(value, 'Routing vehicle capacity'));
+    const matrices = Array.from(transitIndices, index => this.buildTransitMatrixForEvaluator(toIndex(index, 'Routing transit evaluator')));
+    const snapshots = new Map<number, RoutingStateDependentMatrix>();
+    const dependentMatrices = dependentTransitIndices.map(index => {
+      const evaluator = this.stateDependentEvaluators.get(toIndex(index, 'Routing state-dependent evaluator'));
+      if (!evaluator) throw new RangeError('Routing state-dependent evaluator is unavailable.');
+      let matrix = snapshots.get(index);
+      if (!matrix) {
+        const functions: RoutingStateDependentMatrix['functions'] = [];
+        const dimension = this.manager.getNumberOfIndices();
+        for (let from = 0; from < dimension; ++from) for (let to = 0; to < dimension; ++to) {
+          const fn = synchronousCallbackResult(evaluator.callback(from, to), 'Routing state-dependent transit callbacks must return synchronously.');
+          functions.push({ x: Array.from(fn.x, value => toInt64(value)), y: Array.from(fn.y, value => toInt64(value)) });
+        }
+        matrix = { domainStart: evaluator.domainStart, domainEnd: evaluator.domainEnd, functions };
+        snapshots.set(index, matrix);
+      }
+      return matrix;
+    });
+    this.addDimensionState(name);
+    this.operations.push({ type: 'addDependentDimension', transitMatrices: matrices,
+      ...(transitIndices.some(index => this.unaryEvaluators.has(index)) ? { unaryTransits: transitIndices.map(index => this.unaryEvaluators.has(index)) } : {}),
+      dependentMatrices, ...(baseDimension !== null ? { baseDimension } : {}), slackMax: slack, capacities: limits, fixStartCumulToZero, name });
+    return true;
   }
 
   addDimension(
@@ -1169,6 +1567,7 @@ export class RoutingModel {
     const operation: RoutingModelOperation = {
       type: 'addDimension',
       transitMatrix: this.buildTransitMatrixForEvaluator(transitIndex),
+      ...(this.unaryEvaluators.has(transitIndex) ? { unaryTransit: true } : {}),
       slackMax: toInt64(slackMax),
       capacity: toInt64(capacity),
       fixStartCumulToZero,
@@ -1190,6 +1589,7 @@ export class RoutingModel {
     const operation: RoutingModelOperation = {
       type: 'addDimensionWithVehicleCapacity',
       transitMatrix: this.buildTransitMatrixForEvaluator(transitIndex),
+      ...(this.unaryEvaluators.has(transitIndex) ? { unaryTransit: true } : {}),
       slackMax: toInt64(slackMax),
       capacities: capacities.map((value) => toInt64(value)),
       fixStartCumulToZero,
@@ -1212,6 +1612,7 @@ export class RoutingModel {
     const operation: RoutingModelOperation = {
       type: 'addDimensionWithVehicleTransits',
       transitMatrices: indices.map((index) => this.buildTransitMatrixForEvaluator(index)),
+      ...(indices.some(index => this.unaryEvaluators.has(index)) ? { unaryTransits: indices.map(index => this.unaryEvaluators.has(index)) } : {}),
       slackMax: toInt64(slackMax),
       capacity: toInt64(capacity),
       fixStartCumulToZero,
@@ -1235,6 +1636,7 @@ export class RoutingModel {
     const matrices = Array.from(transitIndices, index => this.buildTransitMatrixForEvaluator(toIndex(index, 'Routing transit evaluator')));
     this.addDimensionState(name);
     this.operations.push({ type: 'addDimensionWithVehicleTransitAndCapacity', transitMatrices: matrices, slackMax: slack,
+      ...(transitIndices.some(index => this.unaryEvaluators.has(index)) ? { unaryTransits: transitIndices.map(index => this.unaryEvaluators.has(index)) } : {}),
       capacities: limits, fixStartCumulToZero, name });
     return true;
   }
@@ -1316,7 +1718,12 @@ export class RoutingModel {
       throw new Error(`RoutingModel.getDimensionOrDie: unknown dimension '${name}'.`);
     }
     return createRoutingDimension(this, name, state, operation => this.operations.push(operation),
-      this.manager.getNumberOfIndices() - 1);
+      this.manager.getNumberOfIndices() - 1, (intervals, vehicle, options) => this.setDimensionBreakIntervals(name, intervals, vehicle, options),
+      (limit, pairIndex) => {
+        pairIndex = toIndex(pairIndex, 'Routing pickup/delivery pair', this.pickupDeliveryPairs.length - 1);
+        if (typeof limit !== 'function') throw new TypeError('Routing pickup/delivery limit must be a function.');
+        (state.pickupToDeliveryLimits ??= new Map()).set(pairIndex, limit);
+      }, (query, options, assignment) => this.inspectDimension(query, options, assignment));
   }
 
   /** Replace eligible vehicles for an index; an empty list allows every vehicle.
@@ -1344,7 +1751,7 @@ export class RoutingModel {
     this.operations.push({ type: 'addDisjunction', indices: snapshot, penalty: cost,
       ...(maximum === undefined ? {} : { maxCardinality: maximum }), ...(behavior === undefined ? {} : { penaltyCostBehavior: behavior }) });
     const id = this.disjunctions.length;
-    this.disjunctions.push({ penalty: cost ?? -1n, maxCardinality: maximum ?? 1n,
+    this.disjunctions.push({ penalty: cost ?? -1n,
       penaltyCostBehavior: behavior ?? PenaltyCostBehavior.PENALIZE_ONCE, size: snapshot.length });
     for (const index of snapshot) {
       const memberships = this.indexDisjunctions.get(index) ?? [];
@@ -1366,17 +1773,57 @@ export class RoutingModel {
 
   getDisjunctionPenalty(index: number): bigint { return this.disjunction(index).penalty; }
 
-  getDisjunctionMaxCardinality(index: number): bigint { return this.disjunction(index).maxCardinality; }
+  async getDisjunctionMaxCardinality(index: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    this.disjunction(index);
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_DISJUNCTION_MAX_CARDINALITY,
+      { index: BigInt(index) }, options)).value!;
+  }
 
   getDisjunctionPenaltyCostBehavior(index: number): PenaltyCostBehavior { return this.disjunction(index).penaltyCostBehavior; }
 
   getNumberOfDisjunctions(): number { return this.disjunctions.length; }
 
+  /** Native sorted pairs whose visits each belong to exactly one disjunction. */
+  async getPerfectBinaryDisjunctions(options: RoutingDomainOptions = {}): Promise<Array<[number, number]>> {
+    const result = await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_PERFECT_BINARY_DISJUNCTIONS, {}, options);
+    return result.groups.map(pair => {
+      if (pair.length !== 2) throw new Error('Native Routing executor returned an invalid disjunction pair.');
+      return [pair[0], pair[1]];
+    });
+  }
+
+  /** Native visit count excluding starts, ends and pickup/delivery alternatives. */
+  async getNumOfSingletonNodes(options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_SINGLETON_NODES, {}, options)).value!);
+  }
+
+  /** Explicit allowed-vehicle configuration, not a complete feasibility check. */
+  async isVehicleAllowedForIndex(vehicle: number, index: number, options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLE_ALLOWED, {
+      vehicleOrClass: toIndex(vehicle, 'Routing vehicle', this.vehicles() - 1),
+      index: BigInt(toIndex(index, 'Routing eligibility index', this.manager.getNumberOfIndices() - this.vehicles() - 1)),
+    }, options)).value === 1n;
+  }
+
+  /** Native construction cost; preserves the int64-maximum route-closing sentinel. */
+  async getArcCostForFirstSolution(fromIndex: number, toIndexValue: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_FIRST_SOLUTION_ARC_COST, {
+      index: BigInt(toIndex(fromIndex, 'Routing first-solution arc origin', this.manager.getNumberOfIndices() - this.vehicles() - 1)),
+      otherIndex: BigInt(toIndex(toIndexValue, 'Routing first-solution arc destination', this.manager.getNumberOfIndices() - 1)),
+    }, options)).value!;
+  }
+
   /** Native inspection tests the -1 sentinel specifically, rather than every negative penalty. */
   hasMandatoryDisjunctions(): boolean { return this.disjunctions.some(value => value.penalty === -1n); }
 
-  hasMaxCardinalityConstrainedDisjunctions(): boolean {
-    return this.disjunctions.some(value => BigInt(value.size) > value.maxCardinality);
+  async hasMaxCardinalityConstrainedDisjunctions(options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_HAS_MAX_CARDINALITY_CONSTRAINED_DISJUNCTIONS,
+      {}, options)).value === 1n;
+  }
+
+  /** Explicitly ignore disjunctions whose active variables are already fixed to zero at this construction point. */
+  ignoreDisjunctionsAlreadyForcedToZero(): void {
+    this.operations.push({ type: 'ignoreDisjunctionsAlreadyForcedToZero' });
   }
 
   addSoftSameVehicleConstraint(indices: readonly number[], cost: IntValue): void {
@@ -1413,16 +1860,224 @@ export class RoutingModel {
     return this.pickupDeliveryPolicies.get(toIndex(vehicle, 'Routing pickup/delivery vehicle', this.vehicles() - 1)) ?? PickupAndDeliveryPolicy.PICKUP_AND_DELIVERY_NO_ORDER;
   }
 
+  /** Copy native route variables to this model without validating or solving a schedule. */
+  async transferAssignmentFrom(assignment: Assignment,
+      options: RoutingDomainOptions = {}): Promise<RoutingAssignmentSeed> {
+    const state = assignmentStates.get(assignment);
+    if (!state) throw new Error('Routing source assignment is not registered.');
+    const sourceModel = state.routing;
+    if (sourceModel.manager.numLocations !== this.manager.numLocations || sourceModel.vehicles() !== this.vehicles()
+        || sourceModel.manager.starts.some((value, index) => value !== this.manager.starts[index])
+        || sourceModel.manager.ends.some((value, index) => value !== this.manager.ends[index]))
+      throw new Error('Routing assignment transfer requires the same index-manager layout.');
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.assignmentTransfer = {
+      nextValues: state.result.nextValues.slice(0, sourceModel.manager.getNumberOfIndices() - sourceModel.vehicles()),
+      vehicleValues: [...(state.result.vehicleValues ?? [])],
+    };
+    const snapshot = (await this.inspectNative(prepared, options)).assignmentSeed;
+    if (!snapshot) throw new Error('Native Routing executor did not return an assignment seed.');
+    return createAssignmentSeed(this, snapshot);
+  }
+
   async solveFromAssignmentWithParameters(
-    assignment: Assignment,
+    assignment: Assignment | RoutingAssignmentSeed,
     parameters: RoutingSearchParameters,
     options: RoutingSolveOptions = {},
   ): Promise<Assignment | null> {
     return (await this.solveWithExecutor(
       parameters,
       options,
-      initialRoutesForAssignment(assignment, this),
+      { routes: [], ignoreInactiveIndices: false, snapshot: snapshotForAssignment(assignment, this, true) },
     )).assignment;
+  }
+
+  async restoreAssignment(assignment: Assignment | RoutingAssignmentSeed, options: RoutingSolveOptions = {}): Promise<Assignment | null> {
+    const { executor: _executor, onEvent: _event, signal: _signal, trackUncheckedNeighbors: _unchecked, ...parameters } = options;
+    return (await this.solveWithExecutor(parameters, options,
+      { routes: [], ignoreInactiveIndices: false, snapshot: snapshotForAssignment(assignment, this, true) }, true)).assignment;
+  }
+
+  async solveFromAssignmentsWithParameters(assignments: readonly (Assignment | RoutingAssignmentSeed)[], parameters: RoutingSearchParameters = {},
+      options: RoutingSolveOptions = {}): Promise<RoutingResult> {
+    return await this.solveWithExecutor(parameters, options, undefined, false, {
+      assignmentAction: RoutingAssignmentAction.MULTIPLE_STARTS,
+      candidateAssignments: Array.from(assignments, assignment => snapshotForAssignment(assignment, this, true)),
+    });
+  }
+
+  async fastSolveFromAssignmentWithParameters(assignment: Assignment, parameters: RoutingSearchParameters = {},
+      checkSolutionInCp = true, options: RoutingSolveOptions = {}): Promise<RoutingResult> {
+    return await this.solveWithExecutor(parameters, options,
+      { routes: [], ignoreInactiveIndices: false, snapshot: snapshotForAssignment(assignment, this) }, false,
+      { assignmentAction: RoutingAssignmentAction.FAST_SOLVE, checkSolutionInCp });
+  }
+
+  async packCumulsOfOptimizerDimensionsFromAssignment(assignment: Assignment, durationLimitSeconds: number,
+      options: RoutingSolveOptions = {}): Promise<RoutingPackingResult> {
+    if (typeof durationLimitSeconds !== 'number' || Number.isNaN(durationLimitSeconds)) throw new RangeError('Routing packing duration must be a number other than NaN.');
+    const { executor: _executor, onEvent: _event, signal: _signal, trackUncheckedNeighbors: _unchecked, ...parameters } = options;
+    const result = await this.solveWithExecutor(parameters, options,
+      { routes: [], ignoreInactiveIndices: false, snapshot: snapshotForAssignment(assignment, this) }, false,
+      { assignmentAction: RoutingAssignmentAction.PACK, packingDurationSeconds: durationLimitSeconds });
+    if (result.timeLimitReached === null) throw new Error('Native Routing executor did not return the packing time-limit flag.');
+    return { assignment: result.assignment, timeLimitReached: result.timeLimitReached };
+  }
+
+  async compactAssignment(assignment: Assignment, options: RoutingSolveOptions = {}): Promise<Assignment | null> {
+    return await this.compactNativeAssignment(assignment, false, options);
+  }
+
+  async compactAndCheckAssignment(assignment: Assignment, options: RoutingSolveOptions = {}): Promise<Assignment | null> {
+    return await this.compactNativeAssignment(assignment, true, options);
+  }
+
+  private async compactNativeAssignment(assignment: Assignment, check: boolean, options: RoutingSolveOptions): Promise<Assignment | null> {
+    const { executor: _executor, onEvent: _event, signal: _signal, trackUncheckedNeighbors: _unchecked, ...parameters } = options;
+    return (await this.solveWithExecutor(parameters, options,
+      { routes: [], ignoreInactiveIndices: false, snapshot: snapshotForAssignment(assignment, this) }, false,
+      { assignmentAction: check ? RoutingAssignmentAction.COMPACT_AND_CHECK : RoutingAssignmentAction.COMPACT })).assignment;
+  }
+
+  async computeLowerBound(options: RoutingDomainOptions = {}): Promise<bigint> {
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.assignmentAction = RoutingAssignmentAction.LOWER_BOUND;
+    const result = await this.inspectNative(prepared, options);
+    if (result.computedLowerBound === undefined) throw new Error('Native Routing executor did not return the computed lower bound.');
+    return result.computedLowerBound;
+  }
+
+  async checkIfAssignmentIsFeasible(assignment: Assignment | RoutingAssignmentSeed, callAtSolutionMonitors = false,
+      options: RoutingSolveOptions = {}): Promise<boolean> {
+    if (typeof callAtSolutionMonitors !== 'boolean') throw new TypeError('Routing monitor option must be a boolean.');
+    if (this.solving) throw new Error('RoutingModel.solve() is already in progress.');
+    this.solving = true;
+    try {
+      const { executor: _executor, onEvent: _event, signal: _signal, trackUncheckedNeighbors: _unchecked, ...parameters } = options;
+      const prepared = this.createRequest(parameters, options,
+        { routes: [], ignoreInactiveIndices: false, snapshot: snapshotForAssignment(assignment, this, true) });
+      const { request } = prepared;
+      request.assignmentAction = RoutingAssignmentAction.CHECK_FEASIBILITY;
+      request.callAtSolutionMonitors = callAtSolutionMonitors;
+      const response = await this.executeNative(prepared, options);
+      if (response.assignmentFeasible === undefined) throw new Error('Native Routing executor did not return assignment feasibility.');
+      return response.assignmentFeasible;
+    } finally { this.solving = false; }
+  }
+
+  private async inspectCumulOptimizers(options: RoutingSolveOptions): Promise<NonNullable<RoutingNativeResult['cumulOptimizers']>> {
+    const { executor: _executor, onEvent: _event, signal: _signal, trackUncheckedNeighbors: _unchecked, ...parameters } = options;
+    const prepared = this.createRequest(parameters, options);
+    const { request } = prepared;
+    request.inspectCumulOptimizers = true;
+    const data = (await this.inspectNative(prepared, options)).cumulOptimizers;
+    if (!data) throw new Error('Native Routing executor did not return cumul optimizer inspection.');
+    return data;
+  }
+
+  async hasGlobalCumulOptimizer(dimensionName: string, options: RoutingSolveOptions = {}): Promise<boolean> {
+    this.getDimensionOrDie(dimensionName);
+    return (await this.inspectCumulOptimizers(options)).globalDimensions.includes(dimensionName);
+  }
+
+  async hasLocalCumulOptimizer(dimensionName: string, options: RoutingSolveOptions = {}): Promise<boolean> {
+    this.getDimensionOrDie(dimensionName);
+    return (await this.inspectCumulOptimizers(options)).localDimensions.includes(dimensionName);
+  }
+
+  async getDimensionsWithGlobalCumulOptimizers(options: RoutingSolveOptions = {}): Promise<RoutingDimension[]> {
+    return (await this.inspectCumulOptimizers(options)).globalDimensions.map(name => this.getDimensionOrDie(name));
+  }
+
+  async getDimensionsWithLocalCumulOptimizers(options: RoutingSolveOptions = {}): Promise<RoutingDimension[]> {
+    return (await this.inspectCumulOptimizers(options)).localDimensions.map(name => this.getDimensionOrDie(name));
+  }
+
+  setFirstSolutionHint(assignment: Assignment | null): void {
+    if (assignment !== null) snapshotForAssignment(assignment, this);
+    this.firstSolutionHint = assignment;
+  }
+
+  getFirstSolutionHint(): Assignment | null { return this.firstSolutionHint; }
+
+  addRouteConstraint(evaluator: RoutingRouteEvaluator, costsAreHomogeneousAcrossVehicles = false): void {
+    if (typeof evaluator !== 'function' || typeof costsAreHomogeneousAcrossVehicles !== 'boolean') throw new TypeError('Routing route constraint requires a callback and Boolean cost-homogeneity flag.');
+    this.operations.push({ type: 'addRouteConstraint', evaluator: this.routeEvaluators.length, costsAreHomogeneousAcrossVehicles });
+    this.routeEvaluators.push(evaluator);
+  }
+
+  async getRouteCost(route: readonly number[], options: RoutingDomainOptions = {}): Promise<bigint | null> {
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.routeCostQuery = route.map(index => toIndex(index, 'Routing route index', this.manager.getNumberOfIndices() - 1));
+    const result = await this.inspectNative(prepared, options);
+    if (result.routeCost === undefined) throw new Error('Native Routing executor did not return route cost.');
+    return result.routeCost;
+  }
+
+  /** Return the first native pickup/delivery counterpart accepted by the synchronous predicate. */
+  async getFirstMatchingPickupDeliverySibling(index: number, predicate: (index: number) => boolean,
+      options: RoutingDomainOptions = {}): Promise<number | null> {
+    if (typeof predicate !== 'function') throw new TypeError('Routing sibling lookup requires a predicate.');
+    const callbacks = [...this.routeEvaluators];
+    const evaluator = callbacks.length;
+    callbacks.push(indices => {
+      if (indices.length !== 1) throw new Error('Invalid Routing sibling predicate payload.');
+      const matches = synchronousCallbackResult(predicate(indices[0]), 'Routing sibling predicates must return synchronously.');
+      if (typeof matches !== 'boolean') throw new TypeError('Routing sibling predicate must return a Boolean synchronously.');
+      return matches ? 1n : 0n;
+    });
+    const result = await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_FIRST_MATCHING_PICKUP_DELIVERY_SIBLING, {
+      index: BigInt(toIndex(index, 'Routing pickup/delivery index', this.manager.getNumberOfIndices() - this.vehicles() - 1)),
+      predicateEvaluator: evaluator,
+    }, options, callbacks);
+    return result.value === -1n ? null : toIndex(result.value!, 'Native Routing sibling index', this.manager.getNumberOfIndices() - 1);
+  }
+
+  private async inspectPickupDelivery(index: number, options: RoutingDomainOptions) {
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.pickupDeliveryInspectionIndex = toIndex(index, 'Routing pickup/delivery index', this.manager.getNumberOfIndices() - this.vehicles() - 1);
+    const data = (await this.inspectNative(prepared, options)).pickupDeliveryInspection;
+    if (!data) throw new Error('Native Routing executor did not return pickup/delivery inspection.');
+    return data;
+  }
+  async getPickupPosition(index: number, options: RoutingDomainOptions = {}): Promise<RoutingPickupDeliveryPosition | null> { return (await this.inspectPickupDelivery(index, options)).pickup ?? null; }
+  async getDeliveryPosition(index: number, options: RoutingDomainOptions = {}): Promise<RoutingPickupDeliveryPosition | null> { return (await this.inspectPickupDelivery(index, options)).delivery ?? null; }
+  async isPickup(index: number, options: RoutingDomainOptions = {}): Promise<boolean> { return (await this.inspectPickupDelivery(index, options)).isPickup; }
+  async isDelivery(index: number, options: RoutingDomainOptions = {}): Promise<boolean> { return (await this.inspectPickupDelivery(index, options)).isDelivery; }
+
+  async inspectBreaks(dimensionName: string, vehicle: number, options: RoutingDomainOptions = {}): Promise<RoutingBreakConfiguration> {
+    this.getDimensionOrDie(dimensionName);
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.breakInspection = { dimensionName, vehicle: toIndex(vehicle, 'Routing break vehicle', this.vehicles() - 1) };
+    const data = (await this.inspectNative(prepared, options)).breakConfiguration;
+    if (!data) throw new Error('Native Routing executor did not return break configuration.');
+    return { ...data, intervals: data.intervals.map(index => createBreakInterval(this, this.breakIntervals[toIndex(index, 'Routing break interval', this.breakIntervals.length - 1)])) };
+  }
+
+  async applyLocksToAllVehicles(routes: readonly (readonly number[])[], closeRoutes: boolean,
+      options: RoutingDomainOptions = {}): Promise<boolean> {
+    this.routeLocks = { routes: routes.map((route, vehicle) => route.map((index, position) =>
+      toIndex(index, `Routing lock ${vehicle} index ${position}`, this.manager.getNumberOfIndices() - 1))), closeRoutes };
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.inspectPreAssignment = true;
+    const result = await this.inspectNative(prepared, options);
+    if (result.locksApplied === undefined) throw new Error('Native Routing executor did not report lock application.');
+    return result.locksApplied;
+  }
+
+  async inspectPreAssignment(options: RoutingDomainOptions = {}): Promise<RoutingPreAssignment> {
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.inspectPreAssignment = true;
+    const data = (await this.inspectNative(prepared, options)).preAssignment;
+    if (!data) throw new Error('Native Routing executor did not return preassignment data.');
+    return { nextValues: new Map(Object.entries(data).map(([index, next]) => [Number(index), next])) };
   }
 
   /** Restore routes with native feasibility checks; infeasible routes return null.
@@ -1467,36 +2122,14 @@ export class RoutingModel {
     return toIndex(type, 'Routing visit type', this.numberOfVisitTypes - 1);
   }
 
-  private nodesOfVisitType(type: number): number[] {
-    const kind = this.visitTypeIndex(type);
-    return [...this.visitTypes].filter(([, value]) => value.type === kind).map(([index]) => index).sort((a, b) => a - b);
+  getSingleNodesOfType(type: number, options: RoutingDomainOptions = {}): Promise<number[]> {
+    return this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_SINGLE_NODES_OF_TYPE,
+      { vehicleOrClass: this.visitTypeIndex(type) }, options).then(result => result.indices);
   }
 
-  private visitTypePairMemberships(): Map<number, { pickup?: number; delivery?: number }> {
-    const pairs = new Map<number, { pickup?: number; delivery?: number }>();
-    let pair = 0;
-    for (const operation of this.operations) if (operation.type === 'addPickupAndDelivery') {
-      pairs.set(operation.pickup, { ...pairs.get(operation.pickup), pickup: pair });
-      pairs.set(operation.delivery, { ...pairs.get(operation.delivery), delivery: pair });
-      ++pair;
-    }
-    return pairs;
-  }
-
-  getSingleNodesOfType(type: number): number[] {
-    const pairs = this.visitTypePairMemberships();
-    return this.nodesOfVisitType(type).filter(index => !pairs.has(index));
-  }
-
-  getPairIndicesOfType(type: number): number[] {
-    const pairs = this.visitTypePairMemberships();
-    const result = new Set<number>();
-    for (const index of this.nodesOfVisitType(type)) {
-      const membership = pairs.get(index);
-      if (membership?.pickup !== undefined) result.add(membership.pickup);
-      if (membership?.delivery !== undefined) result.add(membership.delivery);
-    }
-    return [...result];
+  getPairIndicesOfType(type: number, options: RoutingDomainOptions = {}): Promise<number[]> {
+    return this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_PAIR_INDICES_OF_TYPE,
+      { vehicleOrClass: this.visitTypeIndex(type) }, options).then(result => result.indices);
   }
 
   private addTypeIncompatibility(type1: number, type2: number,
@@ -1585,11 +2218,26 @@ export class RoutingModel {
       || this.hasSameVehicleTypeRequirements() || this.hasTemporalTypeRequirements();
   }
 
-  addPickupAndDelivery(pickup: number, delivery: number): void {
+  addPickupAndDelivery(pickup: number, delivery: number): number {
     const maximum = this.manager.getNumberOfIndices() - this.vehicles() - 1;
     this.operations.push({ type: 'addPickupAndDelivery',
       pickup: toIndex(pickup, 'Routing pickup index', maximum),
       delivery: toIndex(delivery, 'Routing delivery index', maximum) });
+    return this.pickupDeliveryPairs.push({ pickups: 1, deliveries: 1 }) - 1;
+  }
+
+  addPickupAndDeliverySets(pickupDisjunction: number, deliveryDisjunction: number): number {
+    pickupDisjunction = toIndex(pickupDisjunction, 'Routing pickup disjunction', this.disjunctions.length - 1);
+    deliveryDisjunction = toIndex(deliveryDisjunction, 'Routing delivery disjunction', this.disjunctions.length - 1);
+    const pickups = this.disjunction(pickupDisjunction).size;
+    const deliveries = this.disjunction(deliveryDisjunction).size;
+    this.operations.push({ type: 'addPickupAndDeliverySets', pickupDisjunction, deliveryDisjunction });
+    return this.pickupDeliveryPairs.push({ pickups, deliveries }) - 1;
+  }
+
+  addEnterSearchCallback(callback: RoutingSearchEntryCallback): void {
+    if (typeof callback !== 'function') throw new TypeError('Routing search-entry callback must be a function.');
+    this.enterSearchCallbacks.push(callback);
   }
 
   addAtSolutionCallback(callback: RoutingSolutionCallback, trackUncheckedNeighbors = false): void {
@@ -1753,9 +2401,10 @@ export class RoutingModel {
   async inspectVariableDomain(variable: RoutingFinalizerVariable, options: RoutingDomainOptions = {}, containsValue?: IntValue): Promise<RoutingVariableDomain> {
     const reference = this.variableReference(variable);
     const probe = containsValue === undefined ? undefined : toInt64(containsValue);
-    const request = this.createRequest({}, options);
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
     request.domainQueries = [{ variable: reference, ...(probe === undefined ? {} : { containsValue: probe }) }];
-    const response = await this.inspectNative(request, options);
+    const response = await this.inspectNative(prepared, options);
     const result = response.domainResults?.[0];
     if (!result || (probe !== undefined && result.contains === undefined)) throw new Error('Routing executor returned no native variable domain or membership answer.');
     return result;
@@ -1828,17 +2477,152 @@ export class RoutingModel {
     const maximum = this.manager.getNumberOfIndices() - 1;
     const from = toIndex(fromIndex, 'Routing from index', maximum), to = toIndex(toIndexValue, 'Routing to index', maximum);
     if (!Number.isInteger(vehicle) || vehicle < -1 || vehicle >= this.vehicles()) throw new RangeError('Invalid Routing vehicle.');
-    const request = this.createRequest({}, options);
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
     request.arcCostQueries = [{ fromIndex: BigInt(from), toIndex: BigInt(to), vehicle }];
-    const response = await this.inspectNative(request, options);
+    const response = await this.inspectNative(prepared, options);
     if (response.arcCosts?.[0] === undefined) throw new Error('Routing executor returned no native arc cost.');
     return response.arcCosts[0];
   }
 
+  async getVehicleClassIndexOfVehicle(vehicle: number, options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLE_CLASS,
+      { vehicleOrClass: toIndex(vehicle, 'Routing vehicle', this.vehicles() - 1) }, options)).value!);
+  }
+
+  async getVehicleClassesCount(options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLE_CLASSES_COUNT, {}, options)).value!);
+  }
+
+  async getVehicleOfClass(vehicleClass: number, options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLE_OF_CLASS,
+      { vehicleOrClass: toIndex(vehicleClass, 'Routing vehicle class', INT32_MAX) }, options)).value!);
+  }
+
+  async getVisitTypeComponents(options: RoutingDomainOptions = {}): Promise<number[][]> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_VISIT_TYPE_COMPONENTS, {}, options)).groups;
+  }
+
+  async getTopologicallySortedVisitTypes(options: RoutingDomainOptions = {}): Promise<number[][]> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_SORTED_VISIT_TYPES, {}, options)).groups;
+  }
+
+  async getSameVehicleIndicesOfIndex(index: number, options: RoutingDomainOptions = {}): Promise<number[]> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_SAME_VEHICLE_INDICES,
+      { index: BigInt(toIndex(index, 'Routing same-vehicle index', this.manager.getNumberOfIndices() - this.vehicles() - 1)) }, options)).indices;
+  }
+
+  async getVehiclesOfSameClass(startEndIndex: number, options: RoutingDomainOptions = {}): Promise<number[]> {
+    const index = toIndex(startEndIndex, 'Routing start/end index', this.manager.getNumberOfIndices() - 1);
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLES_OF_SAME_CLASS, { index: BigInt(index) }, options)).indices;
+  }
+
+  async getSameVehicleClassArcs(fromIndex: number, toIndexValue: number, options: RoutingDomainOptions = {}): Promise<Array<[number, number]>> {
+    const maximum = this.manager.getNumberOfIndices() - 1;
+    const result = await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_SAME_VEHICLE_CLASS_ARCS,
+      { index: BigInt(toIndex(fromIndex, 'Routing from index', maximum)), otherIndex: BigInt(toIndex(toIndexValue, 'Routing to index', maximum)) }, options);
+    return result.groups as Array<[number, number]>;
+  }
+
+  async getTopologicallySortedNodePrecedences(options: RoutingDomainOptions = {}): Promise<number[][][]> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_SORTED_NODE_PRECEDENCES, {}, options)).precedenceGroups;
+  }
+
+  async getCostClassIndexOfVehicle(vehicle: number, options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLE_COST_CLASS,
+      { vehicleOrClass: toIndex(vehicle, 'Routing vehicle', this.vehicles() - 1) }, options)).value!);
+  }
+
+  async hasVehicleWithCostClassIndex(costClass: number, options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_HAS_VEHICLE_COST_CLASS,
+      { vehicleOrClass: toIndex(costClass, 'Routing cost class', INT32_MAX) }, options)).value === 1n;
+  }
+
+  async getCostClassesCount(options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_COST_CLASSES_COUNT, {}, options)).value!);
+  }
+
+  async getNonZeroCostClassesCount(options: RoutingDomainOptions = {}): Promise<number> {
+    return Number((await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_NONZERO_COST_CLASSES_COUNT, {}, options)).value!);
+  }
+
+  async costsAreHomogeneousAcrossVehicles(options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_HOMOGENEOUS_COSTS, {}, options)).value === 1n;
+  }
+
+  /** Whether native Routing detects a vehicle/node matching problem. */
+  async isMatchingModel(options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_IS_MATCHING_MODEL, {}, options)).value === 1n;
+  }
+
+  /** Native route coupling for the supplied search parameters and model configuration. */
+  async areRoutesInterdependent(parameters: RoutingSearchParameters = {}, options: RoutingDomainOptions = {}): Promise<boolean> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_ROUTES_INTERDEPENDENT,
+      {}, options, this.routeEvaluators, parameters)).value === 1n;
+  }
+
+  /** Native construction-time arc preference, using the selected primary dimension. */
+  async arcIsMoreConstrainedThanArc(from: number, to1: number, to2: number, options: RoutingDomainOptions = {}): Promise<boolean> {
+    const maximum = this.manager.getNumberOfIndices() - 1;
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_ARC_MORE_CONSTRAINED, {
+      index: BigInt(toIndex(from, 'Routing arc source', maximum - this.vehicles())),
+      otherIndex: BigInt(toIndex(to1, 'Routing first destination', maximum)),
+      thirdIndex: BigInt(toIndex(to2, 'Routing second destination', maximum)),
+    }, options)).value === 1n;
+  }
+
+  async getArcCostForClass(fromIndex: number, toIndexValue: number, costClass: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    const maximum = this.manager.getNumberOfIndices() - 1;
+    const index = toIndex(fromIndex, 'Routing from index', maximum), otherIndex = toIndex(toIndexValue, 'Routing to index', maximum);
+    if (this.isEnd(index) && index !== otherIndex) throw new RangeError('A Routing end index cannot start an arc.');
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_ARC_COST_FOR_CLASS,
+      { index: BigInt(index), otherIndex: BigInt(otherIndex), vehicleOrClass: toIndex(costClass, 'Routing cost class', INT32_MAX) }, options)).value!;
+  }
+
+  async unperformedPenalty(index: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_UNPERFORMED_PENALTY,
+      { index: BigInt(toIndex(index, 'Routing penalty index', this.manager.getNumberOfIndices() - this.vehicles() - 1)) }, options)).value!;
+  }
+
+  async unperformedPenaltyOrValue(defaultValue: IntValue, index: number, options: RoutingDomainOptions = {}): Promise<bigint> {
+    return (await this.inspectModel(RoutingModelQueryKind.ROUTING_MODEL_QUERY_UNPERFORMED_PENALTY_OR_VALUE,
+      { index: BigInt(toIndex(index, 'Routing penalty index', this.manager.getNumberOfIndices() - this.vehicles() - 1)),
+        defaultValue: toInt64(defaultValue, 'Routing default penalty') }, options)).value!;
+  }
+
+  getUnaryDimensions(options: RoutingDomainOptions = {}): Promise<RoutingDimension[]> {
+    return this.classifiedDimensions(RoutingModelQueryKind.ROUTING_MODEL_QUERY_UNARY_DIMENSIONS, options);
+  }
+
+  getDimensionsWithSoftOrSpanCosts(options: RoutingDomainOptions = {}): Promise<RoutingDimension[]> {
+    return this.classifiedDimensions(RoutingModelQueryKind.ROUTING_MODEL_QUERY_SOFT_OR_SPAN_DIMENSIONS, options);
+  }
+
+  private async classifiedDimensions(kind: RoutingModelQuery['kind'], options: RoutingDomainOptions): Promise<RoutingDimension[]> {
+    const dimensions = this.getDimensions();
+    const result = await this.inspectModel(kind, {}, options);
+    return result.dimensionIndices.map(index => dimensions[toIndex(index, 'Native Routing dimension index', dimensions.length - 1)]);
+  }
+
+  private async inspectModel(kind: RoutingModelQuery['kind'], values: Partial<RoutingModelQuery>, options: RoutingDomainOptions, callbacks = this.routeEvaluators, parameters: RoutingSearchParameters = {}) {
+    const prepared = this.createRequest(parameters, options, undefined, false, callbacks);
+    const { request } = prepared;
+    request.modelQuery = { kind, index: 0n, otherIndex: 0n, vehicleOrClass: 0, defaultValue: 0n, ...values };
+    const result = (await this.inspectNative(prepared, options)).modelInspection;
+    if (!result || ((kind < RoutingModelQueryKind.ROUTING_MODEL_QUERY_UNARY_DIMENSIONS ||
+      (kind >= RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLE_CLASS && kind <= RoutingModelQueryKind.ROUTING_MODEL_QUERY_VEHICLE_OF_CLASS)
+      || kind === RoutingModelQueryKind.ROUTING_MODEL_QUERY_DISJUNCTION_MAX_CARDINALITY
+      || kind === RoutingModelQueryKind.ROUTING_MODEL_QUERY_HAS_MAX_CARDINALITY_CONSTRAINED_DISJUNCTIONS
+      || kind >= RoutingModelQueryKind.ROUTING_MODEL_QUERY_SINGLETON_NODES) && result.value === undefined))
+      throw new Error('Native Routing executor did not return model inspection.');
+    return result;
+  }
+
   async inspectCumulSoftBound(dimensionName: string, index: number, lower: boolean, options: RoutingDomainOptions = {}): Promise<bigint> {
-    const request = this.createRequest({}, options);
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
     request.domainQueries = [{ variable: this.variableReference(this.getDimensionOrDie(dimensionName).cumulVar(index)), softLowerBound: lower }];
-    const response = await this.inspectNative(request, options);
+    const response = await this.inspectNative(prepared, options);
     const bound = response.domainResults?.[0]?.softBound;
     if (bound === undefined) throw new Error('Routing executor returned no native soft bound.');
     return bound;
@@ -1846,9 +2630,10 @@ export class RoutingModel {
 
   async inspectResourceGroup(group: RoutingResourceGroup, options: RoutingDomainOptions = {}): Promise<RoutingResourceGroupInspection> {
     if (this.getResourceGroup(group.index) !== group) throw new Error('Routing resource group belongs to another model.');
-    const request = this.createRequest({}, options);
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
     request.resourceInspectionGroup = group.index;
-    const data = (await this.inspectNative(request, options)).resourceInspection;
+    const data = (await this.inspectNative(prepared, options)).resourceInspection;
     if (!data) throw new Error('Native Routing executor did not return resource inspection data.');
     return { affectedDimensions: [...data.affectedDimensions],
       resources: data.resources.map(resource => ({ classIndex: resource.classIndex, dimensionAttributes: resource.dimensionAttributes.map(resourceDimensionAttributes) })),
@@ -1856,11 +2641,69 @@ export class RoutingModel {
     };
   }
 
-  private async inspectNative(request: RoutingSolveRequest, options: RoutingDomainOptions): Promise<RoutingNativeResult> {
+  /** Select variables for native GENERIC_TABU_SEARCH; null restores its default. */
+  setTabuVars(variables: readonly RoutingIntVar[] | null): void {
+    this.operations.push({ type: 'setTabuVars', variables: variables === null ? null
+      : variables.map(variable => {
+        if (typeof variable === 'number') throw new TypeError('Routing tabu selection requires variable handles.');
+        return this.variableReference(variable);
+      }) });
+  }
+
+  /** Points are in routing-index order, including duplicate starts and ends. */
+  setSweepArranger(points: readonly { x: number; y: number }[]): void {
+    if (points.length !== this.manager.getNumberOfIndices()) throw new RangeError('Routing sweep requires one point per routing index.');
+    const copied = points.map(({ x, y }) => {
+      if (!Number.isInteger(x) || !Number.isInteger(y) || x < -2147483648 || x > INT32_MAX || y < -2147483648 || y > INT32_MAX)
+        throw new RangeError('Routing sweep coordinates must fit int32.');
+      return { x, y };
+    });
+    this.operations.push({ type: 'setSweepArranger', points: copied });
+  }
+
+  addOrderedActivityGroup(disjunctions: readonly number[]): void {
+    this.operations.push({ type: 'addOrderedActivityGroup', disjunctions: disjunctions.map(index =>
+      toIndex(index, 'Routing ordered-activity disjunction', this.disjunctions.length - 1)) });
+  }
+
+  getOrderedActivityGroups(): number[][] {
+    return this.operations.flatMap(operation => operation.type === 'addOrderedActivityGroup' && operation.disjunctions.length > 1
+      ? [[...operation.disjunctions]] : []);
+  }
+
+  addSameActivityGroup(indices: readonly number[]): void {
+    this.operations.push({ type: 'addSameActivityGroup', indices: indices.map(index =>
+      toIndex(index, 'Routing activity-group index', this.manager.getNumberOfIndices() - this.vehicles() - 1)) });
+  }
+
+  async inspectActivityGroups(options: RoutingDomainOptions = {}): Promise<RoutingActivityGroupInspection> {
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.inspectActivityGroups = true;
+    const data = (await this.inspectNative(prepared, options)).activityGroups;
+    if (!data) throw new Error('Native Routing executor did not return activity groups.');
+    return { groups: [...data.groups], members: data.members.map(indices => [...indices]) };
+  }
+
+  private async inspectDimension(query: RoutingDimensionQuery, options: RoutingDomainOptions = {}, assignment?: RoutingAssignmentSnapshot): Promise<RoutingDimensionInspection> {
+    this.getDimensionOrDie(query.dimensionName);
+    const prepared = this.createRequest({}, options);
+    const { request } = prepared;
+    request.dimensionQuery = query;
+    if (assignment) request.initialAssignment = { routes: [], ignoreInactiveIndices: false, snapshot: assignment };
+    const result = (await this.inspectNative(prepared, options)).dimensionInspection;
+    if (!result || ([0, 1, 4, 5, 7, 8, 9, 11, 12, 13].includes(query.kind) && result.value === undefined))
+      throw new Error('Native Routing executor did not return dimension inspection.');
+    return result;
+  }
+
+  private async inspectNative({ request, resources, callbacks }: PreparedRoutingExecution,
+      options: RoutingDomainOptions): Promise<RoutingNativeResult> {
     request.solutionEvents = false;
     const executor = createRoutingExecutor(options.executor);
     return executeSolverJob(executor, { type: 'solve', request, interruptible: false }, {
-      signal: options.signal, onEvent: () => {}, resources: { threads: 1 }, showCloudNotice: !(executor instanceof SolverServerExecutor),
+      onCallback: callbacks.length ? routingRouteCallback(callbacks) : undefined,
+      signal: options.signal, onEvent: () => {}, resources, showCloudNotice: !(executor instanceof SolverServerExecutor),
     });
   }
 
@@ -1871,6 +2714,24 @@ export class RoutingModel {
       quadraticCostSoftSpanUpperBounds: new Map(),
     });
     return true;
+  }
+
+  private pickupToDeliveryLimitOperations(): RoutingModelOperation[] {
+    const operations: RoutingModelOperation[] = [];
+    for (const [dimensionName, state] of this.dimensions) {
+      for (const [pairIndex, limit] of state.pickupToDeliveryLimits ?? []) {
+        const { pickups, deliveries } = this.pickupDeliveryPairs[pairIndex];
+        const limits: bigint[] = [];
+        for (let pickup = 0; pickup < pickups; ++pickup) {
+          for (let delivery = 0; delivery < deliveries; ++delivery) {
+            const value = synchronousCallbackResult(limit(pickup, delivery), 'Routing pickup/delivery limit callbacks must return synchronously.');
+            limits.push(toInt64(value, 'Routing pickup/delivery limit'));
+          }
+        }
+        operations.push({ type: 'setPickupToDeliveryLimits', dimensionName, pairIndex, limits });
+      }
+    }
+    return operations;
   }
 
   private callbackForEvaluator(): RoutingTransitCallback {
@@ -1902,7 +2763,8 @@ export class RoutingModel {
     const matrix = new BigInt64Array(dimension * dimension);
     for (let from = 0; from < dimension; from++) {
       for (let to = 0; to < dimension; to++) {
-        matrix[from * dimension + to] = toInt64(callback(from, to));
+        const value = synchronousCallbackResult(callback(from, to), 'Routing transit callbacks must return synchronously.');
+        matrix[from * dimension + to] = toInt64(value);
       }
     }
     return matrix;

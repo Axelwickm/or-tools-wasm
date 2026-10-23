@@ -11,19 +11,19 @@ root.resolveAll();
 export type EncodedRoutingSearchParameters = { proto: Uint8Array; fields: string[] };
 
 /** Encodes a sparse override and its supplied fields; native code applies it to solver defaults. */
-export function encodeRoutingSearchParameters(parameters: RoutingSearchParameters): EncodedRoutingSearchParameters {
-  if (parameters.satParameters?.numSearchWorkers) throw new TypeError('Routing CP-SAT numSearchWorkers is not supported; use numWorkers.');
-  if (parameters.satParameters?.numWorkers !== undefined && parameters.satParameters.numWorkers < 0) throw new TypeError('Routing CP-SAT numWorkers must be nonnegative.');
-  return encodeRoutingParameters(parameters, parametersType);
+export function encodeRoutingSearchParameters(parameters: RoutingSearchParameters): EncodedRoutingSearchParameters & { numWorkers: number } {
+  const captured = normalizeProtobufInput(parameters, parametersType) as RoutingSearchParameters;
+  if (captured.satParameters?.numSearchWorkers) throw new TypeError('Routing CP-SAT numSearchWorkers is not supported; use numWorkers.');
+  if (captured.satParameters?.numWorkers !== undefined && captured.satParameters.numWorkers < 0) throw new TypeError('Routing CP-SAT numWorkers must be nonnegative.');
+  return { ...encodeRoutingParameters(captured, parametersType), numWorkers: captured.satParameters?.numWorkers ?? 1 };
 }
 
 export function encodeRoutingModelParameters(parameters: RoutingModelParameters): EncodedRoutingSearchParameters {
-  return encodeRoutingParameters(parameters, modelParametersType);
+  return encodeRoutingParameters(normalizeProtobufInput(parameters, modelParametersType), modelParametersType);
 }
 
-function encodeRoutingParameters(parameters: unknown, parametersType: protobuf.Type): EncodedRoutingSearchParameters {
+function encodeRoutingParameters(normalized: Record<string, unknown>, parametersType: protobuf.Type): EncodedRoutingSearchParameters {
   const fields: string[] = [];
-  const normalized = normalizeProtobufInput(parameters, parametersType);
   function collectFields(value: Record<string, unknown>, type: protobuf.Type, prefix: string): void {
     for (const [key, entry] of Object.entries(value)) {
       const field = type.fields[key].resolve();

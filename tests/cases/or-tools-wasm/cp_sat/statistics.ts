@@ -71,7 +71,8 @@ export async function runCpSatStatisticsCases(api: typeof Api) {
       const stoppedModel = new api.CpModel(), stoppedSolver = new api.CpSolver(); stoppedModel.newIntVar(0, 100, 'enumerate');
       class Stop extends api.CpSolverSolutionCallback { override onSolutionCallback() { stoppedSolver.stopSearch(); } }
       const status = await stoppedSolver.solve(stoppedModel, { executor, numWorkers: 1, enumerateAllSolutions: true, solutionCallback: new Stop() });
-      assert((status === 'FEASIBLE' || status === api.CpSolverStatus.FEASIBLE) && stoppedSolver.responseStats().includes('status: FEASIBLE'), 'Native formatting covers the retained response after callback termination');
+      const statusName = stoppedSolver.statusName(status);
+      assert((statusName === 'FEASIBLE' || statusName === 'OPTIMAL') && stoppedSolver.responseStats().includes(`status: ${statusName}`), 'Callback interruption preserves the native final status and its statistics');
     }
     results.push({ id: 'cp_sat.correctness.native_response_statistics', solver: 'cp-sat', mode, ok: true as const });
   }

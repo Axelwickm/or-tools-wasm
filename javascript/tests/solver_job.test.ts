@@ -3,10 +3,11 @@ import { test } from 'node:test';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 const bundled = await build({
-  entryPoints: [fileURLToPath(new URL('../lib/solver_job.ts', import.meta.url))],
+  stdin: { contents: "export { executeSolverJob } from './solver_job.ts'; export { trackPendingEvent } from './solver_executor.ts';",
+    resolveDir: fileURLToPath(new URL('../lib/', import.meta.url)) },
   bundle: true, write: false, platform: 'node', format: 'esm',
 });
-const { executeSolverJob }: typeof import('../lib/solver_job.ts') =
+const { executeSolverJob, trackPendingEvent }: typeof import('../lib/solver_job.ts') & typeof import('../lib/solver_executor.ts') =
   await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 import type {
   SolverExecutionOptions,
@@ -320,6 +321,16 @@ test('pre-interrupted native requests retain their encoded termination path', as
   assert.equal(cancels, 0);
 });
 
+test('pre-interrupted requests signal native interruption after dispatch without cancelling', async () => {
+  const controller = new AbortController(); controller.abort();
+  let interrupts = 0, cancels = 0;
+  const executor = executorWith(() => ({ requestId: 1, result: Promise.resolve(3),
+    interrupt: async () => { ++interrupts; }, cancel: async () => { ++cancels; } }));
+  assert.equal(await executeSolverJob(executor, '', { interruptSignal: controller.signal }), 3);
+  assert.equal(interrupts, 1);
+  assert.equal(cancels, 0);
+});
+
 test('commits a stopped native result before preserving a callback reply failure', async () => {
   const failure = new Error('native callback failed');
   let committed = false;
@@ -359,4 +370,112 @@ test('synchronous observers run inside event emission and retain failures until 
   assert.deepEqual(delivered, [1, 2], 'later emissions are suppressed after failure');
   assert.equal(cancellations, 1);
   assert.equal(committed, true);
+});
+
+for (const rejectsNative of [false, true]) {
+  test(`cancellation bypasses a blocked observer after native ${rejectsNative ? 'rejection' : 'success'}`, { timeout: 2000 }, async () => {
+    const controller = new AbortController();
+    const reason = new Error('caller cancelled');
+    let nativeFinish!: () => void;
+    let observerEntered!: () => void;
+    const entered = new Promise<void>(resolve => { observerEntered = resolve; });
+    let rejectObserver!: (error: Error) => void;
+    const blocked = new Promise<void>((_resolve, reject) => { rejectObserver = reject; });
+    let emit!: SolverExecutionOptions<TestEvent>['onEvent'];
+    let committed = false, nativeCleaned = false, calls = 0, cancels = 0;
+    const executor = executorWith(options => {
+      emit = options.onEvent;
+      const result = new Promise<number>((resolve, reject) => {
+        nativeFinish = () => {
+          nativeCleaned = true;
+          if (rejectsNative) reject(new DOMException('native cancelled', 'AbortError'));
+          else resolve(7);
+        };
+      });
+      return { requestId: 1, result, cancel: async () => { ++cancels; } };
+    });
+    let settled = false;
+    const operation = executeSolverJob(executor, '', {
+      signal: controller.signal,
+      onEvent: async () => { ++calls; observerEntered(); await blocked; },
+      onSuccess: value => { assert.equal(value, 7); committed = true; },
+    }).finally(() => { settled = true; });
+    const rejection = assert.rejects(operation, error => error === reason);
+    assert.equal(emit({ type: 'test', sequence: 1 }), undefined, 'event ingress does not export observer promises');
+    emit({ type: 'test', sequence: 2 });
+    await entered;
+    controller.abort(reason);
+    emit({ type: 'test', sequence: 3 });
+    await Promise.resolve();
+    assert.equal(settled, false, 'cancellation still waits for native cleanup');
+    nativeFinish();
+    await rejection;
+    assert.equal(nativeCleaned, true);
+    assert.equal(committed, !rejectsNative, 'successful native state commits despite blocked observer');
+    assert.equal(cancels, 1);
+    assert.equal(calls, 1, 'queued and late observers are suppressed');
+    rejectObserver(new Error('late observer rejection'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls, 1, 'late rejection is consumed without resuming delivery');
+  });
+}
+
+test('observer cancellation during its synchronous prefix also releases delivery', { timeout: 2000 }, async () => {
+  const controller = new AbortController();
+  let finish!: () => void;
+  const executor = executorWith(options => {
+    const result = new Promise<number>(resolve => { finish = () => resolve(1); });
+    options.onEvent({ type: 'test', sequence: 1 });
+    options.onEvent({ type: 'test', sequence: 2 });
+    return { requestId: 1, result, cancel: async () => { finish(); } };
+  });
+  let calls = 0, committed = false;
+  await assert.rejects(executeSolverJob(executor, '', {
+    signal: controller.signal,
+    onEvent: async () => { ++calls; controller.abort(); await new Promise(() => {}); },
+    onSuccess: () => { committed = true; },
+  }), { name: 'AbortError' });
+  assert.equal(committed, true);
+  assert.equal(calls, 1);
+});
+
+test('executor failure bypasses unrelated blocked observer work', { timeout: 2000 }, async () => {
+  let rejectJob!: (error: Error) => void, entered!: () => void;
+  const observed = new Promise<void>(resolve => { entered = resolve; });
+  const failure = new Error('native failure');
+  const executor = executorWith(options => {
+    options.onEvent({ type: 'test', sequence: 1 });
+    return { requestId: 1, result: new Promise<number>((_resolve, reject) => { rejectJob = reject; }), cancel: async () => {} };
+  });
+  const pending = executeSolverJob(executor, '', {
+    onEvent: async () => { entered(); await new Promise(() => {}); },
+  });
+  const rejected = assert.rejects(pending, error => error === failure);
+  await observed;
+  rejectJob(failure);
+  await rejected;
+});
+
+
+test('low-level event tracking retains only outstanding callbacks', async () => {
+  const pending = new Set<Promise<void>>();
+  const failures: unknown[] = [];
+  const capture = (error: unknown) => { failures.push(error); };
+  trackPendingEvent(pending, undefined, capture);
+  assert.equal(pending.size, 0);
+  for (let index = 0; index < 1000; ++index) {
+    trackPendingEvent(pending, Promise.resolve(), capture);
+    await Promise.resolve();
+    assert.equal(pending.size, 0, 'settled callbacks are not retained for the solve lifetime');
+  }
+  let release!: () => void;
+  trackPendingEvent(pending, new Promise<void>(resolve => { release = resolve; }), capture);
+  trackPendingEvent(pending, Promise.reject(undefined), capture);
+  assert.equal(pending.size, 2);
+  await Promise.resolve();
+  assert.equal(pending.size, 1);
+  assert.deepEqual(failures, [undefined], 'falsy failures are captured');
+  release();
+  await Promise.all(pending);
+  assert.equal(pending.size, 0);
 });

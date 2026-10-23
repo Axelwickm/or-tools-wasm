@@ -211,8 +211,27 @@ void MaxFlowInt64AndStatusBoundaries() {
   Expect(Parse(Execute(Wrap(request))).status() == 2, "Raw negative source remains native BAD_INPUT");
 }
 
+void ForwardsNativePriceScaling() {
+  for (bool maximum_flow : {false, true}) for (int sign : {1, -1}) {
+    bridge::NetworkFlowBridgeRequest request;
+    auto* flow = request.mutable_min_cost_flow();
+    const int64_t cost = sign * (int64_t{1} << 60);
+    flow->add_tails(0); flow->add_heads(1); flow->add_capacities(1); flow->add_unit_costs(cost);
+    flow->add_supplies(1); flow->add_supplies(-1);
+    flow->set_solve_max_flow_with_min_cost(maximum_flow);
+    Expect(Parse(Execute(Wrap(request))).status() == 6, "Absent price-scaling flag preserves native default cost range");
+    flow->set_price_scaling(false);
+    const auto unscaled = Parse(Execute(Wrap(request)));
+    Expect(unscaled.status() == 1 && unscaled.optimal_cost() == cost && unscaled.flows(0) == 1,
+        "Explicit false reaches native scaling and permits the large exact cost");
+    flow->set_price_scaling(true);
+    Expect(Parse(Execute(Wrap(request))).status() == 6, "Explicit true restores native cost range");
+  }
+}
+
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
+      {"ForwardsNativePriceScaling", ForwardsNativePriceScaling},
       {"SolvesMaxFlow", SolvesMaxFlow},
       {"SolvesMinCostFlow", SolvesMinCostFlow},
       {"SolvesAssignment", SolvesAssignment},

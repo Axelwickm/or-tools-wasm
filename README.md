@@ -194,7 +194,8 @@ Each solver has a [dedicated API section](docs/api.md) and an example on the sit
 - [Knapsack](docs/api.md#knapsack) and [Network Flow](docs/api.md#network-flow):
   specialized builders with exact integer results and independent solve snapshots.
 - [Set Cover](docs/api.md#set-cover): native invariant queries, trace compression,
-  heuristic construction and retained guided search. Native queries are awaitable;
+  heuristic construction, retained guided search, MIP covers, LP relaxations, CFT covers and
+  Lagrangian bounds. Native queries are awaitable;
   construction generators ignore iteration limits; the pinned heuristics do not
   enforce time settings.
 - [RCPSP](docs/api.md#rcpsp): standard renewable-resource scheduling and PSPLIB parsing.

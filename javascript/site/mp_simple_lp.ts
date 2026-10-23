@@ -1,3 +1,4 @@
+import { setControlAvailable } from './example_controls.js';
 import {
   appendStatus,
   configureSolverThreadsInput,
@@ -10,7 +11,7 @@ import {
   solveSimpleMpProgram,
 } from './mp_solver_helpers.js';
 import { getMaxWorkerCount } from './worker_limits.js';
-import { MpModel } from 'or-tools-wasm/mp-solver';
+import { MPSolver } from 'or-tools-wasm/mp-solver';
 
 const solutionOutput = document.getElementById('solution-output');
 const statusEl = document.getElementById('status');
@@ -18,9 +19,11 @@ const executorSelector = document.getElementById('solver-executor') as HTMLSelec
 const solverSelect = document.getElementById('solver') as HTMLSelectElement | null;
 const workerInput = document.getElementById('workers') as HTMLInputElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
-const diagnoseButton = document.getElementById('diagnose') as HTMLButtonElement | null;
 const solverParametersInput = document.getElementById('solver-parameters') as HTMLInputElement | null;
 const incrementalInput = document.getElementById('incremental') as HTMLInputElement | null;
+const warmStartInput = document.getElementById('warm-start') as HTMLInputElement | null;
+const clampSampleInput = document.getElementById('clamp-sample') as HTMLInputElement | null;
+const lazyLimitInput = document.getElementById('lazy-limit') as HTMLInputElement | null;
 const maxWorkerCount = getMaxWorkerCount();
 
 configureMPSolverExecutor(executorSelector);
@@ -39,26 +42,48 @@ function selectedSolverId() {
     : 'GLOP';
 }
 
+function updateNativeControls() {
+  setControlAvailable(workerInput, !['GLPK', 'GLPK_LP'].includes(selectedSolverId()));
+  if (lazyLimitInput?.checked && selectedSolverId() === 'SCIP' && workerInput) workerInput.value = '1';
+  for (const [input, backend] of [[warmStartInput, 'GLOP'], [lazyLimitInput, 'SCIP']] as const) {
+    setControlAvailable(input, selectedSolverId() === backend);
+  }
+}
+solverSelect?.addEventListener('change', updateNativeControls);
+lazyLimitInput?.addEventListener('change', updateNativeControls);
+updateNativeControls();
+
 async function runSimpleLp() {
   setRunning(runButton, true);
-  if (diagnoseButton) diagnoseButton.disabled = true;
   if (statusEl) statusEl.textContent = '';
+  if (solutionOutput) solutionOutput.textContent = 'Solving…';
   try {
     const solverId = selectedSolverId();
+    const backend = MPSolver.createSolver(solverId);
+    if (!backend) throw new Error(`${solverId} is unavailable.`);
+    const callbacks = await backend.supportsCallbacks(currentMPSolverExecutionOptions());
+    const messages = await backend.supportsMessageCallbacks(currentMPSolverExecutionOptions());
+    appendStatus(statusEl, `Native callback support: search=${callbacks}, messages=${messages}`);
     const variableKind = solverId === 'SAT' || solverId === 'GLPK' || solverId === 'SCIP' || solverId === 'CBC' || solverId === 'BOP' || solverId === 'KNAPSACK' ? 'integer' : 'continuous';
-    const solverThreads = getSelectedSolverThreads(workerInput, maxWorkerCount);
+    if (clampSampleInput?.checked) {
+      const sample = backend.addVariable(0, 1, variableKind === 'integer', 'sample');
+      const clamped = await MPSolver.clampSolutionWithinBounds(backend,
+        { status: MPSolver.FEASIBLE, variableValue: [2] }, currentMPSolverExecutionOptions());
+      appendStatus(statusEl, `Native bound clamping: sample=${clamped.value(sample)} (input=2)`);
+    }
+    const solverThreads = workerInput?.disabled ? 1 : getSelectedSolverThreads(workerInput, maxWorkerCount);
     const incremental = incrementalInput?.checked ?? false;
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
     appendStatus(statusEl, `Solving with ${solverId}, requested solver threads=${solverThreads}...`);
     const result = await solveSimpleMpProgram({
       solverId,
       variableKind,
-      expectedObjective: incremental ? 1 : 2,
+      expectedObjective: incremental || lazyLimitInput?.checked ? 1 : 2,
+      warmStart: warmStartInput?.checked, lazyLimit: lazyLimitInput?.checked,
       solverThreads,
       solverSpecificParameters: solverParametersInput?.value,
       incremental,
-      messageCallback: solverId === 'BOP' || solverId === 'KNAPSACK' ? undefined
-        : messages => messages.forEach(message => appendStatus(statusEl, message)),
+      messageCallback: messages ? batch => batch.forEach(message => appendStatus(statusEl, message)) : undefined,
     });
 
     renderSimpleMpResult(solutionOutput, result);
@@ -67,39 +92,13 @@ async function runSimpleLp() {
     appendStatus(statusEl, `x = ${formatNumber(result.x)}`);
     appendStatus(statusEl, `y = ${formatNumber(result.y)}`);
   } catch (error) {
+    if (solutionOutput) solutionOutput.textContent = 'No solution available for this run.';
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);
   } finally {
     setRunning(runButton, false);
-    if (diagnoseButton) diagnoseButton.disabled = false;
   }
 }
 
 runButton?.addEventListener('click', () => {
   void runSimpleLp();
 });
-
-diagnoseButton?.addEventListener('click', () => { void diagnoseConflict(); });
-async function diagnoseConflict() {
-  if (diagnoseButton) { diagnoseButton.disabled = true; diagnoseButton.textContent = 'Finding conflict...'; }
-  if (runButton) runButton.disabled = true;
-  if (statusEl) statusEl.textContent = '';
-  try {
-    const model = new MpModel('conflicting limits');
-    const x = model.addNumVariable(0, 10, 'x');
-    model.addConstraint(2, Infinity, 'x at least 2').setCoefficient(x, 1);
-    model.addConstraint(-Infinity, 1, 'x at most 1').setCoefficient(x, 1);
-    const result = await model.computeIrreducibleInfeasibleSubset({
-      ...currentMPSolverExecutionOptions(), timeLimitSeconds: 5,
-    });
-    const names = ['x at least 2', 'x at most 1'];
-    if (solutionOutput) solutionOutput.textContent = result.isInfeasible
-      ? `SCIP conflict: ${result.constraintIndices.map(index => names[index]).join('; ')}.`
-      : 'SCIP did not prove a conflict within the limit.';
-    appendStatus(statusEl, `SCIP IIS: infeasible=${result.isInfeasible}, irreducible=${result.isIrreducible}`);
-    appendStatus(statusEl, `Native search: ${formatNumber(result.timeSeconds)} seconds, ${result.nodes} nodes`);
-  } catch (error) { appendStatus(statusEl, `Conflict diagnosis failed: ${(error as Error).message}`); }
-  finally {
-    if (diagnoseButton) { diagnoseButton.disabled = false; diagnoseButton.textContent = 'Diagnose conflicting limits (SCIP)'; }
-    if (runButton) runButton.disabled = false;
-  }
-}

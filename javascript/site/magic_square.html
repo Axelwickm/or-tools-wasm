@@ -28,14 +28,44 @@
 			}
 		</style>
 	</head>
-	<body>
+	<body class="example-page">
 		<nav>
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>CP-SAT - Magic Square</h1>
 		<p><em>Problem: fill a square grid with distinct numbers so every row, column, and diagonal has the same sum.</em></p>
-		<div class="code-toggle">
+
+		<p>This page exercises the <code>cp_sat_api</code>
+			WASM module by building and solving a magic square model directly in the browser.</p>
+		<div class="example-explanation">
+			<h2>Model</h2>
+			<ul>
+				<li>Each grid cell is an integer decision variable.</li>
+				<li>All numbers in the square must be distinct.</li>
+				<li>Every row, column, and diagonal must have the same magic sum.</li>
+				<li>CP-SAT searches for a grid assignment satisfying all arithmetic constraints.</li>
+				<li>The native solution checker verifies the returned cell values against the model.</li>
+			</ul>
+		</div>
+		<div class="controls">
+			<label>Size <input id="size" class="short-number" type="number" value="5" min="1"></label>
+			<label>Workers <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+			<label>Executor <select id="cp-sat-executor">
+				<option value="direct">Direct</option>
+				<option value="worker" selected>Worker</option>
+				<option value="cloud">Cloud</option>
+				<option value="server">Server</option>
+			</select></label>
+
+		<div class="control-actions"><button id="run">Run magic square</button><button id="stop" disabled>Stop</button></div>
+</div>
+		<div id="solution-wrapper">
+			<p>Latest solution:</p>
+			<div id="solution-grid">Run the solver to view a magic square.</div>
+		</div>
+		<details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+		<div class="code-toggle code-samples">
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import { BoundedLinearExpr, CpModel, CpSat, Domain, sum } from 'or-tools-wasm/cp-sat';
@@ -69,39 +99,14 @@ const result = await CpSat.solve(model, {
   numWorkers: 4,
   logSearchProgress: true,
 });
-if (result.hasSolution) console.log(cells.map((cell) =&gt; result.value(cell)));</code></pre>
+if (result.hasSolution) {
+  console.log(cells.map((cell) =&gt; result.value(cell)));
+  console.log(await model.solutionIsFeasible(result.response!.solution!, { executor: 'worker' }));
+}</code></pre>
 			</details>
 		</div>
-		<p>This page exercises the <code>cp_sat_api</code>
-			WASM module by building and solving a magic square model directly in the browser.</p>
-		<div class="example-explanation">
-			<h2>Model</h2>
-			<ul>
-				<li>Each grid cell is an integer decision variable.</li>
-				<li>All numbers in the square must be distinct.</li>
-				<li>Every row, column, and diagonal must have the same magic sum.</li>
-				<li>CP-SAT searches for a grid assignment satisfying all arithmetic constraints.</li>
-			</ul>
-		</div>
-		<div class="controls">
-			<label>Size <input id="size" class="short-number" type="number" value="5" min="1"></label>
-			<label>Workers <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-			<label>Executor <select id="cp-sat-executor">
-				<option value="direct">Direct</option>
-				<option value="worker" selected>Worker</option>
-				<option value="cloud">Cloud</option>
-				<option value="server">Server</option>
-			</select></label>
-			<button id="run">Run magic square</button>
-			<button id="stop" disabled>Stop</button>
-		</div>
-		<div id="solution-wrapper">
-			<p>Latest solution:</p>
-			<div id="solution-grid">Run the solver to view a magic square.</div>
-		</div>
-		<p>Status / Response:</p>
-		<pre id="status"></pre>
-		<script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./example_controls.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./magic_square.ts"></script>
 	</body>
 </html>

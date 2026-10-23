@@ -138,14 +138,45 @@
       }
     </style>
   </head>
-  <body data-solver-id="GLOP">
+  <body class="example-page" data-solver-id="GLOP">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>GLOP - Stigler diet</h1>
     <p><em>Problem: choose the cheapest mix of foods that satisfies daily minimum nutrition requirements.</em></p>
-    <div class="code-toggle">
+
+    <ul class="example-notes">
+      <li>This is a continuous linear program: foods can be bought in fractional daily units.</li>
+      <li>The objective is to minimize annual food cost.</li>
+      <li>Each nutrient is a lower-bound constraint that the selected food mix must satisfy.</li>
+      <li>Expand any food card to edit its label, unit, color, and nutrient contributions.</li>
+      <li>Change the nutrient requirement inputs to make the diet easier, harder, or impossible.</li>
+      <li>The result is a mathematically cheap diet, not a realistic meal plan.</li>
+    </ul>
+    <div class="controls">
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+
+    <div class="control-actions"><button id="run" data-idle-label="Solve diet">Solve diet</button><button id="clear-solution" type="button">Clear solution</button><button id="add-food" type="button">Add food</button><button id="clear-foods" type="button">Clear foods</button><button id="reset-foods" type="button">Reset foods</button></div>
+</div>
+    <div id="diet-summary" class="diet-summary"></div>
+    <div class="diet-layout">
+      <section>
+        <h2>Food Catalog</h2>
+        <div id="food-catalog" class="food-grid"></div>
+      </section>
+      <section class="nutrient-panel">
+        <div>
+          <h2>Nutrient Requirements</h2>
+          <div id="nutrient-gauges"></div>
+        </div>
+      </section>
+    </div>
+    <h2>Receipt</h2>
+    <div id="solution-output">Run the solver to view the annual diet cost and selected foods.</div>
+    <details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
@@ -180,40 +211,7 @@ objective.setMinimization();
 await solver.solve({ executor: 'worker' });</code></pre>
       </details>
     </div>
-    <ul class="example-notes">
-      <li>This is a continuous linear program: foods can be bought in fractional daily units.</li>
-      <li>The objective is to minimize annual food cost.</li>
-      <li>Each nutrient is a lower-bound constraint that the selected food mix must satisfy.</li>
-      <li>Expand any food card to edit its label, unit, color, and nutrient contributions.</li>
-      <li>Change the nutrient requirement inputs to make the diet easier, harder, or impossible.</li>
-      <li>The result is a mathematically cheap diet, not a realistic meal plan.</li>
-    </ul>
-    <div class="controls">
-      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <button id="run" data-idle-label="Solve diet">Solve diet</button>
-      <button id="clear-solution" type="button">Clear solution</button>
-      <button id="add-food" type="button">Add food</button>
-      <button id="clear-foods" type="button">Clear foods</button>
-      <button id="reset-foods" type="button">Reset foods</button>
-    </div>
-    <div id="diet-summary" class="diet-summary"></div>
-    <div class="diet-layout">
-      <section>
-        <h2>Food Catalog</h2>
-        <div id="food-catalog" class="food-grid"></div>
-      </section>
-      <section class="nutrient-panel">
-        <div>
-          <h2>Nutrient Requirements</h2>
-          <div id="nutrient-gauges"></div>
-        </div>
-      </section>
-    </div>
-    <h2>Receipt</h2>
-    <div id="solution-output">Run the solver to view the annual diet cost and selected foods.</div>
-    <p>Status / Response:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./glop_stigler_diet.ts"></script>
   </body>

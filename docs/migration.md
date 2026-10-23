@@ -4,6 +4,17 @@ This release includes breaking changes. Upgrade the package and solver server
 together; the expanded binary bridge is not a compatibility promise for older
 clients or servers. Nothing is published by the cleanup itself.
 
+## Changes since the current committed API
+
+Relative to commit `2bcb92763f`, four additional Routing queries now return
+promises: `getDisjunctionMaxCardinality()`,
+`hasMaxCardinalityConstrainedDisjunctions()`, `getSingleNodesOfType()` and
+`getPairIndicesOfType()`. Await them and pass executor options when appropriate.
+They read finalized native metadata rather than construction-time JS state.
+`addPickupAndDelivery()` now returns the pair index; callers that ignore its
+return value can continue unchanged. The broader migration notes below also
+cover changes already present in that commit.
+
 ## Results and retained solvers
 
 The existing result-first calls remain: `CpSat.solve(model)`,
@@ -108,8 +119,10 @@ MathOpt incremental `removeNames` is a constructor option; passing it to
 `solve()` now rejects instead of silently retaining the original naming policy.
 
 MathOpt model/parameter exposure does not add multiobjective solving, quadratic
-dual computation or IIS to backends that lack them. SCIP IIS through MPSolver
-is available separately. GLPK retained server sessions require a stable native
+dual computation, IIS or cone execution to backends that lack them. The added
+SCIP IIS extension (including the MPSolver API) and GSCIP cone adapter are deferred.
+MathOpt retains its native IIS operation and cone model representation.
+GLPK retained server sessions require a stable native
 thread and remain unavailable. RCPSP consumer/producer, resource-investment
 and selected-recipe Max constraints use CP-SAT models; they do not introduce
 another optimization engine.

@@ -3552,6 +3552,7 @@ const Assignment* RoutingModel::SolveWithIteratedLocalSearch(
   DCHECK(parameters.use_iterated_local_search());
 
   if (nodes() == 0) {
+    status_ = RoutingSearchStatus::ROUTING_FAIL;
     return nullptr;
   }
 
@@ -3562,12 +3563,18 @@ const Assignment* RoutingModel::SolveWithIteratedLocalSearch(
     return nullptr;
   }
 
+  status_ = RoutingSearchStatus::ROUTING_NOT_SOLVED;
+
   // Build an initial solution.
   solver_->Solve(solve_db_, monitors_);
   int64_t explored_solutions = solver_->solutions();
 
   Assignment* best_solution = collect_assignments_->last_solution_or_null();
   if (!best_solution) {
+    status_ = absl::Milliseconds(solver_->wall_time() - start_time_ms) >=
+                      GetTimeLimit(parameters)
+                  ? RoutingSearchStatus::ROUTING_FAIL_TIMEOUT
+                  : RoutingSearchStatus::ROUTING_FAIL;
     return nullptr;
   }
 
@@ -3671,6 +3678,7 @@ const Assignment* RoutingModel::SolveWithIteratedLocalSearch(
     }
   }
 
+  status_ = RoutingSearchStatus::ROUTING_SUCCESS;
   return best_solution;
 }
 
@@ -3806,6 +3814,18 @@ bool RoutingModel::ReplaceUnusedVehicle(
       compact_assignment->Value(active_vehicle_start_var);
   compact_assignment->SetValue(unused_vehicle_start_var, active_vehicle_next);
   compact_assignment->SetValue(active_vehicle_start_var, End(active_vehicle));
+
+  // Keep captured vehicle activity consistent with the moved route.
+  for (const int vehicle : {unused_vehicle, active_vehicle}) {
+    const int64_t active = vehicle == unused_vehicle;
+    if (compact_assignment->Contains(ActiveVehicleVar(vehicle))) {
+      compact_assignment->SetValue(ActiveVehicleVar(vehicle), active);
+    }
+    if (compact_assignment->Contains(VehicleRouteConsideredVar(vehicle))) {
+      compact_assignment->SetValue(VehicleRouteConsideredVar(vehicle),
+                                   active || IsVehicleUsedWhenEmpty(vehicle));
+    }
+  }
 
   // Update VehicleVars along the route, update the last NextVar.
   int current_index = active_vehicle_next;
@@ -5730,7 +5750,8 @@ void RoutingModel::StoreDimensionCumulOptimizers(
     if (has_soft_lower_bound) ++num_linear_constraints;
     if (has_soft_upper_bound) ++num_linear_constraints;
     if (dimension->HasBreakConstraints()) ++num_linear_constraints;
-    if (num_resource_groups > 0 || num_linear_constraints >= 2) {
+    if (num_resource_groups > 0 || dimension->HasPickupToDeliveryLimits() ||
+        num_linear_constraints >= 2) {
       needs_optimizer = true;
       dimension->SetVehicleOffsetsForLocalOptimizer(std::move(vehicle_offsets));
       local_optimizer_index_[dim] = local_dimension_optimizers_.size();
@@ -7281,8 +7302,10 @@ SortedDisjointIntervalList RoutingDimension::GetAllowedIntervalsInRange(
        interval != forbidden.end(); ++interval) {
     if (next_start > max) break;
     if (next_start < interval->start) {
-      allowed.InsertInterval(next_start, CapSub(interval->start, 1));
+      allowed.InsertInterval(next_start, std::min(max, CapSub(interval->start, 1)));
     }
+    // No permitted suffix remains, including at the int64 maximum.
+    if (interval->end >= max) return allowed;
     next_start = CapAdd(interval->end, 1);
   }
   if (next_start <= max) {
@@ -7541,8 +7564,7 @@ void RoutingDimension::SetupGlobalSpanCost(
                     model_->vehicle_route_considered_[0],
                     solver->MakeProd(
                         solver->MakeProd(
-                            solver->MakeSum(transits_[var_index],
-                                            dependent_transits_[var_index]),
+                            transits_[var_index],
                             global_span_cost_coefficient_),
                         model_->ActiveVar(var_index)))
                 ->Var());

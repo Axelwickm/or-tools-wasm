@@ -8,6 +8,7 @@ message RoutingMatrix {
   // Sampled JS callbacks use routing indices, including duplicate depots.
   // Native node matrices retain the default false value.
   bool routing_indices = 3;
+  bool unary = 4;
 }
 
 message RoutingAddDimension {
@@ -42,6 +43,28 @@ message RoutingAddDimensionWithVehicleTransitAndCapacity {
   string name = 5;
 }
 
+message RoutingPiecewiseLinearFunction {
+  repeated int64 x = 1;
+  repeated int64 y = 2;
+}
+
+message RoutingStateDependentMatrix {
+  // Half-open cumul domain. Functions are in row-major routing-index order.
+  int64 domain_start = 1;
+  int64 domain_end = 2;
+  repeated RoutingPiecewiseLinearFunction functions = 3;
+}
+
+message RoutingAddDependentDimension {
+  repeated RoutingMatrix transit_matrices = 1;
+  repeated RoutingStateDependentMatrix dependent_matrices = 2;
+  optional string base_dimension = 3;
+  int64 slack_max = 4;
+  repeated int64 capacities = 5;
+  bool fix_start_cumul_to_zero = 6;
+  string name = 7;
+}
+
 message RoutingAddConstantDimension {
   int64 value = 1;
   int64 capacity = 2;
@@ -64,6 +87,10 @@ message RoutingAddMatrixDimension {
   string name = 4;
 }
 
+message RoutingSweepPoint { int32 x = 1; int32 y = 2; }
+message RoutingSetSweepArranger { repeated RoutingSweepPoint points = 1; }
+message RoutingOrderedActivityGroup { repeated int32 disjunctions = 1; }
+
 message RoutingAddDisjunction {
   repeated int64 indices = 1;
   optional int64 penalty = 2;
@@ -74,6 +101,17 @@ message RoutingAddDisjunction {
 message RoutingAddPickupAndDelivery {
   int64 pickup = 1;
   int64 delivery = 2;
+}
+
+message RoutingAddPickupAndDeliverySets {
+  int32 pickup_disjunction = 1;
+  int32 delivery_disjunction = 2;
+}
+
+message RoutingSetPickupToDeliveryLimits {
+  string dimension_name = 1;
+  int32 pair_index = 2;
+  repeated int64 limits = 3;
 }
 
 message RoutingAddVehicleEqualityConstraint {
@@ -141,6 +179,7 @@ message RoutingAddNodePrecedence {
   int64 first = 2;
   int64 second = 3;
   int64 offset = 4;
+  int32 performed_constraint = 5;
 }
 
 message RoutingSetSoftSpanUpperBound {
@@ -256,6 +295,11 @@ message RoutingVariableReference {
   int32 resource_group = 4;
 }
 
+message RoutingSetTabuVars {
+  repeated RoutingVariableReference variables = 1;
+  bool reset = 2;
+}
+
 enum RoutingDomainAction {
   ROUTING_DOMAIN_UNSPECIFIED = 0;
   ROUTING_DOMAIN_RANGE = 1;
@@ -354,7 +398,131 @@ message RoutingModelOperation {
     RoutingAddBooleanVariable add_boolean_variable = 37;
     RoutingAddBooleanConstraint add_boolean_constraint = 38;
     RoutingAddIntegerExpression add_integer_expression = 39;
+    RoutingAddBreakInterval add_break_interval = 40;
+    RoutingSetBreakIntervals set_break_intervals = 41;
+    RoutingSetBreakDistanceDuration set_break_distance_duration = 42;
+    RoutingSetPathEnergyCosts set_path_energy_costs = 43;
+    RoutingAddSameActivityGroup add_same_activity_group = 44;
+    RoutingAddDependentDimension add_dependent_dimension = 45;
+    RoutingAddPickupAndDeliverySets add_pickup_and_delivery_sets = 46;
+    RoutingSetPickupToDeliveryLimits set_pickup_to_delivery_limits = 47;
+    RoutingMatrix set_first_solution_evaluator = 48;
+    string set_primary_constrained_dimension = 49;
+    RoutingAddRouteConstraint add_route_constraint = 50;
+    RoutingSetPiecewiseCost set_piecewise_cost = 51;
+    RoutingAddForbiddenIntervals add_forbidden_intervals = 52;
+    RoutingSetSweepArranger set_sweep_arranger = 53;
+    RoutingOrderedActivityGroup add_ordered_activity_group = 54;
+    RoutingSetTabuVars set_tabu_vars = 55;
+    bool ignore_disjunctions_already_forced_to_zero = 56;
   }
+}
+
+message RoutingPiecewiseCostSegment { int64 point_x = 1; int64 point_y = 2; int64 slope = 3; int64 other_point_x = 4; }
+message RoutingSetPiecewiseCost { string dimension_name = 1; int64 index = 2; repeated RoutingPiecewiseCostSegment segments = 3; }
+enum RoutingDimensionQueryKind {
+  ROUTING_DIMENSION_QUERY_TRANSIT = 0;
+  ROUTING_DIMENSION_QUERY_TRANSIT_CLASS = 1;
+  ROUTING_DIMENSION_QUERY_ALLOWED_INTERVALS = 2;
+  ROUTING_DIMENSION_QUERY_FORBIDDEN_INTERVALS = 3;
+  ROUTING_DIMENSION_QUERY_FIRST_ALLOWED = 4;
+  ROUTING_DIMENSION_QUERY_LAST_ALLOWED = 5;
+  ROUTING_DIMENSION_QUERY_PIECEWISE_COST = 6;
+  ROUTING_DIMENSION_QUERY_VEHICLE_CLASS = 7;
+  ROUTING_DIMENSION_QUERY_IS_UNARY = 8;
+  ROUTING_DIMENSION_QUERY_PICKUP_DELIVERY_LIMIT = 9;
+  ROUTING_DIMENSION_QUERY_NODE_PRECEDENCES = 10;
+  ROUTING_DIMENSION_QUERY_TRANSITS_POSITIVE = 11;
+  ROUTING_DIMENSION_QUERY_TRANSIT_SIGN = 12;
+  // Requires initial_assignment.snapshot and bound native route/current cumul.
+  ROUTING_DIMENSION_QUERY_SHORTEST_TRANSITION_SLACK = 13;
+}
+enum RoutingModelQueryKind {
+  ROUTING_MODEL_QUERY_VEHICLE_COST_CLASS = 0;
+  ROUTING_MODEL_QUERY_HAS_VEHICLE_COST_CLASS = 1;
+  ROUTING_MODEL_QUERY_COST_CLASSES_COUNT = 2;
+  ROUTING_MODEL_QUERY_NONZERO_COST_CLASSES_COUNT = 3;
+  ROUTING_MODEL_QUERY_HOMOGENEOUS_COSTS = 4;
+  ROUTING_MODEL_QUERY_ARC_COST_FOR_CLASS = 5;
+  ROUTING_MODEL_QUERY_UNPERFORMED_PENALTY = 6;
+  ROUTING_MODEL_QUERY_UNPERFORMED_PENALTY_OR_VALUE = 7;
+  ROUTING_MODEL_QUERY_UNARY_DIMENSIONS = 8;
+  ROUTING_MODEL_QUERY_SOFT_OR_SPAN_DIMENSIONS = 9;
+  ROUTING_MODEL_QUERY_SINGLE_NODES_OF_TYPE = 10;
+  ROUTING_MODEL_QUERY_PAIR_INDICES_OF_TYPE = 11;
+  ROUTING_MODEL_QUERY_VEHICLE_CLASS = 12;
+  ROUTING_MODEL_QUERY_VEHICLE_CLASSES_COUNT = 13;
+  ROUTING_MODEL_QUERY_VEHICLE_OF_CLASS = 14;
+  ROUTING_MODEL_QUERY_VISIT_TYPE_COMPONENTS = 15;
+  ROUTING_MODEL_QUERY_SORTED_VISIT_TYPES = 16;
+  ROUTING_MODEL_QUERY_SAME_VEHICLE_INDICES = 17;
+  ROUTING_MODEL_QUERY_VEHICLES_OF_SAME_CLASS = 18;
+  ROUTING_MODEL_QUERY_SAME_VEHICLE_CLASS_ARCS = 19;
+  ROUTING_MODEL_QUERY_SORTED_NODE_PRECEDENCES = 20;
+  ROUTING_MODEL_QUERY_DISJUNCTION_MAX_CARDINALITY = 21;
+  ROUTING_MODEL_QUERY_HAS_MAX_CARDINALITY_CONSTRAINED_DISJUNCTIONS = 22;
+  ROUTING_MODEL_QUERY_PERFECT_BINARY_DISJUNCTIONS = 23;
+  ROUTING_MODEL_QUERY_SINGLETON_NODES = 24;
+  ROUTING_MODEL_QUERY_VEHICLE_ALLOWED = 25;
+  ROUTING_MODEL_QUERY_FIRST_SOLUTION_ARC_COST = 26;
+  // Result value is -1 for no matching sibling.
+  ROUTING_MODEL_QUERY_FIRST_MATCHING_PICKUP_DELIVERY_SIBLING = 27;
+  ROUTING_MODEL_QUERY_ARC_MORE_CONSTRAINED = 28;
+  ROUTING_MODEL_QUERY_IS_MATCHING_MODEL = 29;
+  // Uses the request search parameters, including native defaults.
+  ROUTING_MODEL_QUERY_ROUTES_INTERDEPENDENT = 30;
+}
+message RoutingModelQuery {
+  RoutingModelQueryKind kind = 1;
+  int64 index = 2;
+  int64 other_index = 3;
+  int32 vehicle_or_class = 4;
+  int64 default_value = 5;
+  int32 predicate_evaluator = 6;
+  int64 third_index = 7;
+}
+message RoutingIndexGroup { repeated int32 indices = 1; }
+message RoutingIndexGroups { repeated RoutingIndexGroup groups = 1; }
+message RoutingModelInspection {
+  optional int64 value = 1;
+  repeated int32 dimension_indices = 2;
+  repeated int32 indices = 3;
+  repeated RoutingIndexGroup groups = 4;
+  repeated RoutingIndexGroups precedence_groups = 5;
+}
+message RoutingDimensionQuery {
+  string dimension_name = 1; RoutingDimensionQueryKind kind = 2;
+  int64 index = 3; int64 other_index = 4; int32 vehicle_or_class = 5;
+  int64 lower = 6; int64 upper = 7;
+  int32 pair_index = 8; int32 pickup_alternative_index = 9; int32 delivery_alternative_index = 10;
+}
+message RoutingAddForbiddenIntervals { string dimension_name = 1; int64 index = 2; repeated RoutingInt64Interval intervals = 3; }
+message RoutingInt64Interval { int64 start = 1; int64 end = 2; }
+message RoutingDimensionInspection {
+  optional int64 value = 1; repeated RoutingInt64Interval intervals = 2;
+  bool has_piecewise_linear_cost = 3; repeated RoutingPiecewiseCostSegment cost_segments = 4;
+  repeated RoutingNodePrecedence node_precedences = 5;
+}
+message RoutingNodePrecedence {
+  int64 first = 1; int64 second = 2; int64 offset = 3; int32 performed_constraint = 4;
+}
+
+message RoutingAddRouteConstraint { int32 evaluator = 1; bool costs_are_homogeneous_across_vehicles = 2; }
+message RoutingPickupDeliveryPosition { int32 pair_index = 1; int32 alternative_index = 2; }
+message RoutingPickupDeliveryInspection {
+  RoutingPickupDeliveryPosition pickup = 1;
+  RoutingPickupDeliveryPosition delivery = 2;
+  bool is_pickup = 3;
+  bool is_delivery = 4;
+}
+message RoutingBreakInspectionRequest { string dimension_name = 1; int32 vehicle = 2; }
+message RoutingBreakDistanceDuration { int64 distance = 1; int64 duration = 2; }
+message RoutingBreakConfiguration {
+  bool has_break_constraints = 1;
+  repeated int32 intervals = 2;
+  repeated RoutingBreakDistanceDuration distance_duration = 3;
+  optional int32 pre_travel_evaluator = 4;
+  optional int32 post_travel_evaluator = 5;
 }
 
 message RoutingRoute {
@@ -364,6 +532,62 @@ message RoutingRoute {
 message RoutingInitialAssignment {
   repeated RoutingRoute routes = 1;
   bool ignore_inactive_indices = 2;
+  RoutingAssignmentSnapshot snapshot = 3;
+}
+
+message RoutingAssignmentSnapshot {
+  repeated RoutingAssignmentVariable variables = 1;
+  repeated RoutingBreakAssignment intervals = 2;
+  optional int64 objective_value = 3;
+  optional int64 objective_min = 4;
+  optional int64 objective_max = 5;
+}
+// Source route variables already use the target index-manager layout.
+message RoutingAssignmentTransfer {
+  repeated int32 next_values = 1;
+  repeated int32 vehicle_values = 2;
+}
+message RoutingRouteLocks {
+  repeated RoutingRoute routes = 1;
+  bool close_routes = 2;
+}
+message RoutingPreAssignment {
+  map<int32, int32> next_values = 1;
+}
+
+enum RoutingAssignmentAction {
+  ROUTING_ASSIGNMENT_ACTION_SOLVE = 0;
+  ROUTING_ASSIGNMENT_ACTION_PACK = 1;
+  ROUTING_ASSIGNMENT_ACTION_COMPACT = 2;
+  ROUTING_ASSIGNMENT_ACTION_COMPACT_AND_CHECK = 3;
+  ROUTING_ASSIGNMENT_ACTION_FAST_SOLVE = 4;
+  ROUTING_ASSIGNMENT_ACTION_MULTIPLE_STARTS = 5;
+  ROUTING_ASSIGNMENT_ACTION_LOWER_BOUND = 6;
+  ROUTING_ASSIGNMENT_ACTION_CHECK_FEASIBILITY = 7;
+}
+message RoutingCumulOptimizers {
+  repeated string global_dimensions = 1;
+  repeated string local_dimensions = 2;
+}
+message RoutingSearchStatistics {
+  int64 num_cp_sat_calls_in_lp_scheduling = 1;
+  int64 num_glop_calls_in_lp_scheduling = 2;
+  int64 num_min_cost_flow_calls = 3;
+  int64 num_cp_sat_calls_in_routing = 4;
+  int64 num_generalized_cp_sat_calls_in_routing = 5;
+  optional int64 num_decisions_in_first_solution = 6;
+  optional int64 num_rejects_in_first_solution = 7;
+}
+message RoutingSolution {
+  int64 objective_value = 1;
+  repeated int64 next_values = 2;
+  repeated int64 starts = 3;
+  repeated int64 ends = 4;
+  repeated RoutingDimensionValues dimensions = 5;
+  repeated int32 vehicle_values = 6;
+  repeated RoutingAssignmentVariable assignment_variables = 7;
+  repeated RoutingResourceAssignment resource_assignments = 8;
+  repeated RoutingBreakAssignment break_assignments = 9;
 }
 
 message RoutingBridgeRequest {
@@ -393,6 +617,40 @@ message RoutingBridgeRequest {
   repeated RoutingResourceGroup resource_groups = 21;
   // Close the native model and inspect one group without searching.
   optional int32 resource_inspection_group = 22;
+  bool inspect_activity_groups = 23;
+  RoutingRouteLocks route_locks = 24;
+  bool inspect_pre_assignment = 25;
+  RoutingAssignmentSnapshot first_solution_hint = 26;
+  RoutingAssignmentAction assignment_action = 27;
+  repeated RoutingAssignmentSnapshot candidate_assignments = 28;
+  double packing_duration_seconds = 29;
+  bool check_solution_in_cp = 30;
+  bool inspect_cumul_optimizers = 31;
+  bool call_at_solution_monitors = 32;
+  optional int32 pickup_delivery_inspection_index = 33;
+  RoutingBreakInspectionRequest break_inspection = 34;
+  RoutingDimensionQuery dimension_query = 35;
+  bool search_entry_events = 36;
+  RoutingModelQuery model_query = 37;
+  RoutingRoute route_cost_query = 38;
+  // Independently constructed model used by native insertion reoptimization.
+  RoutingBridgeRequest secondary_model = 39;
+  RoutingAssignmentTransfer assignment_transfer = 40;
+}
+
+message RoutingSetPathEnergyCosts {
+  string force = 1;
+  string distance = 2;
+  int64 threshold = 3;
+  int64 cost_below = 4;
+  int64 cost_above = 5;
+  int32 vehicle = 6;
+}
+message RoutingAddSameActivityGroup { repeated int32 indices = 1; }
+message RoutingActivityGroup { repeated int32 indices = 1; }
+message RoutingActivityGroups {
+  repeated int32 groups = 1;
+  repeated RoutingActivityGroup members = 2;
 }
 
 message RoutingDimensionValues {
@@ -407,6 +665,8 @@ message RoutingAssignmentVariable {
   int64 min = 2;
   int64 max = 3;
 }
+
+message RoutingRouteCost { optional int64 cost = 1; }
 
 message RoutingBridgeResponse {
   bool has_solution = 1;
@@ -426,6 +686,57 @@ message RoutingBridgeResponse {
   repeated RoutingAssignmentVariable assignment_variables = 14;
   repeated RoutingResourceAssignment resource_assignments = 15;
   RoutingResourceInspection resource_inspection = 16;
+  repeated RoutingBreakAssignment break_assignments = 17;
+  RoutingActivityGroups activity_groups = 18;
+  optional bool locks_applied = 19;
+  RoutingPreAssignment pre_assignment = 20;
+  repeated RoutingSolution collected_solutions = 21;
+  optional bool time_limit_reached = 22;
+  optional int64 computed_lower_bound = 23;
+  optional int64 objective_lower_bound = 24;
+  RoutingSearchStatistics search_statistics = 25;
+  RoutingCumulOptimizers cumul_optimizers = 26;
+  optional bool assignment_feasible = 27;
+  RoutingPickupDeliveryInspection pickup_delivery_inspection = 28;
+  RoutingBreakConfiguration break_configuration = 29;
+  RoutingDimensionInspection dimension_inspection = 30;
+  bool search_entered = 31;
+  RoutingModelInspection model_inspection = 32;
+  RoutingRouteCost route_cost = 33;
+  RoutingAssignmentSnapshot assignment_seed = 34;
+}
+
+message RoutingAddBreakInterval {
+  int32 index = 1;
+  int64 start_min = 2;
+  int64 start_max = 3;
+  int64 duration = 4;
+  bool optional = 5;
+  string name = 6;
+}
+message RoutingSetBreakIntervals {
+  string dimension_name = 1;
+  repeated int32 intervals = 2;
+  int32 vehicle = 3;
+  RoutingMatrix pre_travel = 4;
+  RoutingMatrix post_travel = 5;
+  optional int32 pre_travel_handle = 6;
+  optional int32 post_travel_handle = 7;
+}
+message RoutingSetBreakDistanceDuration {
+  string dimension_name = 1;
+  int32 vehicle = 2;
+  int64 distance = 3;
+  int64 duration = 4;
+}
+message RoutingBreakAssignment {
+  int32 index = 1;
+  int64 performed_min = 2;
+  int64 performed_max = 3;
+  optional int64 start_min = 4;
+  optional int64 start_max = 5;
+  optional int64 end_min = 6;
+  optional int64 end_max = 7;
 }
 
 message RoutingSolveEvent {

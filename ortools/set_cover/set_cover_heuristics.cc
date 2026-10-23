@@ -542,6 +542,7 @@ bool LazySteepestSearch::NextSolution(const SubsetBoolVector& in_focus) {
            << num_iterations;
   const BaseInt num_selected_subsets = inv()->trace().size();
   std::vector<Cost> selected_costs;
+  std::vector<SubsetIndex> selected_subsets;
   selected_costs.reserve(num_selected_subsets);
   // First part of the trick:
   // Since the heuristic is greedy, it only considers subsets that are selected
@@ -550,6 +551,7 @@ bool LazySteepestSearch::NextSolution(const SubsetBoolVector& in_focus) {
   for (const SetCoverDecision& decision : inv()->trace()) {
     if (in_focus[decision.subset()]) {
       selected_costs.push_back(costs[decision.subset()]);
+      selected_subsets.push_back(decision.subset());
     }
   }
   std::vector<BaseInt> cost_permutation(selected_costs.size());
@@ -565,7 +567,7 @@ bool LazySteepestSearch::NextSolution(const SubsetBoolVector& in_focus) {
   std::vector<SubsetIndex> cost_sorted_subsets;
   cost_sorted_subsets.reserve(num_selected_subsets);
   for (const BaseInt i : cost_permutation) {
-    cost_sorted_subsets.push_back(inv()->trace()[i].subset());
+    cost_sorted_subsets.push_back(selected_subsets[i]);
   }
   for (const SubsetIndex subset : cost_sorted_subsets) {
     // Second part of the trick:

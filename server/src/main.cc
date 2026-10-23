@@ -30,15 +30,20 @@ int RunHttpServer(const ortools_wasm::server::ServerConfig& config) {
   ortools_wasm::server::JobScheduler scheduler(options);
   ortools_wasm::server::SolverJobService job_service(
       scheduler,
-      std::chrono::seconds(config.completed_job_retention_seconds));
+      std::chrono::seconds(config.completed_job_retention_seconds),
+      {static_cast<size_t>(config.event_history_max_events),
+       static_cast<size_t>(config.event_history_max_bytes)});
+  const ortools_wasm::SessionLimits session_limits{
+      static_cast<size_t>(config.max_sessions_per_solver),
+      std::chrono::seconds(config.session_idle_timeout_seconds)};
   job_service.Register(std::make_unique<ortools_wasm::server::CpSatExecutor>());
   job_service.Register(std::make_unique<ortools_wasm::server::KnapsackExecutor>());
-  job_service.Register(std::make_unique<ortools_wasm::server::MathOptExecutor>());
-  job_service.Register(std::make_unique<ortools_wasm::server::MpSolverExecutor>());
+  job_service.Register(std::make_unique<ortools_wasm::server::MathOptExecutor>(session_limits));
+  job_service.Register(std::make_unique<ortools_wasm::server::MpSolverExecutor>(session_limits));
   job_service.Register(std::make_unique<ortools_wasm::server::NetworkFlowExecutor>());
   job_service.Register(std::make_unique<ortools_wasm::server::PdlpExecutor>());
   job_service.Register(std::make_unique<ortools_wasm::server::RoutingExecutor>());
-  job_service.Register(std::make_unique<ortools_wasm::server::SetCoverExecutor>());
+  job_service.Register(std::make_unique<ortools_wasm::server::SetCoverExecutor>(session_limits));
 
   std::cout << "server http_bind=" << config.host << ":" << config.port << '\n';
   if (config.bearer_token.empty()) {

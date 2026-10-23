@@ -20,6 +20,16 @@ enum SetCoverOperation {
   SET_COVER_OPERATION_SESSION_INITIALIZE = 14;
   SET_COVER_OPERATION_SESSION_DELETE = 15;
   SET_COVER_OPERATION_COMPRESS_TRACE = 16;
+  SET_COVER_OPERATION_CLEAR_RANDOM_SUBSETS = 17;
+  SET_COVER_OPERATION_CLEAR_MOST_COVERED_ELEMENTS = 18;
+  SET_COVER_OPERATION_UPDATE_SELECTION = 19;
+  SET_COVER_OPERATION_LAZY_STEEPEST = 20;
+  SET_COVER_OPERATION_READ_MODEL = 21;
+  SET_COVER_OPERATION_WRITE_MODEL = 22;
+  SET_COVER_OPERATION_SESSION_STATISTICS = 23;
+  SET_COVER_OPERATION_LAGRANGIAN_BOUND = 24;
+  SET_COVER_OPERATION_MIP = 25;
+  SET_COVER_OPERATION_CFT = 26;
 }
 
 message SetCoverGuidedTabuParameters {
@@ -49,6 +59,20 @@ message SetCoverBridgeRequest {
   SetCoverOperation session_algorithm = 15;
   SetCoverTrace trace = 16;
   int32 num_subsets = 17;
+  int32 perturbation_count = 18;
+  int32 subset_index = 19;
+  bool subset_selected = 20;
+  bytes input = 21;
+  // 0: OR-Library SCP, 1: OR-Library rail, 2: FIMI (reader only).
+  int32 format = 22;
+  double upper_bound = 23;
+  bool lp_relaxation = 24;
+}
+
+message SetCoverRemovability {
+  bool changed = 1;
+  repeated int32 newly_removable_subsets = 2;
+  repeated int32 newly_non_removable_subsets = 3;
 }
 
 message SetCoverTraceDecision { int32 subset = 1; bool selected = 2; }
@@ -63,7 +87,21 @@ message SetCoverStatistics {
   double iqr = 6;
 }
 
+message SetCoverLagrangianBound {
+  double lower_bound = 1;
+  repeated double reduced_costs = 2;
+  repeated double multipliers = 3;
+}
+
+message SetCoverMipResult {
+  int32 subproblem_status = 1;
+  optional double objective_value = 2;
+}
+
 message SetCoverBridgeResponse {
+  SetCoverLagrangianBound cft_dual = 26;
+  SetCoverMipResult mip = 25;
+  SetCoverLagrangianBound lagrangian_bound = 24;
   bool next_solution = 1;
   double cost = 2;
   int32 num_uncovered_elements = 3;
@@ -82,4 +120,10 @@ message SetCoverBridgeResponse {
   SetCoverGuidedTabuParameters guided_tabu_parameters = 15;
   uint64 session_handle = 16;
   SetCoverTrace trace = 17;
+  SetCoverRemovability removability = 18;
+  repeated int32 perturbation_focus = 19;
+  optional string model_proto_json = 20;
+  optional string text = 21;
+  optional double run_time_seconds = 22;
+  optional double run_time_microseconds = 23;
 }

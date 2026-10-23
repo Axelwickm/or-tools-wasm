@@ -1,5 +1,5 @@
 import {
-  MPSolver,
+  MPSolver, MPSolverParameters, IntegerParam, PresolveValues, type MPSolverSolveOptions,
   type ExecutorConfiguration,
   type MPVariable,
   type MPSolverExecutionOptions,
@@ -15,11 +15,15 @@ export type SimpleMpConfig = {
   workerCount?: number;
   solverThreads?: number;
   solverSpecificParameters?: string;
+  warmStart?: boolean;
+  lazyLimit?: boolean;
   incremental?: boolean;
   messageCallback?: (messages: string[]) => void;
 };
 
 type SimpleMpResult = {
+  warmStarted?: boolean;
+  callbackCount?: number;
   incremental?: boolean;
   verified?: boolean;
   status: number | string;
@@ -99,7 +103,8 @@ function supportsNodeCount(solverId: SimpleMpConfig['solverId']): boolean {
 }
 
 export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<SimpleMpResult> {
-  const executionOptions = { ...currentMPSolverExecutionOptions(), messageCallback: config.messageCallback };
+  const executionOptions: MPSolverSolveOptions = { ...currentMPSolverExecutionOptions(), messageCallback: config.messageCallback };
+  let callbackCount = 0;
 
   const solver = MPSolver.createSolver(config.solverId);
   if (!solver) {
@@ -133,6 +138,20 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
     const workerCount = solverThreads && solverThreads > 1
       ? Math.floor(solverThreads)
       : undefined;
+    if (config.lazyLimit) {
+      executionOptions.callbackRegistration = { mightAddLazyConstraints: true, variableIndices: [x.index()] };
+      executionOptions.callback = data => {
+        callbackCount++;
+        if (data.canQueryVariableValues && data.variableValues[x.index()] > 0)
+          return { lazyConstraints: [{ upperBound: 0, variableIndices: [x.index()], coefficients: [1] }] };
+      };
+    }
+    if (config.warmStart) {
+      const parameters = new MPSolverParameters(); parameters.setIntegerParam(IntegerParam.PRESOLVE, PresolveValues.PRESOLVE_OFF);
+      executionOptions.parameters = parameters;
+      if (await solver.solve(executionOptions) !== MPSolver.OPTIMAL) throw new Error('Initial basis solve failed.');
+      executionOptions.startingBasis = { variableStatuses: [x.basisStatus(), y.basisStatus()], constraintStatuses: [c0.basisStatus()] };
+    }
     let status: number | string = MPSolver.OPTIMAL;
     if (config.incremental) {
       const session = new MPSolver.IncrementalSolver(solver, executionOptions);
@@ -162,6 +181,7 @@ export async function solveSimpleMpProgram(config: SimpleMpConfig): Promise<Simp
     const verified = await solver.verifySolution(1e-7, true, executionOptions);
     if (!verified) throw new Error('Native solution verification failed.');
     const result = {
+      warmStarted: config.warmStart, callbackCount: config.lazyLimit ? callbackCount : undefined,
       incremental: config.incremental,
       verified,
       status,
@@ -193,6 +213,8 @@ export function renderSimpleMpResult(element: HTMLElement | null, result: Simple
     <table>
       <tbody>
         <tr><th>Status</th><td>${status}</td></tr>
+        ${result.warmStarted ? '<tr><th>Starting basis</th><td>Native GLOP basis supplied with presolve off</td></tr>' : ''}
+        ${result.callbackCount !== undefined ? `<tr><th>Native MIP callbacks</th><td>${result.callbackCount}; lazy constraint x ≤ 0</td></tr>` : ''}
         ${result.incremental ? '<tr><th>Native session</th><td>Retained solver; updated x upper bound to 0</td></tr>' : ''}
         ${result.verified !== undefined ? `<tr><th>Native verification</th><td>${result.verified ? 'passed' : 'failed'}</td></tr>` : ''}
         <tr><th>Executor</th><td>${result.executor}</td></tr>

@@ -20,12 +20,18 @@ std::string RequiredStringEnv(const EnvLookup& env, const std::string& name) {
 int RequiredPositiveEnv(const EnvLookup& env, const std::string& name) {
   const std::string value = RequiredStringEnv(env, name);
   try {
-    const int parsed = std::stoi(value);
-    if (parsed > 0) return parsed;
+    size_t consumed = 0;
+    const int parsed = std::stoi(value, &consumed);
+    if (parsed > 0 && consumed == value.size()) return parsed;
   } catch (...) {
   }
   throw std::runtime_error("Environment variable " + name +
                            " must be a positive integer.");
+}
+
+int OptionalPositiveEnv(const EnvLookup& env, const std::string& name, int fallback) {
+  if (!env(name).has_value()) return fallback;
+  return RequiredPositiveEnv(env, name);
 }
 
 int RequiredThreadBudgetEnv(const EnvLookup& env, const std::string& name) {
@@ -61,6 +67,10 @@ ServerConfig LoadServerConfig(EnvLookup env) {
       RequiredPositiveEnv(env,
                           "ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS"),
       OptionalStringEnv(env, "ORTOOLS_SERVER_BEARER_TOKEN"),
+      OptionalPositiveEnv(env, "ORTOOLS_SERVER_EVENT_HISTORY_MAX_EVENTS", 4096),
+      OptionalPositiveEnv(env, "ORTOOLS_SERVER_EVENT_HISTORY_MAX_BYTES", 16 * 1024 * 1024),
+      OptionalPositiveEnv(env, "ORTOOLS_SERVER_MAX_SESSIONS_PER_SOLVER", 64),
+      OptionalPositiveEnv(env, "ORTOOLS_SERVER_SESSION_IDLE_TIMEOUT_SECONDS", 1800),
   };
 }
 

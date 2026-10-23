@@ -239,3 +239,38 @@ test('a retired worker startup failure cannot discard its replacement startup', 
     assert.equal(attempts, 2);
   } finally { manager.terminate(); }
 });
+
+test('a rejected pre-dispatch hook releases idle workers while preserving active requests', async () => {
+  const bundled = await build({ stdin: { resolveDir: fileURLToPath(new URL('../lib', import.meta.url)),
+    contents: `export { ManagedWorker } from './worker_helpers.ts';` },
+    bundle: true, write: false, platform: 'node', format: 'esm' });
+  const api = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+  const events = new EventEmitter();
+  let referenced = true, posts = 0;
+  const worker = {
+    on: events.on.bind(events), terminate() {},
+    ref() { referenced = true; }, unref() { referenced = false; },
+    postMessage() { ++posts; },
+  };
+  const manager: ManagedWorker<Request, Response> = new api.ManagedWorker({
+    createWorker: async () => worker,
+    getRequestId: (request: Request) => request.id,
+    getResponseId: (response: Response) => response.id,
+  });
+  const failure = new Error('runtime was replaced before dispatch');
+  const rejectDispatch = () => { throw failure; };
+  try {
+    await assert.rejects(manager.post({ id: 1, value: 1 }, undefined, undefined, rejectDispatch), error => error === failure);
+    assert.equal(referenced, false, 'a newly loaded idle worker must not keep Node alive');
+    assert.equal(posts, 0);
+    const active = manager.post({ id: 2, value: 2 });
+    await nextTurn();
+    assert.equal(referenced, true);
+    await assert.rejects(manager.post({ id: 3, value: 3 }, undefined, undefined, rejectDispatch), error => error === failure);
+    assert.equal(referenced, true, 'another in-flight request still needs the worker');
+    assert.equal(posts, 1);
+    events.emit('message', { id: 2, value: 2 });
+    assert.deepEqual(await active, { id: 2, value: 2 });
+    assert.equal(referenced, false);
+  } finally { manager.terminate(); }
+});

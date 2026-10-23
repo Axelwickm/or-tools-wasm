@@ -1,0 +1,14 @@
+syntax = "proto3";
+package ortools_wasm.bridge.v1;
+
+message MathOptSolutionImprovementRequest {
+  bytes model_proto = 1;
+  repeated int64 variable_ids = 2;
+  repeated double variable_values = 3;
+  repeated int64 selected_variable_ids = 4;
+  optional double integrality_tolerance = 5;
+}
+message MathOptSolutionImprovementResponse {
+  bytes variable_values_proto = 1;
+  string error = 2;
+}

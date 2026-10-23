@@ -106,7 +106,7 @@ export async function runGroupConstraints({ api, mode, executor }: RoutingContro
     solver: 'routing', source: 'javascript/lib/routing/api.ts', tags: ['contract', 'model-correctness'], mode, ok: true });
   const metadata = new api.RoutingModel(new api.RoutingIndexManager(5, 2, 0));
   assert(metadata.getNumberOfDisjunctions() === 0 && !metadata.hasMandatoryDisjunctions()
-    && !metadata.hasMaxCardinalityConstrainedDisjunctions(), 'Empty models have no disjunction flags');
+    && !(await metadata.hasMaxCardinalityConstrainedDisjunctions({ executor })), 'Empty models have no disjunction flags');
   const members = [2, 1, 2];
   const first = metadata.addDisjunction(members, exact, 2, behavior.PENALIZE_PER_INACTIVE);
   members.fill(4);
@@ -115,23 +115,23 @@ export async function runGroupConstraints({ api, mode, executor }: RoutingContro
     && metadata.getDisjunctionIndices(metadata.start(1)).length === 0, 'Membership queries take node indices, retain duplicates and copy inputs');
   metadata.getDisjunctionIndices(2).push(99);
   assert(metadata.getDisjunctionIndices(2).join(',') === '0,0'
-    && metadata.getDisjunctionPenalty(first) === exact && metadata.getDisjunctionMaxCardinality(first) === 2n
+    && metadata.getDisjunctionPenalty(first) === exact && await metadata.getDisjunctionMaxCardinality(first, { executor }) === 2n
     && metadata.getDisjunctionPenaltyCostBehavior(first) === behavior.PENALIZE_PER_INACTIVE
-    && metadata.hasMaxCardinalityConstrainedDisjunctions() && !metadata.hasMandatoryDisjunctions(), 'Metadata preserves exact costs, modes and independent memberships');
+    && await metadata.hasMaxCardinalityConstrainedDisjunctions({ executor }) && !metadata.hasMandatoryDisjunctions(), 'Metadata preserves exact costs, modes and independent memberships');
   metadata.addDisjunction([2], -2, exact);
   assert(!metadata.hasMandatoryDisjunctions(), 'Native mandatory inspection recognizes only the -1 sentinel, despite all negative penalties enforcing visits');
   const defaultId = metadata.addDisjunction([3]);
   assert(metadata.hasMandatoryDisjunctions() && metadata.getDisjunctionPenalty(defaultId) === -1n
-    && metadata.getDisjunctionMaxCardinality(defaultId) === 1n
+    && await metadata.getDisjunctionMaxCardinality(defaultId, { executor }) === 1n
     && metadata.getDisjunctionPenaltyCostBehavior(defaultId) === behavior.PENALIZE_ONCE
     && metadata.getDisjunctionIndices(2).join(',') === '0,0,1', 'Defaults and overlapping memberships match native getters');
   const unconstrained = new api.RoutingModel(new api.RoutingIndexManager(3, 1, 0));
   unconstrained.addDisjunction([1, 2], 0, 2); unconstrained.addDisjunction([1], 0, exact);
-  assert(!unconstrained.hasMaxCardinalityConstrainedDisjunctions(), 'Equal or larger cardinality does not constrain group size');
+  assert(!(await unconstrained.hasMaxCardinalityConstrainedDisjunctions({ executor })), 'Equal or larger cardinality does not constrain group size');
   for (const index of [-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, 3]) {
     for (const get of [() => metadata.getDisjunctionPenalty(index), () => metadata.getDisjunctionMaxCardinality(index),
       () => metadata.getDisjunctionPenaltyCostBehavior(index)]) {
-      let rejected = false; try { get(); } catch { rejected = true; } assert(rejected, 'Invalid disjunction IDs are rejected');
+      let rejected = false; try { await get(); } catch { rejected = true; } assert(rejected, 'Invalid disjunction IDs are rejected');
     }
   }
   for (const index of [-1, 0.5, NaN, Infinity, metadata.end(0)]) {

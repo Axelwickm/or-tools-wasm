@@ -4,12 +4,13 @@ import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,
   SolverExecutorBusyError,
+  SolverCallbackTransportError,
   SolverFailureKind,
   SolverJobState,
   type SolverExecutionOptions,
 } from '../solver_executor.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
-import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
+import { allocateWasm, allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
 import type {
   MpSolverExecutor,
   MpSolverLogEvent,
@@ -41,7 +42,7 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
   ): MpSolverJob {
     if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextRequestId++;
-    const state = { cancelled: false, nativeRunning: false, interruptible: (operation.type === 'solve' || operation.type === 'sessionRun' || operation.type === 'iis') && operation.interruptible };
+    const state = { cancelled: false, nativeRunning: false, interruptible: (operation.type === 'solve' || operation.type === 'sessionRun') && operation.interruptible };
     this.activeJob = state;
     return {
       requestId,
@@ -89,12 +90,37 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
         options.onDispatch?.(module);
         const state = this.activeJob!;
         if (state.cancelled) throw Object.assign(new Error('MPSolver solve was cancelled.'), { name: 'AbortError' });
-        state.nativeRunning = operation.type === 'solve' || operation.type === 'iis' || (operation.type === 'sessionRun' && operation.action === 0);
+        if ((operation.type === 'solve' || operation.type === 'sessionRun') && operation.callbackRegistration !== undefined && !options.onCallback)
+          throw new Error('MPSolver callback registration requires a handler.');
+        state.nativeRunning = operation.type === 'solve' || (operation.type === 'sessionRun' && operation.action === 0);
         const messages: Map<number, (payload: Uint8Array) => void> = module.__mpSolverMessages ??= new Map();
         if ((operation.type === 'solve' || operation.type === 'sessionRun') && operation.streamMessages)
           messages.set(requestId, payload => { void options.onEvent(mpSolverProtocol.decodeEvent!(payload)!); });
-        try { return await this.executeNative(module, operation, requestId); }
-        finally { messages.delete(requestId); state.nativeRunning = false; }
+        const callbacks: Map<number, (payload: Uint8Array) => number> = module.__mpSolverCallbacks ??= new Map();
+        let callbackFailure: { error: unknown } | undefined;
+        if ((operation.type === 'solve' || operation.type === 'sessionRun') && operation.callbackRegistration !== undefined) {
+          callbacks.set(requestId, payload => {
+            let reply: Uint8Array;
+            try { reply = options.onCallback!(payload); }
+            catch (error) { if (error instanceof SolverCallbackTransportError) callbackFailure ??= { error }; return 0; }
+            let pointer = 0;
+            try {
+              pointer = allocateWasm(module, 4 + reply.length);
+              new DataView(module.HEAPU8.buffer).setUint32(pointer, reply.length, true);
+              module.HEAPU8.set(reply, pointer + 4);
+              return pointer;
+            } catch (error) {
+              if (pointer) module._free(pointer);
+              callbackFailure ??= { error };
+              return 0;
+            }
+          });
+        }
+        try {
+          const result = await this.executeNative(module, operation, requestId);
+          if (callbackFailure) throw callbackFailure.error;
+          return result;
+        } finally { callbacks.delete(requestId); messages.delete(requestId); state.nativeRunning = false; }
       });
       await options.onEvent(createSolverJobStatusEvent(
         this.solver,
@@ -126,16 +152,16 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
     operation: MpSolverOperation,
     requestId: number,
   ): Promise<MpSolverResult> {
-    if (operation.type === 'loadSolution' || operation.type === 'exportModel' || operation.type === 'activities' || operation.type === 'iis' || operation.type === 'sessionCreate' || operation.type === 'sessionRun' || operation.type === 'sessionClose' || (operation.type === 'solve' && (operation.streamMessages || operation.editableSnapshot))) {
+    if (operation.type === 'clampSolution' || operation.type === 'capabilities' || operation.type === 'loadSolution' || operation.type === 'exportModel' || operation.type === 'activities' || operation.type === 'sessionCreate' || operation.type === 'sessionRun' || operation.type === 'sessionClose' || (operation.type === 'solve' && (operation.streamMessages || operation.editableSnapshot || operation.startingBasis || operation.callbackRegistration))) {
       const bytes = mpSolverProtocol.encodeRequest(operation);
       const pointer = allocateWasmBytes(module, bytes);
       try {
         const response = await readWasmResult(module, async length => {
-          const query = operation.type === 'loadSolution' || operation.type === 'exportModel' || operation.type === 'activities';
-          const entrypoint = query ? 'mp_solver_model_query_request' : operation.type === 'iis' ? 'mp_solver_compute_iis_request'
+          const query = operation.type === 'clampSolution' || operation.type === 'capabilities' || operation.type === 'loadSolution' || operation.type === 'exportModel' || operation.type === 'activities';
+          const entrypoint = query ? 'mp_solver_model_query_request'
             : operation.type === 'solve' ? 'mp_solver_solve_bridge_request' : 'mp_solver_session_request';
           const arguments_ = [pointer, bytes.length, length];
-          if (!query && operation.type !== 'iis') arguments_.push(requestId);
+          if (!query) arguments_.push(requestId);
           const result = await module.ccall(entrypoint, 'number',
             arguments_.map(() => 'number'), arguments_, { async: true }) as number;
           if (!result) throw new Error(module.ccall('mp_solver_bridge_error', 'string', [], []) as string);

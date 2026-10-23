@@ -233,27 +233,28 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/proto_solver/sat_solver_utils.cc"
     "${PROJECT_SOURCE_DIR}/ortools/linear_solver/sat_interface.cc"
     "${PROTO_SCHEMA_HEADER}")
-  # Stateful MPSolver commands share the exact bridge wire format with the
-  # native server. Generate only this independent bridge schema for WASM.
-  set(MP_SESSION_PROTO_DIR "${PROJECT_BINARY_DIR}/mp_session_bridge")
+  # Generate the independent bridge schemas used by native WASM entry points.
+  set(WASM_BRIDGE_PROTO_DIR "${PROJECT_BINARY_DIR}/wasm_bridge")
   if(OR_TOOLS_PROTOC_EXECUTABLE)
-    set(MP_SESSION_PROTOC "${OR_TOOLS_PROTOC_EXECUTABLE}")
+    set(WASM_BRIDGE_PROTOC "${OR_TOOLS_PROTOC_EXECUTABLE}")
   elseif(TARGET host_protoc)
-    set(MP_SESSION_PROTOC host_protoc)
+    set(WASM_BRIDGE_PROTOC host_protoc)
   else()
-    set(MP_SESSION_PROTOC protobuf::protoc)
+    set(WASM_BRIDGE_PROTOC protobuf::protoc)
   endif()
-  add_custom_command(
-    OUTPUT "${MP_SESSION_PROTO_DIR}/mp_solver.pb.cc" "${MP_SESSION_PROTO_DIR}/mp_solver.pb.h"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MP_SESSION_PROTO_DIR}"
-    COMMAND ${MP_SESSION_PROTOC} --proto_path=${PROJECT_SOURCE_DIR}/bridge-types
-            --cpp_out=${MP_SESSION_PROTO_DIR} ${PROJECT_SOURCE_DIR}/bridge-types/mp_solver.proto
-    DEPENDS "${PROJECT_SOURCE_DIR}/bridge-types/mp_solver.proto" ${MP_SESSION_PROTOC}
-    VERBATIM)
-  add_library(ortools_wasm_mp_session_bridge STATIC
-    "${MP_SESSION_PROTO_DIR}/mp_solver.pb.cc" "${MP_SESSION_PROTO_DIR}/mp_solver.pb.h")
-  target_include_directories(ortools_wasm_mp_session_bridge PUBLIC "${MP_SESSION_PROTO_DIR}")
-  target_link_libraries(ortools_wasm_mp_session_bridge PUBLIC protobuf::libprotobuf)
+  foreach(bridge_proto routing mp_solver mathopt_iis mathopt_feasibility mathopt_model_transform mathopt_solution_improvement mathopt_expression_bounds)
+    add_custom_command(
+      OUTPUT "${WASM_BRIDGE_PROTO_DIR}/${bridge_proto}.pb.cc" "${WASM_BRIDGE_PROTO_DIR}/${bridge_proto}.pb.h"
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${WASM_BRIDGE_PROTO_DIR}"
+      COMMAND ${WASM_BRIDGE_PROTOC} --proto_path=${PROJECT_SOURCE_DIR}/bridge-types
+              --cpp_out=${WASM_BRIDGE_PROTO_DIR} ${PROJECT_SOURCE_DIR}/bridge-types/${bridge_proto}.proto
+      DEPENDS "${PROJECT_SOURCE_DIR}/bridge-types/${bridge_proto}.proto" ${WASM_BRIDGE_PROTOC}
+      VERBATIM)
+    add_library(ortools_wasm_${bridge_proto}_bridge STATIC
+      "${WASM_BRIDGE_PROTO_DIR}/${bridge_proto}.pb.cc" "${WASM_BRIDGE_PROTO_DIR}/${bridge_proto}.pb.h")
+    target_include_directories(ortools_wasm_${bridge_proto}_bridge PUBLIC "${WASM_BRIDGE_PROTO_DIR}")
+    target_link_libraries(ortools_wasm_${bridge_proto}_bridge PUBLIC protobuf::libprotobuf)
+  endforeach()
   if(ORTOOLS_WASM_USE_CLP)
     list(APPEND MP_SOLVER_BROWSER_SOURCES
       "${PROJECT_SOURCE_DIR}/ortools/linear_solver/clp_interface.cc")
@@ -326,6 +327,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     "${PROJECT_SOURCE_DIR}/ortools/graph/min_cost_flow.cc")
 
   set(SET_COVER_BROWSER_SOURCES
+    "${PROJECT_SOURCE_DIR}/ortools/set_cover/set_cover_reader.cc"
     "${PROJECT_SOURCE_DIR}/javascript/set_cover_api.cc"
     "${PROJECT_SOURCE_DIR}/ortools/set_cover/set_cover_heuristics.cc"
     "${PROJECT_SOURCE_DIR}/ortools/set_cover/set_cover_invariant.cc"
@@ -369,8 +371,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(CP_SAT_JSPI_EXPORTS
     solve_model
     solve_model_with_callback_events
-    validate_model)
-  set(ROUTING_JSPI_EXPORTS
+    validate_model
+    cp_sat_solution_is_feasible)
+  set(ROUTING_JSPI_EXPORTS routing_transfer_assignment routing_get_route_cost routing_inspect_model routing_inspect_model_parameters routing_set_tabu_vars routing_set_sweep_arranger routing_add_ordered_activity_group routing_add_forbidden_intervals routing_set_piecewise_cost routing_inspect_dimension routing_add_enter_search_callback
+    routing_add_route_constraint routing_pickup_delivery_position routing_break_configuration_value
+    routing_set_first_solution_evaluator routing_set_primary_constrained_dimension routing_set_secondary_model routing_ignore_disjunctions_already_forced_to_zero
+    routing_cumul_optimizer_count routing_cumul_optimizer_dimension_name routing_assignment_feasible
+    routing_close_model_proto routing_apply_locks routing_preassignment_next routing_input_assignment_create
+    routing_input_assignment_variable routing_input_assignment_interval routing_set_first_solution_hint routing_restore_assignment
     routing_resource_classes_count routing_resource_class_index routing_resources_in_class routing_resource_attributes routing_resource_dimension_affected
     routing_add_resource_group routing_add_resource routing_require_resource routing_allow_resources routing_assignment_resource_bounds
     routing_create_index_manager_starts_ends
@@ -387,6 +395,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     routing_add_dimension_with_vehicle_capacity
     routing_add_dimension_with_vehicle_transits
     routing_add_dimension_with_vehicle_transit_and_capacity
+    routing_register_state_dependent_transit_matrix
+    routing_add_dependent_dimension
     routing_add_constant_dimension
     routing_add_constant_dimension_with_slack
     routing_add_vector_dimension
@@ -400,6 +410,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     routing_add_temporal_type_incompatibility
     routing_add_type_requirement
     routing_add_pickup_and_delivery
+    routing_add_pickup_and_delivery_sets routing_set_pickup_to_delivery_limits
     routing_add_vehicle_equality_constraint
     routing_add_dimension_cumul_less_or_equal_constraint
     routing_set_vehicle_values
@@ -423,6 +434,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     routing_get_automatic_first_solution_strategy
     routing_set_maximum_active_vehicles
     routing_set_fixed_vehicle_cost
+    routing_set_path_energy_costs
+    routing_add_same_activity_group
+    routing_activity_groups
+    routing_activity_group_count
     routing_set_amortized_vehicle_costs
     routing_set_vehicle_used_when_empty
     routing_dimension_set_cumul_soft_bound
@@ -430,18 +445,31 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     routing_dimension_set_quadratic_cost_soft_span_upper_bound
     routing_solve_with_parameters_proto
     routing_status
+    routing_configure_assignment_workflow
+    routing_add_candidate_assignment
+    routing_collected_solution_count
+    routing_select_collected_solution
+    routing_packing_time_limit_reached
+    routing_computed_lower_bound
+    routing_objective_lower_bound
+    routing_search_statistic
+    routing_first_solution_statistic
     routing_assignment_objective_value
     routing_assignment_vehicle_value
     routing_start
     routing_is_end
     routing_next_value
     routing_assignment_dimension_cumul_value
-    routing_assignment_dimension_cumul_max)
+    routing_assignment_dimension_cumul_max
+    routing_add_break_interval
+    routing_set_break_intervals
+    routing_set_break_distance_duration
+    routing_assignment_break_bounds)
   set(MP_SOLVER_JSPI_EXPORTS
+    set_cover_mip
     mp_solver_session_request
     mp_solver_model_query_request
     mp_solver_solve_bridge_request
-    mp_solver_compute_iis_request
     mp_solver_verify_solution_proto
     mp_solver_validate_solver_specific_parameters
     mp_solver_import_model
@@ -450,9 +478,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     mp_solver_solve_model_request_with_parameters
     knapsack_solve_serialized)
   set(MATHOPT_JSPI_EXPORTS
+    mathopt_add_robust_constraint
+    mathopt_formulate_indicator_constraint_as_mip
+    mathopt_expression_bounds
+    mathopt_improve_solution
+    mathopt_check_primal_feasibility
     mathopt_validate_result
     mathopt_convert_result_proto
     mathopt_solve_request
+    mathopt_compute_infeasible_subsystem
     mathopt_incremental_create
     mathopt_incremental_solve
     mathopt_incremental_update
@@ -469,7 +503,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     graph_max_flow_solve_serialized
     graph_min_cost_flow_solve_serialized
     graph_linear_sum_assignment_solve_serialized)
-  set(SET_COVER_JSPI_EXPORTS set_cover_compress_trace set_cover_statistics set_cover_next_solution_serialized set_cover_next_solution_with_limits set_cover_guided_tabu_parameters set_cover_session_create set_cover_session_next set_cover_session_initialize set_cover_session_delete)
+  set(SET_COVER_JSPI_EXPORTS set_cover_cft set_cover_lagrangian_bound set_cover_session_statistics set_cover_read_model set_cover_write_model set_cover_mutate set_cover_compress_trace set_cover_statistics set_cover_next_solution_serialized set_cover_next_solution_with_limits set_cover_guided_tabu_parameters set_cover_session_create set_cover_session_next set_cover_session_initialize set_cover_session_delete)
 
   set(CP_SAT_ASYNCIFY_LINK_OPTIONS
     "-sASYNCIFY=1")
@@ -572,7 +606,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
           ${RUNTIME_NAME}_asyncify
           ${RUNTIME_NAME}_node
           ${RUNTIME_NAME}_node_asyncify)
-        target_link_libraries(${MP_SOLVER_TARGET} PRIVATE ortools_wasm_mp_session_bridge)
+        target_link_libraries(${MP_SOLVER_TARGET} PRIVATE ortools_wasm_mp_solver_bridge)
         target_link_options(${MP_SOLVER_TARGET} PRIVATE
           "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency+1"
           "-sEXPORTED_FUNCTIONS=['_malloc','_free','_mp_solver_interrupt_address']")
@@ -582,6 +616,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     if(RUNTIME_NAME STREQUAL "mathopt_runtime")
       foreach(MATHOPT_TARGET ${RUNTIME_NAME} ${RUNTIME_NAME}_asyncify
           ${RUNTIME_NAME}_node ${RUNTIME_NAME}_node_asyncify)
+        target_link_libraries(${MATHOPT_TARGET} PRIVATE ortools_wasm_mathopt_iis_bridge ortools_wasm_mathopt_feasibility_bridge ortools_wasm_mathopt_model_transform_bridge ortools_wasm_mathopt_solution_improvement_bridge ortools_wasm_mathopt_expression_bounds_bridge)
         target_link_options(${MATHOPT_TARGET} PRIVATE
           "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency+1"
           "-sEXPORTED_FUNCTIONS=['_malloc','_free','_mathopt_interrupt_address']")
@@ -594,6 +629,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
           ${RUNTIME_NAME}_asyncify
           ${RUNTIME_NAME}_node
           ${RUNTIME_NAME}_node_asyncify)
+        target_link_libraries(${ROUTING_TARGET} PRIVATE ortools_wasm_routing_bridge)
         target_link_options(${ROUTING_TARGET} PRIVATE
           "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency+1"
           "-sEXPORTED_FUNCTIONS=['_malloc','_free','_routing_interrupt_address']")

@@ -5,7 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include "absl/random/random.h"
+#include "javascript/session_registry.h"
 
 #include "server/src/solver_executor.h"
 
@@ -13,6 +13,8 @@ namespace ortools_wasm::server {
 
 class MathOptExecutor final : public SolverExecutor {
  public:
+  explicit MathOptExecutor(SessionLimits limits = ServerSessionLimits()) : sessions_(limits) {}
+  void ExpireIdleSessions() override { sessions_.ExpireIdle(); }
   std::string solver() const override;
   int RequestedThreads(const SolverExecutorRequest& request,
                        int client_requested_threads,
@@ -25,9 +27,7 @@ class MathOptExecutor final : public SolverExecutor {
   struct Session;
   std::shared_ptr<Session> FindSession(uint64_t handle);
 
-  absl::BitGen random_;
-  std::mutex sessions_mutex_;
-  std::unordered_map<uint64_t, std::shared_ptr<Session>> sessions_;
+  SessionRegistry<Session> sessions_;
 };
 
 }  // namespace ortools_wasm::server

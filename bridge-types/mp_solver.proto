@@ -14,6 +14,8 @@ message MpSolverSolveRequest {
   // Editable construction preserves free rows and original row indices.
   // Explicit proto operations retain native import normalization.
   bool editable_snapshot = 6;
+  MpSolverStartingBasis starting_basis = 7;
+  MpSolverCallbackRegistration callback_registration = 8;
 }
 
 message MpSolverParameters {
@@ -22,6 +24,17 @@ message MpSolverParameters {
 }
 
 message MpSolverSchemaRequest {}
+message MpSolverCapabilitiesRequest { int32 solver_type = 1; }
+message MpSolverCapabilitiesResult {
+  bool supports_callbacks = 1;
+  bool supports_message_callbacks = 2;
+}
+
+message MpSolverClampSolutionRequest {
+  bytes model_proto = 1;
+  bytes solution_proto = 2;
+  int32 solver_type = 3;
+}
 
 message MpSolverSchemaResult {
   string linear_solver_proto_schema = 1;
@@ -132,6 +145,7 @@ message MpSolverSessionResult {
 }
 
 message MpSolverBridgeRequest {
+  reserved 10;
   oneof payload {
     MpSolverSolveRequest solve = 1;
     MpSolverSchemaRequest schema = 2;
@@ -142,10 +156,11 @@ message MpSolverBridgeRequest {
     MpSolverSessionCreateRequest session_create = 7;
     MpSolverSessionRunRequest session_run = 8;
     MpSolverSessionCloseRequest session_close = 9;
-    MpSolverIisRequest iis = 10;
     MpSolverExportModelRequest export_model = 11;
     MpSolverActivitiesRequest activities = 12;
     MpSolverLoadSolutionRequest load_solution = 13;
+    MpSolverCapabilitiesRequest capabilities = 14;
+    MpSolverClampSolutionRequest clamp_solution = 15;
   }
 }
 
@@ -159,6 +174,7 @@ message MpSolverNativeMetadata {
 }
 
 message MpSolverBridgeResponse {
+  reserved 10;
   MpSolverNativeMetadata metadata = 3;
   oneof payload {
     bytes response_proto = 1;
@@ -169,33 +185,42 @@ message MpSolverBridgeResponse {
     bool solution_verified = 7;
     uint64 session_handle = 8;
     MpSolverSessionResult session_result = 9;
-    MpSolverIisResult iis = 10;
     string exported_model = 11;
     MpSolverActivitiesResult activities = 12;
     MpSolverLoadSolutionResult load_solution = 13;
+    MpSolverCapabilitiesResult capabilities = 14;
+    bytes clamped_solution = 15;
   }
 }
 
 message MpSolverLogEvent { repeated string messages = 1; }
 
-message MpSolverIisRequest {
-  bytes model_proto = 1;
-  int32 solver_type = 2;
-  string solver_specific_parameters = 3;
-  optional double time_limit_seconds = 4;
-  optional int64 node_limit = 5;
-  bool interruptible = 6;
+
+// These mirror existing GLOP basis input and MPSolver callback contracts.
+message MpSolverStartingBasis {
+  repeated int32 variable_statuses = 1;
+  repeated int32 constraint_statuses = 2;
 }
-message MpSolverIisVariableBounds {
-  int32 variable_index = 1;
-  bool lower_bound_included = 2;
-  bool upper_bound_included = 3;
+message MpSolverCallbackRegistration {
+  bool might_add_cuts = 1;
+  bool might_add_lazy_constraints = 2;
+  bool filter_variables = 3;
+  repeated int32 variable_indices = 4;
 }
-message MpSolverIisResult {
-  bool is_infeasible = 1;
-  bool is_irreducible = 2;
-  double time_seconds = 3;
-  int64 nodes = 4;
-  repeated int32 constraint_indices = 5;
-  repeated MpSolverIisVariableBounds variable_bounds = 6;
+message MpSolverCallbackData {
+  enum Event { MIP_SOLUTION = 0; MIP_NODE = 1; }
+  Event event = 1;
+  bool can_query_variable_values = 2;
+  map<int32, double> variable_values = 3;
+  int64 num_explored_nodes = 4;
+}
+message MpSolverCallbackConstraint {
+  double lower_bound = 1;
+  double upper_bound = 2;
+  repeated int32 variable_indices = 3;
+  repeated double coefficients = 4;
+}
+message MpSolverCallbackResult {
+  repeated MpSolverCallbackConstraint cuts = 1;
+  repeated MpSolverCallbackConstraint lazy_constraints = 2;
 }

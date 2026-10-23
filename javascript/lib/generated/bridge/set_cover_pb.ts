@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file set_cover.proto.
  */
 export const file_set_cover: GenFile = /*@__PURE__*/
-  fileDesc("Cg9zZXRfY292ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi1gEKHFNldENvdmVyR3VpZGVkVGFidVBhcmFtZXRlcnMSHgoRbGFncmFuZ2lhbl9mYWN0b3IYASABKAFIAIgBARIUCgdlcHNpbG9uGAIgASgBSAGIAQESGwoOcGVuYWx0eV9mYWN0b3IYAyABKAFIAogBARIbCg50YWJ1X2xpc3Rfc2l6ZRgEIAEoBUgDiAEBQhQKEl9sYWdyYW5naWFuX2ZhY3RvckIKCghfZXBzaWxvbkIRCg9fcGVuYWx0eV9mYWN0b3JCEQoPX3RhYnVfbGlzdF9zaXplIswEChVTZXRDb3ZlckJyaWRnZVJlcXVlc3QSPAoJb3BlcmF0aW9uGAEgASgOMikub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3Zlck9wZXJhdGlvbhINCgVjb3N0cxgCIAMoARIOCgZzdGFydHMYAyADKAUSEAoIZWxlbWVudHMYBCADKAUSEAoIc2VsZWN0ZWQYBSADKAgSDQoFZm9jdXMYBiADKAgSEQoJaGFzX2ZvY3VzGAcgASgIEhYKDm1heF9pdGVyYXRpb25zGAggASgBEh8KEnRpbWVfbGltaXRfc2Vjb25kcxgJIAEoAUgAiAEBEhUKDWZvY3VzX2luZGljZXMYCyADKAUSFwoPc3RhdGlzdGljc19raW5kGAwgASgFElQKFmd1aWRlZF90YWJ1X3BhcmFtZXRlcnMYDSABKAsyNC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyR3VpZGVkVGFidVBhcmFtZXRlcnMSFgoOc2Vzc2lvbl9oYW5kbGUYDiABKAQSRAoRc2Vzc2lvbl9hbGdvcml0aG0YDyABKA4yKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyT3BlcmF0aW9uEjQKBXRyYWNlGBAgASgLMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3ZlclRyYWNlEhMKC251bV9zdWJzZXRzGBEgASgFQhUKE190aW1lX2xpbWl0X3NlY29uZHNKBAgKEAtSC2NvbnNpc3RlbmN5IjkKFVNldENvdmVyVHJhY2VEZWNpc2lvbhIOCgZzdWJzZXQYASABKAUSEAoIc2VsZWN0ZWQYAiABKAgiUQoNU2V0Q292ZXJUcmFjZRJACglkZWNpc2lvbnMYASADKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyVHJhY2VEZWNpc2lvbiJpChJTZXRDb3ZlclN0YXRpc3RpY3MSCwoDbWluGAEgASgBEgsKA21heBgCIAEoARIOCgZtZWRpYW4YAyABKAESDAoEbWVhbhgEIAEoARIOCgZzdGRkZXYYBSABKAESCwoDaXFyGAYgASgBIqwEChZTZXRDb3ZlckJyaWRnZVJlc3BvbnNlEhUKDW5leHRfc29sdXRpb24YASABKAgSDAoEY29zdBgCIAEoARIeChZudW1fdW5jb3ZlcmVkX2VsZW1lbnRzGAMgASgFEhAKCHNlbGVjdGVkGAQgAygIEhAKCGNvdmVyYWdlGAUgAygFEhkKEW51bV9mcmVlX2VsZW1lbnRzGAYgAygFEiIKGm51bV9jb3ZlcmFnZV9sZV8xX2VsZW1lbnRzGAcgAygFEhQKDGlzX3JlZHVuZGFudBgIIAMoCBIbChNjb21wdXRlZF9yZWR1bmRhbmN5GAogAygIEhgKEGNvc3RfbG93ZXJfYm91bmQYCyABKAESFgoOZm9jdXNfY292ZXJhZ2UYDCADKAUSPgoKc3RhdGlzdGljcxgNIAEoCzIqLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU2V0Q292ZXJTdGF0aXN0aWNzEg8KB2RlY2lsZXMYDiADKAMSVAoWZ3VpZGVkX3RhYnVfcGFyYW1ldGVycxgPIAEoCzI0Lm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU2V0Q292ZXJHdWlkZWRUYWJ1UGFyYW1ldGVycxIWCg5zZXNzaW9uX2hhbmRsZRgQIAEoBBI0CgV0cmFjZRgRIAEoCzIlLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU2V0Q292ZXJUcmFjZUoECAkQClIKY29uc2lzdGVudCqaBQoRU2V0Q292ZXJPcGVyYXRpb24SIwofU0VUX0NPVkVSX09QRVJBVElPTl9VTlNQRUNJRklFRBAAEh8KG1NFVF9DT1ZFUl9PUEVSQVRJT05fVFJJVklBTBABEh4KGlNFVF9DT1ZFUl9PUEVSQVRJT05fR1JFRURZEAISJgoiU0VUX0NPVkVSX09QRVJBVElPTl9FTEVNRU5UX0RFR1JFRRADEisKJ1NFVF9DT1ZFUl9PUEVSQVRJT05fTEFaWV9FTEVNRU5UX0RFR1JFRRAEEh4KGlNFVF9DT1ZFUl9PUEVSQVRJT05fUkFORE9NEAUSIAocU0VUX0NPVkVSX09QRVJBVElPTl9TVEVFUEVTVBAGEiQKIFNFVF9DT1ZFUl9PUEVSQVRJT05fR1VJREVEX0xPQ0FMEAcSIwofU0VUX0NPVkVSX09QRVJBVElPTl9HVUlERURfVEFCVRAIEh8KG1NFVF9DT1ZFUl9PUEVSQVRJT05fSU5TUEVDVBAJEiIKHlNFVF9DT1ZFUl9PUEVSQVRJT05fU1RBVElTVElDUxAKEi4KKlNFVF9DT1ZFUl9PUEVSQVRJT05fR1VJREVEX1RBQlVfUEFSQU1FVEVSUxALEiYKIlNFVF9DT1ZFUl9PUEVSQVRJT05fU0VTU0lPTl9DUkVBVEUQDBIkCiBTRVRfQ09WRVJfT1BFUkFUSU9OX1NFU1NJT05fTkVYVBANEioKJlNFVF9DT1ZFUl9PUEVSQVRJT05fU0VTU0lPTl9JTklUSUFMSVpFEA4SJgoiU0VUX0NPVkVSX09QRVJBVElPTl9TRVNTSU9OX0RFTEVURRAPEiYKIlNFVF9DT1ZFUl9PUEVSQVRJT05fQ09NUFJFU1NfVFJBQ0UQEGIGcHJvdG8z");
+  fileDesc("Cg9zZXRfY292ZXIucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi1gEKHFNldENvdmVyR3VpZGVkVGFidVBhcmFtZXRlcnMSHgoRbGFncmFuZ2lhbl9mYWN0b3IYASABKAFIAIgBARIUCgdlcHNpbG9uGAIgASgBSAGIAQESGwoOcGVuYWx0eV9mYWN0b3IYAyABKAFIAogBARIbCg50YWJ1X2xpc3Rfc2l6ZRgEIAEoBUgDiAEBQhQKEl9sYWdyYW5naWFuX2ZhY3RvckIKCghfZXBzaWxvbkIRCg9fcGVuYWx0eV9mYWN0b3JCEQoPX3RhYnVfbGlzdF9zaXplIuIFChVTZXRDb3ZlckJyaWRnZVJlcXVlc3QSPAoJb3BlcmF0aW9uGAEgASgOMikub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3Zlck9wZXJhdGlvbhINCgVjb3N0cxgCIAMoARIOCgZzdGFydHMYAyADKAUSEAoIZWxlbWVudHMYBCADKAUSEAoIc2VsZWN0ZWQYBSADKAgSDQoFZm9jdXMYBiADKAgSEQoJaGFzX2ZvY3VzGAcgASgIEhYKDm1heF9pdGVyYXRpb25zGAggASgBEh8KEnRpbWVfbGltaXRfc2Vjb25kcxgJIAEoAUgAiAEBEhUKDWZvY3VzX2luZGljZXMYCyADKAUSFwoPc3RhdGlzdGljc19raW5kGAwgASgFElQKFmd1aWRlZF90YWJ1X3BhcmFtZXRlcnMYDSABKAsyNC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyR3VpZGVkVGFidVBhcmFtZXRlcnMSFgoOc2Vzc2lvbl9oYW5kbGUYDiABKAQSRAoRc2Vzc2lvbl9hbGdvcml0aG0YDyABKA4yKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyT3BlcmF0aW9uEjQKBXRyYWNlGBAgASgLMiUub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3ZlclRyYWNlEhMKC251bV9zdWJzZXRzGBEgASgFEhoKEnBlcnR1cmJhdGlvbl9jb3VudBgSIAEoBRIUCgxzdWJzZXRfaW5kZXgYEyABKAUSFwoPc3Vic2V0X3NlbGVjdGVkGBQgASgIEg0KBWlucHV0GBUgASgMEg4KBmZvcm1hdBgWIAEoBRITCgt1cHBlcl9ib3VuZBgXIAEoARIVCg1scF9yZWxheGF0aW9uGBggASgIQhUKE190aW1lX2xpbWl0X3NlY29uZHNKBAgKEAtSC2NvbnNpc3RlbmN5Im0KFFNldENvdmVyUmVtb3ZhYmlsaXR5Eg8KB2NoYW5nZWQYASABKAgSHwoXbmV3bHlfcmVtb3ZhYmxlX3N1YnNldHMYAiADKAUSIwobbmV3bHlfbm9uX3JlbW92YWJsZV9zdWJzZXRzGAMgAygFIjkKFVNldENvdmVyVHJhY2VEZWNpc2lvbhIOCgZzdWJzZXQYASABKAUSEAoIc2VsZWN0ZWQYAiABKAgiUQoNU2V0Q292ZXJUcmFjZRJACglkZWNpc2lvbnMYASADKAsyLS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyVHJhY2VEZWNpc2lvbiJpChJTZXRDb3ZlclN0YXRpc3RpY3MSCwoDbWluGAEgASgBEgsKA21heBgCIAEoARIOCgZtZWRpYW4YAyABKAESDAoEbWVhbhgEIAEoARIOCgZzdGRkZXYYBSABKAESCwoDaXFyGAYgASgBIloKF1NldENvdmVyTGFncmFuZ2lhbkJvdW5kEhMKC2xvd2VyX2JvdW5kGAEgASgBEhUKDXJlZHVjZWRfY29zdHMYAiADKAESEwoLbXVsdGlwbGllcnMYAyADKAEiYAoRU2V0Q292ZXJNaXBSZXN1bHQSGQoRc3VicHJvYmxlbV9zdGF0dXMYASABKAUSHAoPb2JqZWN0aXZlX3ZhbHVlGAIgASgBSACIAQFCEgoQX29iamVjdGl2ZV92YWx1ZSKUCAoWU2V0Q292ZXJCcmlkZ2VSZXNwb25zZRJBCghjZnRfZHVhbBgaIAEoCzIvLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuU2V0Q292ZXJMYWdyYW5naWFuQm91bmQSNgoDbWlwGBkgASgLMikub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3Zlck1pcFJlc3VsdBJJChBsYWdyYW5naWFuX2JvdW5kGBggASgLMi8ub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3ZlckxhZ3JhbmdpYW5Cb3VuZBIVCg1uZXh0X3NvbHV0aW9uGAEgASgIEgwKBGNvc3QYAiABKAESHgoWbnVtX3VuY292ZXJlZF9lbGVtZW50cxgDIAEoBRIQCghzZWxlY3RlZBgEIAMoCBIQCghjb3ZlcmFnZRgFIAMoBRIZChFudW1fZnJlZV9lbGVtZW50cxgGIAMoBRIiChpudW1fY292ZXJhZ2VfbGVfMV9lbGVtZW50cxgHIAMoBRIUCgxpc19yZWR1bmRhbnQYCCADKAgSGwoTY29tcHV0ZWRfcmVkdW5kYW5jeRgKIAMoCBIYChBjb3N0X2xvd2VyX2JvdW5kGAsgASgBEhYKDmZvY3VzX2NvdmVyYWdlGAwgAygFEj4KCnN0YXRpc3RpY3MYDSABKAsyKi5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyU3RhdGlzdGljcxIPCgdkZWNpbGVzGA4gAygDElQKFmd1aWRlZF90YWJ1X3BhcmFtZXRlcnMYDyABKAsyNC5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyR3VpZGVkVGFidVBhcmFtZXRlcnMSFgoOc2Vzc2lvbl9oYW5kbGUYECABKAQSNAoFdHJhY2UYESABKAsyJS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLlNldENvdmVyVHJhY2USQgoMcmVtb3ZhYmlsaXR5GBIgASgLMiwub3J0b29sc193YXNtLmJyaWRnZS52MS5TZXRDb3ZlclJlbW92YWJpbGl0eRIaChJwZXJ0dXJiYXRpb25fZm9jdXMYEyADKAUSHQoQbW9kZWxfcHJvdG9fanNvbhgUIAEoCUgAiAEBEhEKBHRleHQYFSABKAlIAYgBARIdChBydW5fdGltZV9zZWNvbmRzGBYgASgBSAKIAQESIgoVcnVuX3RpbWVfbWljcm9zZWNvbmRzGBcgASgBSAOIAQFCEwoRX21vZGVsX3Byb3RvX2pzb25CBwoFX3RleHRCEwoRX3J1bl90aW1lX3NlY29uZHNCGAoWX3J1bl90aW1lX21pY3Jvc2Vjb25kc0oECAkQClIKY29uc2lzdGVudCqnCAoRU2V0Q292ZXJPcGVyYXRpb24SIwofU0VUX0NPVkVSX09QRVJBVElPTl9VTlNQRUNJRklFRBAAEh8KG1NFVF9DT1ZFUl9PUEVSQVRJT05fVFJJVklBTBABEh4KGlNFVF9DT1ZFUl9PUEVSQVRJT05fR1JFRURZEAISJgoiU0VUX0NPVkVSX09QRVJBVElPTl9FTEVNRU5UX0RFR1JFRRADEisKJ1NFVF9DT1ZFUl9PUEVSQVRJT05fTEFaWV9FTEVNRU5UX0RFR1JFRRAEEh4KGlNFVF9DT1ZFUl9PUEVSQVRJT05fUkFORE9NEAUSIAocU0VUX0NPVkVSX09QRVJBVElPTl9TVEVFUEVTVBAGEiQKIFNFVF9DT1ZFUl9PUEVSQVRJT05fR1VJREVEX0xPQ0FMEAcSIwofU0VUX0NPVkVSX09QRVJBVElPTl9HVUlERURfVEFCVRAIEh8KG1NFVF9DT1ZFUl9PUEVSQVRJT05fSU5TUEVDVBAJEiIKHlNFVF9DT1ZFUl9PUEVSQVRJT05fU1RBVElTVElDUxAKEi4KKlNFVF9DT1ZFUl9PUEVSQVRJT05fR1VJREVEX1RBQlVfUEFSQU1FVEVSUxALEiYKIlNFVF9DT1ZFUl9PUEVSQVRJT05fU0VTU0lPTl9DUkVBVEUQDBIkCiBTRVRfQ09WRVJfT1BFUkFUSU9OX1NFU1NJT05fTkVYVBANEioKJlNFVF9DT1ZFUl9PUEVSQVRJT05fU0VTU0lPTl9JTklUSUFMSVpFEA4SJgoiU0VUX0NPVkVSX09QRVJBVElPTl9TRVNTSU9OX0RFTEVURRAPEiYKIlNFVF9DT1ZFUl9PUEVSQVRJT05fQ09NUFJFU1NfVFJBQ0UQEBIsCihTRVRfQ09WRVJfT1BFUkFUSU9OX0NMRUFSX1JBTkRPTV9TVUJTRVRTEBESMwovU0VUX0NPVkVSX09QRVJBVElPTl9DTEVBUl9NT1NUX0NPVkVSRURfRUxFTUVOVFMQEhIoCiRTRVRfQ09WRVJfT1BFUkFUSU9OX1VQREFURV9TRUxFQ1RJT04QExIlCiFTRVRfQ09WRVJfT1BFUkFUSU9OX0xBWllfU1RFRVBFU1QQFBIiCh5TRVRfQ09WRVJfT1BFUkFUSU9OX1JFQURfTU9ERUwQFRIjCh9TRVRfQ09WRVJfT1BFUkFUSU9OX1dSSVRFX01PREVMEBYSKgomU0VUX0NPVkVSX09QRVJBVElPTl9TRVNTSU9OX1NUQVRJU1RJQ1MQFxIoCiRTRVRfQ09WRVJfT1BFUkFUSU9OX0xBR1JBTkdJQU5fQk9VTkQQGBIbChdTRVRfQ09WRVJfT1BFUkFUSU9OX01JUBAZEhsKF1NFVF9DT1ZFUl9PUEVSQVRJT05fQ0ZUEBpiBnByb3RvMw");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverGuidedTabuParameters
@@ -156,6 +156,43 @@ export type SetCoverBridgeRequest = Message<"ortools_wasm.bridge.v1.SetCoverBrid
    * @generated from field: int32 num_subsets = 17;
    */
   numSubsets: number;
+
+  /**
+   * @generated from field: int32 perturbation_count = 18;
+   */
+  perturbationCount: number;
+
+  /**
+   * @generated from field: int32 subset_index = 19;
+   */
+  subsetIndex: number;
+
+  /**
+   * @generated from field: bool subset_selected = 20;
+   */
+  subsetSelected: boolean;
+
+  /**
+   * @generated from field: bytes input = 21;
+   */
+  input: Uint8Array;
+
+  /**
+   * 0: OR-Library SCP, 1: OR-Library rail, 2: FIMI (reader only).
+   *
+   * @generated from field: int32 format = 22;
+   */
+  format: number;
+
+  /**
+   * @generated from field: double upper_bound = 23;
+   */
+  upperBound: number;
+
+  /**
+   * @generated from field: bool lp_relaxation = 24;
+   */
+  lpRelaxation: boolean;
 };
 
 /**
@@ -243,6 +280,43 @@ export type SetCoverBridgeRequestJson = {
    * @generated from field: int32 num_subsets = 17;
    */
   numSubsets?: number;
+
+  /**
+   * @generated from field: int32 perturbation_count = 18;
+   */
+  perturbationCount?: number;
+
+  /**
+   * @generated from field: int32 subset_index = 19;
+   */
+  subsetIndex?: number;
+
+  /**
+   * @generated from field: bool subset_selected = 20;
+   */
+  subsetSelected?: boolean;
+
+  /**
+   * @generated from field: bytes input = 21;
+   */
+  input?: string;
+
+  /**
+   * 0: OR-Library SCP, 1: OR-Library rail, 2: FIMI (reader only).
+   *
+   * @generated from field: int32 format = 22;
+   */
+  format?: number;
+
+  /**
+   * @generated from field: double upper_bound = 23;
+   */
+  upperBound?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: bool lp_relaxation = 24;
+   */
+  lpRelaxation?: boolean;
 };
 
 export type SetCoverBridgeRequestValid = SetCoverBridgeRequest;
@@ -253,6 +327,55 @@ export type SetCoverBridgeRequestValid = SetCoverBridgeRequest;
  */
 export const SetCoverBridgeRequestSchema: GenMessage<SetCoverBridgeRequest, {jsonType: SetCoverBridgeRequestJson, validType: SetCoverBridgeRequestValid}> = /*@__PURE__*/
   messageDesc(file_set_cover, 1);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverRemovability
+ */
+export type SetCoverRemovability = Message<"ortools_wasm.bridge.v1.SetCoverRemovability"> & {
+  /**
+   * @generated from field: bool changed = 1;
+   */
+  changed: boolean;
+
+  /**
+   * @generated from field: repeated int32 newly_removable_subsets = 2;
+   */
+  newlyRemovableSubsets: number[];
+
+  /**
+   * @generated from field: repeated int32 newly_non_removable_subsets = 3;
+   */
+  newlyNonRemovableSubsets: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverRemovability
+ */
+export type SetCoverRemovabilityJson = {
+  /**
+   * @generated from field: bool changed = 1;
+   */
+  changed?: boolean;
+
+  /**
+   * @generated from field: repeated int32 newly_removable_subsets = 2;
+   */
+  newlyRemovableSubsets?: number[];
+
+  /**
+   * @generated from field: repeated int32 newly_non_removable_subsets = 3;
+   */
+  newlyNonRemovableSubsets?: number[];
+};
+
+export type SetCoverRemovabilityValid = SetCoverRemovability;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SetCoverRemovability.
+ * Use `create(SetCoverRemovabilitySchema)` to create a new message.
+ */
+export const SetCoverRemovabilitySchema: GenMessage<SetCoverRemovability, {jsonType: SetCoverRemovabilityJson, validType: SetCoverRemovabilityValid}> = /*@__PURE__*/
+  messageDesc(file_set_cover, 2);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverTraceDecision
@@ -291,7 +414,7 @@ export type SetCoverTraceDecisionValid = SetCoverTraceDecision;
  * Use `create(SetCoverTraceDecisionSchema)` to create a new message.
  */
 export const SetCoverTraceDecisionSchema: GenMessage<SetCoverTraceDecision, {jsonType: SetCoverTraceDecisionJson, validType: SetCoverTraceDecisionValid}> = /*@__PURE__*/
-  messageDesc(file_set_cover, 2);
+  messageDesc(file_set_cover, 3);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverTrace
@@ -320,7 +443,7 @@ export type SetCoverTraceValid = SetCoverTrace;
  * Use `create(SetCoverTraceSchema)` to create a new message.
  */
 export const SetCoverTraceSchema: GenMessage<SetCoverTrace, {jsonType: SetCoverTraceJson, validType: SetCoverTraceValid}> = /*@__PURE__*/
-  messageDesc(file_set_cover, 3);
+  messageDesc(file_set_cover, 4);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverStatistics
@@ -399,12 +522,115 @@ export type SetCoverStatisticsValid = SetCoverStatistics;
  * Use `create(SetCoverStatisticsSchema)` to create a new message.
  */
 export const SetCoverStatisticsSchema: GenMessage<SetCoverStatistics, {jsonType: SetCoverStatisticsJson, validType: SetCoverStatisticsValid}> = /*@__PURE__*/
-  messageDesc(file_set_cover, 4);
+  messageDesc(file_set_cover, 5);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverLagrangianBound
+ */
+export type SetCoverLagrangianBound = Message<"ortools_wasm.bridge.v1.SetCoverLagrangianBound"> & {
+  /**
+   * @generated from field: double lower_bound = 1;
+   */
+  lowerBound: number;
+
+  /**
+   * @generated from field: repeated double reduced_costs = 2;
+   */
+  reducedCosts: number[];
+
+  /**
+   * @generated from field: repeated double multipliers = 3;
+   */
+  multipliers: number[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverLagrangianBound
+ */
+export type SetCoverLagrangianBoundJson = {
+  /**
+   * @generated from field: double lower_bound = 1;
+   */
+  lowerBound?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: repeated double reduced_costs = 2;
+   */
+  reducedCosts?: (number | "NaN" | "Infinity" | "-Infinity")[];
+
+  /**
+   * @generated from field: repeated double multipliers = 3;
+   */
+  multipliers?: (number | "NaN" | "Infinity" | "-Infinity")[];
+};
+
+export type SetCoverLagrangianBoundValid = SetCoverLagrangianBound;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SetCoverLagrangianBound.
+ * Use `create(SetCoverLagrangianBoundSchema)` to create a new message.
+ */
+export const SetCoverLagrangianBoundSchema: GenMessage<SetCoverLagrangianBound, {jsonType: SetCoverLagrangianBoundJson, validType: SetCoverLagrangianBoundValid}> = /*@__PURE__*/
+  messageDesc(file_set_cover, 6);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverMipResult
+ */
+export type SetCoverMipResult = Message<"ortools_wasm.bridge.v1.SetCoverMipResult"> & {
+  /**
+   * @generated from field: int32 subproblem_status = 1;
+   */
+  subproblemStatus: number;
+
+  /**
+   * @generated from field: optional double objective_value = 2;
+   */
+  objectiveValue?: number | undefined;
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.SetCoverMipResult
+ */
+export type SetCoverMipResultJson = {
+  /**
+   * @generated from field: int32 subproblem_status = 1;
+   */
+  subproblemStatus?: number;
+
+  /**
+   * @generated from field: optional double objective_value = 2;
+   */
+  objectiveValue?: number | "NaN" | "Infinity" | "-Infinity";
+};
+
+export type SetCoverMipResultValid = SetCoverMipResult;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.SetCoverMipResult.
+ * Use `create(SetCoverMipResultSchema)` to create a new message.
+ */
+export const SetCoverMipResultSchema: GenMessage<SetCoverMipResult, {jsonType: SetCoverMipResultJson, validType: SetCoverMipResultValid}> = /*@__PURE__*/
+  messageDesc(file_set_cover, 7);
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverBridgeResponse
  */
 export type SetCoverBridgeResponse = Message<"ortools_wasm.bridge.v1.SetCoverBridgeResponse"> & {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverLagrangianBound cft_dual = 26;
+   */
+  cftDual?: SetCoverLagrangianBound | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverMipResult mip = 25;
+   */
+  mip?: SetCoverMipResult | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverLagrangianBound lagrangian_bound = 24;
+   */
+  lagrangianBound?: SetCoverLagrangianBound | undefined;
+
   /**
    * @generated from field: bool next_solution = 1;
    */
@@ -484,12 +710,57 @@ export type SetCoverBridgeResponse = Message<"ortools_wasm.bridge.v1.SetCoverBri
    * @generated from field: ortools_wasm.bridge.v1.SetCoverTrace trace = 17;
    */
   trace?: SetCoverTrace | undefined;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverRemovability removability = 18;
+   */
+  removability?: SetCoverRemovability | undefined;
+
+  /**
+   * @generated from field: repeated int32 perturbation_focus = 19;
+   */
+  perturbationFocus: number[];
+
+  /**
+   * @generated from field: optional string model_proto_json = 20;
+   */
+  modelProtoJson?: string | undefined;
+
+  /**
+   * @generated from field: optional string text = 21;
+   */
+  text?: string | undefined;
+
+  /**
+   * @generated from field: optional double run_time_seconds = 22;
+   */
+  runTimeSeconds?: number | undefined;
+
+  /**
+   * @generated from field: optional double run_time_microseconds = 23;
+   */
+  runTimeMicroseconds?: number | undefined;
 };
 
 /**
  * @generated from message ortools_wasm.bridge.v1.SetCoverBridgeResponse
  */
 export type SetCoverBridgeResponseJson = {
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverLagrangianBound cft_dual = 26;
+   */
+  cftDual?: SetCoverLagrangianBoundJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverMipResult mip = 25;
+   */
+  mip?: SetCoverMipResultJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverLagrangianBound lagrangian_bound = 24;
+   */
+  lagrangianBound?: SetCoverLagrangianBoundJson;
+
   /**
    * @generated from field: bool next_solution = 1;
    */
@@ -569,6 +840,36 @@ export type SetCoverBridgeResponseJson = {
    * @generated from field: ortools_wasm.bridge.v1.SetCoverTrace trace = 17;
    */
   trace?: SetCoverTraceJson;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.SetCoverRemovability removability = 18;
+   */
+  removability?: SetCoverRemovabilityJson;
+
+  /**
+   * @generated from field: repeated int32 perturbation_focus = 19;
+   */
+  perturbationFocus?: number[];
+
+  /**
+   * @generated from field: optional string model_proto_json = 20;
+   */
+  modelProtoJson?: string;
+
+  /**
+   * @generated from field: optional string text = 21;
+   */
+  text?: string;
+
+  /**
+   * @generated from field: optional double run_time_seconds = 22;
+   */
+  runTimeSeconds?: number | "NaN" | "Infinity" | "-Infinity";
+
+  /**
+   * @generated from field: optional double run_time_microseconds = 23;
+   */
+  runTimeMicroseconds?: number | "NaN" | "Infinity" | "-Infinity";
 };
 
 export type SetCoverBridgeResponseValid = SetCoverBridgeResponse;
@@ -578,7 +879,7 @@ export type SetCoverBridgeResponseValid = SetCoverBridgeResponse;
  * Use `create(SetCoverBridgeResponseSchema)` to create a new message.
  */
 export const SetCoverBridgeResponseSchema: GenMessage<SetCoverBridgeResponse, {jsonType: SetCoverBridgeResponseJson, validType: SetCoverBridgeResponseValid}> = /*@__PURE__*/
-  messageDesc(file_set_cover, 5);
+  messageDesc(file_set_cover, 8);
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SetCoverOperation
@@ -668,12 +969,62 @@ export enum SetCoverOperation {
    * @generated from enum value: SET_COVER_OPERATION_COMPRESS_TRACE = 16;
    */
   COMPRESS_TRACE = 16,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_CLEAR_RANDOM_SUBSETS = 17;
+   */
+  CLEAR_RANDOM_SUBSETS = 17,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_CLEAR_MOST_COVERED_ELEMENTS = 18;
+   */
+  CLEAR_MOST_COVERED_ELEMENTS = 18,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_UPDATE_SELECTION = 19;
+   */
+  UPDATE_SELECTION = 19,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_LAZY_STEEPEST = 20;
+   */
+  LAZY_STEEPEST = 20,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_READ_MODEL = 21;
+   */
+  READ_MODEL = 21,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_WRITE_MODEL = 22;
+   */
+  WRITE_MODEL = 22,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_SESSION_STATISTICS = 23;
+   */
+  SESSION_STATISTICS = 23,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_LAGRANGIAN_BOUND = 24;
+   */
+  LAGRANGIAN_BOUND = 24,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_MIP = 25;
+   */
+  MIP = 25,
+
+  /**
+   * @generated from enum value: SET_COVER_OPERATION_CFT = 26;
+   */
+  CFT = 26,
 }
 
 /**
  * @generated from enum ortools_wasm.bridge.v1.SetCoverOperation
  */
-export type SetCoverOperationJson = "SET_COVER_OPERATION_UNSPECIFIED" | "SET_COVER_OPERATION_TRIVIAL" | "SET_COVER_OPERATION_GREEDY" | "SET_COVER_OPERATION_ELEMENT_DEGREE" | "SET_COVER_OPERATION_LAZY_ELEMENT_DEGREE" | "SET_COVER_OPERATION_RANDOM" | "SET_COVER_OPERATION_STEEPEST" | "SET_COVER_OPERATION_GUIDED_LOCAL" | "SET_COVER_OPERATION_GUIDED_TABU" | "SET_COVER_OPERATION_INSPECT" | "SET_COVER_OPERATION_STATISTICS" | "SET_COVER_OPERATION_GUIDED_TABU_PARAMETERS" | "SET_COVER_OPERATION_SESSION_CREATE" | "SET_COVER_OPERATION_SESSION_NEXT" | "SET_COVER_OPERATION_SESSION_INITIALIZE" | "SET_COVER_OPERATION_SESSION_DELETE" | "SET_COVER_OPERATION_COMPRESS_TRACE";
+export type SetCoverOperationJson = "SET_COVER_OPERATION_UNSPECIFIED" | "SET_COVER_OPERATION_TRIVIAL" | "SET_COVER_OPERATION_GREEDY" | "SET_COVER_OPERATION_ELEMENT_DEGREE" | "SET_COVER_OPERATION_LAZY_ELEMENT_DEGREE" | "SET_COVER_OPERATION_RANDOM" | "SET_COVER_OPERATION_STEEPEST" | "SET_COVER_OPERATION_GUIDED_LOCAL" | "SET_COVER_OPERATION_GUIDED_TABU" | "SET_COVER_OPERATION_INSPECT" | "SET_COVER_OPERATION_STATISTICS" | "SET_COVER_OPERATION_GUIDED_TABU_PARAMETERS" | "SET_COVER_OPERATION_SESSION_CREATE" | "SET_COVER_OPERATION_SESSION_NEXT" | "SET_COVER_OPERATION_SESSION_INITIALIZE" | "SET_COVER_OPERATION_SESSION_DELETE" | "SET_COVER_OPERATION_COMPRESS_TRACE" | "SET_COVER_OPERATION_CLEAR_RANDOM_SUBSETS" | "SET_COVER_OPERATION_CLEAR_MOST_COVERED_ELEMENTS" | "SET_COVER_OPERATION_UPDATE_SELECTION" | "SET_COVER_OPERATION_LAZY_STEEPEST" | "SET_COVER_OPERATION_READ_MODEL" | "SET_COVER_OPERATION_WRITE_MODEL" | "SET_COVER_OPERATION_SESSION_STATISTICS" | "SET_COVER_OPERATION_LAGRANGIAN_BOUND" | "SET_COVER_OPERATION_MIP" | "SET_COVER_OPERATION_CFT";
 
 /**
  * Describes the enum ortools_wasm.bridge.v1.SetCoverOperation.

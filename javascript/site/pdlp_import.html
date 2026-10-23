@@ -11,7 +11,7 @@
     #status { min-height: 8rem; }
   </style>
 </head>
-<body>
+<body class="example-page">
   <nav>
     <a href="./index.html">← All examples</a>
     <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
@@ -19,38 +19,25 @@
   </nav>
   <h1>PDLP — Import a model</h1>
   <p><em>Problem: import a linear or diagonal quadratic model and solve it with PDLP.</em></p>
-  <div class="code-toggle">
-    <details>
-      <summary>Show code</summary>
-      <pre class="code-block"><code data-highlight="ts">import { Pdlp } from 'or-tools-wasm/pdlp';
 
-const qp = await Pdlp.readQuadraticProgram(mpsText, {
-  format: 'mps', includeNames: true, executor: 'worker',
-});
-const result = await Pdlp.solve(qp, { executor: 'worker', numThreads: 1 });
-console.log(result.solveLog.terminationReason, result.primalSolution);
-// Convert an objective evaluated without offset/scaling to original model units:
-console.log(qp.applyObjectiveScalingAndOffset(-12)); // 17 for this example</code></pre>
-    </details>
-  </div>
   <p>Paste a model or choose a file. Switching formats loads the same sample in the selected text format.
     For binary protobuf models, choose a file.</p>
   <div class="example-explanation">
-    <h2>Model</h2>
-    <ul>
-      <li>The sample maximizes 3x + 5 with 0 ≤ x ≤ 4 and a capacity constraint x ≤ 4.</li>
-      <li>The optimum is x = 4 with objective value 17 in every sample format.</li>
-      <li>PDLP solves continuous variables; enable integer relaxation to import integer models as continuous problems.</li>
-      <li>The result shows variable values, the objective, termination status, and iterations.</li>
-    </ul>
+      <h2>Model</h2>
+      <ul>
+        <li>Paste a model or choose a file, then solve it with PDLP.</li>
+        <li>The sample chooses x = 4 and has an objective value of 17.</li>
+        <li>The result lists variable values and the solver’s stopping status.</li>
+      </ul>
   </div>
   <div class="controls">
     <label>Format <select id="format"><option value="mps">MPS</option><option value="textproto">Model textproto</option><option value="json">Model JSON</option><option value="proto">Model protobuf bytes</option></select></label>
     <label>Model file <input id="model-file" type="file"></label>
     <label><input id="relax-integers" type="checkbox"> Relax integer variables</label>
     <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-    <button id="run" data-idle-label="Import and solve">Import and solve</button>
-  </div>
+
+  <div class="control-actions"><button id="run" data-idle-label="Import and solve">Import and solve</button></div>
+</div>
   <label for="model-text">Model text (editing clears the selected file)</label>
   <textarea id="model-text" spellcheck="false">NAME imported
 OBJSENSE
@@ -66,11 +53,21 @@ BOUNDS
  UP bounds x 4
 ENDATA
 </textarea>
-  <pre id="solution-output">Run the solver to view the solution.</pre>
-  <p>Status / Response:</p>
-  <pre id="status"></pre>
+  <section class="solution-panel">
+      <h2>Solution</h2>
+      <pre id="solution-output">Run the solver to view the solution.</pre>
+    </section>
+  <details class="solve-log" open><summary>Solve log</summary><pre id="status" aria-live="polite"></pre></details>
 
+  <div class="code-toggle code-samples">
+    <details>
+      <summary title="Updates when you change the example settings.">Show code</summary>
+      <pre class="code-block"><code data-highlight="ts"></code></pre>
+    </details>
+  </div>
+    <script type="module" src="./example_controls.ts"></script>
   <script type="module" src="./code_highlight.ts"></script>
   <script type="module" src="./pdlp_import.ts"></script>
+  <script type="module" src="./live_example_code.ts"></script>
 </body>
 </html>

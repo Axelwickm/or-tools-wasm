@@ -14,6 +14,9 @@
 #ifndef ORTOOLS_SET_COVER_SET_COVER_MIP_H_
 #define ORTOOLS_SET_COVER_SET_COVER_MIP_H_
 
+#include <functional>
+#include <utility>
+
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "ortools/linear_solver/linear_solver.h"
@@ -56,6 +59,13 @@ class SetCoverMip : public SubsetListBasedSolutionGenerator {
     return *this;
   }
 
+  // Allows an executor to scope cancellation registration around the native solve.
+  using SolveFunction = std::function<MPSolver::ResultStatus(MPSolver&)>;
+  SetCoverMip& UseSolveFunction(SolveFunction solve) {
+    solve_function_ = std::move(solve);
+    return *this;
+  }
+
   MPSolver::ResultStatus solve_status() const { return solve_status_; }
 
   using SubsetListBasedSolutionGenerator::NextSolution;
@@ -70,6 +80,8 @@ class SetCoverMip : public SubsetListBasedSolutionGenerator {
 
   // Whether to use integer variables in the MIP.
   bool use_integers_;
+
+  SolveFunction solve_function_;
 
   // The status of the last solve.
   MPSolver::ResultStatus solve_status_;

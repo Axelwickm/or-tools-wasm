@@ -1,0 +1,17 @@
+syntax = "proto3";
+package ortools_wasm.bridge.v1;
+
+message MathOptFeasibilityRequest {
+  bytes model_proto = 1;
+  repeated int64 variable_ids = 2;
+  repeated double variable_values = 3;
+  optional double absolute_constraint_tolerance = 4;
+  optional double integrality_tolerance = 5;
+  optional double nonzero_tolerance = 6;
+}
+message MathOptFeasibilityResponse {
+  bytes violated_constraints_proto = 1;
+  bool feasible = 2;
+  repeated string descriptions = 3;
+  string error = 4;
+}

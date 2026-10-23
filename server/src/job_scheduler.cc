@@ -105,7 +105,7 @@ struct JobScheduler::State {
   int max_queue_size = 0;
   bool shutting_down = false;
   std::deque<std::shared_ptr<JobRecord>> queue;
-  std::vector<std::future<void>> workers;
+  std::vector<std::shared_future<void>> workers;
 };
 
 JobResult JobResult::Succeeded(std::string message) {
@@ -252,20 +252,22 @@ SchedulerStats JobScheduler::Stats() const {
 
 void JobScheduler::Shutdown() {
   std::vector<std::shared_ptr<JobRecord>> queued;
-  std::vector<std::future<void>> workers;
+  std::vector<std::shared_future<void>> workers;
   {
     std::lock_guard lock(state_->mutex);
-    if (state_->shutting_down) return;
-    state_->shutting_down = true;
-    queued.assign(state_->queue.begin(), state_->queue.end());
-    state_->queue.clear();
-    for (const auto& record : queued) {
-      record->state = JobState::kCancelled;
-      record->completed_at_ms = NowMs();
-      record->message = "Server scheduler is shutting down.";
-      record->promise.set_value(JobResult::Cancelled(record->message));
+    if (!state_->shutting_down) {
+      state_->shutting_down = true;
+      queued.assign(state_->queue.begin(), state_->queue.end());
+      state_->queue.clear();
+      for (const auto& record : queued) {
+        record->state = JobState::kCancelled;
+        record->completed_at_ms = NowMs();
+        record->message = "Server scheduler is shutting down.";
+        record->promise.set_value(JobResult::Cancelled(record->message));
+      }
     }
-    workers = std::move(state_->workers);
+    // Every shutdown caller waits for the same admitted workers.
+    workers = state_->workers;
   }
 
   for (const auto& record : queued) {
@@ -275,6 +277,8 @@ void JobScheduler::Shutdown() {
   for (auto& worker : workers) {
     if (worker.valid()) worker.wait();
   }
+  std::lock_guard lock(state_->mutex);
+  state_->workers.clear();
 }
 
 bool JobScheduler::IsTerminal(JobState state) {
@@ -344,40 +348,37 @@ bool JobScheduler::CancelRecord(const std::shared_ptr<State>& state,
 }
 
 void JobScheduler::Dispatch(const std::shared_ptr<State>& state) {
-  std::vector<std::shared_ptr<JobRecord>> ready;
-  {
-    std::lock_guard lock(state->mutex);
-    state->workers.erase(
-        std::remove_if(state->workers.begin(), state->workers.end(),
-                       [](std::future<void>& worker) {
-                         return worker.valid() &&
-                                worker.wait_for(std::chrono::seconds(0)) ==
-                                    std::future_status::ready;
-                       }),
-        state->workers.end());
-    while (!state->shutting_down && !state->queue.empty()) {
-      const auto& record = state->queue.front();
-      if (record->allocated_threads > state->available_threads) break;
-      state->available_threads -= record->allocated_threads;
-      ++state->active_jobs;
-      record->state = JobState::kStarting;
-      record->started_at_ms = NowMs();
-      ready.push_back(record);
-      state->queue.pop_front();
-    }
-  }
-
-  for (const auto& record : ready) {
-    EmitStatus(record, StatusForState(state, record));
-    std::lock_guard lock(state->mutex);
-    state->workers.push_back(std::async(std::launch::async, [state, record] {
+  std::lock_guard lock(state->mutex);
+  state->workers.erase(
+      std::remove_if(state->workers.begin(), state->workers.end(),
+                     [](std::shared_future<void>& worker) {
+                       return worker.valid() &&
+                              worker.wait_for(std::chrono::seconds(0)) ==
+                                  std::future_status::ready;
+                     }),
+      state->workers.end());
+  while (!state->shutting_down && !state->queue.empty()) {
+    const auto record = state->queue.front();
+    if (record->allocated_threads > state->available_threads) break;
+    // Reserve before launch: allocating vector storage must not destroy a live
+    // async future while its worker is waiting for this mutex.
+    state->workers.reserve(state->workers.size() + 1);
+    auto worker = std::async(std::launch::async, [state, record] {
       JobScheduler::Run(state, record);
-    }));
+    }).share();
+    state->workers.push_back(std::move(worker));
+    state->available_threads -= record->allocated_threads;
+    ++state->active_jobs;
+    record->state = JobState::kStarting;
+    record->started_at_ms = NowMs();
+    state->queue.pop_front();
   }
 }
 
 void JobScheduler::Run(const std::shared_ptr<State>& state,
                        const std::shared_ptr<JobRecord>& record) {
+  // Registration and admission finish under the mutex before observers run.
+  EmitStatus(record, StatusForState(state, record));
   {
     std::lock_guard lock(state->mutex);
     if (record->state != JobState::kCancelling) record->state = JobState::kRunning;

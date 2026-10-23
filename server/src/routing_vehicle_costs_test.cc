@@ -109,12 +109,56 @@ void RejectsMalformedVehicleSettings() {
     Expect(!Execute(request).ok, "Malformed vehicle settings fail before native indexing, negative costs or int64 factor overflow");
   }
 }
+void AppliesNativePathEnergyCosts() {
+  auto unary = Request(3, 1, 1);
+  auto* load = unary.add_operations()->mutable_add_dimension();
+  load->set_name("load"); load->set_capacity(10); load->set_fix_start_cumul_to_zero(true);
+  auto* matrix=load->mutable_transit_matrix(); matrix->set_dimension(4); matrix->set_routing_indices(true); matrix->set_unary(true);
+  for(int from=0; from<4; ++from) for(int to=0; to<4; ++to) matrix->add_values(from==1 || from==2 ? 1:0);
+  auto* distance=unary.add_operations()->mutable_add_constant_dimension();
+  distance->set_name("distance"); distance->set_value(2); distance->set_capacity(100); distance->set_fix_start_cumul_to_zero(true);
+  auto* unary_cost=unary.add_operations()->mutable_set_path_energy_costs();
+  unary_cost->set_force("load"); unary_cost->set_distance("distance"); unary_cost->set_cost_above(3);
+  Expect(Response(unary).objective_value()==21, "Native search uses preserved unary callback arity without a forced route");
+  auto invalid_unary=unary;
+  invalid_unary.mutable_operations(0)->mutable_add_dimension()->mutable_transit_matrix()->set_values(1,5);
+  Expect(!Execute(invalid_unary).ok, "Unary matrices reject destination-dependent rows");
+  auto binary_force=unary;
+  binary_force.mutable_operations(0)->mutable_add_dimension()->mutable_transit_matrix()->set_unary(false);
+  Expect(!Execute(binary_force).ok, "Energy force dimensions require native unary evaluators");
+  auto request = Request(3, 1, 1);
+  for (const auto& [name, value] : std::vector<std::pair<std::string, int>>{{"force",1},{"distance",2}}) {
+    auto* dimension = request.add_operations()->mutable_add_constant_dimension();
+    dimension->set_name(name); dimension->set_value(value); dimension->set_capacity(100); dimension->set_fix_start_cumul_to_zero(true);
+  }
+  Next(request,0,1); Next(request,1,2); Next(request,2,3);
+  auto* energy = request.add_operations()->mutable_set_path_energy_costs();
+  energy->set_force("force"); energy->set_distance("distance"); energy->set_cost_above(3);
+  Expect(Response(request).objective_value() == 39, "Native energy integrates next-node force with arc distance");
+  energy->set_threshold(2); energy->set_cost_below(2); energy->set_cost_above(5);
+  for (int kind = 0; kind < 3; ++kind) {
+    auto current=request;
+    if(kind) {auto* route=current.mutable_initial_assignment()->add_routes(); route->add_indices(1); route->add_indices(2); current.set_read_assignment_only(kind==2);}
+    Expect(Response(current).objective_value() == 33, "Threshold energy uses native rates in normal, warm and restored routes");
+  }
+  auto* zero = request.add_operations()->mutable_set_path_energy_costs();
+  zero->set_force("force"); zero->set_distance("distance");
+  Expect(Response(request).objective_value() == 33, "Zero energy costs preserve the native no-op behavior");
+  for (int malformed=0; malformed<6; ++malformed) {
+    auto invalid=request; auto* value=invalid.add_operations()->mutable_set_path_energy_costs();
+    value->set_force(malformed==0 ? "missing":"force"); value->set_distance(malformed==1 ? "missing":"distance");
+    value->set_vehicle(malformed==2 ? 1:0); value->set_threshold(malformed==3 ? -1:0);
+    value->set_cost_below(malformed==4 ? -1:0); value->set_cost_above(malformed==5 ? -1:1);
+    Expect(!Execute(invalid).ok, "Invalid energy data rejects before native fatal checks");
+  }
+}
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
     {"AppliesFixedCostsAndActiveLimits", AppliesFixedCostsAndActiveLimits},
     {"AppliesAmortizedFactorsAndExactCosts", AppliesAmortizedFactorsAndExactCosts},
     {"CountsEmptyRouteCostsWithoutActiveSlots", CountsEmptyRouteCostsWithoutActiveSlots},
     {"RejectsMalformedVehicleSettings", RejectsMalformedVehicleSettings},
+    {"AppliesNativePathEnergyCosts", AppliesNativePathEnergyCosts},
   };
   for (const auto& [name, test] : tests) {
     try { test(); std::cout << "[PASS] " << name << '\n'; }

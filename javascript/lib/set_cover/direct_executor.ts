@@ -1,4 +1,4 @@
-import { loadSetCoverRuntime } from '../runtime_loader.js';
+import { loadSetCoverRuntime, loadMPSolverRuntime } from '../runtime_loader.js';
 import { withWasmAllocations, type WasmByteAllocator } from '../wasm_memory.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import {
@@ -33,6 +33,7 @@ const algorithmCode: Record<SetCoverSearchOperation['algorithm'], number> = {
   lazyElementDegree: 3,
   random: 4,
   steepest: 5,
+  lazySteepest: 9,
   guidedLocal: 6,
   guidedTabu: 7,
 };
@@ -70,6 +71,7 @@ export class DirectSetCoverExecutor implements SetCoverExecutor {
 
   constructor(
     private readonly loadModuleImpl: () => Promise<OrToolsWasmModule> = loadSetCoverRuntime,
+    private readonly loadMipModuleImpl: () => Promise<OrToolsWasmModule> = loadMPSolverRuntime,
   ) {}
 
   async load(): Promise<void> { await this.module(); }
@@ -103,7 +105,7 @@ export class DirectSetCoverExecutor implements SetCoverExecutor {
       await options.onEvent(createSolverJobStatusEvent(
         this.solver, requestId, SolverJobState.STARTING, createdAt,
       ));
-      const module = await this.module();
+      const module = await (operation.type === 'mip' ? this.loadMipModuleImpl() : this.module());
       await options.onEvent(createSolverJobStatusEvent(
         this.solver, requestId, SolverJobState.RUNNING, createdAt, BigInt(Date.now()),
       ));
@@ -135,6 +137,44 @@ export class DirectSetCoverExecutor implements SetCoverExecutor {
     operation: SetCoverOperation,
   ): Promise<SetCoverResult> {
     return withWasmAllocations(module, async allocate => {
+      if (operation.type === 'sessionStatistics') return nativeResult(JSON.parse(await module.ccall('set_cover_session_statistics', 'string', ['number', 'number'], sessionArguments(operation.handle), { async: true }) as string));
+      if (operation.type === 'mip') {
+        if (operation.selected.length !== operation.costs.length) throw new Error('Set Cover MIP selection dimensions do not match.');
+        const args = [copyFloat64ToHeap(allocate, operation.costs), copyFloat64ToHeap(allocate, operation.starts),
+          copyFloat64ToHeap(allocate, operation.elements), operation.costs.length, operation.elements.length,
+          copyFloat64ToHeap(allocate, operation.selected.map(Number)), copyFloat64ToHeap(allocate, operation.focusIndices ?? []),
+          operation.focusIndices?.length ?? -1, Number(operation.lpRelaxation), operation.timeLimitSeconds];
+        const result = nativeResult(JSON.parse(await module.ccall('set_cover_mip', 'string', Array(10).fill('number'), args, { async: true }) as string));
+        if (result.mip?.objectiveValue !== undefined) result.mip.objectiveValue = Number(result.mip.objectiveValue);
+        return result;
+      }
+      if (operation.type === 'cft') {
+        const args = [copyFloat64ToHeap(allocate, operation.costs), copyFloat64ToHeap(allocate, operation.starts),
+          copyFloat64ToHeap(allocate, operation.elements), operation.costs.length, operation.elements.length,
+          copyFloat64ToHeap(allocate, operation.selected?.map(Number) ?? []), operation.selected?.length ?? -1];
+        const result = nativeResult(JSON.parse(await module.ccall('set_cover_cft', 'string', Array(7).fill('number'), args, { async: true }) as string));
+        if (result.cftDual) result.cftDual = { lowerBound: Number(result.cftDual.lowerBound),
+          reducedCosts: result.cftDual.reducedCosts.map(Number), multipliers: result.cftDual.multipliers.map(Number) };
+        return result;
+      }
+      if (operation.type === 'lagrangianBound') {
+        const args = [copyFloat64ToHeap(allocate, operation.costs), copyFloat64ToHeap(allocate, operation.starts),
+          copyFloat64ToHeap(allocate, operation.elements), operation.costs.length, operation.elements.length, operation.upperBound];
+        const result = nativeResult(JSON.parse(await module.ccall('set_cover_lagrangian_bound', 'string', Array(6).fill('number'), args, { async: true }) as string));
+        if (result.lagrangianBound) {
+          result.lagrangianBound = { lowerBound: Number(result.lagrangianBound.lowerBound),
+            reducedCosts: result.lagrangianBound.reducedCosts.map(Number), multipliers: result.lagrangianBound.multipliers.map(Number) };
+        }
+        return result;
+      }
+      if (operation.type === 'readModel') {
+        const pointer = allocate(operation.input.length ? operation.input : new Uint8Array(1));
+        return nativeResult(JSON.parse(await module.ccall('set_cover_read_model', 'string', Array(3).fill('number'), [pointer, operation.input.length, operation.format], { async: true }) as string));
+      }
+      if (operation.type === 'writeModel') {
+        const costs = copyFloat64ToHeap(allocate, operation.costs), starts = copyFloat64ToHeap(allocate, operation.starts), elements = copyFloat64ToHeap(allocate, operation.elements);
+        return nativeResult(JSON.parse(await module.ccall('set_cover_write_model', 'string', Array(6).fill('number'), [costs, starts, elements, operation.costs.length, operation.elements.length, operation.format], { async: true }) as string));
+      }
       if (operation.type === 'compressTrace') {
         const values = operation.trace.flatMap(item => [item.subset, Number(item.selected)]);
         const pointer = copyFloat64ToHeap(allocate, values);
@@ -157,6 +197,16 @@ export class DirectSetCoverExecutor implements SetCoverExecutor {
         ...guidedTabuArguments(operation.guidedTabuParameters)];
         return nativeResult(JSON.parse(await module.ccall(operation.type === 'sessionNext' ? 'set_cover_session_next' : 'set_cover_session_initialize',
           'string', Array(args.length).fill('number'), args, { async: true }) as string));
+      }
+      if (operation.type === 'clearRandomSubsets' || operation.type === 'clearMostCoveredElements' || operation.type === 'updateSelection') {
+        const focus = operation.type === 'updateSelection' ? undefined : operation.focusIndices;
+        const args = [copyFloat64ToHeap(allocate, operation.costs), copyFloat64ToHeap(allocate, operation.starts),
+          copyFloat64ToHeap(allocate, operation.elements), operation.costs.length, operation.elements.length,
+          copyFloat64ToHeap(allocate, operation.selected.map(Number)), copyFloat64ToHeap(allocate, focus ?? []), focus?.length ?? -1,
+          operation.type === 'clearRandomSubsets' ? 0 : operation.type === 'clearMostCoveredElements' ? 1 : 2,
+          operation.type === 'updateSelection' ? 0 : operation.numSubsets,
+          operation.type === 'updateSelection' ? operation.subset : 0, operation.type === 'updateSelection' ? Number(operation.select) : 0];
+        return nativeResult(JSON.parse(await module.ccall('set_cover_mutate', 'string', Array(args.length).fill('number'), args, { async: true }) as string));
       }
       if ((operation.type === 'nextSolution' || operation.type === 'sessionCreate') && operation.guidedTabuParameters && operation.algorithm !== 'guidedTabu') {
         throw new Error('Guided tabu parameters require guided tabu search.');

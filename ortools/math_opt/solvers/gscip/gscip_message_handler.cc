@@ -120,14 +120,14 @@ MessageHandlerPtr CaptureMessageHandlerPtr(SCIP_MESSAGEHDLR* const handler) {
 }
 
 absl::StatusOr<MessageHandlerPtr> MakeSCIPMessageHandler(
-    const GScipMessageHandler gscip_message_handler) {
+    const GScipMessageHandler gscip_message_handler, const bool buffered_output) {
   // We use a unique_ptr here to make sure we delete the data if
   // SCIPmessagehdlrCreate() fails.
   auto data = std::make_unique<SCIP_MessagehdlrData>(gscip_message_handler);
   SCIP_MESSAGEHDLR* message_handler = nullptr;
   RETURN_IF_SCIP_ERROR(
       SCIPmessagehdlrCreate(&message_handler,
-                            /*bufferedoutput=*/true,
+                            /*bufferedoutput=*/buffered_output,
                             /*filename=*/nullptr,
                             /*quiet=*/false,
                             /*messagewarning=*/SCIPMessageHandlerWarning,

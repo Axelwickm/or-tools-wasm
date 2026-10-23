@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package ortools_wasm.bridge.v1;
 
+import "mathopt_model_transform.proto";
+
 message MathOptSolveRequest {
   bytes solve_request_proto = 1;
   bool use_interrupter = 2;
@@ -46,6 +48,15 @@ message MathOptConvertResultRequest {
   bytes input_proto = 3;
 }
 
+message MathOptInfeasibleSubsystemRequest {
+  bytes solve_request_proto = 1;
+  bool use_interrupter = 2;
+  bool interrupt_at_start = 3;
+  bool stream_messages = 4;
+  optional uint64 handle = 5;
+  optional bytes model_update_proto = 6;
+}
+
 message MathOptBridgeRequest {
   oneof payload {
     MathOptSolveRequest solve = 1;
@@ -58,6 +69,12 @@ message MathOptBridgeRequest {
     MathOptValidateResultRequest validate_result = 8;
     MathOptIncrementalUpdateRequest incremental_update = 9;
     MathOptConvertResultRequest convert_result = 10;
+    MathOptInfeasibleSubsystemRequest compute_infeasible_subsystem = 11;
+    bytes check_primal_feasibility = 12;
+    bytes improve_solution = 15;
+    bytes expression_bounds = 16;
+    MathOptIndicatorToMipRequest formulate_indicator_constraint_as_mip = 13;
+    MathOptRobustConstraintRequest add_robust_constraint = 14;
   }
 }
 
@@ -69,6 +86,9 @@ message MathOptBridgeResponse {
     string validation_error = 4;
     bytes validated_result_proto = 5;
     bool update_applied = 6;
+    bytes primal_feasibility = 7;
+    bytes improved_values = 8;
+    bytes expression_bounds = 9;
   }
 }
 

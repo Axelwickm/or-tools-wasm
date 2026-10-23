@@ -134,14 +134,52 @@
       }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>MPSolver - network design MIP</h1>
     <p><em>Problem: decide which shipping lanes to open, then route demand through the opened network at minimum fixed plus variable cost.</em></p>
-    <div class="code-toggle">
+
+    <ul class="example-notes">
+      <li>This is a mixed-integer linear program: lane-open decisions are binary, shipment flows are continuous.</li>
+      <li>Opening a lane pays a fixed cost even before any shipment moves on it.</li>
+      <li>Each shipment demand must be conserved through the network from source to destination.</li>
+      <li>A lane can carry flow only if it is opened, and its total flow cannot exceed capacity.</li>
+      <li>Hover a demand or an opened lane after solving to see the related routes.</li>
+    </ul>
+    <div class="controls">
+      <label>Backend
+        <select id="solver-id">
+          <option value="SCIP">SCIP</option>
+          <option value="CBC">CBC</option>
+          <option value="GLPK">GLPK</option>
+        </select>
+      </label>
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+
+    <div class="control-actions"><button id="run" data-idle-label="Solve network design">Solve network design</button><button id="clear-solution" type="button">Clear solution</button></div>
+</div>
+    <div class="network-layout">
+      <svg id="network-map" viewBox="0 0 1040 650" role="img" aria-label="Network design map"></svg>
+      <aside class="panel-stack">
+        <div id="summary" class="summary-grid"></div>
+        <section>
+          <h2>Demands</h2>
+          <div id="demand-list" class="lane-grid"></div>
+        </section>
+        <section>
+          <h2>Opened Lanes</h2>
+          <div id="lane-list" class="lane-grid"></div>
+        </section>
+      </aside>
+    </div>
+    <h2>Solution</h2>
+    <div id="solution-output">Run the solver to choose lanes and route shipments.</div>
+    <details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
@@ -182,44 +220,7 @@ objective.setMinimization();
 await solver.solve({ executor: 'worker' });</code></pre>
       </details>
     </div>
-    <ul class="example-notes">
-      <li>This is a mixed-integer linear program: lane-open decisions are binary, shipment flows are continuous.</li>
-      <li>Opening a lane pays a fixed cost even before any shipment moves on it.</li>
-      <li>Each shipment demand must be conserved through the network from source to destination.</li>
-      <li>A lane can carry flow only if it is opened, and its total flow cannot exceed capacity.</li>
-      <li>Hover a demand or an opened lane after solving to see the related routes.</li>
-    </ul>
-    <div class="controls">
-      <label>Backend
-        <select id="solver-id">
-          <option value="SCIP">SCIP</option>
-          <option value="CBC">CBC</option>
-          <option value="GLPK">GLPK</option>
-        </select>
-      </label>
-      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <button id="run" data-idle-label="Solve network design">Solve network design</button>
-      <button id="clear-solution" type="button">Clear solution</button>
-    </div>
-    <div class="network-layout">
-      <svg id="network-map" viewBox="0 0 1040 650" role="img" aria-label="Network design map"></svg>
-      <aside class="panel-stack">
-        <div id="summary" class="summary-grid"></div>
-        <section>
-          <h2>Demands</h2>
-          <div id="demand-list" class="lane-grid"></div>
-        </section>
-        <section>
-          <h2>Opened Lanes</h2>
-          <div id="lane-list" class="lane-grid"></div>
-        </section>
-      </aside>
-    </div>
-    <h2>Solution</h2>
-    <div id="solution-output">Run the solver to choose lanes and route shipments.</div>
-    <p>Status / Response:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./mpsolver_network_design.ts"></script>
   </body>

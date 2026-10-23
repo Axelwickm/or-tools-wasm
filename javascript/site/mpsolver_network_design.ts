@@ -391,7 +391,9 @@ demandList?.addEventListener('pointerenter', (event) => {
   if (!(target instanceof Element)) return;
   const card = target.closest<HTMLElement>('[data-demand-index]');
   if (!card) return;
-  activeDemand = Number(card.getAttribute('data-demand-index'));
+  const next = Number(card.getAttribute('data-demand-index'));
+  if (activeDemand === next && activeArc === null) return;
+  activeDemand = next;
   activeArc = null;
   renderAll();
 }, true);
@@ -406,7 +408,9 @@ laneList?.addEventListener('pointerenter', (event) => {
   if (!(target instanceof Element)) return;
   const card = target.closest<HTMLElement>('[data-arc-index]');
   if (!card) return;
-  activeArc = Number(card.getAttribute('data-arc-index'));
+  const next = Number(card.getAttribute('data-arc-index'));
+  if (activeArc === next && activeDemand === null) return;
+  activeArc = next;
   activeDemand = null;
   renderAll();
 }, true);

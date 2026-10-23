@@ -262,21 +262,29 @@ function assertMessageField(fields: ProtoField[], field: number) {
   assert(value instanceof Uint8Array && value.length > 0, `expected field ${field} to contain message bytes`);
 }
 
-function packedVarints(fields: ProtoField[], field: number): bigint[] {
-  const value = fieldValue(fields, field).value;
-  assert(value instanceof Uint8Array, `expected field ${field} to be packed varints`);
+function repeatedVarints(fields: ProtoField[], field: number): bigint[] {
+  const entries = fields.filter(entry => entry.field === field);
+  assert(entries.length > 0, `expected proto field ${field}`);
   const result: bigint[] = [];
-  let offset = 0;
-  while (offset < value.length) {
-    const parsed = readVarint(value, offset);
-    result.push(parsed.value);
-    offset = parsed.offset;
+  // Repeated integers can use either protobuf representation, including a mix.
+  for (const { value } of entries) {
+    if (typeof value === 'bigint') {
+      result.push(value);
+      continue;
+    }
+    assert(value instanceof Uint8Array, `expected field ${field} to contain varints`);
+    let offset = 0;
+    while (offset < value.length) {
+      const parsed = readVarint(value, offset);
+      result.push(parsed.value);
+      offset = parsed.offset;
+    }
   }
   return result;
 }
 
-function assertPackedVarints(fields: ProtoField[], field: number, expected: Array<number | bigint>) {
-  const actual = packedVarints(fields, field);
+function assertRepeatedVarints(fields: ProtoField[], field: number, expected: Array<number | bigint>) {
+  const actual = repeatedVarints(fields, field);
   assert(actual.length === expected.length, `expected field ${field} length ${expected.length}, got ${actual.length}`);
   expected.forEach((value, index) => {
     assert(actual[index] === BigInt(value), `expected field ${field}[${index}] to be ${String(value)}, got ${String(actual[index])}`);
@@ -1108,25 +1116,25 @@ async function testModelSolveParametersProtoEncoding(api: MathOptApi): Promise<s
   const modelParameters = nestedFields(requestFields, 5);
   const variableFilter = nestedFields(modelParameters, 1);
   assertVarint(variableFilter, 2, 1);
-  assertPackedVarints(variableFilter, 3, [x.id]);
+  assertRepeatedVarints(variableFilter, 3, [x.id]);
   const dualFilter = nestedFields(modelParameters, 2);
   assertVarint(dualFilter, 1, 1);
   assertVarint(dualFilter, 2, 1);
-  assertPackedVarints(dualFilter, 3, [demand.id]);
+  assertRepeatedVarints(dualFilter, 3, [demand.id]);
   const reducedCostsFilter = nestedFields(modelParameters, 3);
   assertVarint(reducedCostsFilter, 2, 1);
-  assertPackedVarints(reducedCostsFilter, 3, [y.id]);
+  assertRepeatedVarints(reducedCostsFilter, 3, [y.id]);
   const hint = nestedFields(modelParameters, 5);
   const hintVariables = nestedFields(hint, 1);
-  assertPackedVarints(hintVariables, 1, [x.id, y.id]);
+  assertRepeatedVarints(hintVariables, 1, [x.id, y.id]);
   assertPackedDoubles(hintVariables, 2, [1.5, 2.5]);
   const hintDuals = nestedFields(hint, 2);
-  assertPackedVarints(hintDuals, 1, [demand.id]);
+  assertRepeatedVarints(hintDuals, 1, [demand.id]);
   assertPackedDoubles(hintDuals, 2, [0.75]);
   const branching = nestedFields(modelParameters, 6);
-  assertPackedVarints(branching, 1, [y.id]);
-  assertPackedVarints(branching, 2, [7]);
-  assertPackedVarints(modelParameters, 9, [cap.id]);
+  assertRepeatedVarints(branching, 1, [y.id]);
+  assertRepeatedVarints(branching, 2, [7]);
+  assertRepeatedVarints(modelParameters, 9, [cap.id]);
   return `${name} PASS`;
 }
 

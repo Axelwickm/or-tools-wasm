@@ -1,3 +1,5 @@
+import type { MPSolver, MpResult, MPSolverProtoSolveResult } from '../lib/mp-solver.js';
+import type { CpSat, CpModel } from '../lib/cp-sat.js';
 import { test } from 'node:test';
 import type { KnapsackResult, KnapsackSolver } from '../lib/knapsack.js';
 import type {
@@ -8,13 +10,22 @@ import type {
   SimpleMaxFlow,
   SimpleMinCostFlow,
 } from '../lib/network-flow.js';
-import type { RoutingModel, RoutingResult } from '../lib/routing.js';
+import type { RoutingModel, RoutingResult, RoutingDimension } from '../lib/routing.js';
+import type {
+  MathOpt, MathOptVariable, MathOptPrimalValuesProto, MathOptModel, MathOptModelProto, MathOptConvertedProto, MathOptFeasibilityResult, MathOptProtoFeasibilityResult,
+  MathOptIncrementalSolver, MathOptProtoIncrementalSolver,
+  MathOptInfeasibleSubsystemResult, MathOptProtoInfeasibleSubsystemResult,
+  MathOptIncrementalInfeasibleSubsystemOptions,
+} from '../lib/mathopt.js';
 
 type Equal<Left, Right> =
   (<T>() => T extends Left ? 1 : 2) extends (<T>() => T extends Right ? 1 : 2)
     ? true
     : false;
 type Expect<T extends true> = T;
+type _CpSatCheck = Expect<Equal<ReturnType<typeof CpSat.solutionIsFeasible>, Promise<boolean>>>;
+type _CpSatProtoCheck = Expect<Equal<ReturnType<typeof CpSat.solutionIsFeasibleProto>, Promise<boolean>>>;
+type _CpModelCheck = Expect<Equal<ReturnType<CpModel['solutionIsFeasible']>, Promise<boolean>>>;
 
 type _KnapsackSolve = Expect<Equal<ReturnType<KnapsackSolver['solve']>, Promise<KnapsackResult>>>;
 type _MaxFlowSolve = Expect<Equal<ReturnType<SimpleMaxFlow['solve']>, Promise<MaxFlowResult>>>;
@@ -24,6 +35,32 @@ type _AssignmentSolve = Expect<Equal<
   Promise<LinearSumAssignmentResult>
 >>;
 type _RoutingSolve = Expect<Equal<ReturnType<RoutingModel['solve']>, Promise<RoutingResult>>>;
+type _RoutingSecondaryConfiguration = Expect<Equal<ReturnType<RoutingModel['setSecondaryModel']>, void>>;
+type _RoutingIgnoreDisjunctions = Expect<Equal<ReturnType<RoutingModel['ignoreDisjunctionsAlreadyForcedToZero']>, void>>;
+type _RoutingDisjunctionCardinality = Expect<Equal<ReturnType<RoutingModel['getDisjunctionMaxCardinality']>, Promise<bigint>>>;
+type _RoutingConstrainedDisjunctions = Expect<Equal<ReturnType<RoutingModel['hasMaxCardinalityConstrainedDisjunctions']>, Promise<boolean>>>;
+type _RoutingClassCount = Expect<Equal<ReturnType<RoutingModel['getCostClassesCount']>, Promise<number>>>;
+type _RoutingClassCost = Expect<Equal<ReturnType<RoutingModel['getArcCostForClass']>, Promise<bigint>>>;
+type _RoutingPenalty = Expect<Equal<ReturnType<RoutingModel['unperformedPenalty']>, Promise<bigint>>>;
+type _RoutingClassifiedDimensions = Expect<Equal<ReturnType<RoutingModel['getUnaryDimensions']>, Promise<RoutingDimension[]>>>;
+type _RoutingVisitPairs = Expect<Equal<ReturnType<RoutingModel['getPairIndicesOfType']>, Promise<number[]>>>;
+type _RoutingVisitSingletons = Expect<Equal<ReturnType<RoutingModel['getSingleNodesOfType']>, Promise<number[]>>>;
+type _RoutingUnary = Expect<Equal<ReturnType<RoutingDimension['isUnary']>, Promise<boolean>>>;
+type _IncrementalIis = Expect<Equal<ReturnType<MathOptIncrementalSolver['computeInfeasibleSubsystem']>, Promise<MathOptInfeasibleSubsystemResult>>>;
+type _ProtoIncrementalIis = Expect<Equal<ReturnType<MathOptProtoIncrementalSolver['computeInfeasibleSubsystem']>, Promise<MathOptProtoInfeasibleSubsystemResult>>>;
+
+function retainedIisOptions(solver: MathOptIncrementalSolver, raw: MathOptProtoIncrementalSolver) {
+  const options: MathOptIncrementalInfeasibleSubsystemOptions = { timeLimitSeconds: 1, nodeLimit: 10n };
+  void solver.computeInfeasibleSubsystem(options);
+  void raw.computeInfeasibleSubsystem(options);
+  // @ts-expect-error The retained solver owns its executor.
+  void solver.computeInfeasibleSubsystem({ executor: 'worker' });
+  // @ts-expect-error The native backend is fixed at construction.
+  void raw.computeInfeasibleSubsystem({ solverType: 'GSCIP' });
+  // @ts-expect-error Optimization callbacks do not apply to IIS.
+  void solver.computeInfeasibleSubsystem({ callback: () => ({}) });
+}
+void retainedIisOptions;
 
 function removedSignatures(
   knapsack: KnapsackSolver,
@@ -211,3 +248,31 @@ function removedReviewApis(math: typeof import('../lib/mathopt.js'), solver: imp
   solver.nextSolution();
 }
 void removedReviewApis;
+
+type _PrimalFeasibility = Expect<Equal<ReturnType<typeof MathOpt.checkPrimalSolutionFeasibility>, Promise<MathOptFeasibilityResult>>>;
+type _ProtoPrimalFeasibility = Expect<Equal<ReturnType<typeof MathOpt.checkPrimalSolutionFeasibilityProto>, Promise<MathOptProtoFeasibilityResult>>>;
+
+type _VehicleClasses = Expect<Equal<ReturnType<RoutingModel['getVehicleClassesCount']>, Promise<number>>>;
+type _VisitTypeComponents = Expect<Equal<ReturnType<RoutingModel['getVisitTypeComponents']>, Promise<number[][]>>>;
+
+type _MPSolverCallbacks = Expect<Equal<ReturnType<MPSolver['supportsCallbacks']>, Promise<boolean>>>;
+type _MPSolverMessageCallbacks = Expect<Equal<ReturnType<MPSolver['supportsMessageCallbacks']>, Promise<boolean>>>;
+
+type _CustomRouteCost = Expect<Equal<ReturnType<RoutingModel['getRouteCost']>, Promise<bigint | null>>>;
+
+type _SameVehicleIndices = Expect<Equal<ReturnType<RoutingModel['getSameVehicleIndicesOfIndex']>, Promise<number[]>>>;
+type _EquivalentVehicles = Expect<Equal<ReturnType<RoutingModel['getVehiclesOfSameClass']>, Promise<number[]>>>;
+type _EquivalentArcs = Expect<Equal<ReturnType<RoutingModel['getSameVehicleClassArcs']>, Promise<Array<[number, number]>>>>;
+type _NodePrecedenceLayers = Expect<Equal<ReturnType<RoutingModel['getTopologicallySortedNodePrecedences']>, Promise<number[][][]>>>;
+
+type _IndicatorMip = Expect<Equal<ReturnType<typeof MathOpt.formulateIndicatorConstraintAsMip>, Promise<MathOptModel>>>;
+type _IndicatorMipProto = Expect<Equal<ReturnType<typeof MathOpt.formulateIndicatorConstraintAsMipProto>, Promise<MathOptConvertedProto<MathOptModelProto>>>>;
+
+type _Robust = Expect<Equal<ReturnType<typeof MathOpt.addRobustConstraint>, Promise<MathOptModel>>>;
+type _RobustProto = Expect<Equal<ReturnType<typeof MathOpt.addRobustConstraintProto>, Promise<MathOptConvertedProto<MathOptModelProto>>>>;
+
+type _ImproveValues = Expect<Equal<ReturnType<typeof MathOpt.moveVariablesToTheirBestFeasibleValue>, Promise<ReadonlyMap<MathOptVariable, number>>>>;
+type _ImproveValuesProto = Expect<Equal<ReturnType<typeof MathOpt.moveVariablesToTheirBestFeasibleValueProto>, Promise<MathOptConvertedProto<MathOptPrimalValuesProto>>>>;
+
+type _ClampedResult = Expect<Equal<ReturnType<typeof MPSolver.clampSolutionWithinBounds>, Promise<MpResult>>>;
+type _ClampedProto = Expect<Equal<ReturnType<typeof MPSolver.clampSolutionWithinBoundsProto>, Promise<MPSolverProtoSolveResult>>>;

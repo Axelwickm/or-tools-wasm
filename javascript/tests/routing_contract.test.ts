@@ -3,6 +3,132 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { build } from 'esbuild';
+import * as protobuf from 'protobufjs';
+import { routingParametersDescriptor } from '../lib/generated/routing_schemas.ts';
+
+test('routing preparation keeps solve and inspection budgets with their captured parameters and callbacks', async () => {
+  const directory = await mkdtemp(fileURLToPath(new URL('.routing-inspection-budget-', import.meta.url)));
+  try {
+    const outfile = `${directory}/api.mjs`;
+    await build({
+      stdin: { contents: `export * from './routing/api.ts';`, resolveDir: fileURLToPath(new URL('../lib', import.meta.url)) },
+      outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
+      plugins: [{ name: 'capture-inspection-budget', setup(builder) {
+        builder.onResolve({ filter: /^\.\/direct_executor\.js$/ }, () => ({ path: 'stub', namespace: 'test' }));
+        builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: `export class DirectRoutingExecutor {
+          execute(operation, options) {
+            globalThis.__routingInspectionBudget = { operation, resources: options.resources, callback: options.onCallback };
+            return { result: Promise.resolve({type:'solve', status:0, solution:null, routeCost:7n,
+              modelInspection:{value:0n, dimensionIndices:[]},
+              cumulOptimizers:{globalDimensions:['time'], localDimensions:['time']}}) };
+          }
+        }` }));
+      } }],
+    });
+    const { RoutingModel, RoutingIndexManager } = await import(outfile);
+    const parametersType = protobuf.Root.fromJSON(routingParametersDescriptor)
+      .lookupType('operations_research.RoutingSearchParameters');
+    const capturedWorkers = (request: { searchParametersProto: Uint8Array }) =>
+      parametersType.toObject(parametersType.decode(request.searchParametersProto)).satParameters?.numWorkers;
+    const submittedRequest = () => (globalThis as Record<string, any>).__routingInspectionBudget;
+    const assertBudget = (workers: number | undefined, secondaryWorkers: number | undefined, expected: number | undefined) => {
+      const submitted = submittedRequest();
+      assert.deepEqual(submitted.resources, expected === undefined ? undefined : { threads: expected },
+        `Primary workers ${workers}, secondary workers ${secondaryWorkers}`);
+      assert.equal(capturedWorkers(submitted.operation.request), workers);
+      assert.equal(submitted.operation.request.searchParameterFields.includes('satParameters.numWorkers'), workers !== undefined);
+      if (secondaryWorkers !== undefined) assert.equal(capturedWorkers(submitted.operation.request.secondaryModel), secondaryWorkers);
+    };
+    for (const [workers, secondaryWorkers, expected] of [
+      [undefined, undefined, 1], [2, undefined, 2], [0, undefined, undefined],
+      [undefined, 3, 3], [2, 3, 3], [3, 2, 3], [0, 3, undefined], [2, 0, undefined],
+    ]) {
+      const model = new RoutingModel(new RoutingIndexManager(3, 1, 0));
+      model.addConstantDimension(1, 10, true, 'time');
+      if (secondaryWorkers !== undefined) model.setSecondaryModel(
+        new RoutingModel(new RoutingIndexManager(3, 1, 0)), { satParameters: { numWorkers: secondaryWorkers } });
+      assert.equal(await model.areRoutesInterdependent(
+        workers === undefined ? {} : { satParameters: { numWorkers: workers } }, { executor: 'direct' }), false);
+      assertBudget(workers, secondaryWorkers, expected);
+      const options = { executor: 'direct', ...(workers === undefined ? {} : { satParameters: { numWorkers: workers } }) };
+      for (const inspect of [
+        () => model.hasGlobalCumulOptimizer('time', options),
+        () => model.hasLocalCumulOptimizer('time', options),
+        () => model.getDimensionsWithGlobalCumulOptimizers(options),
+        () => model.getDimensionsWithLocalCumulOptimizers(options),
+      ]) {
+        const result = await inspect();
+        assert.ok(result === true || result[0].name === 'time');
+        const submitted = submittedRequest();
+        assert.equal(submitted.operation.request.inspectCumulOptimizers, true);
+        assertBudget(workers, secondaryWorkers, expected);
+      }
+      await model.solve(options);
+      assertBudget(workers, secondaryWorkers, expected);
+      await model.solveWithParameters(workers === undefined ? {} : { satParameters: { numWorkers: workers } }, { executor: 'direct' });
+      assertBudget(workers, secondaryWorkers, expected);
+    }
+
+    for (const workers of [2, 0]) for (const solve of [false, true]) {
+      const model = new RoutingModel(new RoutingIndexManager(3, 1, 0));
+      const secondaryParameters = { satParameters: { numWorkers: 3 } };
+      model.setSecondaryModel(new RoutingModel(new RoutingIndexManager(3, 1, 0)), secondaryParameters);
+      const parameters = { satParameters: { numWorkers: workers } };
+      const pending = solve ? model.solveWithParameters(parameters, { executor: 'direct' })
+        : model.areRoutesInterdependent(parameters, { executor: 'direct' });
+      parameters.satParameters.numWorkers = 7;
+      secondaryParameters.satParameters.numWorkers = 8;
+      model.setSecondaryModel(null);
+      await pending;
+      assertBudget(workers, 3, workers === 0 ? undefined : 3);
+      await model.areRoutesInterdependent(parameters, { executor: 'direct' });
+      assertBudget(7, undefined, 7);
+      assert.equal(submittedRequest().operation.request.secondaryModel, undefined);
+    }
+
+    for (const workers of [2, 0]) {
+      const model = new RoutingModel(new RoutingIndexManager(3, 1, 0));
+      await model.areRoutesInterdependent({ sat_parameters: { num_workers: workers } }, { executor: 'direct' });
+      assertBudget(workers, undefined, workers || undefined);
+    }
+
+    const duringPreparation = new RoutingModel(new RoutingIndexManager(3, 1, 0));
+    const parameters = { satParameters: { numWorkers: 2 } };
+    duringPreparation.setSecondaryModel(new RoutingModel(new RoutingIndexManager(3, 1, 0)), { satParameters: { numWorkers: 3 } });
+    duringPreparation.setArcCostEvaluatorOfAllVehicles(duringPreparation.registerTransitCallback(() => {
+      parameters.satParameters.numWorkers = 7;
+      duringPreparation.setSecondaryModel(null);
+      return 1;
+    }));
+    await duringPreparation.areRoutesInterdependent(parameters, { executor: 'direct' });
+    assertBudget(2, 3, 3);
+
+    const primary = new RoutingModel(new RoutingIndexManager(3, 1, 0));
+    const secondary = new RoutingModel(new RoutingIndexManager(3, 1, 0));
+    for (const workers of [4, 0]) {
+      secondary.setSecondaryModel(new RoutingModel(new RoutingIndexManager(3, 1, 0)), { satParameters: { numWorkers: workers } });
+      primary.setSecondaryModel(secondary, { satParameters: { numWorkers: 2 } });
+      await primary.solveWithParameters({}, { executor: 'direct' });
+      assertBudget(undefined, 2, workers || undefined);
+      assert.equal(capturedWorkers(submittedRequest().operation.request.secondaryModel.secondaryModel), workers);
+    }
+
+    const callbacksModel = new RoutingModel(new RoutingIndexManager(3, 1, 0));
+    callbacksModel.addRouteConstraint(() => 7);
+    const pending = callbacksModel.getRouteCost([0, 1], { executor: 'direct' });
+    callbacksModel.addRouteConstraint(() => 9);
+    assert.equal(await pending, 7n);
+    const captured = submittedRequest();
+    assert.equal(captured.operation.request.operations.filter((op: { type: string }) => op.type === 'addRouteConstraint').length, 1);
+    const payload = new Uint8Array(4);
+    assert.equal(new DataView(captured.callback(payload).buffer).getBigInt64(1, true), 7n);
+    new DataView(payload.buffer).setUint32(0, 1, true);
+    assert.throws(() => captured.callback(payload), /Unknown Routing route evaluator/);
+  } finally {
+    delete (globalThis as Record<string, unknown>).__routingInspectionBudget;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test('routing disjunction IDs, unsupported constraints and vehicle-specific arc costs', async () => {
   const directory = await mkdtemp(fileURLToPath(new URL('.routing-contract-', import.meta.url)));
@@ -16,7 +142,7 @@ test('routing disjunction IDs, unsupported constraints and vehicle-specific arc 
       outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
       plugins: [{ name: 'no-native-execution', setup(builder) {
         builder.onResolve({ filter: /^\.\/direct_executor\.js$/ }, () => ({ path: 'stub', namespace: 'test' }));
-        builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: `export class DirectRoutingExecutor { execute(operation) { globalThis.__routingInspection = operation; return { result: Promise.resolve({type:'solve', status:0, solution:null, arcCosts:[777n], domainResults:[{min:0n,max:10n,size:11n,bound:false,softBound:999n}]}) }; } }` }));
+        builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: `export class DirectRoutingExecutor { execute(operation) { globalThis.__routingInspection = operation; return { result: Promise.resolve({type:'solve', status:0, solution:null, locksApplied:true, preAssignment:{0:1}, arcCosts:[777n], domainResults:[{min:0n,max:10n,size:11n,bound:false,softBound:999n}]}) }; } }` }));
       } }],
     });
     const { Assignment, RoutingModel, RoutingIndexManager, routingProtocol, RoutingVariableKind, RoutingDomainAction, RoutingFinalizerKind } = await import(outfile);
@@ -25,13 +151,28 @@ test('routing disjunction IDs, unsupported constraints and vehicle-specific arc 
       routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 3, solution: null, localSearchProfile: '' })),
       { type: 'solve', status: 3, solution: null, localSearchProfile: '' },
     );
+    for (const value of [null, 0n, 9007199254740993n]) {
+      const statistics = { numCpSatCallsInLpScheduling: 0n, numGlopCallsInLpScheduling: 0n,
+        numMinCostFlowCalls: 0n, numCpSatCallsInRouting: 0n, numGeneralizedCpSatCallsInRouting: 0n,
+        numDecisionsInFirstSolution: value, numRejectsInFirstSolution: value };
+      const decoded = routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 3,
+        solution: null, searchStatistics: statistics }));
+      assert.deepEqual(decoded.searchStatistics, statistics);
+    }
     for (const strategy of [0, 3, 4, 8]) {
       const metadata = routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 3,
         solution: null, automaticFirstSolutionStrategy: strategy }));
       assert.equal(metadata.automaticFirstSolutionStrategy, strategy);
     }
+    assert.deepEqual(routingProtocol.decodeEvent(routingProtocol.encodeEvent({ type: 'searchEntered' })), { type: 'searchEntered' });
     const exact = 9_007_199_254_741_003n;
     const boundOperations = [
+      { type: 'addPickupAndDeliverySets', pickupDisjunction: 0, deliveryDisjunction: 1 },
+      { type: 'setPickupToDeliveryLimits', dimensionName: 'time', pairIndex: 1, limits: [exact, -(1n << 63n), (1n << 63n) - 1n] },
+      { type: 'addDependentDimension', transitMatrices: [new BigInt64Array([0n, 1n, 1n, 0n])], unaryTransits: [true],
+        dependentMatrices: [{ domainStart: 0n, domainEnd: 101n,
+          functions: Array.from({ length: 4 }, () => ({ x: [0n, 100n], y: [1n, 2n] })) }],
+        baseDimension: 'clock', slackMax: 0n, capacities: [100n], fixStartCumulToZero: true, name: 'dependent' },
       { type: 'setVisitType', index: 1, visitType: 0, policy: 0 },
       { type: 'setVisitType', index: 0, visitType: -1, policy: 3 },
       { type: 'addHardTypeIncompatibility', type1: 0, type2: 2 },
@@ -49,6 +190,12 @@ test('routing disjunction IDs, unsupported constraints and vehicle-specific arc 
       { type: 'setPickupDeliveryPolicy', policy: 2, vehicle: 1 },
       { type: 'addDisjunction', indices: [1], penalty: undefined, maxCardinality: exact, penaltyCostBehavior: 1 },
       { type: 'addDisjunction', indices: [1], penalty: 0n, maxCardinality: 1n, penaltyCostBehavior: 0 },
+      { type: 'setSweepArranger', points: [{x:0,y:-1},{x:2147483647,y:0}] },
+      { type: 'addOrderedActivityGroup', disjunctions: [1,0] },
+      { type: 'ignoreDisjunctionsAlreadyForcedToZero' },
+      { type: 'setTabuVars', variables: null },
+      { type: 'setTabuVars', variables: [] },
+      { type: 'setTabuVars', variables: [{ kind: 1, dimensionName: 'time', index: 0 }, { kind: 10, dimensionName: '', index: 1, resourceGroup: 2 }] },
       { type: 'setMaximumActiveVehicles', maximum: 0 },
       { type: 'setFixedVehicleCost', cost: exact, vehicle: 0 },
       { type: 'setAmortizedVehicleCosts', linear: exact, quadratic: 0n, vehicle: 0 },
@@ -73,12 +220,92 @@ test('routing disjunction IDs, unsupported constraints and vehicle-specific arc 
       { type: 'setAllowedVehiclesForIndex', vehicles: [], index: 0 },
       { type: 'setCumulBounds', dimensionName: 'time', index: 1, lower: -exact, upper: exact },
       { type: 'setCumulBounds', dimensionName: 'time', index: 0, lower: -(1n << 63n), upper: (1n << 63n) - 1n },
+      { type: 'addBreakInterval', index: 0, startMin: exact, startMax: exact + 1n, duration: 2n, optional: true, name: 'rest' },
+      { type: 'setBreakIntervals', dimensionName: 'time', intervals: [0], vehicle: 0, preTravel: [0n, 1n, 1n, 0n], postTravel: undefined },
+      { type: 'setBreakIntervals', dimensionName: 'time', intervals: [0], vehicle: 0, preTravel: [0n, 1n, 1n, 0n], postTravel: undefined, preTravelHandle: 3, postTravelHandle: -1 },
+      { type: 'addForbiddenIntervals', dimensionName: 'time', index: 1n, intervals: [{ start: exact, end: exact + 1n }] },
+      { type: 'setPiecewiseCost', dimensionName: 'time', index: 1n, segments: [{ pointX: 0n, pointY: exact, slope: 2n, otherPointX: exact }] },
+      { type: 'addRouteConstraint', evaluator: 0, costsAreHomogeneousAcrossVehicles: true },
+      { type: 'setBreakDistanceDuration', dimensionName: 'time', distance: exact, duration: 2n, vehicle: 0 },
+      { type: 'setPathEnergyCosts', force: 'load', distance: 'distance', threshold: exact, costBelow: 2n, costAbove: 3n, vehicle: 0 },
+      { type: 'addSameActivityGroup', indices: [1, 1] },
+      { type: 'addNodePrecedence', dimensionName: 'time', first: 0, second: 1, offset: exact, performedConstraint: 3 },
+      { type: 'addNodePrecedence', dimensionName: 'time', first: 0, second: 1, offset: -exact, performedConstraint: 0 },
+      { type: 'addDimension', transitMatrix: new BigInt64Array([1n, 1n, 2n, 2n]), unaryTransit: true,
+        slackMax: 0n, capacity: exact, fixStartCumulToZero: true, name: 'unary' },
+      { type: 'addDimensionWithVehicleTransitAndCapacity', transitMatrices: [new BigInt64Array([1n, 1n, 2n, 2n])], unaryTransits: [true],
+        slackMax: 0n, capacities: [exact], fixStartCumulToZero: true, name: 'unary_per_vehicle' },
     ];
     const wire = routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: {
       numLocations: 2, numVehicles: 1, starts: [0], ends: [0], searchParametersProto: new Uint8Array(),
       transitMatrix: new BigInt64Array(4), transitMatrixDimension: 2, dimensionNames: ['time'], operations: boundOperations,
+      modelQuery: { kind: 7, index: 1n, otherIndex: 0n, vehicleOrClass: 0, defaultValue: -exact },
     } }));
     assert.deepEqual(wire.request.operations, boundOperations);
+    const assignmentTransfer = { nextValues: [1, 2], vehicleValues: [-1, 0, 0] };
+    assert.deepEqual(routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: {
+      ...wire.request, assignmentTransfer,
+    } })).request.assignmentTransfer, assignmentTransfer);
+    const assignmentSeed = { variables: [{ variable: { kind: 3, index: 0, dimensionName: '' }, min: 1n, max: 1n }],
+      intervals: [], objectiveMin: -(1n << 63n), objectiveMax: (1n << 63n) - 1n };
+    assert.deepEqual(routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 0, solution: null,
+      assignmentSeed })).assignmentSeed, assignmentSeed);
+    const seedRequest = { ...wire.request, initialAssignment: { routes: [], ignoreInactiveIndices: false, snapshot: assignmentSeed } };
+    assert.deepEqual(routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: seedRequest })).request.initialAssignment, seedRequest.initialAssignment);
+    const dimensionQuery = { dimensionName: 'time', kind: 9, index: 0n, otherIndex: 0n, vehicleOrClass: 0,
+      lower: 0n, upper: 0n, pairIndex: 2, pickupAlternativeIndex: 1, deliveryAlternativeIndex: 3 };
+    assert.deepEqual(routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: {
+      ...wire.request, dimensionQuery,
+    } })).request.dimensionQuery, dimensionQuery);
+    const dimensionInspection = { value: (1n << 63n) - 1n, intervals: [], hasPiecewiseLinearCost: false, costSegments: [],
+      nodePrecedences: [{ first: 2n, second: 3n, offset: -exact, performedConstraint: 3 }] };
+    assert.deepEqual(routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 0, solution: null,
+      dimensionInspection })).dimensionInspection, dimensionInspection);
+    assert.deepEqual(wire.request.modelQuery, { kind: 7, index: 1n, otherIndex: 0n, vehicleOrClass: 0, defaultValue: -exact, predicateEvaluator: 0, thirdIndex: 0n });
+    const siblingQuery = { kind: 27, index: 1n, otherIndex: 0n, vehicleOrClass: 0, defaultValue: 0n, predicateEvaluator: 7, thirdIndex: 0n };
+    assert.deepEqual(routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: { ...wire.request, modelQuery: siblingQuery } })).request.modelQuery, siblingQuery);
+    for (const kind of [29, 30]) {
+      const modelQuery = { kind, index: 0n, otherIndex: 0n, thirdIndex: 0n, vehicleOrClass: 0, defaultValue: 0n, predicateEvaluator: 0 };
+      const request = { ...wire.request, modelQuery, searchParametersProto: new Uint8Array([8, 1]), searchParameterFields: ['localSearchMetaheuristic'] };
+      const decoded = routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request })).request;
+      assert.deepEqual(decoded.modelQuery, modelQuery);
+      assert.deepEqual(decoded.searchParametersProto, request.searchParametersProto);
+      assert.deepEqual(decoded.searchParameterFields, request.searchParameterFields);
+    }
+    const arcQuery = { kind: 28, index: 0n, otherIndex: 1n, thirdIndex: exact, vehicleOrClass: 0, defaultValue: 0n, predicateEvaluator: 0 };
+    assert.deepEqual(routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: { ...wire.request, modelQuery: arcQuery } })).request.modelQuery, arcQuery);
+    const slackRequest = { ...wire.request, dimensionQuery: { ...dimensionQuery, kind: 13 },
+      initialAssignment: { routes: [], ignoreInactiveIndices: false, snapshot: assignmentSeed } };
+    const slackDecoded = routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: slackRequest })).request;
+    assert.deepEqual(slackDecoded.dimensionQuery, slackRequest.dimensionQuery);
+    assert.deepEqual(slackDecoded.initialAssignment, slackRequest.initialAssignment);
+    for (const value of [undefined, 0n, exact]) {
+      const modelInspection = { value, dimensionIndices: [0, 2], indices: [1, 0], groups: [[0, 1], [], [2]], precedenceGroups: [[], [[0], [1]], [[2, 3]]] };
+      assert.deepEqual(routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 0, solution: null, modelInspection })).modelInspection, modelInspection);
+    }
+    for (const routeCost of [undefined, null, 0n, exact, -exact]) {
+      const result = routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 0, solution: null, routeCost }));
+      assert.equal(result.routeCost, routeCost);
+    }
+    for (const routeCostQuery of [[], [0, 1, 1, 2]]) {
+      const request = { ...wire.request, routeCostQuery };
+      assert.deepEqual(routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request })).request.routeCostQuery, routeCostQuery);
+    }
+    const activityGroups = { groups: [0, 1, 1], members: [[0], [1, 2]] };
+    assert.deepEqual(routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 0, solution: null, activityGroups })).activityGroups, activityGroups);
+    const breakResult = { status: 1, objectiveValue: 0n, nextValues: [1, 2, 2], starts: [0], ends: [2], dimensionCumulValues: {},
+      breakAssignments: [{ index: 0, performedMin: 1n, performedMax: 1n, startMin: exact, startMax: exact + 1n, endMin: exact + 2n, endMax: exact + 3n },
+        { index: 1, performedMin: 0n, performedMax: 0n, startMin: undefined, startMax: undefined, endMin: undefined, endMax: undefined }] };
+    assert.deepEqual(routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 1, solution: breakResult })).solution.breakAssignments, breakResult.breakAssignments);
+    const snapshot = { variables: [{ variable: { kind: RoutingVariableKind.ROUTING_VARIABLE_CUMUL, dimensionName: 'time', index: 1 }, min: exact, max: exact + 10n }],
+      intervals: breakResult.breakAssignments, objectiveValue: exact };
+    const reuseRequest = { ...wire.request, routeLocks: { routes: [[1]], closeRoutes: false }, inspectPreAssignment: true,
+      firstSolutionHint: snapshot, initialAssignment: { routes: [], ignoreInactiveIndices: false, snapshot } };
+    assert.deepEqual(routingProtocol.decodeRequest(routingProtocol.encodeRequest({ type: 'solve', request: reuseRequest })).request, reuseRequest);
+    for (const locksApplied of [true, false]) {
+      const reply = { type: 'solve', status: 0, solution: null, localSearchProfile: '', locksApplied, preAssignment: { 0: 1, 1: 2 } };
+      assert.deepEqual(routingProtocol.decodeResult(routingProtocol.encodeResult(reply)), reply);
+    }
     const resourceModel = new RoutingModel(new RoutingIndexManager(2, 1, 0));
     resourceModel.addConstantDimension(1, exact + 10n, false, 'time');
     const resourceGroup = resourceModel.addResourceGroup();
@@ -151,6 +378,23 @@ test('routing disjunction IDs, unsupported constraints and vehicle-specific arc 
     }
     assert.throws(() => atomic.addDisjunction([], 10));
     const nativeInspection = new RoutingModel(new RoutingIndexManager(2, 1, 0));
+    const pairModel = new RoutingModel(new RoutingIndexManager(7, 1, 0));
+    pairModel.addConstantDimension(1, exact, true, 'time');
+    const pickupSet = pairModel.addDisjunction([1, 2]), deliverySet = pairModel.addDisjunction([3, 4]);
+    assert.equal(pairModel.addPickupAndDeliverySets(pickupSet, deliverySet), 0);
+    assert.equal(pairModel.addPickupAndDelivery(5, 6), 1);
+    const pairTime = pairModel.getDimensionOrDie('time');
+    assert.equal(pairTime.hasPickupToDeliveryLimits(), false);
+    pairTime.setPickupToDeliveryLimitFunctionForPair((pickup: number, delivery: number) => exact + BigInt(10 * pickup + delivery), 0);
+    pairTime.setPickupToDeliveryLimitFunctionForPair(() => exact, 1);
+    await pairModel.solve({ executor: 'direct' });
+    const limitOperations = (globalThis as Record<string, any>).__routingInspection.request.operations.filter((op: any) => op.type === 'setPickupToDeliveryLimits');
+    assert.deepEqual(limitOperations, [
+      { type: 'setPickupToDeliveryLimits', dimensionName: 'time', pairIndex: 0, limits: [exact, exact + 1n, exact + 10n, exact + 11n] },
+      { type: 'setPickupToDeliveryLimits', dimensionName: 'time', pairIndex: 1, limits: [exact] },
+    ]);
+    assert.equal(pairTime.hasPickupToDeliveryLimits(), true);
+    assert.throws(() => pairTime.setPickupToDeliveryLimitFunctionForPair(() => 1, 2));
     nativeInspection.setArcCostEvaluatorOfAllVehicles(nativeInspection.registerTransitCallback(() => 5));
     assert.equal(await nativeInspection.getArcCostForVehicle(0, 1, 0, {executor:'direct'}), 777n);
     assert.deepEqual(((globalThis as Record<string, unknown>).__routingInspection as {request:{arcCostQueries:unknown}}).request.arcCostQueries, [{fromIndex:0n,toIndex:1n,vehicle:0}]);
@@ -173,6 +417,21 @@ test('routing disjunction IDs, unsupported constraints and vehicle-specific arc 
     const roundtrip = routingProtocol.decodeResult(routingProtocol.encodeResult({ type: 'solve', status: 1, solution: nativeAnswer }));
     assert.deepEqual(roundtrip.solution, nativeAnswer);
     const assignment = new Assignment(routing, roundtrip.solution);
+    routing.setFirstSolutionHint(assignment);
+    const locks = [[2, 1]];
+    const pendingLocks = routing.applyLocksToAllVehicles(locks, false, { executor: 'direct' });
+    locks[0].length = 0;
+    assert.equal(await pendingLocks, true);
+    const reuse = (globalThis as Record<string, any>).__routingInspection.request;
+    assert.deepEqual(reuse.routeLocks.routes, [[2, 1]]);
+    assert.equal(reuse.firstSolutionHint.variables.find((v: any) => v.variable.kind === RoutingVariableKind.ROUTING_VARIABLE_CUMUL && v.variable.index === 1).max, 6n);
+    const preassignment = await routing.inspectPreAssignment({ executor: 'direct' });
+    preassignment.nextValues.clear();
+    assert.equal((await routing.inspectPreAssignment({ executor: 'direct' })).nextValues.get(0), 1);
+    assert.throws(() => new RoutingModel(new RoutingIndexManager(4, 1, 0)).setFirstSolutionHint(assignment), /another model/);
+    routing.setFirstSolutionHint(null);
+    await routing.inspectPreAssignment({ executor: 'direct' });
+    assert.equal((globalThis as Record<string, any>).__routingInspection.request.firstSolutionHint, undefined);
     assert.equal(assignment.value(routing.vehicleVar(2)), -1);
     assert.equal(assignment.min(routing.vehicleVar(2)), -1);
     assert.equal(assignment.max(routing.vehicleVar(2)), -1);

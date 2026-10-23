@@ -5,11 +5,9 @@ Section entries identify assertion-level parity separately from broader native
 contracts. Historical exclusions must be reconsidered when the API expands;
 they do not establish that every gap is filled or that native patches preserve
 unmodified upstream behavior.
-The 2026-10-10 follow-up ownership/API cleanup is recorded in
-[the gap ledger](../../tests/GAPS.MD#further-api-ownership-cleanup-2026-10-10).
-Its shared regressions and Routing helper removal do not change Python
-assertion-port counts.
-The subsequent [wide lifecycle/API cleanup](../../tests/GAPS.MD#wide-lifecycle-and-api-cleanup-2026-10-10)
+The 2026-10-10 follow-up ownership/API cleanup added shared regressions and
+removed Routing helpers without changing Python assertion-port counts.
+The subsequent wide lifecycle/API cleanup
 reclassifies seven Set Cover cases and the RCPSP parser case as binding variants
 where helper assertions are excluded.
 
@@ -50,27 +48,25 @@ independently of observed results. This does not change parity classifications.
 
 The runtime/release gate used our patched OR-Tools 9.15 snapshot. It establishes
 cross-runtime behavior for that snapshot; it does not establish equivalence to
-unmodified upstream. The [binding scope audit](../../tests/GAPS.MD#binding-scope-and-non-coding-audit-2026-10-08)
-inventories all 24 changed native source/patch files and records proposed dispositions.
-Future feature work is limited to MathOpt frontend/native exposure and RCPSP models.
+unmodified upstream. The 2026-10-08 binding scope audit inventoried 24 changed native source/patch
+files and recorded proposed dispositions.
+That audit initially scoped follow-up work to MathOpt frontend/native exposure and RCPSP models.
 The initial documentation-only audit did not alter implementation or test classifications.
-Subsequent cleanup progress and its verification are recorded in `tests/GAPS.MD`.
 
 The initial scope review identified these areas for focused comparison with the
-unmodified pinned sources; current dispositions are tracked in the gap ledger:
+unmodified pinned sources; the outcomes recorded here are:
 
 - Set Cover cost accounting and safety fixes. Added timeout enforcement and changed
   greedy success semantics have now been removed; time setters retain the pinned
-  upstream's unenforced behavior. Cost/copy regressions cover an isolated scalar
-  repair, with a focused stock/tree/scalar performance comparison in the gap ledger.
+  upstream's unenforced behavior. Cost/copy regressions retain loaded-solution
+  and duplicate-accounting fixes; the cost-update numerical heuristic is deferred.
 - Network Flow overflow checks/statuses and PDLP rejection of nonfinite assembled
   input. Some observable behavior comes from local native guards; PDLP can return
   `INVALID_PROBLEM` where previous native paths returned `NUMERICAL_ERROR`.
-- SCIP IIS integrality cleanup and new access hooks. MathOpt's C++ field-width patch
-  has been removed: exact counters remain in protobuf transport, with native duration
-  conversion. All 23 focused native MathOpt tests and affected packed Node/Bun/Deno
-  contracts pass across direct/worker/server, alongside all eight affected Vite
-  development/static Chromium/Firefox profiles.
+- Custom SCIP IIS hooks and the GSCIP cone adapter are deferred. MathOpt bindings
+  preserve upstream capability errors; cone model representation remains available.
+  MathOpt's C++ field-width patch remains removed: exact counters use protobuf
+  transport, with native duration conversion.
 
 Keep the existing crash/wrong-result reproductions during cleanup. Preserve ✅
 classifications for the specific upstream assertions already compared; any affected
@@ -91,14 +87,12 @@ values and per-answer profiling/automatic strategy metadata. The checked native
 values and model inputs remain the same; removed partial facades and duplicate
 constraint shapes are not retained as compatibility shims. Set Cover inspection
 ownership and MPSolver generated proto types are binding contracts, not new
-Python assertion ports. See the
-[current gate](../../tests/GAPS.MD#public-api-simplification-and-verification-2026-10-10).
+Python assertion ports.
 
 Follow-up result ownership cleanup (2026-10-09) is verified against package SHA1
 `93870a49ad304e858a1efad50c19d65b2b1271e3`: complete Node/Bun/Deno assertions,
 all ten browser profiles, 206 native checks, 43 unit test-file entries and
-172 site checks pass. See the
-[current gate](../../tests/GAPS.MD#result-ownership-cleanup-and-final-verification-2026-10-09).
+172 site checks pass.
 Shared MPSolver cases cover independent result diagnostics/native solution
 validation, imported integer rounding, facade compatibility and both
 retained-session facades; MathOpt cases cover owned records, exact backend
@@ -110,9 +104,7 @@ Final scope verification (2026-10-09): the agreed cleanup and MathOpt/RCPSP
 frontend exposure are complete. Frozen package SHA1
 `6c68ddc1a6cc8a56968080c9a59893cf943303a8` passes complete Node/Bun/Deno suites,
 all ten browser profiles, 43 unit test-file entries and 172 site checks;
-the fresh production image passes 205 native checks. See the
-[final gate](../../tests/GAPS.MD#binding-scope-completion-and-final-verification-2026-10-09)
-for artifact/source provenance and backend limits. Objective/import/tracker
+the fresh production image passes 205 native checks. Objective/import/tracker
 coverage notes now reflect the exposed APIs without claiming additional Python
 assertion ports. Historical passes remain evidence for their tested snapshots.
 
@@ -368,7 +360,7 @@ snapshot unchanged. This supplements the constructed-assignment unit test.
 
 ## ortools/linear_solver/python/pywraplp_test.py
 
-- Retained MPSolver sessions (2026-10-08): shared `or-tools-wasm/mp_solver/incremental.ts` contracts cover ordered native edits, snapshots, abort/observer failure, concurrency/close, backend reuse/reset and SCIP solution enumeration. Upstream Python tests do not assert retained native object identity or positive NextSolution behavior; these cases are native contracts, not additional Python assertion parity. Native tests assert identical solver/variable pointers across updates and later server jobs. Controlled unit tests reject runtime replacement and stale cleanup. All 15 new cases pass per Node/Bun/Deno across direct/worker/server; all 42 unit files, 178 native checks, 124 installed Node MPSolver regression results, four packaged Vite Chromium/Firefox profiles and nine example checks pass. Verification evidence is recorded in `tests/GAPS.MD`.
+- Retained MPSolver sessions (2026-10-08): shared `or-tools-wasm/mp_solver/incremental.ts` contracts cover ordered native edits, snapshots, abort/observer failure, concurrency/close, backend reuse/reset and SCIP solution enumeration. Upstream Python tests do not assert retained native object identity or positive NextSolution behavior; these cases are native contracts, not additional Python assertion parity. Native tests assert identical solver/variable pointers across updates and later server jobs. Controlled unit tests reject runtime replacement and stale cleanup. All 15 new cases pass per Node/Bun/Deno across direct/worker/server; all 42 unit files, 178 native checks, 124 installed Node MPSolver regression results, four packaged Vite Chromium/Firefox profiles and nine example checks pass.
 - Native solution verification: existing valid-solution `VerifySolution` assertions now await the native operation through their selected executor. Shared `or-tools-wasm/mp_solver/solution_verification.ts` adds native-contract coverage for all ten built backends, invalid objectives/bounds/rows, negative tolerance, accurate sums, continuous integrality semantics, snapshot isolation and cancellation/recovery. These extensions are not additional Python parity claims. Native server tests assert the real `logErrors` side effect with an Abseil log sink.
 - MPSolver backend coverage
   - 🧪 CLP backend LP coverage - CLP now runs through the same shared TS/WASM MPSolver public API cases as GLOP for `pywraplp_test.py/test_external_api`, `lp_test.py/RunLinearExampleCppStyleAPI`, `lp_api_test.py/test_proto`, and `lp_test.py/testSolveFromProto`; this verifies `CreateSolver("CLP")`, `SupportsProblemType(CLP_LINEAR_PROGRAMMING)`, parse/check support, solve status, objective/value checks, reduced costs, duals, basis status, activities, solver version, and proto solve paths. This is backend parity coverage, not a separate upstream Python `test_clp` because upstream has no explicit Python CLP test body.
@@ -387,15 +379,15 @@ snapshot unchanged. This supplements the constructed-assignment unit test.
   - ✅ 🔎 PyWrapAlgorithmsKnapsackSolverTest.testSolveTwoDimensions
   - ✅ 🔎 PyWrapAlgorithmsKnapsackSolverTest.testSolveBigOneDimension
 
-Knapsack native contracts (2026-10-08): shared numerical cases cover exact int64 totals, nonnegative/overflow boundaries, zero weights, empty instances, atomic initialization, result snapshots, unavailable backend recovery and CP-SAT worker budgets. A shared concurrency case verifies Knapsack and MPSolver use their shared runtime safely. These extend native contract coverage, not upstream Python assertion parity. All 15 new results pass per Node/Bun/Deno across direct/worker/server; 42 unit files, 182 native checks, 33 installed Node Knapsack results, four packaged Vite browser profiles and all 63 site solve scenarios pass. Evidence is in `tests/GAPS.MD`.
+Knapsack native contracts (2026-10-08): shared numerical cases cover exact int64 totals, nonnegative/overflow boundaries, zero weights, empty instances, atomic initialization, result snapshots, unavailable backend recovery and CP-SAT worker budgets. A shared concurrency case verifies Knapsack and MPSolver use their shared runtime safely. These extend native contract coverage, not upstream Python assertion parity. All 15 new results pass per Node/Bun/Deno across direct/worker/server; 42 unit files, 182 native checks, 33 installed Node Knapsack results, four packaged Vite browser profiles and all 63 site solve scenarios pass.
 
 
 ## ortools/set_cover/python/set_cover_test.py
 
-Set Cover trace/limit native contracts (2026-10-08): shared `or-tools-wasm/set_cover/trace_limits.ts` cases verify native first-occurrence compression, initial deselection/final selection, empty traces, unchanged selection, ordinary native solve order, snapshots/abort/observers and constructor-versus-search iteration semantics. These are native contracts beyond upstream Python coverage, not new Python assertion parity. All nine results pass per Node/Bun/Deno across direct/worker/server; 42 unit files, 179 native checks, 64 installed Node Set Cover results, four packaged Vite browser profiles and five example checks pass. Evidence is in `tests/GAPS.MD`.
+Set Cover trace/limit native contracts (2026-10-08): shared `or-tools-wasm/set_cover/trace_limits.ts` cases verify native first-occurrence compression, initial deselection/final selection, empty traces, unchanged selection, ordinary native solve order, snapshots/abort/observers and constructor-versus-search iteration semantics. These are native contracts beyond upstream Python coverage, not new Python assertion parity. All nine results pass per Node/Bun/Deno across direct/worker/server; 42 unit files, 179 native checks, 64 installed Node Set Cover results, four packaged Vite browser profiles and five example checks pass.
 
 - Native guided tabu tuning: `set_cover.native.guided_tabu_tuning` covers defaults, four correctly named setters/getters, explicit zeros, captured inputs, generator isolation, cover preservation, unsafe-input rejection and cancellation/recovery across executors. Native server tests read settings from the actual search generator. This extends the native contract; upstream Python has no runnable guided-tabu tuning test, and its Lagrangian getter/setter names are swapped.
-- Persistent guided native contract: four shared guided-session cases cover repeated calls, native initialization, executor binding, mutation/stale-result handling, observer failures, close and runtime replacement. Native tests retain the exact generator/invariant pointers across calls and separate server job threads. These extend native contract coverage; upstream Python has no repeated guided-search lifecycle tests. All 54 shared Set Cover cases pass per Node/Bun/Deno through direct/worker/server, plus four packaged Vite Chromium/Firefox profiles and five example checks. Native object retention passes in the 176-check server suite. Latest evidence is recorded in tests/GAPS.MD.
+- Persistent guided native contract: four shared guided-session cases cover repeated calls, native initialization, executor binding, mutation/stale-result handling, observer failures, close and runtime replacement. Native tests retain the exact generator/invariant pointers across calls and separate server job threads. These extend native contract coverage; upstream Python has no repeated guided-search lifecycle tests. All 54 shared Set Cover cases pass per Node/Bun/Deno through direct/worker/server, plus four packaged Vite Chromium/Firefox profiles and five example checks. Native object retention passes in the 176-check server suite.
 
 Native statistics/decile regression (2026-10-07): `set_cover.native.statistics_deciles`
 checks cost/row/column distributions, zero-excluding native standard deviation, IQR,
@@ -421,12 +413,12 @@ intentionally calls the actual native column method and documents that differenc
 - RcpspTest
   - 🧪 🔎 RcpspTest.testParseAndAccess — binding variant: `RcpspProblem.fromPsplib(text)` uses the same `j301_1.sm` input and retains resource/task count assertions. Native filesystem parsing and the parser boolean return are excluded.
 - Representative CP-SAT-backed RCPSP coverage
-  - 🧪 Variant contracts (2026-10-09): consumer/producer reservoirs and investment capacity/cost/deadline models follow the upstream example and proto semantics, including active recipe events and time-zero bounds excluding zero. Thirty shared model/numerical results pass in Node/Bun/Deno and four Vite browser profiles across direct/worker/server; ten site checks pass. These are model contracts, not new Python assertion ports. Evidence is in `tests/GAPS.MD`.
+  - 🧪 Variant contracts (2026-10-09): consumer/producer reservoirs and investment capacity/cost/deadline models follow the upstream example and proto semantics, including active recipe events and time-zero bounds excluding zero. Thirty shared model/numerical results pass in Node/Bun/Deno and four Vite browser profiles across direct/worker/server; ten site checks pass. These are model contracts, not new Python assertion ports.
   - 🧪 Worker-bridge coverage note - shared TS/WASM fixtures also solve a small renewable-resource project schedule through the public `RcpspModelBuilder`, verify generated CP-SAT constraints, direct and worker-bridge solve status, makespan `8`, and selected activity starts/ends. This is not included in upstream Python test totals because upstream `rcpsp_test.py` only tests parser access.
 
 ## ortools/graph/python and ortools/graph/samples
 
-Network Flow numerical native contracts (2026-10-08): shared cases cover endpoint rejection before mutation, supply-total/cost-scaling range statuses, exact signed int64 results, failed-result access, snapshots, empty graphs and native source/sink behavior. These extend native contract coverage, not upstream Python sample parity. All 12 new results pass per Node/Bun/Deno across direct/worker/server. The final package passes 42 unit files, 186 native checks, 154 installed Node Network Flow/Routing tests, four Vite browser profiles per solver and 33 related example checks. Routing resource controls are included because they use the native min-cost routine. Evidence is in `tests/GAPS.MD`.
+Network Flow numerical native contracts (2026-10-08): shared cases cover endpoint rejection before mutation, supply-total/cost-scaling range statuses, exact signed int64 results, failed-result access, snapshots, empty graphs and native source/sink behavior. These extend native contract coverage, not upstream Python sample parity. All 12 new results pass per Node/Bun/Deno across direct/worker/server. The final package passes 42 unit files, 186 native checks, 154 installed Node Network Flow/Routing tests, four Vite browser profiles per solver and 33 related example checks. Routing resource controls are included because they use the native min-cost routine.
 
 - Python graph wrapper tests
   - ⚪ 🔎 No upstream Python `*_test.py` files were found for `ortools/graph/python/max_flow.cc`, `min_cost_flow.cc`, or `linear_sum_assignment.cc`; parity coverage is based on the Python samples plus the exposed Python wrapper method/status surface.
@@ -449,7 +441,7 @@ Network Flow numerical native contracts (2026-10-08): shared cases cover endpoin
 - ⚪ 🔎 test_sum_no_brackets - outside current TS contract: upstream only exercises a local Python generator/list summation helper and does not touch OR-Tools solver APIs
 - ✅ 🔎 test_proto
 
-MathOpt native result interoperability (2026-10-08): public typed codecs delegate to native model/solution/result converters for all six solution/ray/basis and four metadata families. Shared cases check exact large IDs/counters, auxiliary objectives, quadratic duals, optional zero/absence, native rejection/recovery and snapshots; an actual native SolveResult import checks quadratic dual names after model mutation. These are native contract extensions, not newly ported Python assertions. All 15 results pass per Node/Bun/Deno across direct/worker/server, with 42 unit files, 189 native checks, 813 installed Node MathOpt case results, four packaged browser profiles and ten example checks. Evidence is in tests/GAPS.MD. Historical entries about unexposed Python parser classes track individual Python assertion parity; equivalent native proto workflows are now available through the two converter methods.
+MathOpt native result interoperability (2026-10-08): public typed codecs delegate to native model/solution/result converters for all six solution/ray/basis and four metadata families. Shared cases check exact large IDs/counters, auxiliary objectives, quadratic duals, optional zero/absence, native rejection/recovery and snapshots; an actual native SolveResult import checks quadratic dual names after model mutation. These are native contract extensions, not newly ported Python assertions. All 15 results pass per Node/Bun/Deno across direct/worker/server, with 42 unit files, 189 native checks, 813 installed Node MathOpt case results, four packaged browser profiles and ten example checks. Public `MathOpt.parseSolveResult()`, `convertSolutionProto()` and `convertResultProto()` provide native proto workflows. The result-test entries below distinguish their existing contract coverage from exact Python assertion parity.
 
 ## ortools/math_opt/python/parameters_test.py
 API-surface parity: this section tracks Python parameter/proto mapping tests separately from solve behavior. Backend-specific parameter wrappers are accepted as parity when the TS API encodes the same upstream proto field path or exposes a raw serialized-proto escape hatch for unsupported details.
@@ -472,7 +464,7 @@ API-surface parity: this section tracks Python parameter/proto mapping tests sep
   - ✅ 🔎 SolveParametersTest backend specifics/cp_sat - `MathOpt.solve(..., { cpSat })` encodes common `SatParameters` fields into `SolveParametersProto.cp_sat`; raw proto bytes remain available for full generated SatParameters coverage
   - ✅ 🔎 SolveParametersTest backend specifics/pdlp - `MathOpt.PdlpParameters` encodes representative `PrimalDualHybridGradientParams` fields into `SolveParametersProto.pdlp`; raw proto bytes remain available for advanced fields
   - ✅ 🔎 SolveParametersTest.test_to_proto_with_specifics/glpk - `MathOpt.solve(..., { glpk: new GlpkParameters(...) })` encodes the GLPK-specific solve parameters
-  - ✅ 🔎 ModelSolveParameters proto mappings - `MathOpt.ModelSolveParameters`, `MathOpt.SparseVectorFilter`, and `MathOpt.SolutionHint` encode model-specific solve filters, solution hints, branching priorities, and lazy linear constraints into `SolveRequest.model_parameters`; raw proto bytes remain available for unsupported model parameter details
+  - ✅ 🔎 ModelSolveParameters proto mappings - `MathOpt.ModelSolveParameters`, `MathOpt.SparseVectorFilter`, and `MathOpt.SolutionHint` encode model-specific solve filters, solution hints, branching priorities, and lazy linear constraints into `SolveRequest.model_parameters`; raw proto bytes remain available for unsupported model parameter details. Assertions compare repeated integer values in either valid protobuf wire representation (packed or unpacked)
   - ✅ 🔎 GLPK threading guard - MathOpt GLPK rejects `threads > 1`; upstream native GLPK tests only allow `threads=1` and reject cross-thread GLPK use
 
 ## ortools/linear_solver/python/model_builder_test.py
@@ -952,7 +944,7 @@ controls and interruption. They do not claim raw incremental creation/update,
 solver-count diagnostics or all core Python tests. All 15 raw cases pass per
 Node/Bun/Deno through direct/worker/server; the installed Node MathOpt suite
 passes 814 results, four packaged Vite Chromium/Firefox profiles pass, and nine
-MathOpt example checks pass. Latest evidence is recorded in tests/GAPS.MD.
+MathOpt example checks pass.
 
 MathOpt raw incremental sessions (2026-10-08): six shared native contracts cover
 explicit update/solve, native false/errors, snapshots/exact IDs, close/concurrency,
@@ -967,8 +959,7 @@ for CP-SAT/PDLP and close after either outcome. Diagnostic global solver-count
 parity remains excluded. All 18 new cases pass in each of Node/Bun/Deno across
 direct/worker/server. All 177 native checks, 41 unit test-file entries and 814
 installed-package Node MathOpt results pass, along with four packaged Vite
-Chromium/Firefox profiles and ten MathOpt example checks. Latest evidence is in
-tests/GAPS.MD.
+Chromium/Firefox profiles and ten MathOpt example checks.
 
 MathOpt live messages (2026-10-08): shared `mathopt.controls.live_messages` cases
 verify native batches before terminal status, ordered asynchronous log events,
@@ -1010,54 +1001,64 @@ This is native contract/lifecycle coverage; Python helper parity is not expanded
   - ⚪ 🔎 SolveTest.test_incremental_solver_context_manager_exception - outside current TS contract: Python `with` exception propagation has no direct TS equivalent
 
 ## ortools/math_opt/python/result_test.py
+
+Reassessed 2026-10-19: result import and metadata conversion are public APIs.
+`mathopt/result_import.ts` and `mathopt/result_conversion.ts` cover native
+validation, round trips, owned snapshots and model references;
+`javascript/tests/mathopt_result.test.ts` also checks backend-specific output
+fields. These are existing contracts, not evidence that every Python assertion
+below has been ported. Python mutable result construction and validation bypass
+are separate from the native import contract. Native validation and TS decoding
+also support metadata stored in deprecated solve-stats fields.
+
 - TerminationTest
-  - ⚪ TerminationTest.test_termination_unspecified - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ TerminationTest.test_termination_limit_but_not_limit_reason - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ TerminationTest.test_termination_limit_reason_but_no_limit - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ TerminationTest.test_termination_ok_proto_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ TerminationTest.test_termination_unspecified — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
+  - 🧪 ⚠️ TerminationTest.test_termination_limit_but_not_limit_reason — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
+  - 🧪 ⚠️ TerminationTest.test_termination_limit_reason_but_no_limit — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
+  - 🧪 ⚠️ TerminationTest.test_termination_ok_proto_round_trip — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
 - ParseProblemStatus
-  - ⚪ ParseProblemStatus.test_problem_status_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ ParseProblemStatus.test_problem_status_unspecified_primal_status - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ ParseProblemStatus.test_problem_status_unspecified_dual_status - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ ParseProblemStatus.test_problem_status_round_trip — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
+  - 🧪 ⚠️ ParseProblemStatus.test_problem_status_unspecified_primal_status — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
+  - 🧪 ⚠️ ParseProblemStatus.test_problem_status_unspecified_dual_status — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
 - ParseObjectiveBounds
-  - ⚪ ParseObjectiveBounds.test_objective_bounds_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ ParseObjectiveBounds.test_objective_bounds_round_trip — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
 - ParseSolveStats
-  - ⚪ ParseSolveStats.test_problem_status_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ ParseSolveStats.test_problem_status_round_trip — native metadata converters are exposed and covered in `mathopt/result_conversion.ts`; exact Python fixtures, field values and exception assertions are not all matched
 - SolveResultAuxiliaryFunctionsTest
-  - 🧪 SolveResult helper method coverage - `MathOptSolveResult` now exposes Python-style `solve_time()`, `objective_value()`, `variable_values()`, `best_objective_bound()`, primal/dual feasibility predicates, dual values, reduced costs, primal ray values for an unbounded GLPK solve, dual ray values/reduced costs for an infeasible GLOP solve, missing-ray errors, basis status accessors, and `bounded()` on real solve results while preserving existing property and raw-response access; constructed-result parser/proto-object-only negative cases remain below
+  - 🧪 SolveResult helper method coverage - `MathOptSolveResult` now exposes Python-style `solve_time()`, `objective_value()`, `variable_values()`, `best_objective_bound()`, primal/dual feasibility predicates, dual values, reduced costs, primal ray values for an unbounded GLPK solve, dual ray values/reduced costs for an infeasible GLOP solve, missing-ray errors, basis status accessors, and `bounded()` on real solve results while preserving existing property and raw-response access; the constructed-result edge cases below require separate assertion comparisons
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_solve_time
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_best_objective_bound
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_primal_solution_has_feasible
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_feasible - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_primal - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_feasible — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_primal — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_primal_solution_no_solution — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_dual_solution_has_feasible
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_feasible - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_dual_in_best_solution - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_feasible — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_dual_in_best_solution — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_dual_solution_no_solution — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_primal_ray_has_ray
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_primal_ray_no_ray
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_dual_ray_has_ray
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_dual_ray_no_ray
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_basis_has_basis
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_no_basis_in_best_solution - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_basis_no_solution - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_basis_no_basis_in_best_solution — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_basis_no_solution — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
   - ✅ 🔎 SolveResultAuxiliaryFunctionsTest.test_bounded
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_not_bounded_primal_infeasible - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultAuxiliaryFunctionsTest.test_not_bounded_dual_infeasible - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_not_bounded_primal_infeasible — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
+  - 🧪 ⚠️ SolveResultAuxiliaryFunctionsTest.test_not_bounded_dual_infeasible — result import and public result accessors are exposed; existing solve/import contracts do not establish this exact constructed-result negative case
 - SolveResultTest
-  - ⚪ SolveResultTest.test_solve_result_gscip_output - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_solve_result_osqp_output - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_solve_result_pdlp_output - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_multiple_solver_specific_outputs_error - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_solve_result_from_proto_missing_bounds_in_termination - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_solve_result_from_proto_missing_status_in_termination - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_solve_result_from_proto_double_infeasible_multiple_rays - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_solve_result_from_feasible_multiple_solutions - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_to_proto_round_trip - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_solution_validation - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_primal_ray_validation - outside current TS contract: Python result parser/proto object API is not exposed
-  - ⚪ SolveResultTest.test_dual_ray_validation - outside current TS contract: Python result parser/proto object API is not exposed
+  - 🧪 ⚠️ SolveResultTest.test_solve_result_gscip_output — backend output decoding is checked in `javascript/tests/mathopt_result.test.ts`; the exact upstream two-way proto fixture is not ported (OSQP output parsing does not require an OSQP backend)
+  - 🧪 ⚠️ SolveResultTest.test_solve_result_osqp_output — backend output decoding is checked in `javascript/tests/mathopt_result.test.ts`; the exact upstream two-way proto fixture is not ported (OSQP output parsing does not require an OSQP backend)
+  - 🧪 ⚠️ SolveResultTest.test_solve_result_pdlp_output — backend output decoding is checked in `javascript/tests/mathopt_result.test.ts`; the exact upstream two-way proto fixture is not ported (OSQP output parsing does not require an OSQP backend)
+  - ⚪ 🔎 SolveResultTest.test_multiple_solver_specific_outputs_error — Python mutates two backend-output fields on a constructed result before export; TS exports an owned native result snapshot, without that mutable result-construction API
+  - 🧪 ⚠️ SolveResultTest.test_solve_result_from_proto_missing_bounds_in_termination — native validation and TS decoding support solve-stats metadata fallback; the exact upstream fixture and native consistency-validation differences are not covered
+  - 🧪 ⚠️ SolveResultTest.test_solve_result_from_proto_missing_status_in_termination — native validation and TS decoding support solve-stats metadata fallback; the exact upstream fixture and native consistency-validation differences are not covered
+  - 🧪 ⚠️ SolveResultTest.test_solve_result_from_proto_double_infeasible_multiple_rays — multiple solution/ray arrays are exposed by result import; existing import contracts do not establish the exact upstream multi-solution/multi-ray fixture and assertions
+  - 🧪 ⚠️ SolveResultTest.test_solve_result_from_feasible_multiple_solutions — multiple solution/ray arrays are exposed by result import; existing import contracts do not establish the exact upstream multi-solution/multi-ray fixture and assertions
+  - 🧪 ⚠️ SolveResultTest.test_to_proto_round_trip — owned result import/export round trips exist in `mathopt/result_import.ts`; the complete upstream fixture and all field assertions are not ported
+  - ⚪ 🔎 SolveResultTest.test_solution_validation — the full Python test requires `validate=False` and creating references to unknown model IDs; TS always uses native validation. Unknown IDs reject in native import/conversion tests; this is a binding contract, not full Python parity
+  - ⚪ 🔎 SolveResultTest.test_primal_ray_validation — the full Python test requires `validate=False` and creating references to unknown model IDs; TS always uses native validation. Unknown IDs reject in native import/conversion tests; this is a binding contract, not full Python parity
+  - ⚪ 🔎 SolveResultTest.test_dual_ray_validation — the full Python test requires `validate=False` and creating references to unknown model IDs; TS always uses native validation. Unknown IDs reject in native import/conversion tests; this is a binding contract, not full Python parity
 
 ## ortools/pdlp/python/pdlp_test.py
 - QuadraticProgramTest
@@ -1088,17 +1089,17 @@ snapshots, pre-abort/recovery and usable binary exports across direct/worker/ser
 The native server test additionally parses text back into a complete ModelProto
 and compares serialized model bytes, including an invalid-domain model.
 
-MPSolver native message contracts (2026-10-08): shared cases exercise native backend log hooks, ordering/quiet output, raw-proto and retained solves, observer failure recovery and guarded close. All 67 logging results pass per Node/Bun/Deno across direct/worker/server, along with 191 native checks, 42 unit files, four packaged browser profiles and 25 related site checks. Retained SCIP enumeration with logging also passes. Python does not expose these per-solve hooks, so this is native contract coverage rather than an upstream assertion-parity claim. See `tests/GAPS.MD`.
+MPSolver native message contracts (2026-10-08): shared cases exercise native backend log hooks, ordering/quiet output, raw-proto and retained solves, observer failure recovery and guarded close. All 67 logging results pass per Node/Bun/Deno across direct/worker/server, along with 191 native checks, 42 unit files, four packaged browser profiles and 25 related site checks. Retained SCIP enumeration with logging also passes. Python does not expose these per-solve hooks, so this is native contract coverage rather than an upstream assertion-parity claim.
 
-CP-SAT proto workflow contracts (2026-10-08): typed individual proto snapshots and copy/edit/rebuild are covered by nine native results per Node/Bun/Deno across direct/worker/server, the 1,097-test installed Node fixture, four packaged browser profiles and five magic-square checks. Integer/floating canonical expression inspection and constructor cache reconstruction use the existing API; separate Python flat/cache helper classes remain excluded. These are explicit snapshot adaptations, so live Python protobuf/helper-class parity is not marked complete. Evidence is in `tests/GAPS.MD`.
+CP-SAT proto workflow contracts (2026-10-08): typed individual proto snapshots and copy/edit/rebuild are covered by nine native results per Node/Bun/Deno across direct/worker/server, the 1,097-test installed Node fixture, four packaged browser profiles and five magic-square checks. Integer/floating canonical expression inspection and constructor cache reconstruction use the existing API; separate Python flat/cache helper classes remain excluded. These are explicit snapshot adaptations, so live Python protobuf/helper-class parity is not marked complete.
 
-MPSolver native IIS contracts (2026-10-08): five shared contracts produce 15 passing results per Node/Bun/Deno across direct/worker/server, covering native source mappings, bounds/integer domains, input ownership, retained-state preservation, limits and cancellation/recovery. All 196 native checks, 42 unit files, four packaged browser profiles and 28 related site checks pass. Native regressions independently solve the integer-domain subsystem and prove interruption during the copied-search setup window. The baseline Python SWIG entry has no corresponding implementation or upstream test; no Python assertion parity is claimed. See `tests/GAPS.MD`.
+SCIP IIS extension deferred: the custom MPSolver API, MathOpt GSCIP implementation, auxiliary membership mapping, copied-search interruption hooks and SCIP patches have been removed. The former extension-specific success cases are no longer current coverage. MathOpt standalone/retained bindings instead test native unsupported-operation errors. No Python parity claim is made.
 
-Set Cover / RCPSP / PDLP numerical contracts (2026-10-08): 27 shared native results pass per Node/Bun/Deno across direct/worker/server, covering atomic model inputs, captured arrays, large columns, native cost rounding/overflow recovery, resource aggregation and native sparse/nonfinite PDLP validation. All 201 native checks, 42 unit files, affected installed Node fixtures, 20 packaged browser profiles and 15 related site checks pass. These are adversarial native contracts, not additional upstream Python assertion-parity claims. See `tests/GAPS.MD`.
+Set Cover / RCPSP / PDLP numerical contracts retain atomic model inputs, captured arrays, large columns, nonfinite cost serialization, resource aggregation and native sparse/nonfinite PDLP validation. The Set Cover cost-update numerical heuristic and its dedicated recovery case are deferred. Loaded-solution and duplicate-counting regression cases remain. These are adversarial native contracts, not additional upstream Python assertion-parity claims.
 
-MPSolver / CP-SAT / MathOpt / Routing numerical contracts (2026-10-08): 18 shared results pass per Node/Bun/Deno across direct/worker/server, covering submitted model/parameter ownership, exact map-domain complements, large expression/result payloads and native Routing int64 rejection/recovery. Complete installed runtime suites, all ten full Vite/webpack/Rollup browser profiles, 42 unit files and 166 site checks pass. Native validators and existing domain primitives remain authoritative; these are additional native contracts, not upstream assertion-parity claims. Final production/bundler verification is recorded in `tests/GAPS.MD`.
+MPSolver / CP-SAT / MathOpt / Routing numerical contracts (2026-10-08): 18 shared results pass per Node/Bun/Deno across direct/worker/server, covering submitted model/parameter ownership, exact map-domain complements, large expression/result payloads and native Routing int64 rejection/recovery. Complete installed runtime suites, all ten full Vite/webpack/Rollup browser profiles, 42 unit files and 166 site checks pass. Native validators and existing domain primitives remain authoritative; these are additional native contracts, not upstream assertion-parity claims.
 
-Runtime/release gate before scope correction (2026-10-08): all 28 WASM targets and 14 binary pairs verify; complete Node/Bun/Deno and all ten Vite/webpack/Rollup browser profiles pass. The fresh production image passes all 201 native checks and the installed Node client suite again; 42 unit files, 166 site checks and documentation checks pass. This release gate does not upgrade deferred Python-only/backend-dependent parity claims or establish unmodified-native equivalence. Scope cleanup and MathOpt/RCPSP feature work remain. Evidence and the exact packed artifact are in `tests/GAPS.MD`.
+Runtime/release gate before scope correction (2026-10-08): all 28 WASM targets and 14 binary pairs verify; complete Node/Bun/Deno and all ten Vite/webpack/Rollup browser profiles pass. The fresh production image passes all 201 native checks and the installed Node client suite again; 42 unit files, 166 site checks and documentation checks pass. This release gate does not upgrade deferred Python-only/backend-dependent parity claims or establish unmodified-native equivalence. Scope cleanup and MathOpt/RCPSP feature work remain.
 
 MathOpt API cleanup (2026-10-10): eight Python equality/Boolean protocol cases
 are outside the TypeScript contract. The fake `VarEqVar`/Boolean helpers were

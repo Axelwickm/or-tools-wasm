@@ -113,14 +113,48 @@
       }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>CLP - transportation LP</h1>
     <p><em>Problem: decide how much each plant should ship to each warehouse so all demand is met at the lowest total shipping cost.</em></p>
-    <div class="code-toggle">
+
+    <p>
+      A continuous transportation LP: choose shipment quantities from plants to warehouses
+      while meeting demand at minimum cost with the COIN-OR CLP backend.
+    </p>
+    <div class="controls">
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+
+    <div class="control-actions"><button id="run" data-idle-label="Solve transportation LP">Solve transportation LP</button><button id="reset" type="button">Reset data</button></div>
+</div>
+    <div class="transport-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Each plant can ship up to its supply limit.</li>
+        <li>Each warehouse must receive exactly its demand.</li>
+        <li>Every plant-to-warehouse lane has a per-unit shipping cost.</li>
+        <li>CLP chooses continuous shipment quantities that minimize total cost.</li>
+        <li>After solving, thicker lanes carry more product.</li>
+      </ul>
+    </div>
+    <div class="transport-layout">
+      <div id="transport-viz" class="transport-viz" aria-label="Transportation network visualization"></div>
+      <p id="transport-detail" class="transport-detail">Hover a plant, warehouse, or lane to inspect it.</p>
+    </div>
+    <div class="transport-editor">
+      <h2>Problem Data</h2>
+      <div id="transport-editor"></div>
+    </div>
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view shipment quantities and total cost.</div>
+    </section>
+    <details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
@@ -172,37 +206,7 @@ await solver.solve({ executor: 'worker' });
 console.log(objective.value());</code></pre>
       </details>
     </div>
-    <p>
-      A continuous transportation LP: choose shipment quantities from plants to warehouses
-      while meeting demand at minimum cost with the COIN-OR CLP backend.
-    </p>
-    <div class="controls">
-      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <button id="run" data-idle-label="Solve transportation LP">Solve transportation LP</button>
-      <button id="reset" type="button">Reset data</button>
-    </div>
-    <div class="transport-explanation">
-      <h2>Model</h2>
-      <ul>
-        <li>Each plant can ship up to its supply limit.</li>
-        <li>Each warehouse must receive exactly its demand.</li>
-        <li>Every plant-to-warehouse lane has a per-unit shipping cost.</li>
-        <li>CLP chooses continuous shipment quantities that minimize total cost.</li>
-        <li>After solving, thicker lanes carry more product.</li>
-      </ul>
-    </div>
-    <div class="transport-layout">
-      <div id="transport-viz" class="transport-viz" aria-label="Transportation network visualization"></div>
-      <p id="transport-detail" class="transport-detail">Hover a plant, warehouse, or lane to inspect it.</p>
-    </div>
-    <div class="transport-editor">
-      <h2>Problem Data</h2>
-      <div id="transport-editor"></div>
-    </div>
-    <div id="solution-output">Run the solver to view shipment quantities and total cost.</div>
-    <p>Status / Response:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./clp_transportation.ts"></script>
   </body>

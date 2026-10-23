@@ -16,6 +16,7 @@ const executorSelector = requiredElement('solver-executor', 'select');
 const supplyCountInput = requiredElement('supply-count', 'input');
 const transitCountInput = requiredElement('transit-count', 'input');
 const demandCountInput = requiredElement('demand-count', 'input');
+const priceScalingInput = requiredElement('price-scaling', 'input');
 const randomizeButton = requiredElement('randomize', 'button');
 const runButton = requiredElement('run', 'button');
 let readNetworkFlowExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
@@ -116,12 +117,12 @@ function generateGraph() {
   arcs = generated;
 }
 
-function renderSolution(minCostFlow: SimpleMinCostFlow, result: MinCostFlowResult, allArcs: number[]) {
+function renderSolution(minCostFlow: SimpleMinCostFlow, result: MinCostFlowResult, allArcs: number[], priceScaling: boolean) {
   const rows = allArcs.map((arc) =>
     `<tr><td>${minCostFlow.tail(arc)}</td><td>${minCostFlow.head(arc)}</td><td>${minCostFlow.capacity(arc)}</td><td>${minCostFlow.unitCost(arc)}</td><td>${result.flow(arc)}</td></tr>`,
   ).join('');
   solutionOutput.innerHTML = `
-    <strong>Optimal cost:</strong> ${result.optimalCost}<br>
+    <strong>${priceScaling ? 'Optimal cost' : 'Cost (native perturbed-cost optimum)'}:</strong> ${result.optimalCost}<br>
     <strong>Maximum flow:</strong> ${result.maximumFlow}
     <table>
       <thead><tr><th>Tail</th><th>Head</th><th>Capacity</th><th>Unit cost</th><th>Flow</th></tr></thead>
@@ -181,6 +182,8 @@ async function runMinCostFlow() {
   statusEl.textContent = '';
   try {
     const minCostFlow = new SimpleMinCostFlow();
+    const priceScaling = priceScalingInput.checked;
+    minCostFlow.setPriceScaling(priceScaling);
     const allArcs = minCostFlow.addArcsWithCapacityAndUnitCost(
       arcs.map((arc) => arc.from),
       arcs.map((arc) => arc.to),
@@ -199,7 +202,7 @@ async function runMinCostFlow() {
       unitCost: Number(minCostFlow.unitCost(arc)),
       flow: Number(result.flow(arc)),
     }));
-    renderSolution(minCostFlow, result, allArcs);
+    renderSolution(minCostFlow, result, allArcs, priceScaling);
     renderGraph(true);
   } catch (error) {
     const message = `Solve failed: ${error instanceof Error ? error.message : String(error)}`;

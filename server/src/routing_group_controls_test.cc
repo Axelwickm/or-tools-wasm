@@ -332,6 +332,26 @@ void InspectsAndValidatesTypeRequirements() {
   auto untyped = Request(2, 1, 1); Requirement(untyped, 1, 0, {});
   Expect(!Execute(untyped).ok, "Requirements need an existing type count");
 }
+void AppliesAndInspectsSameActivityGroups() {
+  auto request = Request(4, 1, 10);
+  for(int index : {1,2,3}) Disjunction(request,{index},5,1,0);
+  auto add=[&](std::vector<int> indices){auto* group=request.add_operations()->mutable_add_same_activity_group(); for(int index:indices)group->add_indices(index);};
+  add({1,2}); add({2,3}); add({}); add({1}); add({1,1});
+  Activity(request,1,0);
+  const auto solved=Response(request);
+  Expect(solved.has_solution() && solved.objective_value()==15 && solved.vehicle_values(2)==-1 && solved.vehicle_values(3)==-1,
+      "Overlapping activity groups propagate native drop decisions");
+  auto query=request; query.set_inspect_activity_groups(true);
+  const auto inspection=Response(query).activity_groups();
+  Expect(inspection.groups(1)==inspection.groups(2) && inspection.groups(2)==inspection.groups(3), "Native inspection reflects transitive active-variable equality");
+  const auto& indices=inspection.members(inspection.groups(1)).indices();
+  Expect(indices.size()==3 && indices.Get(0)==1 && indices.Get(1)==2 && indices.Get(2)==3, "Native group members preserve routing indices");
+  Activity(request,2,1); Expect(!Response(request).has_solution(), "Contradictory grouped activities are infeasible");
+  for (int invalid : {-1,4,std::numeric_limits<int>::max()}) {
+    auto malformed=Request(4,1,1); malformed.add_operations()->mutable_add_same_activity_group()->add_indices(invalid);
+    Expect(!Execute(malformed).ok, "Invalid group indices reject before native access");
+  }
+}
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
     {"EnforcesSameVehicleTypeRequirements", EnforcesSameVehicleTypeRequirements},
@@ -349,6 +369,7 @@ int RunAllTests() {
     {"EnforcesPickupDeliveryPolicies", EnforcesPickupDeliveryPolicies},
     {"AppliesDisjunctionCardinalityAndPenaltyModes", AppliesDisjunctionCardinalityAndPenaltyModes},
     {"RejectsMalformedGroupControls", RejectsMalformedGroupControls},
+    {"AppliesAndInspectsSameActivityGroups", AppliesAndInspectsSameActivityGroups},
   };
   for (const auto& [name, test] : tests) {
     try { test(); std::cout << "[PASS] " << name << '\n'; }

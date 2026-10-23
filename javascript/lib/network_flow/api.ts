@@ -263,6 +263,13 @@ export class SimpleMinCostFlow {
   private capacities: bigint[] = [];
   private unitCosts: bigint[] = [];
   private nodeSupplies: bigint[] = [];
+  private priceScaling = true;
+
+  /** Disabling native price scaling permits a perturbed-cost optimum. */
+  setPriceScaling(value: boolean): void {
+    if (typeof value !== 'boolean') throw new TypeError('Min-cost-flow price scaling must be a Boolean.');
+    this.priceScaling = value;
+  }
 
   /** Solve once and return an answer independent of later solves or model changes. */
   async solve(options: NetworkFlowSolveOptions & { maxFlowWithMinCost?: boolean } = {}): Promise<MinCostFlowResult> {
@@ -270,7 +277,7 @@ export class SimpleMinCostFlow {
     return createMinCostFlowResult(await solveNetworkFlow({
       type: 'minCostFlow', tails: [...this.tails], heads: [...this.heads],
       capacities: [...this.capacities], unitCosts: [...this.unitCosts],
-      supplies: [...this.nodeSupplies], solveMaxFlowWithMinCost: maxFlowWithMinCost,
+      supplies: [...this.nodeSupplies], solveMaxFlowWithMinCost: maxFlowWithMinCost, priceScaling: this.priceScaling,
     }, execution));
   }
 

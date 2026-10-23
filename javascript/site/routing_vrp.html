@@ -40,14 +40,39 @@
       }
 		</style>
 	</head>
-	<body>
+	<body class="example-page">
 		<nav>
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>Routing - Vehicle Routing Problem</h1>
 		<p><em>Problem: split visits across several vehicles so every location is served and total travel distance is minimized.</em></p>
-		<div class="code-toggle">
+
+		<ul class="example-notes">
+			<li>Several vehicles start and end at the same depot.</li>
+			<li>Every destination must be assigned to exactly one vehicle route.</li>
+			<li>Each destination has demand 1, and each vehicle has a balanced destination capacity.</li>
+			<li>The travel cost is the straight-line distance between two locations.</li>
+			<li>The solver minimizes total distance across all vehicle routes.</li>
+			<li>Before solving, the map shows unassigned destinations; after solving, each color is one vehicle route.</li>
+		</ul>
+		<div class="controls">
+			<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+			<label>Destinations <input id="destination-count" class="short-number" type="number" min="4" value="60"></label>
+			<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
+
+		<div class="control-actions"><button id="run">Solve VRP</button><button id="randomize" type="button">Randomize</button></div>
+</div>
+		<div class="route-visual-layout">
+			<svg id="route-map" viewBox="0 0 960 620" role="img" aria-label="Vehicle routing map"></svg>
+			<section class="route-panel">
+				<h2>Routes</h2>
+				<div id="route-output">Run the solver to view vehicle routes.</div>
+			</section>
+		</div>
+		<details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+
+		<div class="code-toggle code-samples">
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import {
@@ -55,7 +80,6 @@
   RoutingIndexManager,
   RoutingModel,
 } from 'or-tools-wasm/routing';
-
 
 const locations = [
   { x: 480, y: 310 },
@@ -92,32 +116,8 @@ const result = await routing.solve({
 console.log(result.status, result.assignment?.objectiveValue());</code></pre>
 			</details>
 		</div>
-		<ul class="example-notes">
-			<li>Several vehicles start and end at the same depot.</li>
-			<li>Every destination must be assigned to exactly one vehicle route.</li>
-			<li>Each destination has demand 1, and each vehicle has a balanced destination capacity.</li>
-			<li>The travel cost is the straight-line distance between two locations.</li>
-			<li>The solver minimizes total distance across all vehicle routes.</li>
-			<li>Before solving, the map shows unassigned destinations; after solving, each color is one vehicle route.</li>
-		</ul>
-		<div class="controls">
-			<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-			<label>Destinations <input id="destination-count" class="short-number" type="number" min="4" value="60"></label>
-			<label>Vehicles <input id="vehicle-count" class="short-number" type="number" min="1" value="4"></label>
-			<button id="randomize" type="button">Randomize</button>
-			<button id="run">Solve VRP</button>
-		</div>
-		<div class="route-visual-layout">
-			<svg id="route-map" viewBox="0 0 960 620" role="img" aria-label="Vehicle routing map"></svg>
-			<section class="route-panel">
-				<h2>Routes</h2>
-				<div id="route-output">Run the solver to view vehicle routes.</div>
-			</section>
-		</div>
-		<p>Status / Response:</p>
-		<pre id="status"></pre>
-
-		<script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./example_controls.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./routing_vrp.ts"></script>
 	</body>
 </html>

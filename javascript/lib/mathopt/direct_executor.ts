@@ -1,3 +1,5 @@
+import { fromBinary } from '@bufbuild/protobuf';
+import { MathOptModelTransformationResponseSchema } from '../generated/bridge/mathopt_model_transform_pb.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import { loadMathOptRuntime } from '../runtime_loader.js';
 import {
@@ -43,7 +45,7 @@ export class DirectMathOptExecutor implements MathOptExecutor {
   ): MathOptJob {
     if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextRequestId++;
-    const state = { cancelled: false, nativeRunning: false, interruptible: (operation.type === 'solve' || operation.type === 'incrementalSolve') && operation.useInterrupter, interrupted: false };
+    const state = { cancelled: false, nativeRunning: false, interruptible: (operation.type === 'solve' || operation.type === 'incrementalSolve' || operation.type === 'computeInfeasibleSubsystem') && operation.useInterrupter, interrupted: false };
     this.activeJob = state;
     return {
       requestId,
@@ -100,19 +102,19 @@ export class DirectMathOptExecutor implements MathOptExecutor {
         options.onDispatch?.(module);
         const state = this.activeJob!;
         if (state.cancelled) throw Object.assign(new Error('MathOpt operation was cancelled.'), { name: 'AbortError' });
-        state.nativeRunning = operation.type === 'solve' || operation.type === 'incrementalSolve';
+        state.nativeRunning = operation.type === 'solve' || operation.type === 'incrementalSolve' || operation.type === 'computeInfeasibleSubsystem';
         try {
-          const request = state.interrupted && (operation.type === 'solve' || operation.type === 'incrementalSolve')
+          const request = state.interrupted && (operation.type === 'solve' || operation.type === 'incrementalSolve' || operation.type === 'computeInfeasibleSubsystem')
             ? { ...operation, interruptAtStart: true } : operation;
           const registry: Map<number, (payload: Uint8Array) => number> = module.__mathoptCallbacks ??= new Map();
           const messages: Map<number, (payload: Uint8Array) => void> = module.__mathoptMessages ??= new Map();
           let callbackFailure: { error: unknown } | undefined;
-          if (request.type === 'solve' || request.type === 'incrementalSolve') {
+          if (request.type === 'solve' || request.type === 'incrementalSolve' || request.type === 'computeInfeasibleSubsystem') {
             if (request.streamMessages) messages.set(requestId, payload => {
               void options.onEvent(mathOptProtocol.decodeEvent!(payload)!);
             });
-            if (request.callbackRegistration !== undefined && !options.onCallback) throw new Error('MathOpt callback registration requires a handler.');
-            if (request.callbackRegistration !== undefined) registry.set(requestId, payload => {
+            if (request.type !== 'computeInfeasibleSubsystem' && request.callbackRegistration !== undefined && !options.onCallback) throw new Error('MathOpt callback registration requires a handler.');
+            if (request.type !== 'computeInfeasibleSubsystem' && request.callbackRegistration !== undefined) registry.set(requestId, payload => {
               let reply: Uint8Array;
               // executeSolverJob retains the user exception while native search
               // terminates normally, allowing incremental state to be committed.
@@ -164,6 +166,39 @@ export class DirectMathOptExecutor implements MathOptExecutor {
   }
 
   private async executeNative(module: OrToolsWasmModule, operation: MathOptOperation, callbackId: number): Promise<MathOptResult> {
+    if (operation.type === 'expressionBounds') {
+      const pointer = allocateWasmBytes(module, operation.request);
+      try {
+        return { expressionBounds: await readWasmResult(module, length => module.ccall('mathopt_expression_bounds', 'number',
+          ['number', 'number', 'number'], [pointer, operation.request.length, length], { async: true }) as Promise<number>) };
+      } finally { module._free(pointer); }
+    }
+    if (operation.type === 'addRobustConstraint') {
+      const pointer = allocateWasmBytes(module, operation.request);
+      try {
+        const bytes = await readWasmResult(module, length => module.ccall('mathopt_add_robust_constraint', 'number',
+          ['number', 'number', 'number'], [pointer, operation.request.length, length], { async: true }) as Promise<number>);
+        const response = fromBinary(MathOptModelTransformationResponseSchema, bytes);
+        return response.error ? { validationError: response.error } : { model: response.modelProto };
+      } finally { module._free(pointer); }
+    }
+    if (operation.type === 'formulateIndicatorConstraintAsMip') {
+      const pointer = allocateWasmBytes(module, operation.model);
+      try {
+        const bytes = await readWasmResult(module, length => module.ccall('mathopt_formulate_indicator_constraint_as_mip', 'number',
+          ['number', 'number', 'bigint', 'number'], [pointer, operation.model.length, operation.indicatorConstraintId, length], { async: true }) as Promise<number>);
+        const response = fromBinary(MathOptModelTransformationResponseSchema, bytes);
+        return response.error ? { validationError: response.error } : { model: response.modelProto };
+      } finally { module._free(pointer); }
+    }
+    if (operation.type === 'checkPrimalFeasibility' || operation.type === 'improveSolution') {
+      const pointer = allocateWasmBytes(module, operation.request);
+      try {
+        const result = await readWasmResult(module, length => module.ccall(operation.type === 'improveSolution' ? 'mathopt_improve_solution' : 'mathopt_check_primal_feasibility', 'number',
+          ['number', 'number', 'number'], [pointer, operation.request.length, length], { async: true }) as Promise<number>);
+        return operation.type === 'improveSolution' ? { improvedValues: result } : { primalFeasibility: result };
+      } finally { module._free(pointer); }
+    }
     if (operation.type === 'incrementalUpdate') {
       const pointer = allocateWasmBytes(module, operation.modelUpdate);
       try {
@@ -211,10 +246,22 @@ export class DirectMathOptExecutor implements MathOptExecutor {
 
   private async executeSolverNative(
     module: OrToolsWasmModule,
-    operation: Exclude<MathOptOperation, { type: 'modelProtoToMps' | 'mpsToModelProto' | 'validateModel' | 'validateResult' | 'convertResult' | 'incrementalUpdate' }>,
+    operation: Exclude<MathOptOperation, { type: 'expressionBounds' | 'improveSolution' | 'addRobustConstraint' | 'formulateIndicatorConstraintAsMip' | 'checkPrimalFeasibility' | 'modelProtoToMps' | 'mpsToModelProto' | 'validateModel' | 'validateResult' | 'convertResult' | 'incrementalUpdate' }>,
     callbackId: number,
   ): Promise<Uint8Array> {
     switch (operation.type) {
+      case 'computeInfeasibleSubsystem': {
+        const pointer = allocateWasmBytes(module, operation.request);
+        let updatePointer = 0;
+        try {
+          if (operation.modelUpdate !== undefined) updatePointer = allocateWasmBytes(module, operation.modelUpdate);
+          return await readWasmResult(module, async length => await module.ccall('mathopt_compute_infeasible_subsystem', 'number',
+            Array(10).fill('number'), [pointer, operation.request.length, Number(operation.useInterrupter),
+              Number(operation.interruptAtStart), length, operation.streamMessages ? callbackId : 0,
+              operation.handle === undefined ? -1 : toIndex(operation.handle, 'MathOpt incremental solver handle'),
+              updatePointer, operation.modelUpdate?.length ?? 0, Number(operation.modelUpdate !== undefined)], { async: true }) as number);
+        } finally { module._free(pointer); if (updatePointer) module._free(updatePointer); }
+      }
       case 'solve': {
         let callbackPointer = 0, pointer = 0;
         try {

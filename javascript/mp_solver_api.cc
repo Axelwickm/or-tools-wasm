@@ -22,11 +22,11 @@
 #include "CbcModel.hpp"
 #endif
 #include "generated_proto_schemas.h"
+#include "javascript/mp_solver_search.h"
 #include "ortools/algorithms/knapsack_solver.h"
 #include "knapsack_validation.h"
 #include "mp_solver_parameters.h"
 #include "javascript/mp_solver_messages.h"
-#include "javascript/mp_solver_iis.h"
 #include "mp_solver_model_import.h"
 #include "javascript/mp_solver_model_queries.h"
 #include "ortools/linear_solver/linear_solver.h"
@@ -34,6 +34,8 @@
 #include "ortools/linear_solver/solve_mp_model.h"
 #include "javascript/mp_solver_solution_verification.h"
 #include "javascript/mp_solver_session.h"
+#include "set_cover_mip.h"
+#include "set_cover_wasm_model.h"
 
 namespace {
 
@@ -197,13 +199,27 @@ std::function<void(const std::string&)> MpSolverMessages(int message_id) {
   };
 }
 
+ortools_wasm::ScopedMpSolverCallback::Transport MpSolverCallbackTransport(int callback_id) {
+  if (callback_id <= 0) return {};
+  return [callback_id](const std::string& bytes) -> std::optional<std::string> {
+    auto* buffer = reinterpret_cast<uint8_t*>(MAIN_THREAD_EM_ASM_PTR({
+      return Module.__mpSolverCallbacks.get($0)(HEAPU8.slice($1, $1 + $2));
+    }, callback_id, bytes.data(), bytes.size()));
+    if (!buffer) return std::nullopt;
+    uint32_t length; std::memcpy(&length, buffer, sizeof(length));
+    std::string reply(reinterpret_cast<const char*>(buffer + sizeof(length)), length);
+    std::free(buffer); return reply;
+  };
+}
+
 uint8_t* SolveModelRequestWithThreads(
     MPModelRequest request, int num_threads,
     std::atomic<bool>* interrupt, size_t* out_len,
     const MPSolverParameters* parameters = nullptr,
     std::function<void(const std::string&)> messages = nullptr,
     ortools_wasm::bridge::v1::MpSolverNativeMetadata* native_metadata = nullptr,
-    bool editable_snapshot = false) {
+    bool editable_snapshot = false,
+    const ortools_wasm::bridge::v1::MpSolverSolveRequest* search = nullptr, int callback_id = 0) {
   g_last_solve_metadata = "{}";
   MPSolutionResponse response;
   if (!ortools_wasm::NormalizeMpSolverParameters(&request, num_threads, &response)) {
@@ -279,6 +295,9 @@ uint8_t* SolveModelRequestWithThreads(
     }
   }
 
+  if (search && search->has_starting_basis()) ortools_wasm::ApplyMpStartingBasis(solver, search->starting_basis());
+  ortools_wasm::ScopedMpSolverCallback callback(solver,
+      search && search->has_callback_registration() ? &search->callback_registration() : nullptr, MpSolverCallbackTransport(callback_id));
   ortools_wasm::ScopedMpSolverMessages scoped_messages(solver, std::move(messages));
   std::atomic<bool> solve_finished = false;
   std::thread interrupt_thread;
@@ -297,13 +316,16 @@ uint8_t* SolveModelRequestWithThreads(
       }
     });
   }
-  if (parameters != nullptr) {
-    solver.Solve(*parameters);
-  } else {
-    solver.Solve();
+  try {
+    if (parameters != nullptr) solver.Solve(*parameters); else solver.Solve();
+  } catch (...) {
+    solve_finished.store(true);
+    if (interrupt_thread.joinable()) interrupt_thread.join();
+    throw;
   }
   solve_finished.store(true);
   if (interrupt_thread.joinable()) interrupt_thread.join();
+  callback.CheckError();
   solver.FillSolutionResponseProto(&response);
   if (native_metadata) ortools_wasm::mp_session::FillMetadata(solver, response, native_metadata);
   std::ostringstream metadata;
@@ -343,6 +365,33 @@ uint8_t* SolveModelRequestWithThreads(
 }  // namespace
 
 extern "C" {
+EMSCRIPTEN_KEEPALIVE const char* set_cover_mip(const double* costs, const double* starts,
+    const double* elements, int num_subsets, int num_elements_data, const double* selected,
+    const double* focus, int focus_count, int relaxation, double time_limit_seconds) {
+  using namespace ortools_wasm::set_cover_wasm;
+  using operations_research::SetCoverInvariant;
+  try {
+    if (num_subsets < 0 || num_elements_data < 0 || !starts || (num_subsets && (!costs || !selected)) ||
+        (num_elements_data && !elements) || focus_count < -1 || (focus_count > 0 && !focus) || (relaxation != 0 && relaxation != 1))
+      throw std::invalid_argument("Invalid Set Cover MIP buffers.");
+    auto model = BuildModel(costs, starts, elements, num_subsets, num_elements_data);
+    SetCoverInvariant invariant(&model);
+    invariant.LoadSolution(ReadSolution(selected, num_subsets));
+    std::vector<SubsetIndex> indices;
+    for (int i = 0; i < focus_count; ++i) indices.push_back(SubsetIndex(NumberToBaseInt(focus[i], "focus", i)));
+    const auto result = ortools_wasm::RunSetCoverMip(invariant, relaxation != 0, indices, focus_count >= 0, time_limit_seconds);
+    std::ostringstream out; out << std::setprecision(17) << "{\"ok\":true,\"nextSolution\":" << (result.next_solution ? "true" : "false");
+    out << ",\"cost\":"; WriteJsonNumber(out, invariant.cost());
+    out << ",\"numUncoveredElements\":" << invariant.num_uncovered_elements();
+    out << ",\"selected\":"; WriteBoolVector(out, invariant.is_selected().get());
+    out << ",\"runTimeSeconds\":" << result.run_time_seconds << ",\"runTimeMicroseconds\":" << result.run_time_microseconds;
+    out << ",\"mip\":{\"subproblemStatus\":" << result.subproblem_status;
+    if (result.objective_value) { out << ",\"objectiveValue\":"; WriteJsonNumber(out, *result.objective_value); }
+    out << "}}"; return StoreString(out.str());
+  } catch (const std::exception& error) { return StoreString("{\"ok\":false,\"error\":\"" + JsonEscape(error.what()) + "\"}"); }
+}
+
+
 
 EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_bridge_request(
     const uint8_t* data, size_t size, size_t* out_len, int message_id) {
@@ -367,7 +416,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_bridge_request(
           input.solve().interruptible() ? &g_mp_solver_interrupt_requested : nullptr,
           &result_size, &parameters,
           input.solve().stream_messages() ? MpSolverMessages(message_id) : nullptr,
-          response.mutable_metadata(), input.solve().editable_snapshot()), &std::free);
+          response.mutable_metadata(), input.solve().editable_snapshot(), &input.solve(), message_id), &std::free);
     if (!result) throw std::runtime_error("Could not allocate MPSolver result.");
     if (response.metadata().solver_version().empty()) response.clear_metadata();
     response.set_response_proto(result.get(), result_size);
@@ -377,28 +426,6 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_solve_bridge_request(
   }
 }
 
-EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_compute_iis_request(
-    const uint8_t* data, size_t size, size_t* out_len) {
-  const ResetMpSolverInterruptOnExit reset_interrupt;
-  namespace bridge = ortools_wasm::bridge::v1;
-  g_mp_session_error.clear();
-  try {
-    bridge::MpSolverBridgeRequest request;
-    if (!request.ParseFromArray(data, size) || !request.has_iis()) {
-      g_mp_session_error = "Invalid MPSolver IIS request."; *out_len = 0; return nullptr;
-    }
-    const auto result = ortools_wasm::ComputeMpSolverIis(request.iis(),
-        request.iis().interruptible() ? &g_mp_solver_interrupt_requested : nullptr);
-    if (!result.ok()) {
-      g_mp_session_error = result.status().ToString(); *out_len = 0; return nullptr;
-    }
-    bridge::MpSolverBridgeResponse response;
-    *response.mutable_iis() = *result;
-    return CopyProtoToBuffer(response, out_len);
-  } catch (const std::exception& error) {
-    g_mp_session_error = error.what(); *out_len = 0; return nullptr;
-  }
-}
 
 EMSCRIPTEN_KEEPALIVE const char* mp_solver_bridge_error() { return g_mp_session_error.c_str(); }
 
@@ -440,6 +467,9 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_session_request(const uint8_t* data, siz
           if (input.solve().num_threads() > 1 && solver.ProblemType() == MPSolver::CBC_MIXED_INTEGER_PROGRAMMING && !CbcModel::haveMultiThreadSupport())
             throw std::invalid_argument("CBC was built without multi-thread support.");
 #endif
+          ortools_wasm::ScopedMpSolverCallback callback(solver,
+              input.solve().has_callback_registration() ? &input.solve().callback_registration() : nullptr,
+              MpSolverCallbackTransport(message_id));
           ortools_wasm::ScopedMpSolverMessages messages(solver, input.solve().stream_messages() ? MpSolverMessages(message_id) : nullptr);
           std::atomic<bool> finished = false;
           std::thread monitor;
@@ -456,6 +486,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t* mp_solver_session_request(const uint8_t* data, siz
           try { solver.Solve(parameters); }
           catch (...) { finished.store(true); if (monitor.joinable()) monitor.join(); throw; }
           finished.store(true); if (monitor.joinable()) monitor.join();
+          callback.CheckError();
         });
         break;
       }

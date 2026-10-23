@@ -53,7 +53,15 @@ export function decodeMathOptResultProto<K extends keyof ProtoMap>(kind: K, byte
   return omitAbsentProtobufMessages(decodeProtobufWithExactLongs<ProtoMap[K]>(protoType(kind), bytes));
 }
 
+export function decodeMathOptPrimalValuesProto(bytes: Uint8Array): import('../generated/mathopt_result_types.js').math_opt_SparseDoubleVectorProto {
+  return decodeProtobufWithExactLongs(root.lookupType('operations_research.math_opt.SparseDoubleVectorProto'), bytes);
+}
+
 const root = protobuf.Root.fromJSON(mathOptResultDescriptor).resolveAll();
+
+export function mathOptProtoType(name: string): protobuf.Type {
+  return root.lookupType(name.includes('.') ? name : `operations_research.math_opt.${name}`);
+}
 export function decodeMathOptSolveResult(bytes: Uint8Array, defaults = true): math_opt_SolveResultProto {
   const type = root.lookupType('operations_research.math_opt.SolveResultProto');
   const message = type.decode(bytes);
@@ -68,4 +76,12 @@ export function decodeMathOptSolveResult(bytes: Uint8Array, defaults = true): ma
     }
   }
   return result;
+}
+
+export function encodeGScipParameters(input: object): Uint8Array {
+  const type = root.lookupType('operations_research.GScipParameters');
+  const value = encodeProtobufBigInts(normalizeProtobufInput(input, type), type) as Record<string, unknown>;
+  const error = type.verify(value);
+  if (error) throw new TypeError(`${type.name}: ${error}`);
+  return type.encode(type.create(value)).finish();
 }

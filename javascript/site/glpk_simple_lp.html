@@ -10,20 +10,44 @@
       #status { min-height: 8rem; }
     </style>
   </head>
-  <body data-solver-id="GLPK_LP">
+  <body class="example-page" data-solver-id="GLPK_LP">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>GLPK - simple linear program</h1>
     <p><em>Problem: choose values for two continuous variables that maximize profit while staying inside two linear resource limits.</em></p>
-    <div class="code-toggle">
+
+    <p>
+      The <code>simple_lp_program.py</code> model solved with the GLPK LP backend.
+    </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>The decision variables are continuous values for <code>x</code> and <code>y</code>.</li>
+        <li>The constraints limit the feasible region to a small polygon.</li>
+        <li>The objective maximizes a linear profit expression.</li>
+        <li>GLPK solves the LP and returns the best feasible corner.</li>
+      </ul>
+    </div>
+    <div class="controls">
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="1" min="1"></label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+
+    <div class="control-actions"><button id="run" data-idle-label="Solve LP">Solve LP</button></div>
+</div>
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the solution.</div>
+    </section>
+    <details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
 const solver = MPSolver.createSolver('GLPK_LP');
 if (!solver) throw new Error('GLPK_LP is unavailable');
-solver.setNumThreads(4);
+solver.setNumThreads(1);
 
 const x = solver.addNumVariable(0, solver.infinity(), 'x');
 const y = solver.addNumVariable(0, solver.infinity(), 'y');
@@ -40,26 +64,7 @@ objective.setMaximization();
 await solver.solve({ executor: 'worker' });</code></pre>
       </details>
     </div>
-    <p>
-      The <code>simple_lp_program.py</code> model solved with the GLPK LP backend.
-    </p>
-    <div class="example-explanation">
-      <h2>Model</h2>
-      <ul>
-        <li>The decision variables are continuous values for <code>x</code> and <code>y</code>.</li>
-        <li>The constraints limit the feasible region to a small polygon.</li>
-        <li>The objective maximizes a linear profit expression.</li>
-        <li>GLPK solves the LP and returns the best feasible corner.</li>
-      </ul>
-    </div>
-    <div class="controls">
-      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <button id="run" data-idle-label="Solve LP">Solve LP</button>
-    </div>
-    <div id="solution-output">Run the solver to view the solution.</div>
-    <p>Status / Response:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./glop_simple_lp.ts"></script>
   </body>

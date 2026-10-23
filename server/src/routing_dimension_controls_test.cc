@@ -582,8 +582,163 @@ void RejectsMalformedDomainAndExpressionRequests() {
     Expect(!Execute(request).ok, "Malformed typed domain/expression requests reject safely");
   }
 }
+void SupportsNativeBreakIntervals() {
+  auto request = Request();
+  AddTime(request);
+  auto* interval = request.add_operations()->mutable_add_break_interval();
+  interval->set_index(0); interval->set_start_min(1); interval->set_start_max(1); interval->set_duration(2); interval->set_name("rest");
+  auto* breaks = request.add_operations()->mutable_set_break_intervals();
+  breaks->set_dimension_name("time"); breaks->set_vehicle(0); breaks->add_intervals(0);
+  const auto response = Response(request);
+  Expect(response.has_solution() && response.break_assignments_size() == 1, "Native break assignment is returned");
+  const auto& value = response.break_assignments(0);
+  Expect(value.performed_min() == 1 && value.performed_max() == 1 && value.start_min() == 1
+      && value.start_max() == 1 && value.end_min() == 3 && value.end_max() == 3, "Native fixed break is performed in its window");
+  Expect(response.dimensions(0).cumul_mins(response.ends(0)) == 5, "Native travel includes the rest duration");
+  auto no_slack = request;
+  no_slack.mutable_operations(0)->mutable_add_dimension()->set_slack_max(0);
+  Expect(!Response(no_slack).has_solution(), "Mandatory break is infeasible without waiting capacity");
+  no_slack.mutable_operations(1)->mutable_add_break_interval()->set_optional(true);
+  const auto skipped = Response(no_slack);
+  Expect(skipped.has_solution() && skipped.break_assignments(0).performed_max() == 0
+      && !skipped.break_assignments(0).has_start_min(), "Native optional break is skipped and has no fabricated time");
+  auto distance = Request(); AddTime(distance);
+  auto* rule = distance.add_operations()->mutable_set_break_distance_duration();
+  rule->set_dimension_name("time"); rule->set_vehicle(0); rule->set_distance(2); rule->set_duration(1);
+  Expect(!Response(distance).has_solution(), "Native distance rule rejects a route with insufficient breaks");
+  auto service = request;
+  auto* pre_travel = service.mutable_operations(2)->mutable_set_break_intervals()->mutable_pre_travel();
+  pre_travel->set_dimension(3); for (int i = 0; i < 9; ++i) pre_travel->add_values(2);
+  auto* travel = service.mutable_operations(0)->mutable_add_dimension()->mutable_transit_matrix();
+  for (int i = 0; i < travel->values_size(); ++i) travel->set_values(i, 3);
+  Expect(!Response(service).has_solution(), "Native pre-travel service prevents an overlapping break");
+}
+bridge::RoutingAddDependentDimension* AddDependentTime(bridge::RoutingBridgeRequest& request, int variant = 0) {
+  auto* value = request.add_operations()->mutable_add_dependent_dimension();
+  *value->add_transit_matrices() = request.transit_matrix();
+  if (variant == 2) for (auto& transit : *value->mutable_transit_matrices(0)->mutable_values()) transit = 2;
+  const int indices = request.num_locations() + request.num_vehicles();
+  auto* matrix = value->add_dependent_matrices();
+  matrix->set_domain_start(0); matrix->set_domain_end(101);
+  for (int arc = 0; arc < indices * indices; ++arc) {
+    auto* function = matrix->add_functions(); function->add_x(0); function->add_x(100);
+    function->add_y(variant == 0 || variant == 4 ? 10 : 0);
+    function->add_y(variant == 0 ? 10 : variant == 2 ? 50 : variant == 4 ? 0 : 100);
+  }
+  value->add_capacities(100); value->set_fix_start_cumul_to_zero(true); value->set_name("dependent");
+  request.add_dimension_names("dependent"); return value;
+}
+void SupportsNativeStateDependentTransit() {
+  const int64_t expected[] = {33, 7, 10, 6, 30};
+  for (int variant = 0; variant < 5; ++variant) {
+    auto request = Request();
+    if (variant == 3) AddTime(request, 0, 100);
+    auto* dimension = AddDependentTime(request, variant);
+    if (variant == 3) dimension->set_base_dimension("time");
+    const auto response = Response(request);
+    Expect(response.has_solution() && response.dimensions(variant == 3 ? 1 : 0).cumul_values(3) == expected[variant],
+        "Native state-dependent transits use base/self cumuls and native fractional rounding");
+    auto* route = request.mutable_initial_assignment()->add_routes(); route->add_indices(1); route->add_indices(2);
+    request.set_read_assignment_only(true);
+    const auto restored = Response(request);
+    Expect(restored.has_solution() && restored.dimensions(variant == 3 ? 1 : 0).cumul_values(3) == expected[variant],
+        "Restoration evaluates native state-dependent transit");
+  }
+}
+bridge::RoutingBridgeRequest ConstantTransitRequest(bool dependent) {
+  auto request = Request();
+  if (dependent) {
+    auto* dimension = AddDependentTime(request);
+    dimension->set_slack_max(10);
+    for (auto& function : *dimension->mutable_dependent_matrices(0)->mutable_functions()) {
+      function.set_y(0, 1); function.set_y(1, 1);
+    }
+  } else {
+    AddTime(request, 10, 100);
+    for (auto& value : *request.mutable_operations(0)->mutable_add_dimension()->mutable_transit_matrix()->mutable_values()) value = 2;
+  }
+  return request;
+}
+void CountsDependentTransitOnceInGlobalSpan() {
+  for (bool dependent : {false, true}) {
+    auto request = ConstantTransitRequest(dependent);
+    auto* cost = request.add_operations()->mutable_set_dimension_value();
+    cost->set_dimension_name(dependent ? "dependent" : "time");
+    cost->set_kind(bridge::ROUTING_DIMENSION_VALUE_KIND_GLOBAL_SPAN_COST); cost->set_value(1);
+    const auto response = Response(request);
+    Expect(response.has_solution() && response.objective_value() == 9
+        && response.dimensions(0).cumul_values(response.ends(0)) == 6,
+        "Equivalent fixed and state-dependent transit must produce arc cost 3 plus global span 6");
+  }
+}
+void RejectsBreaksOnStateDependentDimensions() {
+  for (int kind = 0; kind < 3; ++kind) {
+    auto request = ConstantTransitRequest(kind != 0);
+    const std::string name = kind == 0 ? "time" : "dependent";
+    if (kind < 2) {
+      auto* interval = request.add_operations()->mutable_add_break_interval();
+      interval->set_index(0); interval->set_start_min(1); interval->set_start_max(1); interval->set_duration(2);
+      auto* breaks = request.add_operations()->mutable_set_break_intervals();
+      breaks->set_dimension_name(name); breaks->set_vehicle(0); breaks->add_intervals(0);
+    } else {
+      auto* rule = request.add_operations()->mutable_set_break_distance_duration();
+      rule->set_dimension_name(name); rule->set_vehicle(0); rule->set_distance(2); rule->set_duration(1);
+    }
+    if (kind == 0) {
+      const auto response = Response(request);
+      Expect(response.has_solution() && response.dimensions(0).cumul_values(response.ends(0)) == 8,
+          "The supported fixed-transit break scenario remains feasible");
+    } else {
+      const auto execution = Execute(request);
+      Expect(!execution.ok && execution.error_message.find("breaks on state-dependent dimensions are not supported") != std::string::npos,
+          "Unsupported break propagation rejects instead of reporting false infeasibility");
+    }
+  }
+}
+void RejectsMalformedStateDependentTransit() {
+  for (int variant = 0; variant < 11; ++variant) {
+    auto request = Request();
+    auto* dimension = AddDependentTime(request);
+    auto* matrix = dimension->mutable_dependent_matrices(0);
+    auto* function = matrix->mutable_functions(0);
+    if (variant == 0) function->mutable_y()->RemoveLast();
+    if (variant == 1) function->set_x(1, 0);
+    if (variant == 2) function->set_x(1, 99);
+    if (variant == 3) matrix->set_domain_start(-1);
+    if (variant == 4) matrix->set_domain_end(0);
+    if (variant == 5) matrix->mutable_functions()->RemoveLast();
+    if (variant == 6) dimension->set_capacities(0, 101);
+    if (variant == 7) dimension->set_base_dimension("missing");
+    if (variant == 8) function->set_y(1, 9007199254740992LL);
+    if (variant == 9) function->set_x(1, std::numeric_limits<int64_t>::max());
+    if (variant == 10) dimension->mutable_transit_matrices()->Clear();
+    Expect(!Execute(request).ok, "Malformed state-dependent request rejects without terminating the native server");
+  }
+}
+void RejectsMalformedBreaks() {
+  for (int variant = 0; variant < 6; ++variant) {
+    auto request = Request(); AddTime(request);
+    auto* interval = request.add_operations()->mutable_add_break_interval();
+    interval->set_start_min(1); interval->set_start_max(2); interval->set_duration(1);
+    auto* breaks = request.add_operations()->mutable_set_break_intervals();
+    breaks->set_dimension_name("time"); breaks->add_intervals(0);
+    if (variant == 0) interval->set_index(1);
+    if (variant == 1) interval->set_duration(-1);
+    if (variant == 2) interval->set_start_max(0);
+    if (variant == 3) breaks->set_vehicle(1);
+    if (variant == 4) breaks->set_intervals(0, 1);
+    if (variant == 5) { interval->set_start_max(std::numeric_limits<int64_t>::max()); }
+    Expect(!Execute(request).ok, "Malformed native break request rejects safely");
+  }
+}
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
+    {"SupportsNativeStateDependentTransit", SupportsNativeStateDependentTransit},
+    {"CountsDependentTransitOnceInGlobalSpan", CountsDependentTransitOnceInGlobalSpan},
+    {"RejectsBreaksOnStateDependentDimensions", RejectsBreaksOnStateDependentDimensions},
+    {"RejectsMalformedStateDependentTransit", RejectsMalformedStateDependentTransit},
+    {"SupportsNativeBreakIntervals", SupportsNativeBreakIntervals},
+    {"RejectsMalformedBreaks", RejectsMalformedBreaks},
     {"InspectsNativeDomainsAndHoles", InspectsNativeDomainsAndHoles},
     {"AppliesNativeLinearArithmetic", AppliesNativeLinearArithmetic},
     {"InspectsNativeCostsAndSoftBounds", InspectsNativeCostsAndSoftBounds},

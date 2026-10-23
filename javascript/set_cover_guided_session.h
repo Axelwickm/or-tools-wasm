@@ -9,8 +9,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
-#include "absl/random/random.h"
+#include "javascript/session_registry.h"
 #include "javascript/set_cover_guided_tabu.h"
 #include "ortools/set_cover/set_cover_invariant.h"
 
@@ -65,6 +66,13 @@ struct SetCoverGuidedSession {
     if (tabu) tabu->Initialize(); else local->Initialize();
   }
 
+  std::pair<double, double> RunTime() const {
+    RequireOpen();
+    const operations_research::SetCoverSolutionGenerator* generator = tabu ?
+        static_cast<const operations_research::SetCoverSolutionGenerator*>(tabu.get()) : local.get();
+    return {generator->run_time_in_seconds(), generator->run_time_in_microseconds()};
+  }
+
   bool Next(const std::vector<operations_research::SubsetIndex>& focus, bool has_focus,
             double max_iterations, double time_limit, const GuidedTabuParameters& parameters) {
     RequireOpen();
@@ -90,42 +98,31 @@ struct SetCoverGuidedSession {
 // a server restart. Each executor owns its registry; jobs hold shared ownership.
 class SetCoverGuidedSessions {
  public:
+  explicit SetCoverGuidedSessions(SessionLimits limits = {}) : sessions_(limits) {}
+  void ExpireIdle() { sessions_.ExpireIdle(); }
   uint64_t Create(operations_research::SetCoverModel model,
                   const operations_research::SubsetBoolVector& selected,
                   bool tabu, const GuidedTabuParameters& parameters) {
     auto session = std::make_shared<SetCoverGuidedSession>(std::move(model), selected, tabu, parameters);
-    std::lock_guard lock(mutex_);
-    uint64_t handle;
-    do { handle = absl::Uniform<uint64_t>(random_); } while (handle == 0 || sessions_.count(handle));
-    sessions_.emplace(handle, std::move(session));
-    return handle;
+    return sessions_.Insert(std::move(session));
   }
 
   std::shared_ptr<SetCoverGuidedSession> Find(uint64_t handle) {
-    std::lock_guard lock(mutex_);
-    const auto found = sessions_.find(handle);
-    if (found == sessions_.end()) throw std::runtime_error("Set Cover guided search handle is unavailable or closed.");
-    return found->second;
+    auto session = sessions_.Find(handle);
+    if (!session) throw std::runtime_error("Set Cover guided search handle is unavailable, expired or closed.");
+    return session;
   }
 
   void Delete(uint64_t handle) {
-    std::shared_ptr<SetCoverGuidedSession> session;
-    {
-      std::lock_guard lock(mutex_);
-      const auto found = sessions_.find(handle);
-      if (found == sessions_.end()) return;
-      session = found->second;
-    }
+    auto session = sessions_.Find(handle);
+    if (!session) return;
     std::lock_guard session_lock(session->mutex);
     session->closed = true;
-    std::lock_guard lock(mutex_);
-    sessions_.erase(handle);
+    sessions_.Erase(handle);
   }
 
  private:
-  std::mutex mutex_;
-  absl::BitGen random_;
-  std::unordered_map<uint64_t, std::shared_ptr<SetCoverGuidedSession>> sessions_;
+  SessionRegistry<SetCoverGuidedSession> sessions_;
 };
 }  // namespace ortools_wasm
 #endif

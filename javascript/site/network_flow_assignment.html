@@ -19,14 +19,45 @@
       #status { min-height: 7rem; }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>Network Flow - linear sum assignment</h1>
     <p><em>Problem: assign every worker to one task so the total assignment cost is as small as possible; this is the classic Hungarian algorithm problem.</em></p>
-    <div class="code-toggle">
+
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Each worker must be matched to exactly one task.</li>
+        <li>Each task must receive exactly one worker.</li>
+        <li>Every worker-task pair has an assignment cost.</li>
+        <li>The solver finds the one-to-one matching with minimum total cost.</li>
+        <li>The visualization highlights the selected worker-task pairs after solving.</li>
+      </ul>
+    </div>
+    <div class="controls">
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+      <label>Size <input id="assignment-size" class="short-number" type="number" min="2" value="4"></label>
+
+    <div class="control-actions"><button id="run" data-idle-label="Solve Assignment">Solve Assignment</button><button id="randomize" type="button">Randomize</button></div>
+</div>
+    <ul class="example-notes">
+      <li>Workers are green nodes and tasks are red nodes.</li>
+      <li>This is the linear assignment problem, commonly associated with the Hungarian algorithm.</li>
+      <li>Every worker can be matched to one task with a different cost.</li>
+      <li>Use Size and Randomize to generate a new square worker-task cost matrix.</li>
+      <li>The solver chooses one task per worker while minimizing total assignment cost.</li>
+      <li>After solving, selected matches are emphasized in the cost matrix.</li>
+    </ul>
+    <svg id="assignment-graph" viewBox="0 0 960 520" role="img" aria-label="Assignment graph"></svg>
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the assignment.</div>
+    </section>
+    <details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import {
@@ -64,34 +95,7 @@ if (result.status === SimpleLinearSumAssignmentStatus.OPTIMAL) {
 }</code></pre>
       </details>
     </div>
-    <div class="example-explanation">
-      <h2>Model</h2>
-      <ul>
-        <li>Each worker must be matched to exactly one task.</li>
-        <li>Each task must receive exactly one worker.</li>
-        <li>Every worker-task pair has an assignment cost.</li>
-        <li>The solver finds the one-to-one matching with minimum total cost.</li>
-        <li>The visualization highlights the selected worker-task pairs after solving.</li>
-      </ul>
-    </div>
-    <div class="controls">
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <label>Size <input id="assignment-size" class="short-number" type="number" min="2" value="4"></label>
-      <button id="randomize" type="button">Randomize</button>
-      <button id="run" data-idle-label="Solve Assignment">Solve Assignment</button>
-    </div>
-    <ul class="example-notes">
-      <li>Workers are green nodes and tasks are red nodes.</li>
-      <li>This is the linear assignment problem, commonly associated with the Hungarian algorithm.</li>
-      <li>Every worker can be matched to one task with a different cost.</li>
-      <li>Use Size and Randomize to generate a new square worker-task cost matrix.</li>
-      <li>The solver chooses one task per worker while minimizing total assignment cost.</li>
-      <li>After solving, selected matches are emphasized in the cost matrix.</li>
-    </ul>
-    <svg id="assignment-graph" viewBox="0 0 960 520" role="img" aria-label="Assignment graph"></svg>
-    <div id="solution-output">Run the solver to view the assignment.</div>
-    <p>Status:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./network_flow_assignment.ts"></script>
   </body>

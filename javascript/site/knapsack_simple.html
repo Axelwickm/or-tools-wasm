@@ -44,14 +44,6 @@
       #matrix .selected-cell {
         font-weight: 700;
       }
-      .summary-value {
-        font-size: 1.35rem;
-        font-weight: 700;
-        margin-bottom: 0.35rem;
-      }
-      .solution-panel {
-        margin: 0.75rem 0;
-      }
       .usage-output {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
@@ -88,7 +80,7 @@
       #status { min-height: 7rem; }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
@@ -96,7 +88,44 @@
     <h1>Knapsack - dedicated solver</h1>
     <p><em>Problem: choose the most valuable subset of items without exceeding the knapsack weight capacity.</em></p>
     <p>Values, resource weights and capacities are nonnegative integers. Zero-weight items are allowed.</p>
-    <div class="code-toggle">
+
+    <ul class="example-notes">
+        <li>Choose valuable items without exceeding any resource limit.</li>
+        <li>Add a resource row when the items must also fit another limit, such as volume or budget.</li>
+        <li>Selected items are highlighted after solving.</li>
+</ul>
+    <div class="controls">
+      <label>Backend
+        <select id="backend">
+          <option value="5">Branch and bound</option>
+          <option value="10">CP-SAT</option>
+          <option value="6">SCIP</option>
+          <option value="3">CBC</option>
+        </select>
+      </label>
+      <label hidden>Workers (CP-SAT)
+        <input id="num-workers" type="number" min="1" step="1" value="1" disabled>
+      </label>
+      <label>Executor
+        <select id="solver-executor">
+          <option value="direct">Direct</option>
+          <option value="worker" selected>Worker</option>
+          <option value="server">Server</option>
+        </select>
+      </label>
+
+<div class="control-actions"><button id="run" data-idle-label="Solve Knapsack">Solve Knapsack</button><button id="add-item" type="button">Add item</button><button id="remove-item" type="button">Remove item</button><button id="add-resource" type="button">Add resource</button><button id="remove-resource" type="button">Remove resource</button></div>
+</div>
+    <div class="matrix-scroll">
+      <table id="matrix" aria-label="Knapsack value and weight matrix"></table>
+    </div>
+    <div class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the solution.</div>
+      <div id="usage-output" class="usage-output"></div>
+    </div>
+    <details class="solve-log" open><summary>Solve log</summary><pre id="status" aria-live="polite"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import {
@@ -129,50 +158,7 @@ const packedItems = values
 console.log(result.profit, packedItems, result.optimal);</code></pre>
       </details>
     </div>
-    <ul class="example-notes">
-      <li>Each item is a column; edit the cells to change the model before solving.</li>
-      <li>The value row is what the solver maximizes.</li>
-      <li>Each resource row is something selected items consume, such as weight, volume, time, or budget.</li>
-      <li>The capacity cell at the right is the limit for that resource.</li>
-      <li>Add a resource when the same items must satisfy another limit at the same time.</li>
-      <li>CP-SAT supports the worker setting; the other backends use one worker.</li>
-      <li>After solving, selected item columns are highlighted and the solution reports total value, packed item ids, and resource usage.</li>
-    </ul>
-    <div class="controls">
-      <label>Backend
-        <select id="backend">
-          <option value="5">Branch and bound</option>
-          <option value="10">CP-SAT</option>
-          <option value="6">SCIP</option>
-          <option value="3">CBC</option>
-        </select>
-      </label>
-      <label>Workers (CP-SAT)
-        <input id="num-workers" type="number" min="1" step="1" value="1" disabled>
-      </label>
-      <label>Executor
-        <select id="solver-executor">
-          <option value="direct">Direct</option>
-          <option value="worker" selected>Worker</option>
-          <option value="server">Server</option>
-        </select>
-      </label>
-      <button id="run" data-idle-label="Solve Knapsack">Solve Knapsack</button>
-      <button id="add-item" type="button">Add item</button>
-      <button id="remove-item" type="button">Remove item</button>
-      <button id="add-resource" type="button">Add resource</button>
-      <button id="remove-resource" type="button">Remove resource</button>
-    </div>
-    <div class="matrix-scroll">
-      <table id="matrix" aria-label="Knapsack value and weight matrix"></table>
-    </div>
-    <div class="solution-panel">
-      <h2>Solution</h2>
-      <div id="solution-output">Run the solver to view the solution.</div>
-      <div id="usage-output" class="usage-output"></div>
-    </div>
-    <p>Status:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./knapsack_simple.ts"></script>
   </body>

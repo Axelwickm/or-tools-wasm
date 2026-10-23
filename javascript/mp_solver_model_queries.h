@@ -19,9 +19,20 @@ inline absl::StatusOr<bridge::v1::MpSolverBridgeResponse> QueryMpSolverModel(
     const bridge::v1::MpSolverBridgeRequest& request) {
   namespace wire = bridge::v1;
   using operations_research::MPSolver;
+  if (request.has_capabilities()) {
+    const auto type = static_cast<MPSolver::OptimizationProblemType>(request.capabilities().solver_type());
+    if (!MPSolver::SupportsProblemType(type)) return absl::InvalidArgumentError("The requested MPSolver backend is unavailable.");
+    MPSolver solver("", type);
+    wire::MpSolverBridgeResponse response;
+    auto* result = response.mutable_capabilities();
+    result->set_supports_callbacks(solver.SupportsCallbacks());
+    result->set_supports_message_callbacks(solver.SupportsMessageCallbacks());
+    return response;
+  }
   operations_research::MPModelProto model;
   const auto& bytes = request.has_export_model() ? request.export_model().model_proto()
-      : request.has_load_solution() ? request.load_solution().model_proto() : request.activities().model_proto();
+      : request.has_load_solution() ? request.load_solution().model_proto()
+      : request.has_clamp_solution() ? request.clamp_solution().model_proto() : request.activities().model_proto();
   if (!model.ParseFromString(bytes)) return absl::InvalidArgumentError("Failed to parse MPModelProto.");
   const auto error = operations_research::FindErrorInMPModelProto(model);
   if (!error.empty()) return absl::InvalidArgumentError(error);
@@ -61,11 +72,11 @@ inline absl::StatusOr<bridge::v1::MpSolverBridgeResponse> QueryMpSolverModel(
     result->set_loaded(true);
     solver.FillSolutionResponseProto(&solution);
     result->set_solution_proto(solution.SerializeAsString());
-  } else if (request.has_activities()) {
-    const auto& input = request.activities();
+  } else if (request.has_activities() || request.has_clamp_solution()) {
+    const bool clamp = request.has_clamp_solution();
     operations_research::MPSolutionResponse solution;
-    if (!solution.ParseFromString(input.solution_proto())) return absl::InvalidArgumentError("Failed to parse MPSolutionResponse.");
-    const auto type = static_cast<MPSolver::OptimizationProblemType>(input.solver_type());
+    if (!solution.ParseFromString(clamp ? request.clamp_solution().solution_proto() : request.activities().solution_proto())) return absl::InvalidArgumentError("Failed to parse MPSolutionResponse.");
+    const auto type = static_cast<MPSolver::OptimizationProblemType>(clamp ? request.clamp_solution().solver_type() : request.activities().solver_type());
     if (!MPSolver::SupportsProblemType(type)) return absl::InvalidArgumentError("The requested MPSolver backend is unavailable.");
     MPSolver solver(model.name(), type);
     std::string load_error;
@@ -73,8 +84,15 @@ inline absl::StatusOr<bridge::v1::MpSolverBridgeResponse> QueryMpSolverModel(
       return absl::InvalidArgumentError(load_error);
     const auto loaded = solver.LoadSolutionFromProto(solution, std::numeric_limits<double>::infinity());
     if (!loaded.ok()) return loaded;
-    auto* result = response.mutable_activities();
-    for (double value : solver.ComputeConstraintActivities()) result->add_activities(value);
+    if (clamp) {
+      const auto status = solver.ClampSolutionWithinBounds();
+      if (!status.ok()) return status;
+      solver.FillSolutionResponseProto(&solution);
+      response.set_clamped_solution(solution.SerializeAsString());
+    } else {
+      auto* result = response.mutable_activities();
+      for (double value : solver.ComputeConstraintActivities()) result->add_activities(value);
+    }
   } else {
     return absl::InvalidArgumentError("MPSolver request has no model query.");
   }

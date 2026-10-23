@@ -14,6 +14,10 @@ struct ServerConfig {
   int max_queue_size = 0;
   int completed_job_retention_seconds = 0;
   std::string bearer_token;
+  int event_history_max_events = 4096;
+  int event_history_max_bytes = 16 * 1024 * 1024;
+  int max_sessions_per_solver = 64;
+  int session_idle_timeout_seconds = 1800;
 };
 
 using EnvLookup = std::function<std::optional<std::string>(const std::string&)>;

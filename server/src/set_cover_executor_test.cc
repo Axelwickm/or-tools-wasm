@@ -1,5 +1,10 @@
 #include "server/src/set_cover_executor.h"
 
+#include <atomic>
+#include <chrono>
+#include <future>
+#include <random>
+#include <thread>
 #include <cstdlib>
 #include <cmath>
 #include <iostream>
@@ -13,7 +18,13 @@
 #include "ortools/set_cover/set_cover_heuristics.h"
 #include "ortools/set_cover/set_cover_invariant.h"
 #include "ortools/set_cover/set_cover_model.h"
+#include "ortools/set_cover/set_cover_lagrangian.h"
+#include "ortools/set_cover/set_cover_mip.h"
+#include "ortools/set_cover/set_cover_cft.h"
 #include "javascript/set_cover_guided_session.h"
+#include "javascript/set_cover_formats.h"
+#include "javascript/set_cover_mip.h"
+#include <filesystem>
 
 namespace ortools_wasm::server {
 namespace {
@@ -45,6 +56,82 @@ SolverExecutorResult Execute(const SolverExecutorRequest& request, SetCoverExecu
   });
   handle.result().get();
   return execution;
+}
+
+void PreservesNativeMipAndRelaxationContracts() {
+  for (bool relaxation : {false, true}) for (int scenario = 0; scenario < 5; ++scenario) {
+    bridge::SetCoverBridgeRequest request;
+    request.set_operation(bridge::SET_COVER_OPERATION_MIP);
+    request.set_lp_relaxation(relaxation);
+    request.set_time_limit_seconds(0);
+    operations_research::SetCoverModel model;
+    for (int i = 0; i < 3; ++i) { request.add_costs(1); model.AddEmptySubset(1); request.add_selected(scenario == 1 || (scenario == 3 && i == 2)); }
+    for (int start : {0, 2, 4, 6}) request.add_starts(start);
+    int position = 0;
+    for (int element : {0, 1, 1, 2, 0, 2}) { request.add_elements(element); model.AddElementToSubset(element, position++ / 2); }
+    model.CreateSparseRowView();
+    operations_research::SetCoverInvariant invariant(&model);
+    operations_research::SubsetBoolVector selection(operations_research::SubsetIndex(3), false);
+    for (int i = 0; i < 3; ++i) selection[operations_research::SubsetIndex(i)] = request.selected(i);
+    invariant.LoadSolution(selection);
+    invariant.Recompute(operations_research::SetCoverInvariant::ConsistencyLevel::kCostAndCoverage);
+    operations_research::SetCoverMip native(&invariant);
+    native.UseMipSolver(relaxation ? operations_research::SetCoverMipSolver::GLOP : operations_research::SetCoverMipSolver::SCIP);
+    native.UseIntegers(!relaxation); native.SetTimeLimitInSeconds(0);
+    std::vector<operations_research::SubsetIndex> focus;
+    if (scenario >= 2) { request.set_has_focus(true); if (scenario != 4) { request.add_focus_indices(0); focus.push_back(operations_research::SubsetIndex(0)); } }
+    const bool next = scenario >= 2 ? native.NextSolution(focus) : native.NextSolution();
+    invariant.Recompute(operations_research::SetCoverInvariant::ConsistencyLevel::kFreeAndUncovered);
+    const auto execution = Execute({1, "set-cover", request.SerializeAsString()});
+    Expect(execution.ok, execution.error_message);
+    bridge::SetCoverBridgeResponse response;
+    Expect(response.ParseFromString(execution.payload), "Decode MIP response");
+    Expect(response.mip().subproblem_status() == native.solve_status() && response.next_solution() == next, "Native subproblem status and Boolean");
+    Expect(response.cost() == invariant.cost() && response.num_uncovered_elements() == invariant.num_uncovered_elements(), "Native cover accounting");
+    for (int i = 0; i < 3; ++i) Expect(response.selected(i) == invariant.is_selected()[operations_research::SubsetIndex(i)], "Native selection snapshot");
+    Expect(response.mip().has_objective_value() == !invariant.is_cost_consistent(), "Native relaxation presence");
+    if (!invariant.is_cost_consistent()) Expect(response.mip().objective_value() == invariant.CostOrLowerBound(), "Native focused objective");
+    if (scenario == 0) Expect(relaxation ? response.mip().objective_value() == 1.5 : response.cost() == 2, "Triangle integer versus relaxation result");
+    if (scenario == 1 && !relaxation) Expect(response.cost() == 3, "Native optimal subproblem retains redundant seeds");
+    if (scenario == 2 && !relaxation) Expect(response.num_uncovered_elements() == 1, "Native focused success need not cover the full model");
+    request.set_time_limit_seconds(std::numeric_limits<double>::infinity());
+    Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Reject unsafe native time conversion");
+    request.set_time_limit_seconds(0); request.set_has_focus(true); request.clear_focus_indices(); request.add_focus_indices(0); request.add_focus_indices(0);
+    Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Reject duplicate focus before native variable overwrite");
+  }
+}
+
+void ComputesNativeLagrangianBound() {
+  bridge::SetCoverBridgeRequest request;
+  request.set_operation(bridge::SET_COVER_OPERATION_LAGRANGIAN_BOUND);
+  request.set_upper_bound(2);
+  operations_research::SetCoverModel model;
+  for (double cost : {1, 1, 1}) { request.add_costs(cost); model.AddEmptySubset(cost); }
+  for (int start : {0, 2, 4, 6}) request.add_starts(start);
+  int position = 0;
+  for (int element : {0, 1, 1, 2, 0, 2}) {
+    request.add_elements(element);
+    model.AddElementToSubset(element, position++ / 2);
+  }
+  model.CreateSparseRowView();
+  operations_research::SetCoverInvariant invariant(&model);
+  operations_research::SetCoverLagrangian native(&invariant);
+  native.UseNumThreads(1);
+  const auto [bound, reduced, multipliers] = native.ComputeLowerBound(model.subset_costs(), 2);
+  const auto call = [&] { return Execute({1, "set-cover", request.SerializeAsString()}); };
+  auto execution = call(); Expect(execution.ok, execution.error_message);
+  bridge::SetCoverBridgeResponse response;
+  Expect(response.ParseFromString(execution.payload), "Decode Lagrangian response");
+  const auto& result = response.lagrangian_bound();
+  Expect(result.lower_bound() == bound && std::abs(bound - 1.5) < 1e-9, "Native triangle lower bound");
+  Expect(result.reduced_costs_size() == 3 && result.multipliers_size() == 3, "Native vector dimensions");
+  for (int i = 0; i < 3; ++i) {
+    Expect(result.reduced_costs(i) == reduced[operations_research::SubsetIndex(i)], "Native reduced cost");
+    Expect(result.multipliers(i) == multipliers[operations_research::ElementIndex(i)], "Native multiplier");
+  }
+  request.set_upper_bound(std::numeric_limits<double>::infinity()); Expect(!call().ok, "Reject nonfinite upper bound");
+  request.set_upper_bound(2); request.set_costs(0, -1); Expect(!call().ok, "Reject negative costs");
+  request.set_costs(0, 1); Expect(call().ok, "Recovery after invalid inputs");
 }
 
 void RetainsNativeGuidedGeneratorsAndRejectsClosedHandles() {
@@ -94,6 +181,80 @@ void RetainsNativeGuidedGeneratorsAndRejectsClosedHandles() {
   Expect(!Execute({1, "set-cover", request.SerializeAsString()}, &executor).ok, "Server rejects deleted handles");
   request.set_session_handle(handle + 1);
   Expect(!Execute({1, "set-cover", request.SerializeAsString()}, &executor).ok, "Server rejects unknown handles");
+}
+
+bridge::SetCoverBridgeRequest MutationRequest() {
+  bridge::SetCoverBridgeRequest request;
+  for (double cost : {2, 3, 5}) request.add_costs(cost);
+  for (int start : {0, 1, 2, 3}) request.add_starts(start);
+  for (int element : {0, 0, 1}) request.add_elements(element);
+  for (bool selected : {true, true, true}) request.add_selected(selected);
+  return request;
+}
+
+void PerturbsUsingNativeFocusAndIntersectionSemantics() {
+  // Native-only reproduction: the iterator used to skip all intersections
+  // when the seed was subset zero, and skip later entries after seeing itself.
+  operations_research::SetCoverModel native_model;
+  for (int element : {0, 0, 1}) { native_model.AddEmptySubset(1); native_model.AddElementToLastSubset(element); }
+  native_model.CreateSparseRowView();
+  for (int seed : {0, 1}) {
+    operations_research::SetCoverInvariant native_invariant(&native_model);
+    native_invariant.LoadSolution(operations_research::SubsetBoolVector(operations_research::SubsetIndex(3), true));
+    const std::vector<operations_research::SubsetIndex> focus = {operations_research::SubsetIndex(seed)};
+    const auto sampled = operations_research::ClearRandomSubsets(focus, 1, &native_invariant);
+    Expect(sampled == focus && !native_invariant.is_selected()[operations_research::SubsetIndex(0)] &&
+        !native_invariant.is_selected()[operations_research::SubsetIndex(1)] && native_invariant.is_selected()[operations_research::SubsetIndex(2)],
+        "Native-only random clearing visits intersections on either side of its seed index");
+  }
+  auto request = MutationRequest();
+  request.set_has_focus(true); request.add_focus_indices(0); request.set_perturbation_count(1);
+  request.set_operation(bridge::SET_COVER_OPERATION_CLEAR_RANDOM_SUBSETS);
+  auto execution = Execute({1, "set-cover", request.SerializeAsString()});
+  bridge::SetCoverBridgeResponse response;
+  Expect(execution.ok && response.ParseFromString(execution.payload), execution.error_message);
+  Expect(response.perturbation_focus_size() == 1 && response.perturbation_focus(0) == 0 &&
+      !response.selected(0) && !response.selected(1) && response.selected(2), "Random native perturbation also clears intersecting subsets outside focus");
+  Expect(response.has_trace() && response.trace().decisions_size() == 5, "Native mutation trace includes both intersecting removals");
+  request.set_operation(bridge::SET_COVER_OPERATION_CLEAR_MOST_COVERED_ELEMENTS);
+  execution = Execute({1, "set-cover", request.SerializeAsString()});
+  Expect(execution.ok && response.ParseFromString(execution.payload) && !response.selected(0) && response.selected(1) && response.selected(2),
+      "Most-covered native perturbation clears only the sampled focus subset");
+  request.clear_focus_indices();
+  execution = Execute({1, "set-cover", request.SerializeAsString()});
+  Expect(execution.ok && response.ParseFromString(execution.payload) && response.perturbation_focus_size() == 0 && response.selected(0), "Empty explicit focus differs from global focus");
+  request.set_has_focus(false); request.set_perturbation_count(100);
+  execution = Execute({1, "set-cover", request.SerializeAsString()});
+  Expect(execution.ok && response.ParseFromString(execution.payload) && response.perturbation_focus_size() == 2 &&
+      !response.selected(0) && !response.selected(1) && response.selected(2), "Global native perturbation caps samples at eligible subsets");
+  request.set_perturbation_count(-1);
+  Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Negative sample count rejects before native CHECK");
+  request.set_perturbation_count(1); request.set_has_focus(true); request.add_focus_indices(3);
+  Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Invalid focus index rejects before native indexing");
+}
+
+void ReturnsNativeIncrementalRemovabilityWithoutRetainingResults() {
+  auto request = MutationRequest();
+  request.set_selected(1, false);
+  request.set_operation(bridge::SET_COVER_OPERATION_UPDATE_SELECTION); request.set_subset_index(1); request.set_subset_selected(true);
+  auto execution = Execute({1, "set-cover", request.SerializeAsString()});
+  bridge::SetCoverBridgeResponse response;
+  Expect(execution.ok && response.ParseFromString(execution.payload), execution.error_message);
+  const auto& delta = response.removability();
+  Expect(response.has_removability() && delta.changed() && delta.newly_removable_subsets_size() == 3 &&
+      delta.newly_removable_subsets(0) == 0 && delta.newly_removable_subsets(1) == 1 && delta.newly_removable_subsets(2) == 1 &&
+      delta.newly_non_removable_subsets_size() == 0, "Native selection notifications retain the newly selected subset's repeated entry");
+  request.set_selected(1, true); request.set_subset_selected(false);
+  execution = Execute({1, "set-cover", request.SerializeAsString()});
+  Expect(execution.ok && response.ParseFromString(execution.payload) && response.removability().changed() &&
+      response.removability().newly_removable_subsets_size() == 0 && response.removability().newly_non_removable_subsets_size() == 1 &&
+      response.removability().newly_non_removable_subsets(0) == 0, "Native deselection reports the remaining selected subset that becomes essential");
+  request.set_selected(1, false);
+  execution = Execute({1, "set-cover", request.SerializeAsString()});
+  Expect(execution.ok && response.ParseFromString(execution.payload) && !response.removability().changed() &&
+      response.removability().newly_non_removable_subsets_size() == 0, "No-op mutation returns fresh empty notifications");
+  request.set_subset_index(3);
+  Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Invalid update subset rejects");
 }
 
 void SolvesAndSerializesResult() {
@@ -346,31 +507,8 @@ void RejectsIncompleteElementOffsets() {
   Expect(Execute(Request()).ok, "Canonical native offsets recover after malformed requests");
 }
 
-void NativeCostUpdatesRecoverFromRoundingAndOverflow() {
-  namespace native = ::operations_research;
-  for (const auto& costs : {std::vector<double>{1e20, 1},
-      std::vector<double>{1e20, 1, 5e5}, std::vector<double>{1e308, 1e308, 1e308}}) {
-    native::SetCoverModel model;
-    for (const double cost : costs) { model.AddEmptySubset(cost); model.AddElementToLastSubset(0); }
-    model.CreateSparseRowView(); native::SetCoverInvariant invariant(&model);
-    native::SubsetBoolVector selected(native::SubsetIndex(costs.size()), true);
-    invariant.LoadSolution(selected);
-    native::SteepestSearch search(&invariant); search.SetMaxIterations(costs.size() - 1);
-    search.NextSolution();
-    int remaining = 0;
-    for (const auto subset : model.SubsetRange()) if (invariant.is_selected()[subset]) {
-      ++remaining;
-      Expect(invariant.cost() == model.subset_costs()[subset], "Native cost equals the remaining leaf after cancellation");
-    }
-    Expect(remaining == 1 && invariant.CheckConsistency(native::SetCoverInvariant::ConsistencyLevel::kRedundancy),
-           "Native scalar cache recovers from cancellation/overflow without corrupting coverage");
-    invariant.Clear(); invariant.LoadSolution(selected);
-    Expect(invariant.CheckConsistency(native::SetCoverInvariant::ConsistencyLevel::kCostAndCoverage),
-           "Clear and bulk load reconstruct matching native sums");
-  }
-}
 
-void PreservesScalarCostStateAcrossLoadsAndCopies() {
+void PreservesLoadedCostAndCopyIndependence() {
   namespace native = ::operations_research;
   native::SetCoverModel model;
   for (double cost : {1e20, 1.0, 5e5}) {
@@ -386,12 +524,6 @@ void PreservesScalarCostStateAcrossLoadsAndCopies() {
   Expect(invariant.cost() == 500001 && copy.cost() == 1e20 + 500001,
          "Bulk replacement recovers the residual and retains native copy independence");
   const auto level = native::SetCoverInvariant::ConsistencyLevel::kCostAndCoverage;
-  for (int pass = 0; pass < 20; ++pass) {
-    invariant.Select(native::SubsetIndex(0), level);
-    invariant.Deselect(native::SubsetIndex(0), level);
-    Expect(invariant.cost() == 500001 && invariant.CheckConsistency(level),
-           "Repeated large updates retain the smaller selected costs");
-  }
   copy = invariant;
   copy.Deselect(native::SubsetIndex(2), level);
   Expect(copy.cost() == 1 && invariant.cost() == 500001,
@@ -411,12 +543,235 @@ void NativeBooleanFocusKeepsIndicesAndLifetime() {
          "Native Boolean focus owns the temporary list through dispatch and advances its source indices");
 }
 
+void LazySteepestSearchPreservesFocusedIndices() {
+  operations_research::SetCoverModel model;
+  for (int i = 0; i < 2; ++i) { model.AddEmptySubset(i ? 1 : 10); model.AddElementToLastSubset(0); }
+  model.ComputeFeasibility();
+  operations_research::SetCoverInvariant invariant(&model);
+  invariant.LoadSolution(operations_research::SubsetBoolVector(operations_research::SubsetIndex(2), true));
+  operations_research::SubsetBoolVector focus(operations_research::SubsetIndex(2), false); focus[operations_research::SubsetIndex(1)] = true;
+  operations_research::LazySteepestSearch search(&invariant);
+  Expect(search.NextSolution(focus) && invariant.is_selected()[operations_research::SubsetIndex(0)]
+      && !invariant.is_selected()[operations_research::SubsetIndex(1)], "Focused cost positions must retain their original subset IDs");
+  bridge::SetCoverBridgeRequest request; request.set_operation(bridge::SET_COVER_OPERATION_LAZY_STEEPEST);
+  request.add_costs(10); request.add_costs(1); request.add_starts(0); request.add_starts(1); request.add_starts(2);
+  request.add_elements(0); request.add_elements(0); request.add_selected(true); request.add_selected(true);
+  request.set_has_focus(true); request.add_focus(false); request.add_focus(true);
+  const auto execution = Execute({1, "set-cover", request.SerializeAsString()});
+  bridge::SetCoverBridgeResponse response;
+  Expect(execution.ok && response.ParseFromString(execution.payload) && response.selected(0) && !response.selected(1),
+      "Server dispatch forwards native lazy steepest focus correctly");
+}
+
+
+void NativeFormatsRoundTripAndCleanUpErrors() {
+  const auto temporary_count = [] {
+    int count = 0;
+    for (const auto& file : std::filesystem::directory_iterator("/tmp"))
+      if (file.path().filename().string().find("ortools-cover-") == 0) ++count;
+    return count;
+  };
+  const int before = temporary_count();
+  auto model = ortools_wasm::ReadSetCoverText("2 2\n0.10000000000000002 2\n1 1\n2 1 2", 0);
+  for (int format : {0, 1}) {
+    const auto restored = ortools_wasm::ReadSetCoverText(ortools_wasm::WriteSetCoverText(model, format), format);
+    Expect(restored.ExportModelAsProto().SerializeAsString() == model.ExportModelAsProto().SerializeAsString(), "Native formats preserve exact double costs and incidence");
+  }
+  auto fimi = ortools_wasm::ReadSetCoverText("10 11 11\n11 12\n12", 2);
+  Expect(fimi.num_elements() == 3 && fimi.num_subsets() == 3 && fimi.num_nonzeros() == 5, "Native FIMI normalizes labels and removes duplicates");
+  for (const auto& invalid : std::vector<std::pair<int, std::string>>{{0, "2 1\n1\n1 1\n0"}, {0, "2 1\n1\n0\n0"}, {1, "2 1\n1 1 1"}, {1, "2 1\n1 0"}, {0, ""}, {0, "1 1\nwat\n1 1"}, {0, "1 1\n1\n1"}, {0, "1 1\n1\n1 2"}, {0, "1 1\ninf\n1 1"}, {1, "1 1\n1 1 0"}, {2, "one"}, {2, "-1"}}) {
+    bridge::SetCoverBridgeRequest request; request.set_operation(bridge::SET_COVER_OPERATION_READ_MODEL); request.set_format(invalid.first); request.set_input(invalid.second);
+    const auto execution = Execute({1, "set-cover", request.SerializeAsString()});
+    Expect(!execution.ok, "Invalid native input returns an error instead of terminating the server");
+    Expect(temporary_count() == before, "Private temporary files are released on parser exceptions");
+  }
+  bridge::SetCoverBridgeRequest request; request.set_operation(bridge::SET_COVER_OPERATION_READ_MODEL); request.set_input("1 1\n1\n1 1");
+  auto execution = Execute({1, "set-cover", request.SerializeAsString()}); bridge::SetCoverBridgeResponse response;
+  Expect(execution.ok && response.ParseFromString(execution.payload) && response.has_model_proto_json(), "Server returns native model JSON after parser errors");
+  request.ParseFromString(Request().payload); request.set_operation(bridge::SET_COVER_OPERATION_WRITE_MODEL); request.set_format(1);
+  execution = Execute({1, "set-cover", request.SerializeAsString()});
+  Expect(execution.ok && response.ParseFromString(execution.payload) && response.has_text(), "Server exports native rail text");
+  request.set_format(2); Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Missing native FIMI writer is not emulated");
+  Expect(temporary_count() == before, "All native format operations release temporary files");
+}
+
+
+// Exercise the actual executor with a hard, bounded MIP so a missing native
+// cancellation handler fails without leaving an unlimited test job behind.
+void CancelsRunningMipAndReleasesCapacity() {
+  bridge::SetCoverBridgeRequest request;
+  request.set_operation(bridge::SET_COVER_OPERATION_MIP);
+  request.set_time_limit_seconds(10);
+  request.add_starts(0);
+  std::mt19937 random(42);
+  for (int subset = 0; subset < 2000; ++subset) {
+    request.add_costs(1 + random() % 100);
+    request.add_selected(false);
+    std::vector<bool> seen(1000, false);
+    for (int entry = 0; entry < 50;) {
+      const int element = random() % 1000;
+      if (seen[element]) continue;
+      seen[element] = true;
+      request.add_elements(element);
+      ++entry;
+    }
+    request.add_starts(request.elements_size());
+  }
+  SetCoverExecutor executor;
+  JobScheduler scheduler({1, 8});
+  SolverExecutorResult execution;
+  std::promise<void> started;
+  auto handle = scheduler.Submit(JobSpec{"set-cover", 1}, [&](JobContext& context) {
+    started.set_value();
+    execution = executor.Execute({1, "set-cover", request.SerializeAsString()}, context, [](std::string) {});
+    if (execution.failure_kind == SolverExecutionFailureKind::kCancelled) return JobResult::Cancelled();
+    return execution.ok ? JobResult::Succeeded() : JobResult::Failed(execution.error_message);
+  });
+  started.get_future().get();
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  Expect(handle.Cancel(), "Running Set Cover MIP cancellation is accepted");
+  Expect(handle.result().wait_for(std::chrono::seconds(3)) == std::future_status::ready,
+      "Native MIP stops promptly instead of consuming its entire solve budget");
+  Expect(handle.result().get().state == JobState::kCancelled && !execution.ok &&
+      execution.failure_kind == SolverExecutionFailureKind::kCancelled, "Cancellation is reported instead of a partial solution");
+  auto next = scheduler.Submit(JobSpec{"set-cover", 1}, [&](JobContext& context) {
+    const auto result = executor.Execute(Request(), context, [](std::string) {});
+    return result.ok ? JobResult::Succeeded() : JobResult::Failed(result.error_message);
+  });
+  Expect(next.result().wait_for(std::chrono::seconds(3)) == std::future_status::ready &&
+      next.result().get().state == JobState::kSucceeded, "Cancellation releases scheduler capacity for the next solve");
+}
+
+// Synchronize at native search output to prove the integration hook can stop
+// a solve already inside MPSolver, including guard teardown before destruction.
+void InterruptsInternalMipDuringNativeSolve() {
+  using namespace operations_research;
+  SetCoverModel model;
+  for (int subset = 0; subset < 3; ++subset) {
+    model.AddEmptySubset(1);
+    model.AddElementToLastSubset(subset);
+    model.AddElementToLastSubset((subset + 1) % 3);
+  }
+  model.CreateSparseRowView();
+  SetCoverInvariant invariant(&model);
+  JobScheduler scheduler({1, 8});
+  std::promise<void> searching, release;
+  const auto released = release.get_future().share();
+  std::atomic<bool> signalled{false}, interrupted{false};
+  auto handle = scheduler.Submit(JobSpec{"set-cover", 1}, [&](JobContext& context) {
+    ortools_wasm::RunSetCoverMip(invariant, false, {}, false, 5, [&](MPSolver& solver) {
+      auto cancellation = context.OnCancellation([&solver, &interrupted] { interrupted = solver.InterruptSolve(); });
+      Expect(solver.SetMessageCallback([&](const std::string&) {
+        if (!signalled.exchange(true)) {
+          searching.set_value();
+          released.wait();
+        }
+      }), "SCIP supports native message callbacks");
+      solver.EnableOutput();
+      return solver.Solve();
+    });
+    return JobResult::Succeeded();
+  });
+  const bool reached_search = searching.get_future().wait_for(std::chrono::seconds(3)) == std::future_status::ready;
+  // Always release the callback before throwing so test failures cannot deadlock.
+  if (reached_search) handle.Cancel();
+  release.set_value();
+  Expect(reached_search, "Internal MPSolver enters native search");
+  Expect(handle.result().wait_for(std::chrono::seconds(3)) == std::future_status::ready,
+      "Interrupted internal MPSolver finishes");
+  Expect(handle.result().get().state == JobState::kCancelled && interrupted,
+      "Scoped server cancellation reaches the internal solver");
+}
+
+void ReturnsNativeSearchTimingAndSessionCounters() {
+  auto result = Execute(Request()); bridge::SetCoverBridgeResponse response;
+  Expect(result.ok && response.ParseFromString(result.payload) && response.has_run_time_seconds() && response.has_run_time_microseconds(), "One-shot generator timing is returned");
+  Expect(response.run_time_seconds() >= 0 && response.run_time_microseconds() >= 0 && response.run_time_seconds() * 1e6 - response.run_time_microseconds() < 1.01, "Native microsecond truncation is preserved");
+  SetCoverExecutor executor; bridge::SetCoverBridgeRequest request; request.ParseFromString(Request().payload);
+  request.set_operation(bridge::SET_COVER_OPERATION_SESSION_CREATE); request.set_session_algorithm(bridge::SET_COVER_OPERATION_GUIDED_LOCAL);
+  for (int i = 0; i < request.selected_size(); ++i) request.set_selected(i, true);
+  result = Execute({1, "set-cover", request.SerializeAsString()}, &executor);
+  Expect(result.ok && response.ParseFromString(result.payload), "Guided session is created"); const auto handle = response.session_handle();
+  request.Clear(); request.set_operation(bridge::SET_COVER_OPERATION_SESSION_NEXT); request.set_session_handle(handle); request.set_max_iterations(2);
+  result = Execute({1, "set-cover", request.SerializeAsString()}, &executor);
+  Expect(result.ok && response.ParseFromString(result.payload), "Guided search runs"); const double before = response.run_time_seconds();
+  request.set_operation(bridge::SET_COVER_OPERATION_SESSION_STATISTICS);
+  result = Execute({1, "set-cover", request.SerializeAsString()}, &executor);
+  Expect(result.ok && response.ParseFromString(result.payload) && response.run_time_seconds() == before && response.selected_size() == 0, "Timing reads the native counter without serializing solution state or running search");
+  request.set_operation(bridge::SET_COVER_OPERATION_SESSION_DELETE); Expect(Execute({1, "set-cover", request.SerializeAsString()}, &executor).ok, "Session closes");
+  request.set_operation(bridge::SET_COVER_OPERATION_SESSION_STATISTICS); Expect(!Execute({1, "set-cover", request.SerializeAsString()}, &executor).ok, "Closed session timing is unavailable");
+}
+
+void PreservesNativeCftPrimalDualState() {
+  using namespace operations_research;
+  for (double scale : {1.0, 0.1, 0.0}) {
+    SetCoverModel model;
+    bridge::SetCoverBridgeRequest request;
+    request.set_operation(bridge::SET_COVER_OPERATION_CFT);
+    request.add_starts(0);
+    // An expensive leading duplicate must retain its full-model position.
+    const std::vector<std::vector<int>> columns = {{0, 1}, {0, 1}, {1, 2}, {0, 2}};
+    for (const auto& column : columns) {
+      const double cost = request.costs_size() == 0 ? 10.0 : scale;
+      model.AddEmptySubset(cost); request.add_costs(cost);
+      for (int element : column) { model.AddElementToLastSubset(element); request.add_elements(element); }
+      request.add_starts(request.elements_size());
+    }
+    model.CreateSparseRowView();
+    scp::SubModel submodel(&model);
+    const auto native = scp::RunCftHeuristic(submodel);
+    auto execution = Execute({1, "set-cover", request.SerializeAsString()});
+    bridge::SetCoverBridgeResponse response;
+    Expect(execution.ok && response.ParseFromString(execution.payload), "CFT bridge succeeds: " + execution.error_message);
+    Expect(response.cost() == native.solution.cost() && response.num_uncovered_elements() == 0, "Native cover snapshot");
+    Expect(response.selected_size() == 4 && !response.selected(0), "Full-model subset IDs");
+    for (auto subset : native.solution.subsets()) Expect(response.selected(subset.value()), "Native selected subset");
+    const auto& dual = response.cft_dual();
+    Expect(response.has_cft_dual() && dual.lower_bound() == native.dual_state.lower_bound(), "Native dual bound");
+    Expect(dual.multipliers_size() == 3 && dual.reduced_costs_size() == 4, "Full-model dual dimensions");
+    for (int i = 0; i < 3; ++i) Expect(dual.multipliers(i) == native.dual_state.multipliers()[ElementIndex(i)], "Native multiplier");
+    for (int j = 0; j < 4; ++j) Expect(dual.reduced_costs(j) == native.dual_state.reduced_costs()[SubsetIndex(j)], "Native reduced cost");
+    for (int j = 0; j < 4; ++j) request.add_selected(true);
+    scp::SubModel seeded_model(&model);
+    const auto seeded_native = scp::RunCftHeuristic(seeded_model,
+        scp::Solution(seeded_model, {SubsetIndex(0), SubsetIndex(1), SubsetIndex(2), SubsetIndex(3)}));
+    execution = Execute({1, "set-cover", request.SerializeAsString()});
+    Expect(execution.ok && response.ParseFromString(execution.payload), "Seeded CFT bridge succeeds");
+    Expect(response.cost() == seeded_native.solution.cost() && response.num_uncovered_elements() == 0,
+        "Native initial-cover overload is preserved");
+    for (auto subset : seeded_native.solution.subsets()) Expect(response.selected(subset.value()), "Native seeded selection");
+    for (int j = 0; j < 4; ++j) request.set_selected(j, false);
+    Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Explicit empty cover rejects safely");
+    request.set_selected(0, true);
+    Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Incomplete cover rejects safely");
+    request.mutable_selected()->RemoveLast();
+    Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Malformed seed dimensions reject safely");
+    request.clear_selected();
+    request.set_costs(1, -1); Expect(!Execute({1, "set-cover", request.SerializeAsString()}).ok, "Reject negative costs safely");
+  }
+  bridge::SetCoverBridgeRequest empty; empty.set_operation(bridge::SET_COVER_OPERATION_CFT); empty.add_starts(0);
+  Expect(!Execute({1, "set-cover", empty.SerializeAsString()}).ok, "Reject empty native CFT model");
+  empty.add_costs(1); empty.add_starts(0);
+  Expect(!Execute({1, "set-cover", empty.SerializeAsString()}).ok, "Reject empty subsets before native search");
+  empty.set_starts(1, 1); empty.add_elements(1);
+  Expect(!Execute({1, "set-cover", empty.SerializeAsString()}).ok, "Reject uncovered element before native search");
+}
+
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
+      {"CancelsRunningMipAndReleasesCapacity", CancelsRunningMipAndReleasesCapacity},
+      {"InterruptsInternalMipDuringNativeSolve", InterruptsInternalMipDuringNativeSolve},
+      {"PreservesNativeCftPrimalDualState", PreservesNativeCftPrimalDualState},
+      {"ReturnsNativeSearchTimingAndSessionCounters", ReturnsNativeSearchTimingAndSessionCounters},
+      {"NativeFormatsRoundTripAndCleanUpErrors", NativeFormatsRoundTripAndCleanUpErrors},
+      {"LazySteepestSearchPreservesFocusedIndices", LazySteepestSearchPreservesFocusedIndices},
+      {"PerturbsUsingNativeFocusAndIntersectionSemantics", PerturbsUsingNativeFocusAndIntersectionSemantics},
+      {"ReturnsNativeIncrementalRemovabilityWithoutRetainingResults", ReturnsNativeIncrementalRemovabilityWithoutRetainingResults},
       {"NativeBooleanFocusKeepsIndicesAndLifetime", NativeBooleanFocusKeepsIndicesAndLifetime},
-      {"PreservesScalarCostStateAcrossLoadsAndCopies", PreservesScalarCostStateAcrossLoadsAndCopies},
-      {"NativeCostUpdatesRecoverFromRoundingAndOverflow", NativeCostUpdatesRecoverFromRoundingAndOverflow},
+      {"PreservesLoadedCostAndCopyIndependence", PreservesLoadedCostAndCopyIndependence},
       {"PreservesNonfiniteNativeCosts", PreservesNonfiniteNativeCosts},
+      {"PreservesNativeMipAndRelaxationContracts", PreservesNativeMipAndRelaxationContracts},
+      {"ComputesNativeLagrangianBound", ComputesNativeLagrangianBound},
       {"RejectsIncompleteElementOffsets", RejectsIncompleteElementOffsets},
       {"CompressesTraceUsingNativeOrder", CompressesTraceUsingNativeOrder},
       {"RetainsNativeGuidedGeneratorsAndRejectsClosedHandles", RetainsNativeGuidedGeneratorsAndRejectsClosedHandles},

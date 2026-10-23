@@ -3,6 +3,7 @@
 
 #include "server/src/solver_executor.h"
 #include <memory>
+#include "javascript/session_registry.h"
 
 namespace ortools_wasm { class SetCoverGuidedSessions; }
 
@@ -10,7 +11,8 @@ namespace ortools_wasm::server {
 
 class SetCoverExecutor final : public SolverExecutor {
  public:
-  SetCoverExecutor();
+  explicit SetCoverExecutor(SessionLimits limits = ServerSessionLimits());
+  void ExpireIdleSessions() override;
   ~SetCoverExecutor() override;
   std::string solver() const override;
   int RequestedThreads(const SolverExecutorRequest& request,

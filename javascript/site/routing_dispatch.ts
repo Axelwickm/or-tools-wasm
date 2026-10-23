@@ -1,3 +1,4 @@
+import { setControlAvailable } from './example_controls.js';
 import {
   FirstSolutionStrategy,
   RoutingIndexManager,
@@ -49,6 +50,10 @@ const resourceSlotsInput = document.getElementById('resource-slots') as HTMLInpu
 const useResourcesInput = document.getElementById('use-resources') as HTMLInputElement | null;
 const deliveryChoiceInput = document.getElementById('delivery-choice') as HTMLInputElement | null;
 const deliveryOrderInput = document.getElementById('delivery-order') as HTMLInputElement | null;
+function updateResourceControls() { setControlAvailable(resourceSlotsInput, Boolean(useResourcesInput?.checked)); }
+useResourcesInput?.addEventListener('change', updateResourceControls);
+updateResourceControls();
+
 const randomizeButton = document.getElementById('randomize') as HTMLButtonElement | null;
 const runButton = document.getElementById('run') as HTMLButtonElement | null;
 
@@ -491,3 +496,9 @@ distanceCapInput?.addEventListener('change', () => {
 
 generateScenario();
 resetDispatchView();
+
+/** Current inputs, shared with the displayed native API sample. */
+export function getDispatchScenario() {
+  return { stops, vehicleCapacities: vehicles.map(vehicle => vehicle.capacity),
+    distanceCap: distanceCap(), priorityPenalty };
+}

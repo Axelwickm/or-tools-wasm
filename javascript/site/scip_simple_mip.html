@@ -10,14 +10,38 @@
       #status { min-height: 8rem; }
     </style>
   </head>
-  <body data-solver-id="SCIP">
+  <body class="example-page" data-solver-id="SCIP">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>SCIP - integer programming backend</h1>
     <p><em>Problem: choose integer values for two variables that maximize the objective while satisfying linear limits.</em></p>
-    <div class="code-toggle">
+
+    <p>
+      Direct port of <code>simple_mip_program.py</code> through the MPSolver SCIP integer backend.
+    </p>
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>The decision variables are integer values for <code>x</code> and <code>y</code>.</li>
+        <li>The linear constraints define which integer points are feasible.</li>
+        <li>The objective maximizes a linear score over those feasible points.</li>
+        <li>SCIP searches the integer feasible set and returns the best assignment.</li>
+      </ul>
+    </div>
+    <div class="controls">
+      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+
+    <div class="control-actions"><button id="run" data-idle-label="Solve MIP">Solve MIP</button></div>
+</div>
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the solution.</div>
+    </section>
+    <details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import { MPSolver } from 'or-tools-wasm/mp-solver';
@@ -42,26 +66,7 @@ const status = await solver.solve({ executor: 'worker' });
 console.log(status, objective.value(), x.solutionValue(), y.solutionValue());</code></pre>
       </details>
     </div>
-    <p>
-      Direct port of <code>simple_mip_program.py</code> through the MPSolver SCIP integer backend.
-    </p>
-    <div class="example-explanation">
-      <h2>Model</h2>
-      <ul>
-        <li>The decision variables are integer values for <code>x</code> and <code>y</code>.</li>
-        <li>The linear constraints define which integer points are feasible.</li>
-        <li>The objective maximizes a linear score over those feasible points.</li>
-        <li>SCIP searches the integer feasible set and returns the best assignment.</li>
-      </ul>
-    </div>
-    <div class="controls">
-      <label>Solver threads <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <button id="run" data-idle-label="Solve MIP">Solve MIP</button>
-    </div>
-    <div id="solution-output">Run the solver to view the solution.</div>
-    <p>Status / Response:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./sat_simple_mip.ts"></script>
   </body>

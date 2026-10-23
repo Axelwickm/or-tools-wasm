@@ -1174,6 +1174,12 @@ bool SolveModelWithSat(RoutingModel* model, RoutingSearchStats* search_stats,
                        const RoutingSearchParameters& search_parameters,
                        const Assignment* initial_solution,
                        Assignment* solution) {
+  // Neither Routing-to-CP-SAT converter encodes pickup-to-delivery limits.
+  // Reject this unsupported model family instead of returning a route that
+  // bypasses the limits enforced by the native Routing filters and scheduler.
+  for (const RoutingDimension* dimension : model->GetDimensions()) {
+    if (dimension->HasPickupToDeliveryLimits()) return false;
+  }
   // Adding a bit of slack to the time limit for the CP-SAT solver.
   const absl::Duration remaining_time = model->RemainingTime() * 0.95;
   const absl::Time deadline = model->solver()->Now() + remaining_time;

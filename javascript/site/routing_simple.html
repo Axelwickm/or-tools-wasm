@@ -5,95 +5,54 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>Routing - Simple Routing</title>
 		<link rel="stylesheet" href="./example.css">
-		<style>
-			.example-notes {
-				max-width: 56rem;
-			}
-			.route-visual-layout {
-				display: grid;
-				grid-template-columns: minmax(0, 960px) minmax(14rem, 22rem);
-				gap: 1rem;
-				align-items: start;
-				margin: 1rem 0;
-			}
-			#route-map {
-				display: block;
-				width: 100%;
-				max-width: 960px;
-				border: 1px solid #d0d7de;
-				border-radius: 6px;
-				background: #f6f8fa;
-			}
-			.route-panel {
-				border: 1px solid #d0d7de;
-				border-radius: 6px;
-				padding: 0.75rem;
-				background: #fff;
-			}
-			.route-panel h2 {
-				margin-top: 0;
-			}
-			#route-output { margin: 0.75rem 0 0; }
-			#status { min-height: 9rem; }
-      @media (max-width: 760px) {
-        .route-visual-layout { grid-template-columns: minmax(0, 1fr); }
-      }
-		</style>
+		<link rel="stylesheet" href="./routing_example.css">
 	</head>
-	<body>
+	<body class="example-page">
 		<nav>
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
-		<h1>Routing - Simple Routing</h1>
+		<h1>Simple routing</h1>
 		<p><em>Problem: find the shortest route for one vehicle to visit every location and return to the depot.</em></p>
-		<div class="code-toggle">
-			<details>
-				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import {
-  FirstSolutionStrategy,
-  RoutingIndexManager,
-  RoutingModel,
-} from 'or-tools-wasm/routing';
 
-
-const locations = [
-  { x: 480, y: 310 },
-  ...Array.from({ length: 20 }, () =&gt; ({
-    x: 52 + Math.random() * 856,
-    y: 52 + Math.random() * 516,
-  })),
-];
-
-const manager = new RoutingIndexManager(locations.length, 1, 0);
-const routing = new RoutingModel(manager);
-const transit = routing.registerTransitCallback((from, to) =&gt; {
-  const a = locations[manager.indexToNode(from)];
-  const b = locations[manager.indexToNode(to)];
-  return Math.round(Math.hypot(a.x - b.x, a.y - b.y));
-});
-routing.setArcCostEvaluatorOfAllVehicles(transit);
-
-const result = await routing.solve({
-  firstSolutionStrategy: FirstSolutionStrategy.PATH_CHEAPEST_ARC,
-  executor: 'worker',
-});
-console.log(result.status, result.assignment?.objectiveValue());</code></pre>
-			</details>
-		</div>
 		<ul class="example-notes">
-			<li>One vehicle starts and ends at the depot.</li>
-			<li>Every customer location must be visited exactly once.</li>
-			<li>The travel cost is the straight-line distance between two locations.</li>
-			<li>Before solving, the map shows the locations without a chosen route.</li>
-			<li>After solving, the route line shows the visit order and return to the depot.</li>
-		</ul>
+        <li>One vehicle leaves the depot, visits each destination and returns.</li>
+        <li>The aim is to find a short route using straight-line travel distances.</li>
+        <li>Choose a scenario to add a driver break, traffic or a pickup and delivery.</li>
+        <li>After solving, the map and visit list show the planned route.</li>
+</ul>
 		<div class="controls">
-			<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-			<label>Destinations <input id="node-count" class="short-number" type="number" min="3" value="20"></label>
-			<button id="randomize" type="button">Randomize</button>
-			<button id="run">Solve route</button>
-		</div>
+<label>Destinations <input id="node-count" class="short-number" type="number" min="3" value="20"></label>
+<label>Scenario <select id="scenario" title="Choose a preset or customize it in Advanced settings."><option value="basic">Shortest route</option><option value="breaks">Driver break</option><option value="traffic">Peak traffic</option><option value="pickup">Pickup and delivery</option><option value="grouped">Optional stops together</option><option value="load">Carrying a load</option><option value="replan">Replan after two visits</option><option value="custom">Custom settings</option></select></label>
+<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+
+<div class="control-actions"><button id="run">Solve route</button><button id="randomize" type="button">Randomize</button></div>
+</div>
+<details class="advanced-settings" id="advanced-settings"><summary>Advanced settings</summary>
+<section class="settings-group"><h3>Route conditions</h3><div class="option-grid"><label title="The optional driver break lasts from minute 1 to minute 3; travel time assumes 100 metres per minute."><input id="driver-break" type="checkbox"> Driver break</label>
+<label title="Peak traffic adds a native time-dependent delay, rising to three minutes at minute 5 and falling back to zero at minute 10."><input id="peak-traffic" type="checkbox"> Peak traffic</label>
+<label title="Alternative pickups choose stop 1 or 2, then deliver to stop 3 within 1000 metres of travel; the other pickup is skipped."><input id="alternative-pickup" type="checkbox"> Alternative pickups</label>
+<label title="Native sweep uses the map coordinates; ordered optional stops enforce activation dependencies between groups."><input id="grouped-stops" type="checkbox"> Optional stops together</label>
+<label title="Node precedence can require an optional stop to have another stop served earlier in the route."><input id="ordered-stops" type="checkbox"> Ordered optional stops</label>
+<label title="Node precedence can require an optional stop to have another stop served earlier in the route."><input id="precedence-stops" type="checkbox"> Stop precedence</label>
+<label title="Explicitly excluding stops 1 and 2 can ignore their disjunction penalty through the native forced-zero operation."><input id="excluded-stops" type="checkbox"> Exclude two stops</label>
+</div></section>
+<section class="settings-group"><h3>Costs and scheduling</h3><div class="option-grid"><label title="Tiered lateness adds 10 per minute after minute 5, then 30 per minute after minute 10, through native piecewise-linear cumul costs."><input id="tiered-lateness" type="checkbox"> Lateness cost</label>
+<label title="The optional whole-route callback adds the longest travel leg to the native objective; the example evaluates that custom cost separately for the solved route."><input id="route-cost" type="checkbox"> Longest-leg cost</label>
+<label title="Load costs assume one unit collected at each stop and charge load × distance in addition to travel."><input id="energy-cost" type="checkbox"> Load × distance cost</label>
+</div></section>
+<section class="settings-group"><h3>Search strategy</h3><div class="option-grid"><label>First solution <select id="first-solution-strategy"><option value="3">Cheapest arc</option><option value="5">Evaluator strategy</option><option value="11">Native sweep</option><option value="4">Most constrained arc</option><option value="9">Local cheapest insertion</option><option value="16">Local cheapest cost insertion</option></select></label>
+<label hidden title="Partial-route optimization uses a second native model with travel costs during local cheapest insertion. Its greedy search is limited to 0.05 seconds per call."><input id="secondary-model" type="checkbox"> Refine insertion</label>
+<label title="Generic tabu search can track successor variables instead of the native default objective variable."><input id="generic-tabu" type="checkbox"> Tabu on successors</label>
+<label title="Ordinary search returns up to three collected assignments. Iterated local search uses a spatial ruin strategy and runs for 0.1 seconds; select it separately from committed-route replanning."><input id="iterated-local-search" type="checkbox"> Iterated local search</label>
+</div></section>
+<section class="settings-group"><h3>Reuse and inspection</h3><div class="option-grid"><label title="Keep the first two visits fixed and solve the remaining route again."><input id="replan" type="checkbox"> Commit two visits and replan</label>
+<label title="Route transfer reuses routes in a separate model with doubled travel costs, then solves that model."><input id="transfer-route" type="checkbox"> Transfer routes to another model</label>
+<label title="Schedule packing keeps the routes fixed and packs native optimizer dimensions; without an eligible optimizer it keeps the schedule."><input id="pack-schedule" type="checkbox"> Pack schedule</label>
+<label title="Inspect native model classifications, dimensions and variable domains."><input id="native-inspection" type="checkbox"> Inspect model</label>
+</div></section>
+</details>
+
 		<div class="route-visual-layout">
 			<svg id="route-map" viewBox="0 0 960 620" role="img" aria-label="Simple routing map"></svg>
 			<section class="route-panel">
@@ -101,10 +60,17 @@ console.log(result.status, result.assignment?.objectiveValue());</code></pre>
 				<div id="route-output">Run the solver to view the route.</div>
 			</section>
 		</div>
-		<p>Status / Response:</p>
-		<pre id="status"></pre>
+		<details class="solve-log" open><summary>Solve log</summary><pre id="status" aria-live="polite"></pre></details>
 
-		<script type="module" src="./code_highlight.ts"></script>
+		<div class="code-toggle code-samples">
+			<details>
+				<summary title="Updates when you change the example settings.">Show code</summary>
+				<pre class="code-block"><code data-highlight="ts"></code></pre>
+			</details>
+		</div>
+    <script type="module" src="./example_controls.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./routing_simple.ts"></script>
-	</body>
+	  <script type="module" src="./live_example_code.ts"></script>
+</body>
 </html>

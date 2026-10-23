@@ -388,6 +388,8 @@ function extractSchedule(
 }
 
 async function runSportsScheduling() {
+  statusEl.textContent = '';
+  solutionOutput.textContent = 'No solution available for this run.';
   const numTeams = Math.max(2, Number.parseInt(teamsInput.value, 10) || 2);
   if (numTeams % 2 !== 0) {
     append('Number of teams must be even.');
@@ -468,7 +470,7 @@ async function runSportsScheduling() {
     renderSchedule(schedule, build.numDays);
     renderSolution(String(response.status ?? 'UNKNOWN'), response.objectiveValue, breaks, build.numTeams, build.numDays);
   } catch (error) {
-    const message = `Schedule failed: ${error instanceof Error ? error.message : String(error)}`;
+    const message = signal.aborted ? 'Schedule cancelled.' : `Schedule failed: ${error instanceof Error ? error.message : String(error)}`;
     append(message);
     showScheduleMessage(message);
     solutionOutput.textContent = message;

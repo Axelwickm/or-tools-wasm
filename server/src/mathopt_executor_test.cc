@@ -1,5 +1,9 @@
+#include <fstream>
+#include <unistd.h>
+#include "absl/cleanup/cleanup.h"
 #include "server/src/mathopt_executor.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstdint>
 #include <limits>
@@ -8,12 +12,22 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <tuple>
 
 #include "mathopt.pb.h"
+#include "mathopt_iis.pb.h"
+#include "mathopt_feasibility.pb.h"
+#include "mathopt_solution_improvement.pb.h"
+#include "mathopt_expression_bounds.pb.h"
+#include "ortools/math_opt/cpp/math_opt.h"
+#include "ortools/math_opt/labs/linear_expr_util.h"
+#include "ortools/math_opt/infeasible_subsystem.pb.h"
 #include "ortools/math_opt/rpc.pb.h"
 #include "ortools/math_opt/io/mps_converter.h"
 #include "ortools/math_opt/storage/model_storage.h"
 #include "ortools/math_opt/core/solver.h"
+#include "ortools/math_opt/solvers/gscip/gscip.h"
+#include "scip/scip_iisfinder.h"
 #include "ortools/math_opt/validators/model_parameters_validator.h"
 #include "javascript/mathopt_thread_budget.h"
 #include "server/src/job_scheduler.h"
@@ -66,6 +80,62 @@ math_opt::SolveResponse InnerResponse(const SolverExecutorResult& execution) {
   Expect(outer.ParseFromString(execution.payload), "MathOpt bridge response parses");
   Expect(inner.ParseFromString(outer.solve_response_proto()), "MathOpt SolveResponse parses");
   return inner;
+}
+
+void RejectsIncrementalBackendChanges() {
+  MathOptExecutor executor;
+  auto inner = InnerRequest();
+  inner.set_solver_type(math_opt::SOLVER_TYPE_PDLP);
+  bridge::MathOptBridgeRequest create;
+  create.mutable_incremental_create()->set_solve_request_proto(inner.SerializeAsString());
+  const auto created = InnerResponse(Execute(&executor, create));
+  Expect(!created.has_status() && created.messages_size() == 1, "PDLP session is created");
+  const uint64_t handle = std::stoull(created.messages(0));
+  math_opt::ModelUpdateProto update;
+  update.mutable_variable_updates()->mutable_upper_bounds()->add_ids(0);
+  update.mutable_variable_updates()->mutable_upper_bounds()->add_values(2.5);
+  auto changed = inner;
+  changed.mutable_model()->mutable_variables()->set_upper_bounds(0, 2.5);
+  for (const auto backend : {math_opt::SOLVER_TYPE_GLPK, math_opt::SOLVER_TYPE_GLOP}) {
+    changed.set_solver_type(backend);
+    for (const bool with_update : {false, true}) {
+      bridge::MathOptBridgeRequest solve;
+      auto* operation = solve.mutable_incremental_solve();
+      operation->set_handle(handle);
+      operation->set_solve_request_proto(changed.SerializeAsString());
+      if (with_update) operation->set_model_update_proto(update.SerializeAsString());
+      const auto rejected = InnerResponse(Execute(&executor, solve));
+      Expect(rejected.has_status() && rejected.status().code() == static_cast<int>(absl::StatusCode::kInvalidArgument) &&
+          rejected.status().message().find("session backend") != std::string::npos,
+          "Incremental solve rejects backend changes before updating or rebuilding");
+      bridge::MathOptBridgeRequest iis;
+      auto* inspection = iis.mutable_compute_infeasible_subsystem();
+      inspection->set_handle(handle);
+      inspection->set_solve_request_proto(changed.SerializeAsString());
+      if (with_update) inspection->set_model_update_proto(update.SerializeAsString());
+      const auto result = Execute(&executor, iis);
+      Expect(!result.ok && result.error_message.find("session backend") != std::string::npos,
+          "Retained IIS rejects backend changes before updating or rebuilding");
+    }
+  }
+  bridge::MathOptBridgeRequest solve;
+  auto* operation = solve.mutable_incremental_solve();
+  operation->set_handle(handle);
+  operation->set_solve_request_proto(inner.SerializeAsString());
+  const auto unchanged = InnerResponse(Execute(&executor, solve));
+  Expect(!unchanged.has_status() && unchanged.result().termination().reason() == math_opt::TERMINATION_REASON_OPTIMAL &&
+      unchanged.result().solutions(0).primal_solution().objective_value() == 12,
+      "Rejected requests leave the original model and backend usable");
+  changed.set_solver_type(math_opt::SOLVER_TYPE_PDLP);
+  operation->set_solve_request_proto(changed.SerializeAsString());
+  operation->set_model_update_proto(update.SerializeAsString());
+  const auto rebuilt = InnerResponse(Execute(&executor, solve));
+  Expect(!rebuilt.has_status() && rebuilt.result().termination().reason() == math_opt::TERMINATION_REASON_OPTIMAL &&
+      rebuilt.result().solutions(0).primal_solution().objective_value() == 7.5,
+      "PDLP rebuilds using the retained backend after an unsupported update");
+  bridge::MathOptBridgeRequest remove;
+  remove.mutable_incremental_delete()->set_handle(handle);
+  Expect(Execute(&executor, remove).ok, "Retained session is safely deleted on a later job thread");
 }
 
 void UpdatesRawIncrementalSessionsWithoutRebuilding() {
@@ -635,29 +705,358 @@ void PreservesNativeObjectiveUpdatesAndParameterReferences() {
       "Native variable deletion removes remaining auxiliary coefficients without redundant zero updates");
 }
 
-void ReportsNativeIisBackendLimitations() {
+void ReportsNativeIisCapabilities() {
   for (const auto type : {math_opt::SOLVER_TYPE_GLOP, math_opt::SOLVER_TYPE_GSCIP,
       math_opt::SOLVER_TYPE_GLPK, math_opt::SOLVER_TYPE_CP_SAT, math_opt::SOLVER_TYPE_PDLP}) {
-    auto model = InnerRequest().model();
-    if (type == math_opt::SOLVER_TYPE_CP_SAT) model.mutable_variables()->set_integers(0, true);
-    auto* rows = model.mutable_linear_constraints();
-    rows->add_ids(17); rows->add_lower_bounds(5); rows->add_upper_bounds(std::numeric_limits<double>::infinity());
-    auto* matrix = model.mutable_linear_constraint_matrix();
-    matrix->add_row_ids(17); matrix->add_column_ids(0); matrix->add_coefficients(1);
-    // x <= 4 and x >= 5 is valid but infeasible. Calling the native API proves
-    // the built MathOpt adapters lack IIS, independently of wrapper coverage.
+    auto inner = InnerRequest(); inner.set_solver_type(type);
+    if (type == math_opt::SOLVER_TYPE_CP_SAT) inner.mutable_model()->mutable_variables()->set_integers(0, true);
     math_opt::Solver::ComputeInfeasibleSubsystemArgs arguments;
     arguments.parameters.set_threads(1);
-    auto result = math_opt::Solver::NonIncrementalComputeInfeasibleSubsystem(model, type, {}, arguments);
-    Expect(!result.ok() && result.status().code() == absl::StatusCode::kUnimplemented,
-        "Native MathOpt IIS must report UNIMPLEMENTED for " + math_opt::SolverTypeProto_Name(type) +
-        ": " + result.status().ToString());
+    const auto native = math_opt::Solver::NonIncrementalComputeInfeasibleSubsystem(inner.model(), type, {}, arguments);
+    Expect(!native.ok() && native.status().code() == absl::StatusCode::kUnimplemented,
+        "Bundled backend preserves upstream IIS capability errors");
+    MathOptExecutor executor;
+    for (const bool retained : {false, true}) {
+      if (retained && type == math_opt::SOLVER_TYPE_GLPK) continue;
+      bridge::MathOptBridgeRequest request;
+      auto* operation = request.mutable_compute_infeasible_subsystem();
+      if (retained) {
+        bridge::MathOptBridgeRequest create;
+        create.mutable_incremental_create()->set_solve_request_proto(inner.SerializeAsString());
+        const auto created = InnerResponse(Execute(&executor, create));
+        Expect(!created.has_status() && created.messages_size() == 1, "Retained model is created");
+        operation->set_handle(std::stoull(created.messages(0)));
+      }
+      operation->set_solve_request_proto(inner.SerializeAsString());
+      bridge::MathOptBridgeResponse outer;
+      bridge::MathOptInfeasibleSubsystemResponse reply;
+      const auto result = Execute(&executor, request);
+      Expect(result.ok && outer.ParseFromString(result.payload) && reply.ParseFromString(outer.solve_response_proto()) &&
+          reply.has_status() && reply.status().code() == static_cast<int>(absl::StatusCode::kUnimplemented),
+          "Standalone and retained IIS bindings preserve native UNIMPLEMENTED status");
+      if (retained) {
+        bridge::MathOptBridgeRequest close;
+        close.mutable_incremental_delete()->set_handle(operation->handle());
+        Expect(Execute(&executor, close).ok, "Unsupported IIS retains a deletable native session");
+      }
+    }
   }
+}
+
+void RejectsUnsupportedNativeCones() {
+  auto model = InnerRequest().model();
+  auto& cone = (*model.mutable_second_order_cone_constraints())[23];
+  cone.add_arguments_to_norm()->set_offset(3);
+  cone.mutable_upper_bound()->add_ids(0); cone.mutable_upper_bound()->add_coefficients(1);
+  const auto created = math_opt::Solver::New(math_opt::SOLVER_TYPE_GSCIP, model, {});
+  Expect(!created.ok() && created.status().message().find("cone") != std::string::npos,
+      "GSCIP preserves upstream rejection of second-order cone models");
+  auto original = math_opt::Solver::New(math_opt::SOLVER_TYPE_GSCIP, InnerRequest().model(), {});
+  Expect(original.ok(), "An ordinary GSCIP model is created");
+  math_opt::ModelUpdateProto update;
+  (*update.mutable_second_order_cone_constraint_updates()->mutable_new_constraints())[23] = cone;
+  const auto applied = (*original)->Update(update);
+  Expect(applied.ok() && !*applied, "Native GSCIP declines unsupported cone updates without applying them");
+}
+
+bridge::MathOptBridgeResponse TransformIndicator(MathOptExecutor* executor, const math_opt::ModelProto& model, int64_t id) {
+  bridge::MathOptBridgeRequest request;
+  auto* input = request.mutable_formulate_indicator_constraint_as_mip();
+  input->set_model_proto(model.SerializeAsString()); input->set_indicator_constraint_id(id);
+  const auto execution = Execute(executor, request); Expect(execution.ok, execution.error_message);
+  bridge::MathOptBridgeResponse response;
+  Expect(response.ParseFromString(execution.payload), "Native transformation reply parses");
+  return response;
+}
+
+math_opt::ModelProto IndicatorModel() {
+  math_opt::ModelProto model; model.set_name("indicator conversion");
+  for (const auto [id, upper] : {std::pair<int64_t, double>{7, 1}, {11, 10}}) {
+    auto* variables = model.mutable_variables(); variables->add_ids(id); variables->add_lower_bounds(0);
+    variables->add_upper_bounds(upper); variables->add_integers(true);
+  }
+  auto& constraint = (*model.mutable_indicator_constraints())[23];
+  constraint.set_indicator_id(7); constraint.set_lower_bound(2); constraint.set_upper_bound(6);
+  constraint.mutable_expression()->add_ids(11); constraint.mutable_expression()->add_values(1);
+  return model;
+}
+
+void FormulatesIndicatorConstraintsThroughNativeMathOpt() {
+  MathOptExecutor executor; const auto model = IndicatorModel();
+  const auto response = TransformIndicator(&executor, model, 23);
+  math_opt::ModelProto converted;
+  Expect(response.has_model_proto() && converted.ParseFromString(response.model_proto()), "Native returns an exported model");
+  Expect(converted.indicator_constraints().empty() && converted.linear_constraints().ids_size() == 2 &&
+    converted.variables().ids(0) == 7 && converted.variables().ids(1) == 11 && converted.name() == model.name(),
+    "Only the selected indicator is replaced by native rows, retaining model metadata and variable IDs");
+  Expect(model.indicator_constraints().size() == 1 && model.linear_constraints().ids_size() == 0,
+    "Submitted proto is unchanged");
+  auto exact = model; const int64_t id = (int64_t{1} << 60) + 3;
+  auto indicator = exact.indicator_constraints().at(23); exact.clear_indicator_constraints();
+  (*exact.mutable_indicator_constraints())[id] = indicator;
+  Expect(TransformIndicator(&executor, exact, id).has_model_proto(), "Exact int64 indicator IDs survive the bridge");
+}
+
+void PreservesNativeIndicatorConversionErrors() {
+  MathOptExecutor executor; auto model = IndicatorModel();
+  Expect(TransformIndicator(&executor, model, 999).has_validation_error(), "Missing indicator rejects before native checked lookup");
+  model.mutable_variables()->set_upper_bounds(1, std::numeric_limits<double>::infinity());
+  auto response = TransformIndicator(&executor, model, 23);
+  Expect(response.has_validation_error() && !response.validation_error().empty() && !response.has_model_proto(),
+    "Insufficient upper bound reports native error without returning a partial transformation");
+  Expect(model.indicator_constraints().size() == 1 && model.linear_constraints().ids_size() == 0, "Failure leaves input untouched");
+  model.mutable_variables()->set_upper_bounds(1, 10);
+  Expect(TransformIndicator(&executor, model, 23).has_model_proto(), "Native executor recovers after transformation errors");
+  (*model.mutable_indicator_constraints())[23].clear_indicator_id();
+  math_opt::ModelProto converted; response = TransformIndicator(&executor, model, 23);
+  Expect(response.has_model_proto() && converted.ParseFromString(response.model_proto()) && converted.indicator_constraints().empty()
+    && converted.linear_constraints().ids_size() == 0, "Native inactive indicator is deleted without adding rows");
+}
+
+bridge::MathOptFeasibilityResponse CheckPoint(MathOptExecutor* executor, const bridge::MathOptFeasibilityRequest& input) {
+  bridge::MathOptBridgeRequest request; request.set_check_primal_feasibility(input.SerializeAsString());
+  const auto execution = Execute(executor, request); Expect(execution.ok, execution.error_message);
+  bridge::MathOptBridgeResponse outer; bridge::MathOptFeasibilityResponse result;
+  Expect(outer.ParseFromString(execution.payload) && result.ParseFromString(outer.primal_feasibility()), "Native feasibility reply parses");
+  return result;
+}
+void ChecksPrimalFeasibilityWithNativeTolerances() {
+  MathOptExecutor executor;
+  auto model = InnerRequest().model(); model.mutable_variables()->set_integers(0, true);
+  bridge::MathOptFeasibilityRequest input; input.set_model_proto(model.SerializeAsString()); input.add_variable_ids(0); input.add_variable_values(4.5);
+  auto result = CheckPoint(&executor, input); math_opt::ModelSubsetProto violations;
+  Expect(result.error().empty() && !result.feasible() && violations.ParseFromString(result.violated_constraints_proto()), "Native checker returns typed violations");
+  Expect(violations.variable_bounds().at(0).upper() && violations.variable_integrality_size() == 1 && result.descriptions_size() >= 2, "Bound and integer violations include native descriptions");
+  input.set_absolute_constraint_tolerance(0.5); input.set_integrality_tolerance(0.5);
+  result = CheckPoint(&executor, input); Expect(result.error().empty() && result.feasible() && result.descriptions_size() == 0, "Native tolerance boundaries are inclusive");
+  input.set_integrality_tolerance(0); Expect(!CheckPoint(&executor, input).feasible(), "Explicit zero is distinct from native tolerance defaults");
+  input.set_integrality_tolerance(-1); Expect(!CheckPoint(&executor, input).error().empty(), "Native checker rejects invalid tolerance");
+  input.clear_integrality_tolerance(); input.set_variable_values(0, 4); Expect(CheckPoint(&executor, input).feasible(), "Runtime recovers after checker errors");
+}
+void ValidatesCompletePrimalValuesAndExactIds() {
+  MathOptExecutor executor; auto model = InnerRequest().model();
+  const int64_t id = (int64_t{1} << 60) + 3;
+  model.mutable_variables()->set_ids(0, id); model.mutable_objective()->mutable_linear_coefficients()->set_ids(0, id);
+  bridge::MathOptFeasibilityRequest input; input.set_model_proto(model.SerializeAsString());
+  Expect(!CheckPoint(&executor, input).error().empty(), "Missing variable values reject");
+  input.add_variable_ids(id); input.add_variable_values(-1);
+  const auto result = CheckPoint(&executor, input); math_opt::ModelSubsetProto violations;
+  Expect(result.error().empty() && violations.ParseFromString(result.violated_constraints_proto()) && violations.variable_bounds().at(id).lower(), "Exact int64 model IDs survive native checker serialization");
+  input.add_variable_ids(id); input.add_variable_values(0);
+  Expect(!CheckPoint(&executor, input).error().empty(), "Duplicate sparse IDs reject");
+  input.set_variable_ids(1, id + 1); Expect(!CheckPoint(&executor, input).error().empty(), "Extra unknown IDs reject");
+  input.clear_variable_values(); Expect(!CheckPoint(&executor, input).error().empty(), "Mismatched sparse vector lengths reject");
+}
+
+bridge::MathOptBridgeResponse TransformRobust(MathOptExecutor* executor,
+    const bridge::MathOptRobustConstraintRequest& input) {
+  bridge::MathOptBridgeRequest request; *request.mutable_add_robust_constraint() = input;
+  const auto execution = Execute(executor, request); Expect(execution.ok, execution.error_message);
+  bridge::MathOptBridgeResponse response;
+  Expect(response.ParseFromString(execution.payload), "Robust transformation response parses");
+  return response;
+}
+bridge::MathOptRobustConstraintRequest RobustInput() {
+  auto main = InnerRequest().model();
+  auto* variables = main.mutable_variables();
+  variables->add_ids(1); variables->add_lower_bounds(4); variables->add_upper_bounds(4); variables->add_integers(false);
+  auto uncertainty = InnerRequest().model();
+  uncertainty.mutable_variables()->set_upper_bounds(0, 1);
+  bridge::MathOptRobustConstraintRequest input;
+  input.set_model_proto(main.SerializeAsString()); input.set_uncertainty_model_proto(uncertainty.SerializeAsString());
+  input.set_rhs_id(1);
+  auto* coefficient = input.add_uncertain_coefficients(); coefficient->set_variable_id(0);
+  coefficient->add_uncertainty_variable_ids(0); coefficient->add_coefficients(1); coefficient->set_offset(1);
+  return input;
+}
+void FormulatesNativeRobustConstraints() {
+  MathOptExecutor executor; const auto input = RobustInput();
+  const auto response = TransformRobust(&executor, input);
+  Expect(response.has_model_proto(), response.validation_error());
+  math_opt::ModelProto model; Expect(model.ParseFromString(response.model_proto()), "Output model parses");
+  Expect(model.variables().ids_size() == 4 && model.linear_constraints().ids_size() == 2,
+      "Native LP duality adds split bound variables and linking rows");
+  auto solved = math_opt::Solver::NonIncrementalSolve(model, math_opt::SOLVER_TYPE_GLOP, {}, {});
+  Expect(solved.ok(), solved.status().ToString());
+  Expect(std::abs(solved->solutions(0).primal_solution().objective_value() - 6) < 1e-8,
+      "Native robust constraint enforces (1+w)*x <= 4 for every w in [0,1]");
+  const int64_t id = 9007199254740993LL;
+  auto exact = input; math_opt::ModelProto uncertainty;
+  uncertainty.ParseFromString(input.uncertainty_model_proto());
+  uncertainty.mutable_variables()->set_ids(0, id);
+  uncertainty.mutable_objective()->mutable_linear_coefficients()->set_ids(0, id);
+  exact.set_uncertainty_model_proto(uncertainty.SerializeAsString());
+  exact.mutable_uncertain_coefficients(0)->set_uncertainty_variable_ids(0, id);
+  Expect(TransformRobust(&executor, exact).has_model_proto(), "Exact uncertainty IDs survive native reconstruction");
+}
+void RejectsUnsafeRobustInputs() {
+  MathOptExecutor executor;
+  for (int variant = 0; variant < 8; ++variant) {
+    auto input = RobustInput(); math_opt::ModelProto uncertainty;
+    uncertainty.ParseFromString(input.uncertainty_model_proto());
+    if (variant == 0) input.set_rhs_id(99);
+    if (variant == 1) input.mutable_uncertain_coefficients(0)->set_variable_id(99);
+    if (variant == 2) input.mutable_uncertain_coefficients(0)->set_uncertainty_variable_ids(0, 99);
+    if (variant == 3) input.mutable_uncertain_coefficients(0)->clear_coefficients();
+    if (variant == 4) input.mutable_uncertain_coefficients(0)->set_offset(std::numeric_limits<double>::quiet_NaN());
+    if (variant == 5) uncertainty.mutable_variables()->set_integers(0, true);
+    if (variant == 6) {
+      auto* terms = uncertainty.mutable_objective()->mutable_quadratic_coefficients();
+      terms->add_row_ids(0); terms->add_column_ids(0); terms->add_coefficients(1);
+    }
+    if (variant >= 5) input.set_uncertainty_model_proto(uncertainty.SerializeAsString());
+    if (variant == 7) input.set_uncertainty_model_proto("\xff");
+    Expect(TransformRobust(&executor, input).has_validation_error(), "Invalid robust input returns an error, never unchecked native access");
+  }
+  Expect(TransformRobust(&executor, RobustInput()).has_model_proto(), "Executor recovers after invalid robust inputs");
+}
+
+bridge::MathOptSolutionImprovementResponse ImproveValues(MathOptExecutor* executor,
+    const bridge::MathOptSolutionImprovementRequest& input) {
+  bridge::MathOptBridgeRequest request; request.set_improve_solution(input.SerializeAsString());
+  const auto execution = Execute(executor, request); Expect(execution.ok, execution.error_message);
+  bridge::MathOptBridgeResponse outer; bridge::MathOptSolutionImprovementResponse response;
+  Expect(outer.ParseFromString(execution.payload) && response.ParseFromString(outer.improved_values()), "Improvement response parses");
+  return response;
+}
+bridge::MathOptSolutionImprovementRequest ImprovementInput() {
+  bridge::MathOptSolutionImprovementRequest input;
+  input.set_model_proto(InnerRequest().model().SerializeAsString());
+  input.add_variable_ids(0); input.add_variable_values(1); input.add_selected_variable_ids(0);
+  return input;
+}
+void ImprovesSolutionsThroughNativeMathOpt() {
+  MathOptExecutor executor; const auto input = ImprovementInput();
+  const auto response = ImproveValues(&executor, input); Expect(response.error().empty(), response.error());
+  math_opt::SparseDoubleVectorProto values;
+  Expect(values.ParseFromString(response.variable_values_proto()) && values.ids(0) == 0 && values.values(0) == 4,
+      "Native improvement moves selected variable to its best feasible bound");
+  auto empty = input; empty.clear_selected_variable_ids();
+  Expect(values.ParseFromString(ImproveValues(&executor, empty).variable_values_proto()) && values.values(0) == 1,
+      "An explicit empty selection preserves the complete point");
+  const int64_t id = 9007199254740993LL;
+  auto exact = input; auto model = InnerRequest().model();
+  model.mutable_variables()->set_ids(0, id); model.mutable_objective()->mutable_linear_coefficients()->set_ids(0, id);
+  exact.set_model_proto(model.SerializeAsString()); exact.set_variable_ids(0, id); exact.set_selected_variable_ids(0, id);
+  const auto transformed = ImproveValues(&executor, exact);
+  Expect(transformed.error().empty() && values.ParseFromString(transformed.variable_values_proto()) && values.ids(0) == id,
+      "Native output preserves exact int64 variable IDs");
+}
+void PreservesNativeImprovementErrors() {
+  MathOptExecutor executor;
+  for (int variant = 0; variant < 7; ++variant) {
+    auto input = ImprovementInput(); auto model = InnerRequest().model();
+    if (variant == 0) input.set_selected_variable_ids(0, 99);
+    if (variant == 1) { input.clear_variable_ids(); input.clear_variable_values(); }
+    if (variant == 2) input.set_variable_values(0, std::numeric_limits<double>::infinity());
+    if (variant == 3) input.set_integrality_tolerance(-1);
+    if (variant == 4) input.set_integrality_tolerance(0.2501);
+    if (variant == 5) {
+      model.mutable_variables()->set_upper_bounds(0, std::numeric_limits<double>::infinity());
+      input.set_model_proto(model.SerializeAsString());
+    }
+    if (variant == 6) {
+      auto* quadratic = model.mutable_objective()->mutable_quadratic_coefficients();
+      quadratic->add_row_ids(0); quadratic->add_column_ids(0); quadratic->add_coefficients(1);
+      input.set_model_proto(model.SerializeAsString());
+    }
+    Expect(!ImproveValues(&executor, input).error().empty(), "Native validation errors remain errors");
+  }
+  Expect(ImproveValues(&executor, ImprovementInput()).error().empty(), "Executor recovers after improvement errors");
+}
+
+void BoundsExpressionsThroughNativeMathOpt() {
+  MathOptExecutor executor;
+  math_opt::Model model;
+  const auto x = model.AddContinuousVariable(-1, 2, "x");
+  const auto y = model.AddContinuousVariable(3, 5, "y");
+  model.AddLinearConstraint(x == 0);
+  const math_opt::LinearExpression expression = 2 * x - 3 * y + 4;
+  bridge::MathOptExpressionBoundsRequest input;
+  input.set_model_proto(model.ExportModel().SerializeAsString());
+  input.add_variable_ids(x.id()); input.add_coefficients(2);
+  input.add_variable_ids(y.id()); input.add_coefficients(-3); input.set_offset(4);
+  auto evaluate = [&](const bridge::MathOptExpressionBoundsRequest& value) {
+    bridge::MathOptBridgeRequest request; request.set_expression_bounds(value.SerializeAsString());
+    const auto execution = Execute(&executor, request); Expect(execution.ok, execution.error_message);
+    bridge::MathOptBridgeResponse outer; bridge::MathOptExpressionBoundsResponse response;
+    Expect(outer.ParseFromString(execution.payload) && response.ParseFromString(outer.expression_bounds()), "Native bounds reply parses");
+    return response;
+  };
+  const auto response = evaluate(input);
+  Expect(response.error().empty() && response.lower_bound() == math_opt::LowerBound(expression) &&
+    response.upper_bound() == math_opt::UpperBound(expression) && response.lower_bound() == -13 && response.upper_bound() == -1,
+    "Bridge matches direct native bounds independently of tighter constraints");
+  for (int variant = 0; variant < 6; ++variant) {
+    auto bad = input;
+    if (variant == 0) bad.set_variable_ids(0, 99);
+    if (variant == 1) bad.clear_coefficients();
+    if (variant == 2) bad.set_variable_ids(1, x.id());
+    if (variant == 3) bad.set_coefficients(0, std::numeric_limits<double>::infinity());
+    if (variant == 4) bad.set_offset(std::numeric_limits<double>::quiet_NaN());
+    if (variant == 5) bad.set_model_proto("\xff");
+    Expect(!evaluate(bad).error().empty(), "Malformed expressions return native validation errors");
+  }
+  Expect(evaluate(input).error().empty(), "Executor recovers after invalid queries");
+}
+
+void RejectsRemoteFilesystemParameters() {
+  char path[] = "/tmp/ortools-mathopt-policy-XXXXXX";
+  const int fd = mkstemp(path); Expect(fd >= 0, "Create private policy sentinel"); close(fd);
+  const absl::Cleanup cleanup = [&] { std::remove(path); };
+  { std::ofstream output(path); output << "untouched"; }
+  std::vector<operations_research::GScipParameters> parameters(3);
+  parameters[0].set_search_logs_filename(path);
+  parameters[1].set_detailed_solving_stats_filename(path);
+  parameters[2].set_scip_model_filename(path);
+  for (const std::string key : {"visual/vbcfilename", "visual/bakfilename", "heuristics/alns/rewardfilename", "certificate/filename", "future/file"}) {
+    operations_research::GScipParameters value;
+    (*value.mutable_string_params())[key] = path; parameters.push_back(value);
+  }
+  MathOptExecutor executor;
+  for (const auto& value : parameters) for (int operation = 0; operation < 4; ++operation) {
+    auto inner = InnerRequest(); inner.set_solver_type(math_opt::SOLVER_TYPE_GSCIP);
+    *inner.mutable_parameters()->mutable_gscip() = value;
+    bridge::MathOptBridgeRequest request;
+    if (operation == 0) request.mutable_solve()->set_solve_request_proto(inner.SerializeAsString());
+    if (operation == 1) request.mutable_incremental_create()->set_solve_request_proto(inner.SerializeAsString());
+    if (operation == 2) request.mutable_incremental_solve()->set_solve_request_proto(inner.SerializeAsString());
+    if (operation == 3) request.mutable_compute_infeasible_subsystem()->set_solve_request_proto(inner.SerializeAsString());
+    const SolverExecutorRequest outer{1, "mathopt", request.SerializeAsString()};
+    bool rejected = false;
+    try { executor.RequestedThreads(outer, 0, 2); } catch (const std::invalid_argument&) { rejected = true; }
+    Expect(rejected, "Admission rejects remote filesystem parameters");
+    JobScheduler scheduler({1, 2}); SolverExecutorResult result;
+    auto job = scheduler.Submit({"mathopt", 1}, [&](JobContext& context) {
+      result = executor.Execute(outer, context, [](std::string) {}); return JobResult::Succeeded();
+    });
+    job.result().get();
+    Expect(!result.ok && result.error_message.find("filesystem") != std::string::npos,
+        "Direct executor entry also enforces filesystem policy");
+    std::ifstream input(path); std::string contents; input >> contents;
+    Expect(contents == "untouched", "Server never truncates the private sentinel");
+  }
+  auto safe = InnerRequest(); safe.set_solver_type(math_opt::SOLVER_TYPE_GSCIP);
+  (*safe.mutable_parameters()->mutable_gscip()->mutable_int_params())["display/verblevel"] = 0;
+  (*safe.mutable_parameters()->mutable_gscip()->mutable_string_params())["heuristics/undercover/fixingalts"] = "lni";
+  bridge::MathOptBridgeRequest request; request.mutable_solve()->set_solve_request_proto(safe.SerializeAsString());
+  Expect(InnerResponse(Execute(&executor, request)).has_result(), "Ordinary native parameters still solve");
 }
 
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
-      {"ReportsNativeIisBackendLimitations", ReportsNativeIisBackendLimitations},
+      {"RejectsRemoteFilesystemParameters", RejectsRemoteFilesystemParameters},
+      {"BoundsExpressionsThroughNativeMathOpt", BoundsExpressionsThroughNativeMathOpt},
+      {"ImprovesSolutionsThroughNativeMathOpt", ImprovesSolutionsThroughNativeMathOpt},
+      {"PreservesNativeImprovementErrors", PreservesNativeImprovementErrors},
+      {"FormulatesNativeRobustConstraints", FormulatesNativeRobustConstraints},
+      {"RejectsUnsafeRobustInputs", RejectsUnsafeRobustInputs},
+      {"FormulatesIndicatorConstraintsThroughNativeMathOpt", FormulatesIndicatorConstraintsThroughNativeMathOpt},
+      {"PreservesNativeIndicatorConversionErrors", PreservesNativeIndicatorConversionErrors},
+      {"ChecksPrimalFeasibilityWithNativeTolerances", ChecksPrimalFeasibilityWithNativeTolerances},
+      {"ValidatesCompletePrimalValuesAndExactIds", ValidatesCompletePrimalValuesAndExactIds},
+      {"ReportsNativeIisCapabilities", ReportsNativeIisCapabilities},
+      {"RejectsUnsupportedNativeCones", RejectsUnsupportedNativeCones},
       {"PreservesNativeObjectiveUpdatesAndParameterReferences", PreservesNativeObjectiveUpdatesAndParameterReferences},
       {"ConvertsStandaloneSolutionsWithExactIds", ConvertsStandaloneSolutionsWithExactIds},
       {"ConvertsNativeResultMetadata", ConvertsNativeResultMetadata},
@@ -675,6 +1074,7 @@ int RunAllTests() {
       {"RejectsInvalidBackendWorkerCounts", RejectsInvalidBackendWorkerCounts},
       {"SolvesNestedProto", SolvesNestedProto},
       {"UpdatesRawIncrementalSessionsWithoutRebuilding", UpdatesRawIncrementalSessionsWithoutRebuilding},
+      {"RejectsIncrementalBackendChanges", RejectsIncrementalBackendChanges},
       {"CreatesAndDeletesIncrementalSession", CreatesAndDeletesIncrementalSession},
       {"ReservesNestedThreadCount", ReservesNestedThreadCount},
       {"AcceptsGlopThreads", AcceptsGlopThreads},

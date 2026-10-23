@@ -8,6 +8,8 @@ namespace ortools_wasm::server {
 
 class MpSolverExecutor final : public SolverExecutor {
  public:
+  explicit MpSolverExecutor(SessionLimits limits = ServerSessionLimits()) : sessions_(true, limits) {}
+  void ExpireIdleSessions() override { sessions_.ExpireIdle(); }
   std::string solver() const override;
   int RequestedThreads(const SolverExecutorRequest& request,
                        int client_requested_threads,
@@ -16,7 +18,7 @@ class MpSolverExecutor final : public SolverExecutor {
                                const JobContext& context,
                                const SolverEventSink& emit_event) override;
  private:
-  ortools_wasm::mp_session::Registry sessions_{true};
+  ortools_wasm::mp_session::Registry sessions_;
 };
 
 }  // namespace ortools_wasm::server

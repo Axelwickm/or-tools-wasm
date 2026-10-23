@@ -1,10 +1,12 @@
 #include "server/src/solver_job_service.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <future>
+#include <deque>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -143,37 +145,73 @@ bool IsTerminalResponse(const bridge::SolverBridgeResponse& response) {
          response.payload_case() == bridge::SolverBridgeResponse::kFailure;
 }
 
+class ExpiredEventCursor : public std::runtime_error {
+ public:
+  ExpiredEventCursor() : std::runtime_error("Event history expired; the requested cursor is outside the retained window. The final result remains available at /result.") {}
+};
+
 class EventLog {
  public:
+  explicit EventLog(EventHistoryLimits limits) : limits_(limits) {}
+
   bridge::SolverBridgeResponse Append(bridge::SolverBridgeResponse response,
                                       bool close = false) {
     {
       std::lock_guard lock(mutex_);
-      response.set_sequence_id(next_sequence_id_++);
-      responses_.push_back(response);
+      response.set_sequence_id(next_sequence_id_);
+      const size_t bytes = response.ByteSizeLong();
+      // Large final results remain in JobOutput and are fetched via /result;
+      // duplicating them in event history would defeat the byte budget.
+      if (bytes > limits_.max_bytes && !close) {
+        // Do not throw through native observer threads. Expire the cursor so
+        // clients see an explicit gap and cancel, instead of skipping data.
+        responses_.clear();
+        bytes_ = 0;
+        minimum_cursor_ = next_sequence_id_++;
+        response.set_sequence_id(0);  // Signals that this event was not retained.
+      }
+      if (bytes <= limits_.max_bytes) {
+        while (!responses_.empty() &&
+               (responses_.size() >= limits_.max_events || bytes_ + bytes > limits_.max_bytes)) {
+          bytes_ -= responses_.front().ByteSizeLong();
+          responses_.pop_front();
+        }
+        ++next_sequence_id_;
+        responses_.push_back(response);
+        bytes_ += bytes;
+        if (!first_) first_ = response;
+      }
       if (close) closed_at_ = std::chrono::steady_clock::now();
     }
     changed_.notify_all();
     return response;
   }
 
+  void CheckCursor(uint64_t sequence_id) const {
+    std::lock_guard lock(mutex_);
+    CheckCursorLocked(sequence_id);
+  }
+
   std::vector<bridge::SolverBridgeResponse> After(uint64_t sequence_id) const {
     std::lock_guard lock(mutex_);
-    if (sequence_id >= responses_.size()) return {};
-    return {responses_.begin() + sequence_id, responses_.end()};
+    CheckCursorLocked(sequence_id);
+    if (responses_.empty() || sequence_id >= next_sequence_id_ - 1) return {};
+    const size_t offset = sequence_id + 1 - responses_.front().sequence_id();
+    return {responses_.begin() + offset, responses_.end()};
   }
 
   void ReleaseCallbackPayload(uint64_t sequence_id) {
     std::lock_guard lock(mutex_);
-    // Entries retain their sequence metadata, so old cursors can still advance
-    // without replaying callbacks that have already been answered or closed.
-    responses_.at(sequence_id - 1).clear_payload();
+    if (responses_.empty() || sequence_id < responses_.front().sequence_id() || sequence_id >= next_sequence_id_) return;
+    auto& response = responses_[sequence_id - responses_.front().sequence_id()];
+    bytes_ -= response.ByteSizeLong();
+    response.clear_payload();
+    bytes_ += response.ByteSizeLong();
   }
 
   std::optional<bridge::SolverBridgeResponse> First() const {
     std::lock_guard lock(mutex_);
-    if (responses_.empty()) return std::nullopt;
-    return responses_.front();
+    return first_;
   }
 
   struct ReadResult {
@@ -185,10 +223,11 @@ class EventLog {
                        std::chrono::milliseconds timeout) const {
     std::unique_lock lock(mutex_);
     changed_.wait_for(lock, timeout, [&] {
-      return closed_at_.has_value() || sequence_id < responses_.size();
+      return closed_at_.has_value() || sequence_id < next_sequence_id_ - 1;
     });
-    if (sequence_id < responses_.size())
-      return {responses_[sequence_id], closed_at_.has_value()};
+    CheckCursorLocked(sequence_id);
+    if (!responses_.empty() && sequence_id < next_sequence_id_ - 1)
+      return {responses_[sequence_id + 1 - responses_.front().sequence_id()], closed_at_.has_value()};
     return {std::nullopt, closed_at_.has_value()};
   }
 
@@ -198,10 +237,19 @@ class EventLog {
   }
 
  private:
+  void CheckCursorLocked(uint64_t sequence_id) const {
+    if (sequence_id < minimum_cursor_ ||
+        (!responses_.empty() && sequence_id < responses_.front().sequence_id() - 1))
+      throw ExpiredEventCursor();
+  }
+  const EventHistoryLimits limits_;
   mutable std::mutex mutex_;
   mutable std::condition_variable changed_;
   uint64_t next_sequence_id_ = 1;
-  std::vector<bridge::SolverBridgeResponse> responses_;
+  uint64_t minimum_cursor_ = 0;
+  size_t bytes_ = 0;
+  std::deque<bridge::SolverBridgeResponse> responses_;
+  std::optional<bridge::SolverBridgeResponse> first_;
   std::optional<std::chrono::steady_clock::time_point> closed_at_;
 };
 
@@ -214,6 +262,7 @@ struct PendingCallback {
   std::optional<std::string> reply;
 };
 struct JobOutput {
+  explicit JobOutput(EventHistoryLimits limits) : events(limits) {}
   EventLog events;
   std::mutex callbacks_mutex;
   uint64_t next_callback = 1;
@@ -241,6 +290,12 @@ struct JobOutput {
     {
       std::lock_guard lock(pending->mutex);
       pending->sequence_id = events.Append(std::move(event)).sequence_id();
+      if (pending->sequence_id == 0) {
+        std::lock_guard callbacks_lock(callbacks_mutex);
+        callbacks.erase(id);
+        callback_transport_error = "Native callback exceeds the event-history byte limit.";
+        return std::nullopt;
+      }
     }
     std::optional<std::string> reply;
     bool received;
@@ -265,21 +320,27 @@ struct JobOutput {
 }  // namespace
 
 struct SolverJobService::JobEntry {
+  explicit JobEntry(EventHistoryLimits limits) : output(std::make_shared<JobOutput>(limits)) {}
   uint32_t request_id = 0;
   std::string solver;
   JobHandle handle;
-  std::shared_ptr<JobOutput> output = std::make_shared<JobOutput>();
+  std::shared_ptr<JobOutput> output;
+  std::atomic<bool> stream_active{false};
 };
 
 SolverJobService::SolverJobService(
     JobScheduler& scheduler,
-    std::chrono::milliseconds completed_job_retention)
+    std::chrono::milliseconds completed_job_retention,
+    EventHistoryLimits event_history_limits)
     : scheduler_(scheduler),
+      event_history_limits_(event_history_limits),
       completed_job_retention_(completed_job_retention) {
   if (completed_job_retention_ <= std::chrono::milliseconds::zero()) {
     throw std::invalid_argument(
         "SolverJobService completed-job retention must be positive.");
   }
+  if (!event_history_limits.max_events || event_history_limits.max_bytes < 1024)
+    throw std::invalid_argument("Event history requires a positive count and at least 1024 bytes.");
   cleanup_thread_ = std::thread([this] { CleanupExpiredJobs(); });
 }
 
@@ -340,7 +401,7 @@ HttpBinaryResponse SolverJobService::Submit(const HttpBinaryRequest& request) {
                            bridge::SOLVER_FAILURE_KIND_INVALID_REQUEST);
   }
 
-  auto entry = std::make_shared<JobEntry>();
+  auto entry = std::make_shared<JobEntry>(event_history_limits_);
   entry->request_id = bridge_request.request_id();
   entry->solver = bridge_request.solver();
   auto output = entry->output;
@@ -427,6 +488,8 @@ HttpBinaryResponse SolverJobService::Events(const HttpBinaryRequest& request) {
       *batch.add_responses() = response;
     }
     return ProtoResponse(200, batch);
+  } catch (const ExpiredEventCursor& error) {
+    return TextResponse(410, std::string(error.what()) + "\n");
   } catch (const std::exception& error) {
     return TextResponse(400, std::string(error.what()) + "\n");
   }
@@ -443,16 +506,34 @@ HttpEventStreamResponse SolverJobService::StreamEvents(
           {}, {}};
     }
     const uint64_t initial_sequence_id = EventCursorFromRequest(request);
+    entry->output->events.CheckCursor(initial_sequence_id);
+    struct StreamLease {
+      explicit StreamLease(std::shared_ptr<JobEntry> job)
+          : job(std::move(job)), acquired(!this->job->stream_active.exchange(true)) {}
+      ~StreamLease() { if (acquired) job->stream_active.store(false); }
+      std::shared_ptr<JobEntry> job;
+      const bool acquired;
+    };
+    auto lease = std::make_shared<StreamLease>(entry);
+    if (!lease->acquired) return HttpEventStreamResponse{
+        409, "Job already has an event stream; use polling.\n", {}, {}};
     return HttpEventStreamResponse{
         200,
         {},
         {},
-        [entry, sequence_id = initial_sequence_id]() mutable
+        [entry, lease = std::move(lease), sequence_id = initial_sequence_id]() mutable
             -> std::optional<HttpServerSentEvent> {
-          const EventLog::ReadResult read = entry->output->events.WaitAfter(
-              sequence_id, kEventStreamHeartbeatInterval);
+          EventLog::ReadResult read;
+          try {
+            read = entry->output->events.WaitAfter(sequence_id, kEventStreamHeartbeatInterval);
+          } catch (const ExpiredEventCursor&) {
+            // Headers have already been sent. Close cleanly; polling with the
+            // same cursor then reports HTTP 410 instead of silently losing events.
+            lease.reset();
+            return std::nullopt;
+          }
           if (!read.response.has_value()) {
-            if (read.closed) return std::nullopt;
+            if (read.closed) { lease.reset(); return std::nullopt; }
             return HttpServerSentEvent{};
           }
           sequence_id = read.response->sequence_id();
@@ -460,10 +541,14 @@ HttpEventStreamResponse SolverJobService::StreamEvents(
           if (!read.response->SerializeToString(&bytes)) {
             throw std::runtime_error("Failed to serialize streamed protobuf response.");
           }
+          const bool terminal = IsTerminalResponse(*read.response);
+          if (terminal) lease.reset();
           return HttpServerSentEvent{
               std::to_string(sequence_id), "solver", std::move(bytes),
-              IsTerminalResponse(*read.response)};
+              terminal};
         }};
+  } catch (const ExpiredEventCursor& error) {
+    return HttpEventStreamResponse{410, std::string(error.what()) + "\n", {}, {}};
   } catch (const std::exception& error) {
     return HttpEventStreamResponse{400, std::string(error.what()) + "\n", {}, {}};
   }
@@ -574,7 +659,7 @@ HttpBinaryResponse SolverJobService::Interrupt(const HttpBinaryRequest& request)
                              "Interruption target does not match the job.", 400,
                              bridge::SOLVER_FAILURE_KIND_INVALID_REQUEST);
     }
-    if (entry->solver != "mathopt") return FailureResponse(control.request_id(), entry->solver, job_id,
+    if (entry->solver != "mathopt" && entry->solver != "cp-sat") return FailureResponse(control.request_id(), entry->solver, job_id,
         "Native interruption with a retained result is not supported for this solver.", 400,
         bridge::SOLVER_FAILURE_KIND_INVALID_REQUEST);
     entry->handle.Interrupt();
@@ -634,6 +719,7 @@ void SolverJobService::CleanupExpiredJobs() {
     const auto now = std::chrono::steady_clock::now();
     {
       std::lock_guard jobs_lock(mutex_);
+      for (const auto& [name, executor] : executors_) executor->ExpireIdleSessions();
       for (auto it = jobs_.begin(); it != jobs_.end();) {
         const auto closed_at = it->second->output->events.ClosedAt();
         if (closed_at.has_value() &&

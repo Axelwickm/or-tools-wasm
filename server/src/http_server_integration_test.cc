@@ -47,6 +47,7 @@ struct ExecutionCounters {
   std::atomic<int> allocated_threads{0};
   std::atomic<int> maximum_allocated_threads{0};
   std::atomic<int> completed_jobs{0};
+  std::atomic<int> stream_sources{0};
 };
 
 class FakeExecutor final : public SolverExecutor {
@@ -78,7 +79,10 @@ class FakeExecutor final : public SolverExecutor {
     }
 
     emit_event("started");
-    if (request.payload == "control") {
+    if (request.payload == "callback") {
+      const auto reply = request.callback("challenge");
+      Expect(reply && *reply == "reply", "HTTP callback reply reaches the executor");
+    } else if (request.payload == "control") {
       std::this_thread::sleep_for(1s);
     } else {
       std::this_thread::sleep_for(request.payload == "stream" ? 50ms : 3ms);
@@ -148,6 +152,15 @@ class RunningServer {
     service_.Register(std::make_unique<FakeExecutor>(counters_));
     server_.AddHealthRoute();
     AddSolverJobRoutes(server_, service_);
+    server_.AddEventStreamRoute("/test/stream", [counters = counters_](const HttpBinaryRequest& request) {
+      if (request.query_parameters.count("reject")) return HttpEventStreamResponse{400, "invalid", {}, {}};
+      auto lease = std::shared_ptr<void>(nullptr, [counters](void*) { counters->stream_sources.fetch_sub(1); });
+      counters->stream_sources.fetch_add(1);
+      return HttpEventStreamResponse{200, {}, {}, [lease]() -> std::optional<HttpServerSentEvent> {
+        std::this_thread::sleep_for(10ms);
+        return HttpServerSentEvent{};
+      }};
+    });
     thread_ = std::thread([this] { server_.Listen(); });
 
     httplib::Client client("127.0.0.1", kPort);
@@ -224,6 +237,83 @@ void ControlPlaneRemainsResponsiveWithActiveStreams() {
   for (const auto& job : submitted) ReleaseJob(job.job_id());
 }
 
+void StreamAdmissionLeavesControlCapacity(const RunningServer& server) {
+  // With eight solver threads the HTTP pool has twelve workers: at most eight
+  // may serve streams, including streams unrelated to active scheduler slots.
+  for (int round = 0; round < 2; ++round) {
+    httplib::Client control("127.0.0.1", kPort);
+    control.set_read_timeout(1, 0);
+    for (int attempt = 0; attempt < 16; ++attempt) {
+      const auto rejected = control.Get("/test/stream?reject=1");
+      Expect(rejected && rejected->status == 400, "Invalid stream requests release admission slots");
+    }
+    std::atomic<bool> disconnect{false};
+    std::mutex errors_mutex;
+    std::vector<std::string> errors;
+    std::vector<std::thread> subscribers;
+    for (int index = 0; index < kTotalThreads; ++index) {
+      subscribers.emplace_back([&] {
+        httplib::Client client("127.0.0.1", kPort);
+        client.set_read_timeout(2, 0);
+        const auto result = client.Get("/test/stream", [&](const char*, size_t) { return !disconnect.load(); });
+        // The receiver intentionally disconnects instead of consuming a terminal event.
+        if (result && result->status != 200) {
+          std::lock_guard lock(errors_mutex); errors.push_back("Expected admitted stream");
+        }
+      });
+    }
+    const auto join = [&] { disconnect.store(true); for (auto& subscriber : subscribers) subscriber.join(); };
+    try {
+      const auto deadline = std::chrono::steady_clock::now() + 2s;
+      while (server.counters()->stream_sources.load() != kTotalThreads && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(1ms);
+      ExpectEq(server.counters()->stream_sources.load(), kTotalThreads, "All permitted streams are active");
+      for (int attempt = 0; attempt < 16; ++attempt) {
+        const auto rejected = control.Get("/test/stream");
+        Expect(rejected && rejected->status == 503, "Excess stream subscriptions return promptly");
+        ExpectEq(rejected->get_header_value("Connection"), std::string("close"), "Rejected subscriptions release HTTP workers");
+        ExpectEq(rejected->get_header_value("Retry-After"), std::string("1"), "Stream admission failure can be retried");
+      }
+      const auto health = control.Get("/healthz");
+      Expect(health && health->status == 200, "Health remains responsive at the stream limit");
+      const auto callback_job = SubmitJob(6000 + round, 1, "callback");
+      bridge::SolverCallbackRequest callback;
+      const auto callback_deadline = std::chrono::steady_clock::now() + 2s;
+      while (callback.callback_id() == 0 && std::chrono::steady_clock::now() < callback_deadline) {
+        const auto events = control.Get("/jobs/" + std::to_string(callback_job.job_id()) + "/events");
+        bridge::SolverEventBatch batch;
+        Expect(events && events->status == 200 && batch.ParseFromString(events->body), "Callback events remain accessible");
+        for (const auto& event : batch.responses()) if (event.has_callback_request()) callback = event.callback_request();
+        if (callback.callback_id() == 0) std::this_thread::sleep_for(1ms);
+      }
+      Expect(callback.callback_id() != 0, "Executor publishes its callback");
+      bridge::SolverBridgeRequest reply;
+      reply.set_request_id(6000 + round); reply.set_solver("fake");
+      reply.mutable_callback_reply()->set_callback_id(callback.callback_id());
+      reply.mutable_callback_reply()->set_payload("reply");
+      const auto acknowledgement = control.Post("/jobs/" + std::to_string(callback_job.job_id()) + "/callback",
+          reply.SerializeAsString(), kProtobufContentType);
+      Expect(acknowledgement && acknowledgement->status == 200, "Callback replies remain responsive at the stream limit");
+      Expect(WaitForResult(callback_job.job_id()).has_result_payload(), "Callback-enabled job completes at the stream limit");
+      ReleaseJob(callback_job.job_id());
+      const auto job = SubmitJob(4000 + round, 1, "control");
+      bridge::SolverBridgeRequest cancel;
+      cancel.set_request_id(5000 + round); cancel.set_solver("fake");
+      cancel.mutable_cancel()->set_target_request_id(4000 + round);
+      const auto stopped = control.Post("/jobs/" + std::to_string(job.job_id()) + "/cancel",
+          cancel.SerializeAsString(), kProtobufContentType);
+      Expect(stopped && stopped->status == 200, "Cancellation remains responsive at the stream limit");
+      WaitForResult(job.job_id()); ReleaseJob(job.job_id());
+    } catch (...) { join(); throw; }
+    join();
+    Expect(errors.empty(), errors.empty() ? "All stream clients were admitted" : errors.front());
+    const auto deadline = std::chrono::steady_clock::now() + 2s;
+    while (server.counters()->stream_sources.load() != 0 && std::chrono::steady_clock::now() < deadline)
+      std::this_thread::sleep_for(1ms);
+    ExpectEq(server.counters()->stream_sources.load(), 0, "Disconnected streams release sources and admission slots");
+  }
+}
+
 void HandlesConcurrentJobsAndStreamsLifecycleEvents() {
   RunningServer server;
   constexpr int kProducerCount = 8;
@@ -293,6 +383,7 @@ void HandlesConcurrentJobsAndStreamsLifecycleEvents() {
   ReleaseJob(streamed.job_id());
 
   ControlPlaneRemainsResponsiveWithActiveStreams();
+  StreamAdmissionLeavesControlCapacity(server);
 }
 
 }  // namespace

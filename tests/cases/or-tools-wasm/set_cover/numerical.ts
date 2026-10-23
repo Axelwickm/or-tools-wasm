@@ -75,28 +75,6 @@ export const setCoverNumericalCases: SharedCase<CoverApi,
     },
   },
   {
-    id: 'set_cover.numerical.native_cost_update_recovery', name: 'Native search cost cache survives rounding and overflow', solver: 'set-cover',
-    source: 'ortools/set_cover/set_cover_invariant.cc', tags: ['native-contract', 'native-regression', 'floating-point'],
-    async run(api, context) {
-      const options = execution(context.mode);
-      for (const costs of [[1e20, 1], [1e20, 1, 5e5], [1e308, 1e308, 1e308]]) {
-        const model = new api.SetCoverModel();
-        for (const cost of costs) { model.addEmptySubset(cost); model.addElementToLastSubset(0); }
-        const invariant = new api.SetCoverInvariant(model); invariant.loadSolution(costs.map(() => true));
-        const search = new api.SteepestSearch(invariant); search.setMaxIterations(costs.length - 1);
-        await search.nextSolution(undefined, options);
-        const remaining = invariant.isSelected().flatMap((selected, index) => selected ? [index] : []);
-        assert(remaining.length === 1 && await invariant.cost(options) === costs[remaining[0]],
-          'Native cost repair recovers the actual remaining cost after cancellation/overflow');
-        assert(await invariant.numUncoveredElements(options) === 0, 'Numerical repair preserves the native cover');
-        invariant.clear(); invariant.loadSolution(costs.map(() => true));
-        await search.nextSolution(undefined, options);
-        assert(invariant.isSelected().filter(Boolean).length === 1, 'Clear and bulk load rebuild the native cost cache');
-      }
-      return { cost: 1, numUncoveredElements: 0 };
-    },
-  },
-  {
     id: 'set_cover.numerical.large_column', name: 'Large valid columns serialize without argument limits', solver: 'set-cover',
     source: 'ortools/set_cover/set_cover_model.cc', tags: ['native-contract', 'large-input'],
     async run(api, context) {

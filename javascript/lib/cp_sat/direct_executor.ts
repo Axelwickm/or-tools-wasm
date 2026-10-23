@@ -1,3 +1,4 @@
+import { trackPendingEvent } from '../solver_executor.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { allocateWasmBytes, readWasmResult, withWasmAllocations } from '../wasm_memory.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
@@ -134,18 +135,20 @@ export class DirectCpSatExecutor implements CpSatExecutor {
     const requestId = this.nextCpSatRequestId();
     const state = { cancelled: false, nativeRunning: false };
     this.activeJob = state;
+    const stop = async () => {
+      if (payload.type !== 'solve') throw new SolverCancellationUnsupportedError(this.solver);
+      if (this.activeJob !== state) return;
+      state.cancelled = true;
+      const module = await this.module();
+      if (this.activeJob === state && state.nativeRunning) this.interrupt(module);
+    };
     return {
       requestId,
       result: this.run(requestId, payload, options.onEvent).finally(() => {
         if (this.activeJob === state) this.activeJob = null;
       }),
-      cancel: async () => {
-        if (payload.type !== 'solve') throw new SolverCancellationUnsupportedError(this.solver);
-        if (this.activeJob !== state) return;
-        state.cancelled = true;
-        const module = await this.module();
-        if (this.activeJob === state && state.nativeRunning) this.interrupt(module);
-      },
+      cancel: stop,
+      interrupt: stop,
     };
   }
 
@@ -168,6 +171,23 @@ export class DirectCpSatExecutor implements CpSatExecutor {
       ));
       let result: CpSatRunResult;
       switch (payload.type) {
+        case 'checkSolution': {
+          const module = await this.module();
+          const feasible = await withWasmRuntimeLock(module, () => withWasmAllocations(module, async allocate => {
+            const model = allocate(payload.model);
+            const values = allocate(new Uint8Array(new BigInt64Array(payload.values).buffer));
+            const output = allocate(new Uint8Array(4));
+            const error = await readWasmResult(module, length => module.ccall('cp_sat_solution_is_feasible', 'number',
+              ['number', 'number', 'number', 'number', 'number', 'number'],
+              [model, payload.model.length, values, payload.values.length, output, length], { async: true }) as Promise<number>,
+              pointer => module._free_buffer(pointer));
+            const answer = new DataView(module.HEAPU8.buffer).getInt32(output, true);
+            if (answer !== 0 && answer !== 1) throw new Error(new TextDecoder().decode(error) || 'Failed to check CP-SAT solution.');
+            return answer === 1;
+          }));
+          result = { response: { type: 'solutionFeasible', feasible }, terminalState: SolverJobState.SUCCEEDED };
+          break;
+        }
         case 'solve':
           result = {
             response: await this.solve(requestId, payload, createdAtMs, onEvent),
@@ -249,8 +269,8 @@ export class DirectCpSatExecutor implements CpSatExecutor {
     const modelBytes = solveRequest.model;
     const paramsBytes = solveRequest.parameters;
     const flags = callbackFlags(solveRequest.callbacks);
-    let callbackError: unknown = null;
-    const pendingCallbacks: Promise<void>[] = [];
+    let callbackError: { error: unknown } | undefined;
+    const pendingCallbacks = new Set<Promise<void>>();
     const bytes = await withWasmRuntimeLock(module, () => withWasmAllocations(module, async allocate => {
       const modelPtr = allocate(modelBytes);
       const paramsPtr = allocate(paramsBytes);
@@ -278,13 +298,9 @@ export class DirectCpSatExecutor implements CpSatExecutor {
             if (!event || callbackError) return;
             try {
               const pending = onEvent(event);
-              if (pending) {
-                pendingCallbacks.push(Promise.resolve(pending).catch((error) => {
-                  callbackError ??= error;
-                }));
-              }
+              trackPendingEvent(pendingCallbacks, pending, error => { callbackError ??= { error }; });
             } catch (error) {
-              callbackError ??= error;
+              callbackError ??= { error };
             }
           });
           return await module.ccall(
@@ -305,7 +321,7 @@ export class DirectCpSatExecutor implements CpSatExecutor {
     // Release native access before awaiting callbacks: a callback may await
     // another entry point that uses this same runtime.
     await Promise.all(pendingCallbacks);
-    if (callbackError) throw callbackError;
+    if (callbackError) throw callbackError.error;
     return { type: 'solve', response: bytes.bytes, statistics: bytes.statistics };
   }
 

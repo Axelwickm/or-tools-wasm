@@ -1,4 +1,5 @@
 #include "server/src/mp_solver_executor.h"
+#include "server/src/remote_parameters.h"
 
 #include <stdexcept>
 #include <string>
@@ -8,8 +9,8 @@
 #include "absl/time/time.h"
 #include "generated_proto_schemas.h"
 #include "javascript/mp_solver_parameters.h"
+#include "javascript/mp_solver_search.h"
 #include "javascript/mp_solver_messages.h"
-#include "javascript/mp_solver_iis.h"
 #include "javascript/mp_solver_model_import.h"
 #include "javascript/mp_solver_model_queries.h"
 #include "javascript/mp_solver_solution_verification.h"
@@ -56,7 +57,8 @@ std::function<void(const std::string&)> Messages(bool stream, const SolverEventS
 }
 
 SolverExecutorResult Solve(const bridge::MpSolverSolveRequest& solve_request,
-                           const JobContext& context, const SolverEventSink& emit_event) {
+                           const JobContext& context, const SolverEventSink& emit_event,
+                           const ScopedMpSolverCallback::Transport& transport) {
   MPModelRequest request;
   if (!request.ParseFromString(solve_request.request_proto())) return Error("Failed to parse MPModelRequest.");
   if (!request.has_model()) return Error("MPModelRequest has no model.");
@@ -108,6 +110,8 @@ SolverExecutorResult Solve(const bridge::MpSolverSolveRequest& solve_request,
     rejected = true;
   }
   if (!rejected) {
+    if (solve_request.has_starting_basis()) ApplyMpStartingBasis(solver, solve_request.starting_basis());
+    ScopedMpSolverCallback callback(solver, solve_request.has_callback_registration() ? &solve_request.callback_registration() : nullptr, transport);
     ScopedMpSolverMessages messages(solver, Messages(solve_request.stream_messages(), emit_event));
     auto cancellation = context.OnCancellation([&solver] { solver.InterruptSolve(); });
     if (context.cancellation_requested()) return Error("MP Solver solve was cancelled before it started.", SolverExecutionFailureKind::kCancelled);
@@ -121,6 +125,7 @@ SolverExecutorResult Solve(const bridge::MpSolverSolveRequest& solve_request,
           static_cast<operations_research::MPSolverParameters::IntegerParam>(key), value);
     }
     solver.Solve(parameters);
+    callback.CheckError();
     solver.FillSolutionResponseProto(&solution);
     metadata.set_solver_version(solver.SolverVersion());
     metadata.set_iterations(solver.iterations());
@@ -148,6 +153,7 @@ int MpSolverExecutor::RequestedThreads(const SolverExecutorRequest& request,
                                        int server_total_threads) const {
   bridge::MpSolverBridgeRequest parsed;
   if (!parsed.ParseFromString(request.payload)) throw std::invalid_argument("Failed to parse MP Solver bridge request.");
+  ValidateRemoteParameters(parsed);
   const bridge::MpSolverSolveRequest* solve_request = nullptr;
   if (parsed.payload_case() == bridge::MpSolverBridgeRequest::kSolve) solve_request = &parsed.solve();
   if (parsed.payload_case() == bridge::MpSolverBridgeRequest::kSessionRun &&
@@ -173,8 +179,12 @@ SolverExecutorResult MpSolverExecutor::Execute(const SolverExecutorRequest& requ
                                                const SolverEventSink& emit_event) {
   bridge::MpSolverBridgeRequest parsed;
   if (!parsed.ParseFromString(request.payload)) return Error("Failed to parse MP Solver bridge request.");
+  try { ValidateRemoteParameters(parsed); }
+  catch (const std::exception& error) { return Error(error.what()); }
   switch (parsed.payload_case()) {
+    case bridge::MpSolverBridgeRequest::kCapabilities:
     case bridge::MpSolverBridgeRequest::kExportModel:
+    case bridge::MpSolverBridgeRequest::kClampSolution:
     case bridge::MpSolverBridgeRequest::kLoadSolution:
     case bridge::MpSolverBridgeRequest::kActivities: {
       const auto result = QueryMpSolverModel(parsed);
@@ -187,26 +197,18 @@ SolverExecutorResult MpSolverExecutor::Execute(const SolverExecutorRequest& requ
     case bridge::MpSolverBridgeRequest::kSessionRun:
       try {
         return Response(sessions_.Run(parsed.session_run(), [&](MPSolver& solver, const operations_research::MPSolverParameters& parameters) {
+          ScopedMpSolverCallback callback(solver,
+              parsed.session_run().solve().has_callback_registration() ? &parsed.session_run().solve().callback_registration() : nullptr, request.callback);
           ScopedMpSolverMessages messages(solver, Messages(parsed.session_run().solve().stream_messages(), emit_event));
           auto cancellation = context.OnCancellation([&solver] { solver.InterruptSolve(); });
           if (context.cancellation_requested()) throw std::runtime_error("MPSolver session solve was cancelled before it started.");
           solver.Solve(parameters);
+          callback.CheckError();
         }));
       } catch (const std::exception& error) { return Error(error.what()); }
     case bridge::MpSolverBridgeRequest::kSessionClose:
       try { return Response(sessions_.Close(parsed.session_close().handle())); }
       catch (const std::exception& error) { return Error(error.what()); }
-    case bridge::MpSolverBridgeRequest::kIis: {
-      std::atomic<bool> interrupted{context.cancellation_requested()};
-      auto cancellation = context.OnCancellation([&] { interrupted.store(true); });
-      const auto result = ComputeMpSolverIis(parsed.iis(), &interrupted);
-      if (!result.ok()) return Error(result.status().ToString(),
-          absl::IsCancelled(result.status()) ? SolverExecutionFailureKind::kCancelled
-                                            : SolverExecutionFailureKind::kInvalidRequest);
-      bridge::MpSolverBridgeResponse response;
-      *response.mutable_iis() = *result;
-      return Response(response);
-    }
     case bridge::MpSolverBridgeRequest::kVerifySolution: {
       const auto& input = parsed.verify_solution();
       const auto verified = ortools_wasm::VerifyMpSolverSolution(
@@ -218,7 +220,7 @@ SolverExecutorResult MpSolverExecutor::Execute(const SolverExecutorRequest& requ
       return Response(response);
     }
     case bridge::MpSolverBridgeRequest::kSolve:
-      try { return Solve(parsed.solve(), context, emit_event); }
+      try { return Solve(parsed.solve(), context, emit_event, request.callback); }
       catch (const std::exception& error) { return Error(error.what()); }
     case bridge::MpSolverBridgeRequest::kValidateParameters: {
       const auto& input = parsed.validate_parameters();

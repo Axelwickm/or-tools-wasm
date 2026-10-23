@@ -39,6 +39,9 @@ class SolverExecutor {
  public:
   virtual ~SolverExecutor() = default;
 
+  // Called periodically even when clients have disappeared.
+  virtual void ExpireIdleSessions() {}
+
   virtual std::string solver() const = 0;
   virtual int RequestedThreads(const SolverExecutorRequest& request,
                                int client_requested_threads,

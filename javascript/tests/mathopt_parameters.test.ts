@@ -80,6 +80,47 @@ test('MathOpt exact integer wire encoding and backend admission', async t => {
         assert.throws(() => new GScipParameters({ intParams: { invalid: value } }).toProtoBytes(), /int32/);
       }
     });
+    await t.test('GSCIP uses schema validation without coercing or discarding options', async () => {
+      for (const options of [
+        { silenceOuput: true }, { silenceOutput: "false" }, { printScipModel: "false" },
+        { printDetailedSolvingStats: 1 }, { boolParams: { flag: "false" } },
+        { stringParams: { file: 1 } }, { charParams: { char: false } },
+        { emphasis: 'typo' },
+        { numSolutions: 2147483648 }, { objectiveLimit: '12' },
+      ]) {
+        assert.throws(() => new GScipParameters(options).toProtoBytes(), /protobuf|boolean|string|enum|integer|int32|number|expected/i, JSON.stringify(options));
+        calls.length = 0;
+        await assert.rejects(MathOpt.solve(model, { executor: 'direct', gscip: options }));
+        assert.equal(calls.length, 0, 'invalid backend parameters fail before dispatch');
+      }
+      const schemaRoot = protobuf.Root.fromJSON((await import('../lib/generated/mathopt_result_schemas.ts')).mathOptResultDescriptor).resolveAll();
+      const native = schemaRoot.lookupType('operations_research.GScipParameters');
+      const parameters = new GScipParameters({ emphasis: 'FEASIBILITY', heuristics: 'OFF',
+        presolve: 'AGGRESSIVE', separating: 'FAST', silenceOutput: false,
+        printDetailedSolvingStats: false, printScipModel: true,
+        boolParams: { disabled: false }, intParams: { zero: 0 }, longParams: { exact: 9007199254740993n },
+        realParams: { ratio: 0.25 }, charParams: { value: 'x' }, stringParams: { value: '' },
+        searchLogsFilename: 'search.log', detailedSolvingStatsFilename: 'stats.log', scipModelFilename: 'model.cip',
+        numSolutions: 0, objectiveLimit: 0,
+      });
+      const parsed = native.toObject(native.decode(parameters.toProtoBytes()));
+      assert.equal(parsed.emphasis, 4);
+      assert.equal(parsed.heuristics, 3);
+      assert.equal(parsed.presolve, 1);
+      assert.equal(parsed.separating, 2);
+      assert.equal(parsed.silenceOutput, false, 'optional false retains presence');
+      assert.equal(parsed.numSolutions, 0, 'optional zero retains presence');
+      assert.equal(parsed.objectiveLimit, 0);
+      assert.equal(parsed.longParams.exact.toString(), '9007199254740993');
+      assert.equal(parsed.boolParams.disabled, false);
+      assert.equal(parsed.stringParams.value, '');
+      assert.equal(parsed.searchLogsFilename, 'search.log');
+      assert.equal(parsed.detailedSolvingStatsFilename, 'stats.log');
+      assert.equal(parsed.scipModelFilename, 'model.cip');
+      assert.deepEqual(new GScipParameters({ heuristics: 'OFF', silenceOutput: false }).toProtoBytes(),
+        new GScipParameters({ heuristics: 3, silenceOutput: false }).toProtoBytes(), 'existing enum name aliases remain valid');
+      assert.throws(() => new GlopParameters({ typo: true }).toProtoBytes(), /Unknown protobuf field/);
+    });
     await t.test('backend overrides control admission for typed, class and raw parameter forms', async () => {
       const scenarios = [
         { solverType: types.CP_SAT, cpSat: { numWorkers: 2 }, expected: 2 },

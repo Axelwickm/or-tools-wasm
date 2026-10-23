@@ -1,3 +1,5 @@
+#include <unistd.h>
+#include "absl/cleanup/cleanup.h"
 #include "server/src/mp_solver_executor.h"
 
 #include <cstdlib>
@@ -19,8 +21,8 @@
 
 #include "CbcModel.hpp"
 #include "mp_solver.pb.h"
+#include "javascript/mp_solver_search.h"
 #include "scip/scip.h"
-#include "scip/pub_iisfinder.h"
 #include "scip/scipdefplugins.h"
 #include "ortools/lp_data/mps_reader.h"
 #include "ortools/linear_solver/linear_solver.h"
@@ -732,160 +734,159 @@ void RoutesNativeBackendMessagesAndReleasesObservers() {
   Expect(bop.SetMessageCallback(nullptr), "Clearing an unsupported callback is harmless");
 }
 
-void ComputesNativeIisWithExactSourceMappings() {
-  linear::MPSolver solver("native_iis", linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  auto* x = solver.MakeNumVar(0, 10, "duplicate");
-  auto* unused = solver.MakeNumVar(0, 10, "duplicate");
-  solver.MakeRowConstraint(2, solver.infinity(), "duplicate")->SetCoefficient(x, 1);
-  solver.MakeRowConstraint(-solver.infinity(), 1, "duplicate")->SetCoefficient(x, 1);
-  solver.MakeRowConstraint(-solver.infinity(), 8, "duplicate")->SetCoefficient(unused, 1);
-  Expect(solver.SetSolverSpecificParametersAsString("iis/irreducible = TRUE\niis/removebounds = TRUE\niis/silent = TRUE"), "SCIP accepts native IIS settings");
-  const auto found = solver.ComputeIrreducibleInfeasibleSubset();
-  Expect(found.ok(), std::string(found.status().message()));
-  Expect(found->is_infeasible && found->is_irreducible &&
-         found->constraint_indices == std::vector<int>({0, 1}),
-         "Native IIS returns conflicting source rows without name matching");
-  Expect(found->variable_bounds.size() == 1 && found->variable_bounds[0].variable_index == 0,
-         "Native mappings exclude removed variables and retain original indices");
-  Expect(found->time_seconds >= 0 && found->nodes >= 0, "Native IIS counters return faithfully");
-  solver.constraint(1)->SetBounds(-solver.infinity(), 3);
-  const auto feasible = solver.ComputeIrreducibleInfeasibleSubset();
-  Expect(feasible.ok() && !feasible->is_infeasible && !feasible->is_irreducible,
-         "Feasible models do not fabricate an IIS");
-  Expect(found->constraint_indices == std::vector<int>({0, 1}), "Prior native result is independently owned");
-  Expect(solver.Solve() == linear::MPSolver::OPTIMAL, "Native solver is reusable after IIS queries");
+void AppliesNativeStartingBasis() {
+  bridge::MpSolverBridgeRequest input; Expect(input.ParseFromString(Request().payload), "Base request parses");
+  auto* basis = input.mutable_solve()->mutable_starting_basis(); basis->add_variable_statuses(linear::MPSolver::AT_UPPER_BOUND);
+  (*input.mutable_solve()->mutable_parameters()->mutable_integer_params())[linear::MPSolverParameters::PRESOLVE] = linear::MPSolverParameters::PRESOLVE_OFF;
+  const auto execution = Execute({1,"mp-solver",input.SerializeAsString()}); Expect(execution.ok, execution.error_message);
+  bridge::MpSolverBridgeResponse response; response.ParseFromString(execution.payload);
+  linear::MPSolutionResponse solution; solution.ParseFromString(response.response_proto());
+  Expect(solution.status() == linear::MPSOLVER_OPTIMAL && solution.objective_value() == 12, "Native GLOP solves from supplied basis");
+  basis->add_variable_statuses(linear::MPSolver::FREE);
+  Expect(!Execute({1,"mp-solver",input.SerializeAsString()}).ok, "Mismatched basis rejects before native indexing");
+  basis->mutable_variable_statuses()->RemoveLast();
+  linear::MPModelRequest model; model.ParseFromString(input.solve().request_proto()); model.set_solver_type(linear::MPModelRequest::SCIP_MIXED_INTEGER_PROGRAMMING);
+  input.mutable_solve()->set_request_proto(model.SerializeAsString());
+  Expect(!Execute({1,"mp-solver",input.SerializeAsString()}).ok, "Unsupported starting-basis backend rejects");
 }
 
-void NativeIisReportsBoundsAndIntegralDomains() {
-  linear::MPSolver bounded("bound_iis", linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  auto* x = bounded.MakeNumVar(0, 1, "x");
-  bounded.MakeRowConstraint(2, bounded.infinity(), "too_high")->SetCoefficient(x, 1);
-  const auto bounds = bounded.ComputeIrreducibleInfeasibleSubset();
-  Expect(bounds.ok() && bounds->is_infeasible && bounds->constraint_indices == std::vector<int>({0}),
-         "Native bound conflict keeps its source constraint");
-  Expect(bounds->variable_bounds.size() == 1 && bounds->variable_bounds[0].upper_bound,
-         "Native bound membership is reported");
-  linear::MPSolver integer("integer_iis", linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  auto* y = integer.MakeIntVar(-integer.infinity(), integer.infinity(), "y");
-  integer.MakeRowConstraint(0.5, 0.5, "fraction")->SetCoefficient(y, 1);
-  const auto domain = integer.ComputeIrreducibleInfeasibleSubset();
-  Expect(domain.ok() && domain->is_infeasible && domain->variable_bounds.size() == 1 &&
-         !domain->variable_bounds[0].lower_bound && !domain->variable_bounds[0].upper_bound,
-         "A retained integer variable can have no finite bounds in the IIS");
-  auto* native = static_cast<SCIP*>(integer.underlying_solver());
-  auto* subset = SCIPiisGetSubscip(SCIPgetIIS(native));
-  Expect(SCIPsolve(subset) == SCIP_OKAY && SCIPgetStatus(subset) == SCIP_STATUS_INFEASIBLE,
-         "The native integer IIS remains infeasible when solved independently");
-  linear::MPSolver empty("empty_iis", linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  const auto absent = empty.ComputeIrreducibleInfeasibleSubset();
-  Expect(absent.ok() && !absent->is_infeasible && absent->constraint_indices.empty(),
-         "Empty native models are handled without pointer arithmetic on null arrays");
+void ForwardsNativeMipCallbacksAndConstraints() {
+  bridge::MpSolverBridgeRequest input; input.ParseFromString(Request().payload);
+  linear::MPModelRequest model; model.ParseFromString(input.solve().request_proto());
+  model.set_solver_type(linear::MPModelRequest::SCIP_MIXED_INTEGER_PROGRAMMING); model.mutable_model()->mutable_variable(0)->set_is_integer(true);
+  input.mutable_solve()->set_request_proto(model.SerializeAsString());
+  input.mutable_solve()->mutable_callback_registration()->set_might_add_lazy_constraints(true);
+  int calls = 0;
+  SolverExecutorRequest request{1,"mp-solver",input.SerializeAsString()};
+  request.callback = [&](const std::string& bytes) -> std::optional<std::string> {
+    bridge::MpSolverCallbackData data; Expect(data.ParseFromString(bytes), "Native callback data parses"); ++calls;
+    bridge::MpSolverCallbackResult result;
+    if (data.can_query_variable_values() && data.variable_values().at(0) > 1.0) {
+      auto* row = result.add_lazy_constraints(); row->set_lower_bound(-std::numeric_limits<double>::infinity()); row->set_upper_bound(1);
+      row->add_variable_indices(0); row->add_coefficients(1);
+    }
+    return result.SerializeAsString();
+  };
+  const auto execution = Execute(request); Expect(execution.ok, execution.error_message);
+  bridge::MpSolverBridgeResponse response; response.ParseFromString(execution.payload);
+  linear::MPSolutionResponse solution; solution.ParseFromString(response.response_proto());
+  Expect(calls > 0 && solution.status() == linear::MPSOLVER_OPTIMAL && solution.objective_value() == 3, "Native lazy constraints change the native feasible set");
+  input.mutable_solve()->set_num_threads(4); request.payload = input.SerializeAsString();
+  Expect(!Execute(request).ok, "Native concurrent SCIP callback limitations are rejected explicitly");
+  input.mutable_solve()->set_num_threads(1); request.payload = input.SerializeAsString();
+  request.callback = [](const std::string&) -> std::optional<std::string> { return std::string(1, '\xff'); };
+  Expect(!Execute(request).ok, "Malformed reply stops search and reports after native unwind");
+  request.callback = {};
+  Expect(!Execute(request).ok, "Missing callback transport rejects before search");
+  input.mutable_solve()->clear_callback_registration(); request.payload = input.SerializeAsString();
+  Expect(Execute(request).ok, "A later ordinary solve remains usable");
 }
 
-void NativeIisLimitsCancellationAndUnsupportedBackends() {
-  linear::MPSolver solver("iis_controls", linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  auto* x = solver.MakeNumVar(0, 4, "x");
-  solver.MakeRowConstraint(2, solver.infinity())->SetCoefficient(x, 1);
-  solver.MakeRowConstraint(-solver.infinity(), 1)->SetCoefficient(x, 1);
-  std::atomic<bool> interrupted = true;
-  const auto cancelled = solver.ComputeIrreducibleInfeasibleSubset(&interrupted);
-  Expect(absl::IsCancelled(cancelled.status()), "Pre-cancellation returns native cancellation status");
-  interrupted.store(false);
-  const auto limited = solver.ComputeIrreducibleInfeasibleSubset(&interrupted, 0.0, 0);
-  Expect(limited.ok(), std::string(limited.status().message()));
-  auto* scip = static_cast<SCIP*>(solver.underlying_solver());
-  SCIP_Real seconds; SCIP_Longint nodes;
-  Expect(SCIPgetRealParam(scip, "iis/time", &seconds) == SCIP_OKAY && seconds == 0 &&
-         SCIPgetLongintParam(scip, "iis/nodes", &nodes) == SCIP_OKAY && nodes == 0,
-         "Top-level limits are forwarded to native IIS parameters including zero");
-  Expect(!solver.ComputeIrreducibleInfeasibleSubset(nullptr, -1.0).ok() &&
-         !solver.ComputeIrreducibleInfeasibleSubset(nullptr, std::nullopt, -2).ok(),
-         "Invalid native IIS limits reject");
-  const auto recovered = solver.ComputeIrreducibleInfeasibleSubset(nullptr, 5.0, -1);
-  Expect(recovered.ok() && recovered->is_infeasible, "Native IIS recovers after limits and invalid settings");
-  linear::MPSolver glop("unsupported_iis", linear::MPSolver::GLOP_LINEAR_PROGRAMMING);
-  Expect(absl::IsUnimplemented(glop.ComputeIrreducibleInfeasibleSubset().status()),
-         "Backends without native IIS return Unimplemented");
+void ReturnsNativeCallbackCapabilities() {
+  for (int id : {0, 1, 2, 3, 4, 5, 8, 12, 13, 14}) {
+    const auto type = static_cast<linear::MPSolver::OptimizationProblemType>(id);
+    if (!linear::MPSolver::SupportsProblemType(type)) continue;
+    linear::MPSolver native("", type);
+    bridge::MpSolverBridgeRequest request; request.mutable_capabilities()->set_solver_type(id);
+    const auto execution = Execute({1, "mp-solver", request.SerializeAsString()});
+    Expect(execution.ok, execution.error_message);
+    bridge::MpSolverBridgeResponse response; Expect(response.ParseFromString(execution.payload), "Capability response parses");
+    Expect(response.has_capabilities(), "Even two false answers retain capability response presence");
+    Expect(response.capabilities().supports_callbacks() == native.SupportsCallbacks() &&
+      response.capabilities().supports_message_callbacks() == native.SupportsMessageCallbacks(), "Both capabilities come from the native backend");
+  }
+  bridge::MpSolverBridgeRequest request; request.mutable_capabilities()->set_solver_type(999);
+  Expect(!Execute({1, "mp-solver", request.SerializeAsString()}).ok, "Unavailable backend rejects before construction");
 }
 
-struct IisCopyCancellation {
-  std::atomic<bool> interrupted{false};
-  bool enabled = true;
-  int copies = 0;
-};
-SCIP_RETCODE IncludeIisCopyCancellation(SCIP* scip, IisCopyCancellation* data);
-SCIP_DECL_EVENTEXEC(IisCopyCancellationExec) { return SCIP_OKAY; }
-SCIP_DECL_EVENTCOPY(IisCopyCancellationCopy) {
-  auto* data = reinterpret_cast<IisCopyCancellation*>(SCIPeventhdlrGetData(eventhdlr));
-  ++data->copies;
-  if (data->enabled) data->interrupted.store(true);
-  return IncludeIisCopyCancellation(scip, data);
+SolverExecutorRequest ClampRequest(const linear::MPSolutionResponse& solution) {
+  bridge::MpSolverBridgeRequest request; linear::MPModelRequest original;
+  bridge::MpSolverBridgeRequest solve; solve.ParseFromString(Request().payload);
+  original.ParseFromString(solve.solve().request_proto());
+  auto* input = request.mutable_clamp_solution();
+  input->set_model_proto(original.model().SerializeAsString());
+  input->set_solution_proto(solution.SerializeAsString()); input->set_solver_type(linear::MPSolver::GLOP_LINEAR_PROGRAMMING);
+  return SolverExecutorRequest{1, "mp-solver", request.SerializeAsString()};
 }
-SCIP_RETCODE IncludeIisCopyCancellation(SCIP* scip, IisCopyCancellation* data) {
-  SCIP_EVENTHDLR* handler = nullptr;
-  SCIP_CALL(SCIPincludeEventhdlrBasic(scip, &handler, "iis_test_copy_cancel",
-      "Cancel in the native IIS copy window", IisCopyCancellationExec,
-      reinterpret_cast<SCIP_EVENTHDLRDATA*>(data)));
-  return SCIPsetEventhdlrCopy(scip, handler, IisCopyCancellationCopy);
+void ClampsSolutionsUsingNativeBounds() {
+  for (const double value : {-2.0, 2.0, 8.0, -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity()}) {
+    linear::MPSolutionResponse solution;
+    solution.set_status(linear::MPSOLVER_FEASIBLE); solution.add_variable_value(value); solution.set_objective_value(123);
+    const auto execution = Execute(ClampRequest(solution)); Expect(execution.ok, execution.error_message);
+    bridge::MpSolverBridgeResponse outer; linear::MPSolutionResponse result;
+    Expect(outer.ParseFromString(execution.payload) && result.ParseFromString(outer.clamped_solution()), "Native clamped solution parses");
+    Expect(result.variable_value(0) == (value < 0 ? 0 : value > 4 ? 4 : value), "Native routine moves values onto variable bounds");
+    Expect(result.objective_value() == 123 && result.status() == linear::MPSOLVER_FEASIBLE,
+        "Native clamping preserves submitted objective and status without recertifying them");
+    Expect(solution.variable_value(0) == value, "Submitted response remains unchanged");
+  }
+}
+void PreservesNativeClampingErrors() {
+  linear::MPSolutionResponse solution; solution.set_status(linear::MPSOLVER_FEASIBLE); solution.add_variable_value(8);
+  for (int variant = 0; variant < 5; ++variant) {
+    auto input = solution;
+    if (variant == 0) input.set_variable_value(0, std::numeric_limits<double>::quiet_NaN());
+    if (variant == 1) input.clear_variable_value();
+    if (variant == 2) input.set_status(linear::MPSOLVER_NOT_SOLVED);
+    if (variant == 3) { input.add_dual_value(1); }
+    auto request = ClampRequest(input);
+    if (variant == 4) {
+      bridge::MpSolverBridgeRequest outer; outer.ParseFromString(request.payload);
+      outer.mutable_clamp_solution()->set_solver_type(linear::MPSolver::HIGHS_LINEAR_PROGRAMMING);
+      request.payload = outer.SerializeAsString();
+    }
+    Expect(!Execute(request).ok, "Invalid input or unavailable backend returns an error without exporting partial values");
+  }
+  Expect(Execute(ClampRequest(solution)).ok, "Native clamping recovers after failures");
 }
 
-void InterruptsCopiedIisSearchAndRecovers() {
-  IisCopyCancellation data;  // Lives longer than every copied handler.
-  linear::MPSolver solver("iis_copy_cancel", linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  auto* x = solver.MakeNumVar(0, 4, "x");
-  solver.MakeRowConstraint(2, solver.infinity())->SetCoefficient(x, 1);
-  solver.MakeRowConstraint(-solver.infinity(), 1)->SetCoefficient(x, 1);
-  auto* scip = static_cast<SCIP*>(solver.underlying_solver());
-  Expect(IncludeIisCopyCancellation(scip, &data) == SCIP_OKAY, "Install deterministic copy-window probe");
-  const auto cancelled = solver.ComputeIrreducibleInfeasibleSubset(&data.interrupted);
-  Expect(data.copies > 0 && absl::IsCancelled(cancelled.status()),
-         "Cancellation during native copying returns Cancelled");
-  auto* subset = SCIPiisGetSubscip(SCIPgetIIS(scip));
-  Expect(subset && SCIPgetStatus(subset) == SCIP_STATUS_USERINTERRUPT,
-         "Copied solver is interrupted natively before it proves infeasibility");
-  data.enabled = false; data.interrupted.store(false);
-  const auto recovered = solver.ComputeIrreducibleInfeasibleSubset(&data.interrupted);
-  Expect(recovered.ok() && recovered->is_infeasible, "Copied interruption state is released and reusable");
-}
-
-void ComputesIisThroughServerBridge() {
-  linear::MPModelProto model;
-  auto* x = model.add_variable(); x->set_lower_bound(0); x->set_upper_bound(1);
-  auto* row = model.add_constraint(); row->set_lower_bound(2);
-  row->add_var_index(0); row->add_coefficient(1);
-  bridge::MpSolverBridgeRequest input;
-  auto* iis = input.mutable_iis();
-  iis->set_model_proto(model.SerializeAsString());
-  iis->set_solver_type(linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  iis->set_solver_specific_parameters("iis/silent = TRUE");
-  iis->set_time_limit_seconds(5); iis->set_node_limit(INT64_MAX);
+void RejectsRemoteFilesystemParameters() {
+  char path[] = "/tmp/ortools-mpsolver-policy-XXXXXX";
+  const int fd = mkstemp(path); Expect(fd >= 0, "Create private policy sentinel"); close(fd);
+  const absl::Cleanup cleanup = [&] { std::remove(path); };
+  { std::ofstream output(path); output << "untouched"; }
+  std::vector<std::string> names = {"visual/vbcfilename", "visual/bakfilename", "heuristics/alns/rewardfilename", "certificate/filename", "display/logfile"};
+  names.push_back(std::string("visual/vbcfilename") + char(0) + "suffix");
   MpSolverExecutor executor;
-  const SolverExecutorRequest request{1, "mp-solver", input.SerializeAsString()};
-  Expect(executor.RequestedThreads(request, 1, 8) == 1,
-         "Native IIS admission uses one search thread");
-  const auto execution = Execute(request);
-  Expect(execution.ok, execution.error_message);
+  for (const auto& name : names) for (int operation = 0; operation < 4; ++operation) {
+    const std::string parameters = "display/verblevel = 0,  " + name + "\t = \"" + path + "\"\n";
+    linear::MPModelRequest inner; inner.set_solver_type(linear::MPModelRequest::SCIP_MIXED_INTEGER_PROGRAMMING);
+    inner.set_solver_specific_parameters(parameters); inner.set_ignore_solver_specific_parameters_failure(true);
+    bridge::MpSolverBridgeRequest request;
+    if (operation == 0) request.mutable_solve()->set_request_proto(inner.SerializeAsString());
+    if (operation == 1) request.mutable_session_create()->set_request_proto(inner.SerializeAsString());
+    if (operation == 2) request.mutable_session_run()->mutable_solve()->set_request_proto(inner.SerializeAsString());
+    if (operation == 3) {
+      request.mutable_validate_parameters()->set_solver_type(inner.solver_type()); request.mutable_validate_parameters()->set_parameters(parameters);
+    }
+    const SolverExecutorRequest outer{1, "mp-solver", request.SerializeAsString()};
+    bool rejected = false;
+    try { executor.RequestedThreads(outer, 0, 2); } catch (const std::invalid_argument&) { rejected = true; }
+    Expect(rejected, "Admission rejects backend path parameter: " + name);
+    const auto result = Execute(outer);
+    Expect(!result.ok && result.error_message.find("filesystem") != std::string::npos,
+        "Direct executor entry also enforces filesystem policy");
+    std::ifstream input(path); std::string contents; input >> contents;
+    Expect(contents == "untouched", "Server never truncates the private sentinel");
+  }
+  bridge::MpSolverBridgeRequest request; request.ParseFromString(Request().payload);
+  linear::MPModelRequest inner; inner.ParseFromString(request.solve().request_proto());
+  inner.set_solver_type(linear::MPModelRequest::SCIP_MIXED_INTEGER_PROGRAMMING);
+  inner.set_solver_specific_parameters("display/verblevel = 0, heuristics/undercover/fixingalts = lni");
+  request.mutable_solve()->set_request_proto(inner.SerializeAsString());
+  const auto result = Execute({1, "mp-solver", request.SerializeAsString()});
   bridge::MpSolverBridgeResponse response;
-  Expect(response.ParseFromString(execution.payload) && response.has_iis() &&
-         response.iis().is_infeasible() && response.iis().constraint_indices_size() == 1 &&
-         response.iis().variable_bounds_size() == 1 &&
-         response.iis().variable_bounds(0).upper_bound_included(), "Server transports the typed native conflict");
-  iis->set_solver_type(linear::MPSolver::GLOP_LINEAR_PROGRAMMING);
-  Expect(!Execute({1, "mp-solver", input.SerializeAsString()}).ok, "Unsupported native backend rejects");
-  iis->set_solver_type(linear::MPSolver::SCIP_MIXED_INTEGER_PROGRAMMING);
-  iis->set_node_limit(-2);
-  Expect(!Execute({1, "mp-solver", input.SerializeAsString()}).ok, "Native limit validation reaches server callers");
-  iis->set_node_limit(-1);
-  Expect(Execute({1, "mp-solver", input.SerializeAsString()}).ok, "Server recovers after rejected IIS queries");
+  Expect(result.ok && response.ParseFromString(result.payload), "Allowed native parameters still execute");
+  linear::MPSolutionResponse solution; solution.ParseFromString(response.response_proto());
+  Expect(solution.status() == linear::MPSOLVER_OPTIMAL, "Allowed native parameters retain solve behavior");
 }
 
 int RunAllTests() {
   const std::vector<std::pair<std::string, void (*)()>> tests = {
-      {"InterruptsCopiedIisSearchAndRecovers", InterruptsCopiedIisSearchAndRecovers},
-      {"ComputesIisThroughServerBridge", ComputesIisThroughServerBridge},
-      {"ComputesNativeIisWithExactSourceMappings", ComputesNativeIisWithExactSourceMappings},
-      {"NativeIisReportsBoundsAndIntegralDomains", NativeIisReportsBoundsAndIntegralDomains},
-      {"NativeIisLimitsCancellationAndUnsupportedBackends", NativeIisLimitsCancellationAndUnsupportedBackends},
+      {"RejectsRemoteFilesystemParameters", RejectsRemoteFilesystemParameters},
+      {"ReturnsNativeCallbackCapabilities", ReturnsNativeCallbackCapabilities},
+      {"AppliesNativeStartingBasis", AppliesNativeStartingBasis},
+      {"ForwardsNativeMipCallbacksAndConstraints", ForwardsNativeMipCallbacksAndConstraints},
       {"RoutesNativeBackendMessagesAndReleasesObservers", RoutesNativeBackendMessagesAndReleasesObservers},
       {"StreamsNativeMessagesThroughBridge", StreamsNativeMessagesThroughBridge},
       {"RetainsNativeSessionsAndAppliesOrderedEdits", RetainsNativeSessionsAndAppliesOrderedEdits},
@@ -898,6 +899,8 @@ int RunAllTests() {
       {"FillsNativeSolutionResponses", FillsNativeSolutionResponses},
       {"ExportsThroughNativeFormattersAndParsers", ExportsThroughNativeFormattersAndParsers},
       {"LoadsSolutionsUsingNativeValidation", LoadsSolutionsUsingNativeValidation},
+      {"ClampsSolutionsUsingNativeBounds", ClampsSolutionsUsingNativeBounds},
+      {"PreservesNativeClampingErrors", PreservesNativeClampingErrors},
       {"ComputesNativeActivitiesWithoutOptimization", ComputesNativeActivitiesWithoutOptimization},
       {"SolvesNestedProto", SolvesNestedProto},
       {"ReservesRequestedThreads", ReservesRequestedThreads},

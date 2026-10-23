@@ -300,3 +300,46 @@ th {
 		overflow-x: auto;
 	}
 }
+
+/* Keep primary controls and results visible; advanced settings can be expanded. */
+[hidden] { display: none !important; }
+.example-page { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
+.example-page .controls { gap: 0.8rem 1rem; align-items: end; margin: 1.25rem 0; }
+.example-page .controls > label:not(:has(input[type="checkbox"])) { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+.example-page input:not([type="checkbox"]):not([type="file"]),
+.example-page select { padding: 0.4rem 0.5rem; border: 1px solid #b8c1cc; border-radius: 4px; }
+.example-page .controls button { min-height: 2.25rem; cursor: pointer; }
+.example-page .controls button:is(#run, #solve, #toggle-running) { background: #175cd3; border: 1px solid #175cd3; border-radius: 4px; color: white; }
+.example-page .controls button:disabled { opacity: 0.65; cursor: progress; }
+.advanced-settings, .solve-log, .code-samples { margin: 0.8rem 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 0.65rem 0.85rem; }
+.advanced-settings > summary, .solve-log > summary, .code-samples > summary { cursor: pointer; font-weight: 600; }
+.option-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem 1.25rem; padding-top: 0.85rem; }
+.option-grid label { min-width: 0; align-items: center; }
+.option-grid label:not(:has(input[type="checkbox"])) { flex-direction: column; align-items: start; }
+.option-grid input[type="checkbox"] { flex-shrink: 0; margin: 0; }
+.option-grid input[type="text"], .option-grid select { width: 100%; box-sizing: border-box; }
+.solve-log #status { min-height: 0; max-height: 24rem; overflow: auto; margin-bottom: 0; }
+.settings-group + .settings-group { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+.settings-group h3 { margin: 1rem 0 0; font-size: 1rem; }
+@media (max-width: 760px) {
+  .example-page { margin: 0.75rem auto; padding: 0 0.75rem; }
+  .option-grid { grid-template-columns: minmax(0, 1fr); }
+  .example-page .controls > label { flex: 1 1 9rem; }
+  .example-page .controls select { width: 100%; }
+}
+.control-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; align-self: end; margin-left: auto; }
+.code-samples > details + details { margin-top: 0.65rem; }
+@media (max-width: 760px) {
+  .control-actions { flex-basis: 100%; margin-left: 0; }
+}
+
+/* Keep checkbox choices in fixed slots when an incompatible option is hidden. */
+.option-grid > label[hidden]:has(input[type="checkbox"]) {
+  display: inline-flex !important;
+  visibility: hidden;
+}
+
+.example-page .controls input[type="number"] { width: 5rem; }
+
+.solution-panel { margin: 0.75rem 0; }
+.summary-value { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.35rem; }

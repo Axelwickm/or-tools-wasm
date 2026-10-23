@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <exception>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <mutex>
 #include <set>
@@ -487,8 +488,59 @@ void NativeInterruptionRetainsResultAndReleasesCapacity() {
   Expect(!handle.Interrupt(), "terminal native interruption is a no-op");
 }
 
+void ShutdownWaitsForAnAdmittedWorkerBeforeItStarts() {
+  JobScheduler scheduler({1, 8});
+  ManualEvent admitted, release;
+  std::atomic<bool> shutdown_returned = false;
+  std::atomic<bool> started_after_shutdown = false;
+  auto submission = std::async(std::launch::async, [&] {
+    return scheduler.Submit(Spec(), [&](JobContext&) {
+      started_after_shutdown = shutdown_returned.load();
+      return JobResult::Succeeded();
+    }, [&](const JobStatus& status) {
+      if (status.state == JobState::kStarting) { admitted.Set(); release.Wait(); }
+    });
+  });
+  const bool admission_observed = admitted.WaitFor(2s);
+  auto shutdown = std::async(std::launch::async, [&] {
+    scheduler.Shutdown();
+    shutdown_returned = true;
+    return scheduler.Stats();
+  });
+  const bool returned_early = shutdown.wait_for(50ms) == std::future_status::ready;
+  release.Set();
+  auto handle = submission.get();
+  handle.result().wait();
+  const auto stats = shutdown.get();
+  Expect(admission_observed, "admitted worker observed");
+  Expect(!returned_early, "shutdown waits while an admitted worker has not entered its job");
+  Expect(!started_after_shutdown, "no job starts after shutdown returns");
+  ExpectEq(stats.active_jobs, 0, "shutdown drains every admitted job");
+  ExpectEq(stats.available_threads, stats.total_threads, "shutdown restores thread tokens");
+}
+
+void ConcurrentShutdownCallersBothWaitForWorkers() {
+  JobScheduler scheduler({1, 8});
+  ManualEvent entered, release;
+  auto handle = scheduler.Submit(Spec(), [&](JobContext&) {
+    entered.Set(); release.Wait(); return JobResult::Succeeded();
+  });
+  const bool started = entered.WaitFor(2s);
+  auto first = std::async(std::launch::async, [&] { scheduler.Shutdown(); });
+  auto second = std::async(std::launch::async, [&] { scheduler.Shutdown(); });
+  const bool first_early = first.wait_for(50ms) == std::future_status::ready;
+  const bool second_early = second.wait_for(50ms) == std::future_status::ready;
+  release.Set();
+  first.get(); second.get(); handle.result().wait();
+  Expect(started, "job started");
+  Expect(!first_early && !second_early, "all shutdown callers wait for admitted workers");
+  ExpectEq(scheduler.Stats().active_jobs, 0, "concurrent shutdown drains active work");
+}
+
 int RunAllTests() {
   const TestCase tests[] = {
+      {"ShutdownWaitsForAnAdmittedWorkerBeforeItStarts", ShutdownWaitsForAnAdmittedWorkerBeforeItStarts},
+      {"ConcurrentShutdownCallersBothWaitForWorkers", ConcurrentShutdownCallersBothWaitForWorkers},
       {"RunsSingleJobAndReportsLifecycle", RunsSingleJobAndReportsLifecycle},
       {"NativeInterruptionRetainsResultAndReleasesCapacity", NativeInterruptionRetainsResultAndReleasesCapacity},
       {"QueuesWhenThreadBudgetIsExhausted", QueuesWhenThreadBudgetIsExhausted},

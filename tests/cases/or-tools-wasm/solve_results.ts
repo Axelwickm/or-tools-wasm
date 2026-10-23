@@ -1,4 +1,49 @@
+import { observerCancellationCases } from './observer_cancellation.ts';
+import { mathOptExpressionBoundsCases } from './mathopt/expression_bounds.ts';
+import { routingSiblingCases } from './routing/sibling.ts';
+import { routingNativeQueryCases } from './routing/native_queries.ts';
+import { mpClampingCases } from './mp_solver/clamping.ts';
+import { cpSatSolutionCheckCases } from './cp_sat/solution_check.ts';
+import { routingSecondaryCases } from './routing/secondary.ts';
+import { routingForcedZeroCases } from './routing/forced_zero.ts';
+import { mathOptImprovementCases } from './mathopt/improvement.ts';
+import { mathOptRobustCases } from './mathopt/robust.ts';
+import { mathOptIndicatorMipCases } from './mathopt/indicator_mip.ts';
+import { routingRelationshipCases } from './routing/relationships.ts';
+import { routingRouteCostCases } from './routing/route_cost.ts';
+import { mpCapabilityCases } from './mp_solver/capabilities.ts';
+import { routingEquivalenceCases } from './routing/equivalence.ts';
+import { mathOptFeasibilityCases } from './mathopt/feasibility.ts';
+import { routingSweepOrderedCases } from './routing/sweep_ordered.ts';
+import { mpSearchNativeCases } from './mp_solver/search_native.ts';
+import { routingDimensionNativeCases } from './routing/dimension_native.ts';
+import { routingDimensionMetadataCases } from './routing/dimension_metadata.ts';
+import { routingClassificationCases } from './routing/classification.ts';
+import { routingArcSlackCases } from './routing/arc_slack.ts';
+import { routingTransferCases } from './routing/transfer.ts';
+import { setCoverCftCases } from './set_cover/cft.ts';
+import { setCoverMipCases } from './set_cover/mip.ts';
+import { setCoverLagrangianCases } from './set_cover/lagrangian.ts';
+import { setCoverTimingCases } from './set_cover/timing.ts';
+import { routingRemainingNativeCases } from './routing/remaining_native.ts';
+import { setCoverFormatCases } from './set_cover/formats.ts';
+import { routingWorkflowCases } from './routing/workflows.ts';
+import { routingSearchInspectionCases } from './routing/search_inspection.ts';
 import { adversarialSolveCases } from './adversarial.ts';
+import { mathOptSosCases } from './mathopt/sos.ts';
+import { mathOptIisCases } from './mathopt/iis.ts';
+import { mathOptIncrementalIisCases } from './mathopt/incremental_iis.ts';
+import { routingTabuCases } from './routing/tabu.ts';
+import { routingPresenceCases } from './routing/presence.ts';
+import { routingModelInspectionCases } from './routing/model_inspection.ts';
+import { flowPriceScalingCases } from './network_flow/price_scaling.ts';
+import { mathOptConeCases } from './mathopt/cones.ts';
+import { routingBreakCases } from './routing/breaks.ts';
+import { routingEnergyActivityCases } from './routing/energy_activity.ts';
+import { routingStateDependentCases } from './routing/state_dependent.ts';
+import { routingReuseCases } from './routing/reuse.ts';
+import { routingPairCases } from './routing/pairs.ts';
+import { setCoverMutationCases } from './set_cover/mutations.ts';
 import {
   assertCaseMatrix, executorFixtureModes, passedCase, serverExecutorConfiguration,
   type ExecutorFixtureMode, type SharedCase,
@@ -28,7 +73,52 @@ function execution(mode: ExecutorFixtureMode = 'direct') {
 }
 
 export const solveResultCases: SharedCase<SolveResultApis, Record<string, never>, ExecutorFixtureMode>[] = [
+  ...observerCancellationCases,
+  ...routingForcedZeroCases,
+  ...routingNativeQueryCases,
+  ...routingSiblingCases,
+  ...routingSecondaryCases,
+  ...cpSatSolutionCheckCases,
+  ...mathOptIndicatorMipCases,
+  ...mathOptRobustCases,
+  ...mathOptImprovementCases,
+  ...mathOptExpressionBoundsCases,
+  ...mathOptFeasibilityCases,
+  ...routingEquivalenceCases,
+  ...routingRouteCostCases,
+  ...routingRelationshipCases,
+  ...routingPresenceCases,
+  ...routingModelInspectionCases,
+  ...routingTabuCases,
+  ...flowPriceScalingCases,
+  ...mathOptIncrementalIisCases,
+  ...routingSweepOrderedCases,
+  ...mpCapabilityCases,
+  ...mpClampingCases,
+  ...mpSearchNativeCases,
   ...adversarialSolveCases,
+  ...mathOptSosCases,
+  ...mathOptIisCases,
+  ...mathOptConeCases,
+  ...routingBreakCases,
+  ...routingEnergyActivityCases,
+  ...routingStateDependentCases,
+  ...routingReuseCases,
+  ...routingWorkflowCases,
+  ...routingSearchInspectionCases,
+  ...routingRemainingNativeCases,
+  ...routingDimensionNativeCases,
+  ...routingDimensionMetadataCases,
+  ...routingTransferCases,
+  ...routingArcSlackCases,
+  ...routingClassificationCases,
+  ...setCoverTimingCases,
+  ...setCoverLagrangianCases,
+  ...setCoverMipCases,
+  ...setCoverCftCases,
+  ...setCoverFormatCases,
+  ...routingPairCases,
+  ...setCoverMutationCases,
   {
     id: 'mathopt.expressions.builders', name: 'MathOpt term constructors, summation and evaluation preserve all inputs', solver: 'mathopt',
     async run({ mathopt: { MathOpt } }) {

@@ -25,6 +25,7 @@ message MinCostFlowRequest {
   repeated int64 unit_costs = 4;
   repeated int64 supplies = 5;
   bool solve_max_flow_with_min_cost = 6;
+  optional bool price_scaling = 7;
 }
 
 message LinearSumAssignmentRequest {

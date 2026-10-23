@@ -1,0 +1,24 @@
+syntax = "proto3";
+package ortools_wasm.bridge.v1;
+
+message MathOptIndicatorToMipRequest {
+  bytes model_proto = 1;
+  int64 indicator_constraint_id = 2;
+}
+message MathOptModelTransformationResponse {
+  bytes model_proto = 1;
+  string error = 2;
+}
+
+message MathOptRobustCoefficient {
+  int64 variable_id = 1;
+  repeated int64 uncertainty_variable_ids = 2;
+  repeated double coefficients = 3;
+  double offset = 4;
+}
+message MathOptRobustConstraintRequest {
+  bytes model_proto = 1;
+  bytes uncertainty_model_proto = 2;
+  int64 rhs_id = 3;
+  repeated MathOptRobustCoefficient uncertain_coefficients = 4;
+}

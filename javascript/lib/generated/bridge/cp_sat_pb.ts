@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file cp_sat.proto.
  */
 export const file_cp_sat: GenFile = /*@__PURE__*/
-  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEi6wEKEkNwU2F0QnJpZGdlUmVxdWVzdBI6CgVzb2x2ZRgKIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlcXVlc3RIABJACgh2YWxpZGF0ZRgLIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlcXVlc3RIABIVCgttb2RlbF9zdGF0cxgMIAEoDEgAEhgKDnJlc3BvbnNlX3N0YXRzGA0gASgMSAASGwoRZXhwb3J0X21vZGVsX3RleHQYDiABKAxIAEIJCgdwYXlsb2FkIpYCChNDcFNhdEJyaWRnZVJlc3BvbnNlEkAKDHNvbHZlX3Jlc3VsdBgKIAEoCzIoLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlc3VsdEgAEj4KC3NvbHZlX2V2ZW50GAsgASgLMicub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlRXZlbnRIABJGCg92YWxpZGF0ZV9yZXN1bHQYDCABKAsyKy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0VmFsaWRhdGVSZXN1bHRIABIUCgpzdGF0aXN0aWNzGA0gASgJSAASFAoKbW9kZWxfdGV4dBgOIAEoCUgAQgkKB3BheWxvYWQiiwEKEUNwU2F0U29sdmVSZXF1ZXN0EhYKDmNwX21vZGVsX3Byb3RvGAEgASgMEhwKFHNhdF9wYXJhbWV0ZXJzX3Byb3RvGAIgASgMEkAKDWNhbGxiYWNrX21hc2sYAyABKAsyKS5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0Q2FsbGJhY2tNYXNrIkYKEUNwU2F0Q2FsbGJhY2tNYXNrEhAKCHNvbHV0aW9uGAEgASgIEhIKCmJlc3RfYm91bmQYAiABKAgSCwoDbG9nGAMgASgIIm4KEENwU2F0U29sdmVSZXN1bHQSIAoYY3Bfc29sdmVyX3Jlc3BvbnNlX3Byb3RvGAEgASgMEiAKE3Jlc3BvbnNlX3N0YXRpc3RpY3MYAiABKAlIAIgBAUIWChRfcmVzcG9uc2Vfc3RhdGlzdGljcyJbCg9DcFNhdFNvbHZlRXZlbnQSGAoOc29sdXRpb25fcHJvdG8YASABKAxIABIUCgpiZXN0X2JvdW5kGAIgASgBSAASDQoDbG9nGAMgASgJSABCCQoHcGF5bG9hZCIuChRDcFNhdFZhbGlkYXRlUmVxdWVzdBIWCg5jcF9tb2RlbF9wcm90bxgBIAEoDCIyChNDcFNhdFZhbGlkYXRlUmVzdWx0EgoKAm9rGAEgASgIEg8KB21lc3NhZ2UYAiABKAliBnByb3RvMw");
+  fileDesc("CgxjcF9zYXQucHJvdG8SFm9ydG9vbHNfd2FzbS5icmlkZ2UudjEiuAIKEkNwU2F0QnJpZGdlUmVxdWVzdBI6CgVzb2x2ZRgKIAEoCzIpLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRTb2x2ZVJlcXVlc3RIABJACgh2YWxpZGF0ZRgLIAEoCzIsLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlcXVlc3RIABIVCgttb2RlbF9zdGF0cxgMIAEoDEgAEhgKDnJlc3BvbnNlX3N0YXRzGA0gASgMSAASGwoRZXhwb3J0X21vZGVsX3RleHQYDiABKAxIABJLCg5jaGVja19zb2x1dGlvbhgPIAEoCzIxLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRDaGVja1NvbHV0aW9uUmVxdWVzdEgAQgkKB3BheWxvYWQiswIKE0NwU2F0QnJpZGdlUmVzcG9uc2USQAoMc29sdmVfcmVzdWx0GAogASgLMigub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdFNvbHZlUmVzdWx0SAASPgoLc29sdmVfZXZlbnQYCyABKAsyJy5vcnRvb2xzX3dhc20uYnJpZGdlLnYxLkNwU2F0U29sdmVFdmVudEgAEkYKD3ZhbGlkYXRlX3Jlc3VsdBgMIAEoCzIrLm9ydG9vbHNfd2FzbS5icmlkZ2UudjEuQ3BTYXRWYWxpZGF0ZVJlc3VsdEgAEhQKCnN0YXRpc3RpY3MYDSABKAlIABIUCgptb2RlbF90ZXh0GA4gASgJSAASGwoRc29sdXRpb25fZmVhc2libGUYDyABKAhIAEIJCgdwYXlsb2FkIosBChFDcFNhdFNvbHZlUmVxdWVzdBIWCg5jcF9tb2RlbF9wcm90bxgBIAEoDBIcChRzYXRfcGFyYW1ldGVyc19wcm90bxgCIAEoDBJACg1jYWxsYmFja19tYXNrGAMgASgLMikub3J0b29sc193YXNtLmJyaWRnZS52MS5DcFNhdENhbGxiYWNrTWFzayJGChFDcFNhdENhbGxiYWNrTWFzaxIQCghzb2x1dGlvbhgBIAEoCBISCgpiZXN0X2JvdW5kGAIgASgIEgsKA2xvZxgDIAEoCCJuChBDcFNhdFNvbHZlUmVzdWx0EiAKGGNwX3NvbHZlcl9yZXNwb25zZV9wcm90bxgBIAEoDBIgChNyZXNwb25zZV9zdGF0aXN0aWNzGAIgASgJSACIAQFCFgoUX3Jlc3BvbnNlX3N0YXRpc3RpY3MiWwoPQ3BTYXRTb2x2ZUV2ZW50EhgKDnNvbHV0aW9uX3Byb3RvGAEgASgMSAASFAoKYmVzdF9ib3VuZBgCIAEoAUgAEg0KA2xvZxgDIAEoCUgAQgkKB3BheWxvYWQiLgoUQ3BTYXRWYWxpZGF0ZVJlcXVlc3QSFgoOY3BfbW9kZWxfcHJvdG8YASABKAwiMgoTQ3BTYXRWYWxpZGF0ZVJlc3VsdBIKCgJvaxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIkwKGUNwU2F0Q2hlY2tTb2x1dGlvblJlcXVlc3QSFgoOY3BfbW9kZWxfcHJvdG8YASABKAwSFwoPdmFyaWFibGVfdmFsdWVzGAIgAygDYgZwcm90bzM");
 
 /**
  * @generated from message ortools_wasm.bridge.v1.CpSatBridgeRequest
@@ -49,6 +49,12 @@ export type CpSatBridgeRequest = Message<"ortools_wasm.bridge.v1.CpSatBridgeRequ
      */
     value: Uint8Array;
     case: "exportModelText";
+  } | {
+    /**
+     * @generated from field: ortools_wasm.bridge.v1.CpSatCheckSolutionRequest check_solution = 15;
+     */
+    value: CpSatCheckSolutionRequest;
+    case: "checkSolution";
   } | { case: undefined; value?: undefined };
 };
 
@@ -80,6 +86,11 @@ export type CpSatBridgeRequestJson = {
    * @generated from field: bytes export_model_text = 14;
    */
   exportModelText?: string;
+
+  /**
+   * @generated from field: ortools_wasm.bridge.v1.CpSatCheckSolutionRequest check_solution = 15;
+   */
+  checkSolution?: CpSatCheckSolutionRequestJson;
 };
 
 export type CpSatBridgeRequestValid = CpSatBridgeRequest;
@@ -128,6 +139,12 @@ export type CpSatBridgeResponse = Message<"ortools_wasm.bridge.v1.CpSatBridgeRes
      */
     value: string;
     case: "modelText";
+  } | {
+    /**
+     * @generated from field: bool solution_feasible = 15;
+     */
+    value: boolean;
+    case: "solutionFeasible";
   } | { case: undefined; value?: undefined };
 };
 
@@ -159,6 +176,11 @@ export type CpSatBridgeResponseJson = {
    * @generated from field: string model_text = 14;
    */
   modelText?: string;
+
+  /**
+   * @generated from field: bool solution_feasible = 15;
+   */
+  solutionFeasible?: boolean;
 };
 
 export type CpSatBridgeResponseValid = CpSatBridgeResponse;
@@ -431,4 +453,43 @@ export type CpSatValidateResultValid = CpSatValidateResult;
  */
 export const CpSatValidateResultSchema: GenMessage<CpSatValidateResult, {jsonType: CpSatValidateResultJson, validType: CpSatValidateResultValid}> = /*@__PURE__*/
   messageDesc(file_cp_sat, 7);
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.CpSatCheckSolutionRequest
+ */
+export type CpSatCheckSolutionRequest = Message<"ortools_wasm.bridge.v1.CpSatCheckSolutionRequest"> & {
+  /**
+   * @generated from field: bytes cp_model_proto = 1;
+   */
+  cpModelProto: Uint8Array;
+
+  /**
+   * @generated from field: repeated int64 variable_values = 2;
+   */
+  variableValues: bigint[];
+};
+
+/**
+ * @generated from message ortools_wasm.bridge.v1.CpSatCheckSolutionRequest
+ */
+export type CpSatCheckSolutionRequestJson = {
+  /**
+   * @generated from field: bytes cp_model_proto = 1;
+   */
+  cpModelProto?: string;
+
+  /**
+   * @generated from field: repeated int64 variable_values = 2;
+   */
+  variableValues?: string[];
+};
+
+export type CpSatCheckSolutionRequestValid = CpSatCheckSolutionRequest;
+
+/**
+ * Describes the message ortools_wasm.bridge.v1.CpSatCheckSolutionRequest.
+ * Use `create(CpSatCheckSolutionRequestSchema)` to create a new message.
+ */
+export const CpSatCheckSolutionRequestSchema: GenMessage<CpSatCheckSolutionRequest, {jsonType: CpSatCheckSolutionRequestJson, validType: CpSatCheckSolutionRequestValid}> = /*@__PURE__*/
+  messageDesc(file_cp_sat, 8);
 

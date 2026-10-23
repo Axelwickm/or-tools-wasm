@@ -128,7 +128,7 @@ EMSCRIPTEN_KEEPALIVE const char* graph_min_cost_flow_solve_serialized(
     const int32_t* tails_data, const int32_t* heads_data,
     const int64_t* capacities_data, const int64_t* unit_costs_data, int num_arcs,
     const int64_t* supplies_data, int num_supplies,
-    int solve_max_flow_with_min_cost) {
+    int solve_max_flow_with_min_cost, int price_scaling) {
   if ((num_arcs > 0 && (tails_data == nullptr || heads_data == nullptr ||
                         capacities_data == nullptr ||
                         unit_costs_data == nullptr)) ||
@@ -146,6 +146,7 @@ EMSCRIPTEN_KEEPALIVE const char* graph_min_cost_flow_solve_serialized(
       return ErrorResult("SimpleMinCostFlow: too many supply nodes.");
     }
     SimpleMinCostFlow solver;
+    solver.SetPriceScaling(price_scaling != 0);
     for (int arc = 0; arc < num_arcs; ++arc) {
       solver.AddArcWithCapacityAndUnitCost(tails_data[arc], heads_data[arc],
                                            capacities_data[arc],

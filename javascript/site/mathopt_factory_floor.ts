@@ -773,7 +773,7 @@ async function solvePlan(): Promise<void> {
         await disposePlanner(nextPlanner, 'The production planner solve failed.');
         throw error;
       }
-      startDecisions = plannedStartDecisions(result.variableValuesById, nextPlanner);
+      if (result.hasSolution) startDecisions = plannedStartDecisions(result.variableValuesById, nextPlanner);
       desiredStarts = summarizeStartDecisions(startDecisions);
       launched = launchFromPlan(startDecisions);
     }
@@ -1103,6 +1103,11 @@ async function planTrafficDispatches(): Promise<string> {
       stopAfterFirstSolution: false,
     },
   });
+
+  if (!result.hasSolution) {
+    debugFactoryPlan('traffic plan has no incumbent', { status: result.terminationReason });
+    return `Traffic: ${result.terminationReason}; no dispatch solution`;
+  }
 
   let plannedCount = 0;
   for (const choices of choicesByRelease.values()) {

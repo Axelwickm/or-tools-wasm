@@ -1,130 +1,17 @@
+import { elements, regions } from './models/set_cover.js';
+import { setControlAvailable } from './example_controls.js';
 import {
   type ExecutorConfiguration,
   GreedySolutionGenerator,
+  LazySteepestSearch,
   GuidedTabuSearch,
   SetCoverInvariant,
   SetCoverModel,
+  SetCover,
+  SetCoverMipStatus,
 } from 'or-tools-wasm/set-cover';
 import { configureSolverExecutorSelector } from './solver_executor_selector.js';
 import { requiredElement } from './site_support.js';
-
-type ElementPoint = {
-  id: number;
-  x: number;
-  y: number;
-};
-
-type CoverRegion = {
-  id: number;
-  name: string;
-  cost: number;
-  color: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  radius: string;
-  elements: number[];
-};
-
-const elements: ElementPoint[] = [
-  { id: 0, x: 12, y: 22 },
-  { id: 1, x: 23, y: 16 },
-  { id: 2, x: 35, y: 27 },
-  { id: 3, x: 51, y: 18 },
-  { id: 4, x: 68, y: 24 },
-  { id: 5, x: 82, y: 18 },
-  { id: 6, x: 18, y: 48 },
-  { id: 7, x: 35, y: 54 },
-  { id: 8, x: 50, y: 46 },
-  { id: 9, x: 66, y: 54 },
-  { id: 10, x: 83, y: 48 },
-  { id: 11, x: 28, y: 78 },
-  { id: 12, x: 52, y: 76 },
-  { id: 13, x: 76, y: 78 },
-];
-
-const regions: CoverRegion[] = [
-  {
-    id: 0,
-    name: 'Northwest route',
-    cost: 5,
-    color: '#0969da',
-    x: 8,
-    y: 12,
-    width: 31,
-    height: 46,
-    rotation: 0,
-    radius: '2rem 3rem 2.2rem 2.8rem',
-    elements: [0, 1, 2, 6, 7],
-  },
-  {
-    id: 1,
-    name: 'North ridge',
-    cost: 6,
-    color: '#8250df',
-    x: 31,
-    y: 14,
-    width: 41,
-    height: 45,
-    rotation: 0,
-    radius: '2.6rem 2rem 3rem 2.1rem',
-    elements: [2, 3, 4, 8, 9],
-  },
-  {
-    id: 2,
-    name: 'East loop',
-    cost: 5,
-    color: '#cf222e',
-    x: 62,
-    y: 14,
-    width: 26,
-    height: 69,
-    rotation: 0,
-    radius: '2rem 2.8rem 2.4rem 3rem',
-    elements: [4, 5, 9, 10, 13],
-  },
-  {
-    id: 3,
-    name: 'Southwest sweep',
-    cost: 4,
-    color: '#1a7f37',
-    x: 14,
-    y: 44,
-    width: 43,
-    height: 39,
-    rotation: 0,
-    radius: '2.4rem 2rem 3rem 2.2rem',
-    elements: [6, 7, 11, 12],
-  },
-  {
-    id: 4,
-    name: 'South belt',
-    cost: 6,
-    color: '#bf8700',
-    x: 46,
-    y: 42,
-    width: 42,
-    height: 41,
-    rotation: 0,
-    radius: '3rem 2rem 2.5rem 2.2rem',
-    elements: [8, 9, 10, 12, 13],
-  },
-  {
-    id: 5,
-    name: 'Central express',
-    cost: 7,
-    color: '#d1248f',
-    x: 19,
-    y: 12,
-    width: 52,
-    height: 47,
-    rotation: 0,
-    radius: '2rem 3rem 2rem 3rem',
-    elements: [1, 2, 3, 7, 8, 9],
-  },
-];
 
 const coverageMap = requiredElement('coverage-map', 'div');
 const coverageLegend = requiredElement('coverage-legend', 'div');
@@ -133,10 +20,15 @@ const statusEl = requiredElement('status', 'pre');
 const executorSelector = requiredElement('solver-executor', 'select');
 const runButton = requiredElement('run', 'button');
 const clearButton = requiredElement('clear', 'button');
-const guidedTabuInput = requiredElement('guided-tabu', 'input');
-const penaltyFactorInput = requiredElement('penalty-factor', 'input');
-const epsilonInput = requiredElement('epsilon', 'input');
-const tabuSizeInput = requiredElement('tabu-size', 'input');
+const modelFormat = document.getElementById('model-format') as HTMLSelectElement | null;
+const modelText = document.getElementById('model-text') as HTMLTextAreaElement | null;
+const cftComparisonInput = document.getElementById('cft-comparison') as HTMLInputElement | null;
+const mipComparisonInput = document.getElementById('mip-comparison') as HTMLInputElement | null;
+const penaltyFactorInput = document.getElementById('penalty-factor') as HTMLInputElement | null;
+const epsilonInput = document.getElementById('epsilon') as HTMLInputElement | null;
+const tabuSizeInput = document.getElementById('tabu-size') as HTMLInputElement | null;
+const searchMethod = document.getElementById('search-method') as HTMLSelectElement | null;
+const using = (method: string) => searchMethod?.value === method;
 let readSetCoverExecutor: () => ExecutorConfiguration = () => ({ type: 'worker' });
 
 let selectedSubsets: number[] = [];
@@ -147,6 +39,8 @@ let hoveredRegionId: number | null = null;
 
 function setRunning(running: boolean) {
   runButton.disabled = running;
+  if (modelFormat) modelFormat.disabled = running;
+  if (searchMethod) searchMethod.disabled = running;
   runButton.textContent = running ? 'Solving...' : 'Solve Set Cover';
 }
 
@@ -225,7 +119,7 @@ function renderMap() {
       style="--color: ${region.color};"
     >
       <div class="legend-title">${region.id}. ${region.name}</div>
-      <div>Cost ${region.cost}</div>
+      <div>Cost ${modelFormat?.value === 'fimi' ? 1 : region.cost}</div>
       <div class="legend-elements">Elements ${region.elements.join(', ')}</div>
     </div>
   `).join('');
@@ -260,6 +154,42 @@ function renderSolution() {
   `;
 }
 
+type ModelTextFormat = 'orlibScp' | 'orlibRail' | 'fimi';
+function exportModelText(model: SetCoverModel, format: ModelTextFormat): Promise<string> {
+  return format === 'fimi'
+    ? Promise.resolve(regions.map(region => region.elements.join(' ')).join('\n'))
+    : model.exportText(format, { executor: readSetCoverExecutor() });
+}
+
+async function updateModelText() {
+  const format = modelFormat?.value ?? 'builder';
+  const preview = modelText?.closest('details');
+  if (preview) {
+    preview.hidden = format === 'builder';
+    preview.open = format !== 'builder';
+  }
+  if (!modelText) return;
+  modelText.value = '';
+  runButton.disabled = format !== 'builder';
+  if (format === 'builder') return;
+  if (modelFormat) modelFormat.disabled = true;
+  modelText.placeholder = 'Loading model text…';
+  try {
+    const text = await exportModelText(buildModel(), format as ModelTextFormat);
+    modelText.value = text;
+  } catch (error) {
+    modelText.placeholder = 'Model text could not be loaded.';
+    appendStatus(`Model export failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    if (modelFormat) modelFormat.disabled = false;
+    runButton.disabled = false;
+  }
+}
+modelFormat?.addEventListener('change', () => {
+  clearSolution();
+  void updateModelText();
+});
+
 async function runSetCover() {
   setRunning(true);
   statusEl.textContent = '';
@@ -270,31 +200,59 @@ async function runSetCover() {
     renderMap();
     renderSolution();
 
-    const model = buildModel();
-    const costStats = await model.computeCostStats({ executor: readSetCoverExecutor() });
-    appendStatus(`Subset costs: median ${costStats.median}, standard deviation ${costStats.stddev}, interquartile range ${costStats.iqr}.`);
+    let model = buildModel();
+    const format = (modelFormat?.value ?? 'builder');
+    if (format !== 'builder') {
+      const selectedFormat = format as ModelTextFormat;
+      const text = await exportModelText(model, selectedFormat);
+      if (modelText) modelText.value = text;
+      model = await SetCoverModel.fromText(text, selectedFormat, { executor: readSetCoverExecutor() });
+      appendStatus(`Imported ${model.numSubsets} regions from ${format}.`);
+    } else if (modelText) modelText.value = '';
+    if (modelFormat) {
+      const costStats = await model.computeCostStats({ executor: readSetCoverExecutor() });
+      appendStatus(`Subset costs: median ${costStats.median}, standard deviation ${costStats.stddev}, interquartile range ${costStats.iqr}.`);
+    }
     const inv = new SetCoverInvariant(model);
     const greedy = new GreedySolutionGenerator(inv);
 
     appendStatus(`Solving with ${executorSelector.value} executor...`);
-    await greedy.nextSolution(undefined, {
-      executor: readSetCoverExecutor(),
-    });
+    const construction = await greedy.nextSolutionWithStats(undefined, { executor: readSetCoverExecutor() });
+    if (construction.statistics) appendStatus(`Native greedy time: ${construction.statistics.runTimeSeconds.toFixed(6)} seconds.`);
     if (await inv.numUncoveredElements({ executor: readSetCoverExecutor() }) !== 0) {
       appendStatus('No solution found by the greedy heuristic.');
       return;
     }
 
-    if (guidedTabuInput.checked) {
+    if (using('restart')) {
+      const extra = inv.isSelected().findIndex(selected => !selected);
+      if (extra >= 0) {
+        const changes = await inv.updateSelection(extra, true, { executor: readSetCoverExecutor() });
+        appendStatus(`Added ${regions[extra].name}. Newly removable regions: ${changes.newlyRemovableSubsets.join(', ') || 'none'}.`);
+      }
+      const focus = await inv.clearMostCoveredElements(1, { executor: readSetCoverExecutor() });
+      appendStatus(`Native perturbation cleared ${focus.length} overcovered region.`);
+      await greedy.nextSolution(undefined, { executor: readSetCoverExecutor() });
+      appendStatus('Greedy reconstruction completed after perturbation.');
+    }
+
+    if (using('lazy')) {
+      await new LazySteepestSearch(inv).nextSolution(undefined, { executor: readSetCoverExecutor() });
+      appendStatus('Lazy steepest search removed redundant regions.');
+    }
+
+    if (using('guided')) {
       const search = new GuidedTabuSearch(inv);
       try {
-        search.setPenaltyFactor(Number(penaltyFactorInput.value));
-        search.setEpsilon(Number(epsilonInput.value));
-        search.setTabuListSize(Number(tabuSizeInput.value));
+        search.setPenaltyFactor(Number(penaltyFactorInput?.value ?? '0.3'));
+        search.setEpsilon(Number(epsilonInput?.value ?? '0.000001'));
+        search.setTabuListSize(Number(tabuSizeInput?.value ?? '17'));
         search.setMaxIterations(40);
         await search.initialize({ executor: readSetCoverExecutor() });
         for (let pass = 0; pass < 5; pass++) await search.nextSolution();
         appendStatus('Guided tabu search finished after five continued passes.');
+        const statistics = await search.statistics();
+        if (statistics) appendStatus(`Native guided search time: ${statistics.runTimeSeconds.toFixed(6)} seconds.`);
       } finally { await search.close(); }
     }
 
@@ -307,6 +265,21 @@ async function runSetCover() {
       for (const element of regions[subsetIndex]?.elements ?? []) {
         coveredElements.add(element);
       }
+    }
+    if (modelFormat) {
+      const bound = await model.computeLagrangianLowerBound(state.cost, { executor: readSetCoverExecutor() });
+      appendStatus(`Native Lagrangian lower bound: ${bound.lowerBound.toFixed(3)}; cover cost: ${state.cost}.`);
+    }
+    if (mipComparisonInput?.checked) {
+      const integer = await SetCover.solveMip(model, { executor: readSetCoverExecutor() });
+      appendStatus(`Native MIP subproblem: ${SetCoverMipStatus[integer.subproblemStatus]}; cover ${integer.cover.hasSolution ? integer.cover.cost : 'incomplete'}.`);
+      const relaxation = await SetCover.solveLpRelaxation(model, { executor: readSetCoverExecutor() });
+      appendStatus(`Native LP subproblem: ${SetCoverMipStatus[relaxation.subproblemStatus]}; objective ${relaxation.objectiveValue ?? 'unavailable'}.`);
+    }
+    if (cftComparisonInput?.checked) {
+      const initialSelectedSubsets = state.numUncoveredElements === 0 ? selectedSubsets : undefined;
+      const cft = await SetCover.solveCft(model, { executor: readSetCoverExecutor(), initialSelectedSubsets });
+      appendStatus(`Native CFT: cover ${cft.cover.hasSolution ? cft.cover.cost : 'incomplete'}; lower bound ${cft.dual.lowerBound.toFixed(3)}.${initialSelectedSubsets ? ' Seeded from the current cover.' : ''}`);
     }
     lastCost = state.cost;
     lastUncovered = state.numUncoveredElements;
@@ -323,9 +296,11 @@ async function runSetCover() {
 }
 
 runButton.addEventListener('click', () => void runSetCover());
-guidedTabuInput.addEventListener('change', () => {
-  for (const input of [penaltyFactorInput, epsilonInput, tabuSizeInput]) input.disabled = !guidedTabuInput.checked;
-});
+function updateTuningControls() {
+  for (const input of [penaltyFactorInput, epsilonInput, tabuSizeInput]) setControlAvailable(input, using('guided'));
+}
+searchMethod?.addEventListener('change', updateTuningControls);
+updateTuningControls();
 clearButton.addEventListener('click', clearSolution);
 coverageMap.addEventListener('pointerover', (event) => {
   const target = event.target;
@@ -355,3 +330,5 @@ coverageLegend.addEventListener('pointerout', (event) => {
 renderMap();
 renderSolution();
 readSetCoverExecutor = configureSolverExecutorSelector(executorSelector);
+
+void updateModelText();

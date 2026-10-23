@@ -63,6 +63,11 @@ set(BRIDGE_PROTO_SRCS
   "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.cc"
   "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.cc"
   "${BRIDGE_PROTO_OUT_DIR}/mathopt.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_iis.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_feasibility.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_expression_bounds.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_solution_improvement.pb.cc"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_model_transform.pb.cc"
   "${BRIDGE_PROTO_OUT_DIR}/mp_solver.pb.cc"
   "${BRIDGE_PROTO_OUT_DIR}/network_flow.pb.cc"
   "${BRIDGE_PROTO_OUT_DIR}/pdlp.pb.cc"
@@ -73,6 +78,11 @@ set(BRIDGE_PROTO_HDRS
   "${BRIDGE_PROTO_OUT_DIR}/cp_sat.pb.h"
   "${BRIDGE_PROTO_OUT_DIR}/knapsack.pb.h"
   "${BRIDGE_PROTO_OUT_DIR}/mathopt.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_iis.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_feasibility.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_expression_bounds.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_solution_improvement.pb.h"
+  "${BRIDGE_PROTO_OUT_DIR}/mathopt_model_transform.pb.h"
   "${BRIDGE_PROTO_OUT_DIR}/mp_solver.pb.h"
   "${BRIDGE_PROTO_OUT_DIR}/network_flow.pb.h"
   "${BRIDGE_PROTO_OUT_DIR}/pdlp.pb.h"
@@ -89,6 +99,11 @@ add_custom_command(
     "cp_sat.proto"
     "knapsack.proto"
     "mathopt.proto"
+    "mathopt_iis.proto"
+    "mathopt_feasibility.proto"
+    "mathopt_expression_bounds.proto"
+    "mathopt_solution_improvement.proto"
+    "mathopt_model_transform.proto"
     "mp_solver.proto"
     "network_flow.proto"
     "pdlp.proto"
@@ -99,6 +114,11 @@ add_custom_command(
     "${REPO_ROOT}/bridge-types/cp_sat.proto"
     "${REPO_ROOT}/bridge-types/knapsack.proto"
     "${REPO_ROOT}/bridge-types/mathopt.proto"
+    "${REPO_ROOT}/bridge-types/mathopt_iis.proto"
+    "${REPO_ROOT}/bridge-types/mathopt_feasibility.proto"
+    "${REPO_ROOT}/bridge-types/mathopt_expression_bounds.proto"
+    "${REPO_ROOT}/bridge-types/mathopt_solution_improvement.proto"
+    "${REPO_ROOT}/bridge-types/mathopt_model_transform.proto"
     "${REPO_ROOT}/bridge-types/mp_solver.proto"
     "${REPO_ROOT}/bridge-types/network_flow.proto"
     "${REPO_ROOT}/bridge-types/pdlp.proto"
@@ -171,17 +191,28 @@ target_link_libraries(ortools_server PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_job_scheduler_test
+# Test declarations drive the build target, container runner and optional CTest
+# registration. Keep native dependency tests disabled in Docker.
+set(SERVER_TEST_TARGETS)
+function(add_server_test target)
+  add_executable(${target} ${ARGN})
+  set(SERVER_TEST_TARGETS ${SERVER_TEST_TARGETS} ${target} PARENT_SCOPE)
+  if(BUILD_TESTING)
+    add_test(NAME ${target} COMMAND ${target})
+  endif()
+endfunction()
+
+add_server_test(server_job_scheduler_test
   src/job_scheduler.cc
   src/job_scheduler_test.cc)
 target_include_directories(server_job_scheduler_test PRIVATE "${REPO_ROOT}")
 
-add_executable(server_config_test
+add_server_test(server_config_test
   src/server_config.cc
   src/server_config_test.cc)
 target_include_directories(server_config_test PRIVATE "${REPO_ROOT}")
 
-add_executable(server_solver_job_service_test
+add_server_test(server_solver_job_service_test
   src/job_scheduler.cc
   src/solver_job_service.cc
   src/solver_job_service_test.cc)
@@ -192,7 +223,7 @@ target_link_libraries(server_solver_job_service_test PRIVATE
   protobuf::libprotobuf
   server_bridge_proto)
 
-add_executable(server_http_integration_test
+add_server_test(server_http_integration_test
   src/http_server.cc
   src/http_server_integration_test.cc
   src/job_scheduler.cc
@@ -206,7 +237,7 @@ target_link_libraries(server_http_integration_test PRIVATE
   server_bridge_proto
   server_cpp_httplib)
 
-add_executable(server_cp_sat_executor_test
+add_server_test(server_cp_sat_executor_test
   src/cp_sat_executor.cc
   src/cp_sat_executor_test.cc
   src/job_scheduler.cc)
@@ -217,7 +248,7 @@ target_link_libraries(server_cp_sat_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_knapsack_executor_test
+add_server_test(server_knapsack_executor_test
   src/job_scheduler.cc
   src/knapsack_executor.cc
   src/knapsack_executor_test.cc)
@@ -229,7 +260,7 @@ target_link_libraries(server_knapsack_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_network_flow_executor_test
+add_server_test(server_network_flow_executor_test
   src/job_scheduler.cc
   src/network_flow_executor.cc
   src/network_flow_executor_test.cc)
@@ -241,7 +272,7 @@ target_link_libraries(server_network_flow_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_mp_solver_executor_test
+add_server_test(server_mp_solver_executor_test
   src/job_scheduler.cc
   src/mp_solver_executor.cc
   src/mp_solver_executor_test.cc)
@@ -255,7 +286,7 @@ target_link_libraries(server_mp_solver_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_mathopt_executor_test
+add_server_test(server_mathopt_executor_test
   src/job_scheduler.cc
   src/mathopt_executor.cc
   src/mathopt_executor_test.cc)
@@ -268,7 +299,7 @@ target_link_libraries(server_mathopt_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_set_cover_executor_test
+add_server_test(server_set_cover_executor_test
   src/job_scheduler.cc
   src/set_cover_executor.cc
   src/set_cover_executor_test.cc)
@@ -280,7 +311,7 @@ target_link_libraries(server_set_cover_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_pdlp_executor_test
+add_server_test(server_pdlp_executor_test
   src/job_scheduler.cc
   src/pdlp_executor.cc
   src/pdlp_executor_test.cc)
@@ -293,7 +324,7 @@ target_link_libraries(server_pdlp_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_routing_executor_test
+add_server_test(server_routing_executor_test
   src/job_scheduler.cc
   src/routing_executor.cc
   src/routing_executor_test.cc)
@@ -305,7 +336,7 @@ target_link_libraries(server_routing_executor_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_routing_dimension_controls_test
+add_server_test(server_routing_dimension_controls_test
   src/job_scheduler.cc
   src/routing_executor.cc
   src/routing_dimension_controls_test.cc)
@@ -317,7 +348,7 @@ target_link_libraries(server_routing_dimension_controls_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_routing_vehicle_costs_test
+add_server_test(server_routing_vehicle_costs_test
   src/job_scheduler.cc
   src/routing_executor.cc
   src/routing_vehicle_costs_test.cc)
@@ -329,7 +360,7 @@ target_link_libraries(server_routing_vehicle_costs_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-add_executable(server_routing_group_controls_test
+add_server_test(server_routing_group_controls_test
   src/job_scheduler.cc
   src/routing_executor.cc
   src/routing_group_controls_test.cc)
@@ -341,20 +372,14 @@ target_link_libraries(server_routing_group_controls_test PRIVATE
   server_bridge_proto
   server_ortools_link_shims)
 
-if(BUILD_TESTING)
-  add_test(NAME server_job_scheduler_test COMMAND server_job_scheduler_test)
-  add_test(NAME server_config_test COMMAND server_config_test)
-  add_test(NAME server_solver_job_service_test COMMAND server_solver_job_service_test)
-  add_test(NAME server_http_integration_test COMMAND server_http_integration_test)
-  add_test(NAME server_cp_sat_executor_test COMMAND server_cp_sat_executor_test)
-  add_test(NAME server_knapsack_executor_test COMMAND server_knapsack_executor_test)
-  add_test(NAME server_network_flow_executor_test COMMAND server_network_flow_executor_test)
-  add_test(NAME server_mp_solver_executor_test COMMAND server_mp_solver_executor_test)
-  add_test(NAME server_mathopt_executor_test COMMAND server_mathopt_executor_test)
-  add_test(NAME server_set_cover_executor_test COMMAND server_set_cover_executor_test)
-  add_test(NAME server_pdlp_executor_test COMMAND server_pdlp_executor_test)
-  add_test(NAME server_routing_executor_test COMMAND server_routing_executor_test)
-  add_test(NAME server_routing_dimension_controls_test COMMAND server_routing_dimension_controls_test)
-  add_test(NAME server_routing_vehicle_costs_test COMMAND server_routing_vehicle_costs_test)
-  add_test(NAME server_routing_group_controls_test COMMAND server_routing_group_controls_test)
-endif()
+add_server_test(server_session_registry_test src/session_registry_test.cc)
+target_include_directories(server_session_registry_test PRIVATE "${REPO_ROOT}")
+target_link_libraries(server_session_registry_test PRIVATE ortools::ortools)
+
+add_custom_target(server_tests DEPENDS ${SERVER_TEST_TARGETS})
+set(server_test_script "#!/bin/sh\nset -eu\n")
+foreach(target IN LISTS SERVER_TEST_TARGETS)
+  string(APPEND server_test_script "echo 'Running ${target}'\n\"$<TARGET_FILE:${target}>\"\n")
+endforeach()
+file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/run_server_tests.sh"
+  CONTENT "${server_test_script}")

@@ -381,7 +381,11 @@ async function generatePuzzle() {
       await sleep(20);
 
       const check = await hasUniqueSolution(puzzle, backend, workers);
-      if (cancelled) break;
+      if (cancelled) {
+        puzzle[index] = previous;
+        givens.add(index);
+        break;
+      }
       if (check.unique) {
         removed++;
         appendStatus(`  kept empty; puzzle remains unique (${removed} removed).`);
@@ -399,7 +403,7 @@ async function generatePuzzle() {
       ? `Stopped with ${clueCount(puzzle)} clues.`
       : `Done. Generated puzzle has ${clueCount(puzzle)} clues.`);
   } catch (error) {
-    appendStatus(`Generator failed: ${error instanceof Error ? error.message : String(error)}`);
+    appendStatus(cancelled ? 'Generation stopped.' : `Generator failed: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
     setRunning(false);
     cancelled = false;

@@ -442,8 +442,8 @@ class IntersectingSubsetsIterator {
       const SparseRow& current_row = rows_[current_element];
       const RowEntryIndex current_row_size = RowEntryIndex(current_row.size());
       for (; subset_entry_ < current_row_size; ++subset_entry_) {
-        if (intersecting_subset_ == seed_subset_) continue;
         intersecting_subset_ = current_row[subset_entry_];
+        if (intersecting_subset_ == seed_subset_) continue;
         return;
       }
       subset_entry_ = RowEntryIndex(0);  // 'carriage-return'

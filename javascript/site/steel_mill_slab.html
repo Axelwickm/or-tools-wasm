@@ -6,12 +6,6 @@
 		<title>CP-SAT - Steel Mill Slab</title>
 		<link rel="stylesheet" href="./example.css">
 		<style>
-			body { line-height: 1.6; }
-			label { display: flex; }
-			.controls { margin-bottom: 0.75rem; }
-			.controls > div {
-				min-width: 250px;
-			}
 			th {
 				text-align: left;
 			}
@@ -100,95 +94,14 @@
       }
 		</style>
 	</head>
-	<body>
+	<body class="example-page">
 		<nav>
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>CP-SAT - Steel Mill Slab</h1>
 		<p><em>Problem: pack steel orders onto large steel slabs while minimizing unused steel.</em></p>
-		<div class="code-toggle">
-			<details>
-				<summary>Show code</summary>
-				<pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm/cp-sat';
 
-type Order = { width: number; color: number };
-type Column = { orders: number[]; load: number; loss: number };
-type CpModelInput = {
-  name: string;
-  variables: Array&lt;{ name: string; domain: number[] }&gt;;
-  constraints: Array&lt;{ name?: string; linear: { vars: number[]; coeffs: number[]; domain: number[] } }&gt;;
-  objective: { vars: number[]; coeffs: number[] };
-};
-
-const capacities = [0, 17, 44];
-const orders: Order[] = [
-  { width: 4, color: 1 },
-  { width: 22, color: 2 },
-  { width: 9, color: 3 },
-  { width: 5, color: 1 },
-  { width: 8, color: 2 },
-  { width: 3, color: 3 },
-];
-
-function lossForLoad(load: number) {
-  const capacity = capacities.find((value) =&gt; value &gt;= load) ?? capacities[capacities.length - 1];
-  return capacity - load;
-}
-
-function enumerateColumns(): Column[] {
-  const maxCapacity = Math.max(...capacities);
-  const columns: Column[] = [];
-  const visit = (nextOrder: number, selected: number[], load: number, colors: Set&lt;number&gt;) =&gt; {
-    columns.push({ orders: [...selected], load, loss: lossForLoad(load) });
-    for (let orderId = nextOrder; orderId &lt; orders.length; ++orderId) {
-      const order = orders[orderId];
-      const nextColors = new Set(colors).add(order.color);
-      if (load + order.width &gt; maxCapacity || nextColors.size &gt; 2) continue;
-      visit(orderId + 1, [...selected, orderId], load + order.width, nextColors);
-    }
-  };
-  visit(0, [], 0, new Set());
-  return columns.filter((column) =&gt; column.orders.length &gt; 0);
-}
-
-function buildSteelMillModel(): CpModelInput {
-  const columns = enumerateColumns();
-  const variables = columns.map((_, index) =&gt; ({ name: `use_column_${index}`, domain: [0, 1] }));
-  const constraints = orders.map((_, orderId) =&gt; {
-    const coveringColumns = columns
-      .map((column, columnId) =&gt; (column.orders.includes(orderId) ? columnId : -1))
-      .filter((columnId) =&gt; columnId &gt;= 0);
-    return {
-      name: `cover_order_${orderId}`,
-      linear: {
-        vars: coveringColumns,
-        coeffs: Array(coveringColumns.length).fill(1),
-        domain: [1, 1],
-      },
-    };
-  });
-
-  return {
-    name: 'steel_mill_slab',
-    variables,
-    constraints,
-    objective: {
-      vars: columns.map((_, index) =&gt; index),
-      coeffs: columns.map((column) =&gt; column.loss),
-    },
-  };
-}
-
-const model = await CpSat.createModel(buildSteelMillModel());
-const validation = await CpSat.validate(model, { executor: 'worker' });
-if (!validation.ok) throw new Error(validation.message);
-
-const params: SatParameters = { numWorkers: 4, logSearchProgress: true };
-const result = await CpSat.solveProto(model, { ...params, executor: 'worker' });
-console.log(result.response?.objectiveValue, result.response?.solution);</code></pre>
-			</details>
-		</div>
 		<ul class="example-notes">
 			<li>A slab is a large steel blank that can be used to satisfy several orders.</li>
 			<li>Each order consumes some slab width and belongs to a color group.</li>
@@ -199,14 +112,11 @@ console.log(result.response?.objectiveValue, result.response?.solution);</code><
 			<li>The drawing shows each used slab as colored order segments plus hatched waste.</li>
 		</ul>
 		<div class="controls">
-			<div>
-				<label>
+			<label>
 					Problem
 					<select id="problem-id"></select>
 				</label>
-			</div>
-			<div>
-				<label>
+			<label>
 					Solver
 					<select id="solver-method">
 						<option value="sat">SAT (load + loss via dynamic tables)</option>
@@ -214,27 +124,20 @@ console.log(result.response?.objectiveValue, result.response?.solution);</code><
 						<option value="sat_column">Column generation (allowed columns)</option>
 					</select>
 				</label>
-			</div>
-			<div>
-				<label><input id="break-symmetries" type="checkbox" checked>
+			<label><input id="break-symmetries" type="checkbox" checked>
 				Break symmetries</label>
-			</div>
-			<div>
-				<label>
+			<label>
 					Workers
 					<input id="workers" type="number" value="1" min="1">
 				</label>
-			</div>
-			<div>
-				<label>Executor <select id="cp-sat-executor">
+			<label>Executor <select id="cp-sat-executor">
 					<option value="direct">Direct</option>
 					<option value="worker" selected>Worker</option>
 					<option value="server">Server</option>
 				</select></label>
-			</div>
-		</div>
-		<button id="run">Run steel mill slab</button>
-		<button id="stop" disabled>Stop solving</button>
+
+<div class="control-actions"><button id="run">Run steel mill slab</button><button id="stop" disabled>Stop solving</button></div>
+</div>
 		<h2 class="section-heading">Solution</h2>
 		<div id="summary">No solution yet.</div>
 		<div class="solution-visuals">
@@ -242,9 +145,17 @@ console.log(result.response?.objectiveValue, result.response?.solution);</code><
 			<div id="order-drawing" class="hidden" aria-label="Steel order drawing"></div>
 		</div>
 		<table id="slab-table"></table>
-		<p>Status / Response:</p>
-		<pre id="status"></pre>
-		<script type="module" src="./code_highlight.ts"></script>
+		<details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+		<div class="code-toggle code-samples">
+			<details>
+				<summary title="Updates when you change the example settings.">Show code</summary>
+				<pre class="code-block"><code data-highlight="ts"></code></pre>
+			</details>
+      <details id="model-construction"><summary>Show model construction</summary><pre class="code-block"><code data-highlight="ts"></code></pre></details>
+		</div>
+    <script type="module" src="./example_controls.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./steel_mill_slab.ts"></script>
-	</body>
+	  <script type="module" src="./live_example_code.ts"></script>
+</body>
 </html>

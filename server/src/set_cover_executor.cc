@@ -15,9 +15,14 @@
 #include "ortools/set_cover/set_cover_model.h"
 #include "set_cover.pb.h"
 #include "javascript/set_cover_statistics.h"
+#include "javascript/set_cover_lagrangian.h"
+#include "javascript/set_cover_cft.h"
+#include "javascript/set_cover_mip.h"
 #include "javascript/set_cover_guided_tabu.h"
 #include "javascript/set_cover_guided_session.h"
 #include "javascript/set_cover_trace.h"
+#include "javascript/set_cover_mutations.h"
+#include "javascript/set_cover_formats.h"
 
 namespace ortools_wasm::server {
 namespace {
@@ -97,6 +102,8 @@ SolverExecutorResult SessionResponse(ortools_wasm::SetCoverGuidedSession& sessio
   const auto exported = invariant.ExportSolutionAsProto();
   bridge::SetCoverBridgeResponse response;
   response.set_session_handle(handle);
+  const auto timing = session.RunTime();
+  response.set_run_time_seconds(timing.first); response.set_run_time_microseconds(timing.second);
   response.set_next_solution(next);
   response.set_cost(invariant.cost());
   response.set_num_uncovered_elements(invariant.num_uncovered_elements());
@@ -143,6 +150,11 @@ SolverExecutorResult SessionOperation(const bridge::SetCoverBridgeRequest& reque
     WriteGuidedTabuParameters(ortools_wasm::ReadGuidedTabuParameters(*session->tabu), &response);
     return SolverExecutorResult{true, response.SerializeAsString(), {}};
   }
+  if (request.operation() == bridge::SET_COVER_OPERATION_SESSION_STATISTICS) {
+    const auto timing = session->RunTime(); bridge::SetCoverBridgeResponse response;
+    response.set_run_time_seconds(timing.first); response.set_run_time_microseconds(timing.second);
+    return SolverExecutorResult{true, response.SerializeAsString(), {}};
+  }
   if (request.operation() == bridge::SET_COVER_OPERATION_SESSION_INITIALIZE) {
     SubsetBoolVector selected(SubsetIndex(request.selected_size()), false);
     for (int i = 0; i < request.selected_size(); ++i) selected[SubsetIndex(i)] = request.selected(i);
@@ -172,7 +184,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
     WriteGuidedTabuParameters(ortools_wasm::ReadGuidedTabuParameters(generator), &response);
     return SolverExecutorResult{true, response.SerializeAsString(), {}};
   }
-  if ((request.operation() != bridge::SET_COVER_OPERATION_STATISTICS && request.costs_size() != request.selected_size()) ||
+  if ((request.operation() != bridge::SET_COVER_OPERATION_STATISTICS && request.operation() != bridge::SET_COVER_OPERATION_LAGRANGIAN_BOUND && request.operation() != bridge::SET_COVER_OPERATION_CFT && request.costs_size() != request.selected_size()) ||
       request.starts_size() != request.costs_size() + 1 ||
       (request.operation() != bridge::SET_COVER_OPERATION_INSPECT && request.has_focus() && request.focus_size() != request.costs_size())) {
     return Error("Set Cover request dimensions are inconsistent.");
@@ -192,6 +204,31 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
   }
 
   auto model = BuildModel(request);
+  if (request.operation() == bridge::SET_COVER_OPERATION_CFT) {
+    if (request.selected_size() != 0 && request.selected_size() != model.num_subsets())
+      return Error("Set Cover CFT initial selection dimensions do not match.");
+    SubsetBoolVector initial(model.num_subsets(), false);
+    for (int i = 0; i < request.selected_size(); ++i) initial[SubsetIndex(i)] = request.selected(i);
+    const auto result = ortools_wasm::RunSetCoverCft(model, request.selected_size() == 0 ? nullptr : &initial);
+    bridge::SetCoverBridgeResponse response;
+    response.set_cost(result.state.solution.cost());
+    response.set_num_uncovered_elements(result.uncovered);
+    for (bool value : result.selected) response.add_selected(value);
+    auto* dual = response.mutable_cft_dual();
+    dual->set_lower_bound(result.state.dual_state.lower_bound());
+    for (double value : result.state.dual_state.reduced_costs()) dual->add_reduced_costs(value);
+    for (double value : result.state.dual_state.multipliers()) dual->add_multipliers(value);
+    return SolverExecutorResult{true, response.SerializeAsString(), {}};
+  }
+  if (request.operation() == bridge::SET_COVER_OPERATION_LAGRANGIAN_BOUND) {
+    const auto [bound, reduced, multipliers] = ortools_wasm::ComputeSetCoverLagrangianBound(model, request.upper_bound());
+    bridge::SetCoverBridgeResponse response;
+    auto* result = response.mutable_lagrangian_bound();
+    result->set_lower_bound(bound);
+    for (double value : reduced) result->add_reduced_costs(value);
+    for (double value : multipliers) result->add_multipliers(value);
+    return SolverExecutorResult{true, response.SerializeAsString(), {}};
+  }
   if (request.operation() == bridge::SET_COVER_OPERATION_STATISTICS) {
     try {
       const auto result = ortools_wasm::ComputeSetCoverStatistics(model, request.statistics_kind());
@@ -230,6 +267,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
   }
 
   bool next_solution = false;
+  std::optional<std::pair<double, double>> timing;
   std::optional<ortools_wasm::GuidedTabuParameters> effective_parameters;
   switch (request.operation()) {
     case bridge::SET_COVER_OPERATION_INSPECT: break;
@@ -238,6 +276,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus_indices);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     case bridge::SET_COVER_OPERATION_GREEDY: {
@@ -245,6 +284,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus_indices);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     case bridge::SET_COVER_OPERATION_ELEMENT_DEGREE: {
@@ -252,6 +292,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     case bridge::SET_COVER_OPERATION_LAZY_ELEMENT_DEGREE: {
@@ -259,6 +300,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     case bridge::SET_COVER_OPERATION_RANDOM: {
@@ -266,6 +308,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus_indices);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     case bridge::SET_COVER_OPERATION_STEEPEST: {
@@ -273,6 +316,15 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
+      break;
+    }
+    case bridge::SET_COVER_OPERATION_LAZY_STEEPEST: {
+      operations_research::LazySteepestSearch generator(&invariant);
+      generator.SetMaxIterations(max_iterations);
+      generator.SetTimeLimitInSeconds(time_limit);
+      next_solution = Next(&generator, request.has_focus(), focus);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     case bridge::SET_COVER_OPERATION_GUIDED_LOCAL: {
@@ -280,6 +332,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus_indices);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     case bridge::SET_COVER_OPERATION_GUIDED_TABU: {
@@ -289,6 +342,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
       generator.SetMaxIterations(max_iterations);
       generator.SetTimeLimitInSeconds(time_limit);
       next_solution = Next(&generator, request.has_focus(), focus_indices);
+      timing = {generator.run_time_in_seconds(), generator.run_time_in_microseconds()};
       break;
     }
     default:
@@ -306,6 +360,7 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
   bridge::SetCoverBridgeResponse response;
   if (effective_parameters) WriteGuidedTabuParameters(*effective_parameters, &response);
   response.set_next_solution(next_solution);
+  if (timing) { response.set_run_time_seconds(timing->first); response.set_run_time_microseconds(timing->second); }
   response.set_cost_lower_bound(exported.cost_lower_bound());
   for (bool value : computed_redundancy) response.add_computed_redundancy(value);
   for (int value : focus_coverage.get()) response.add_focus_coverage(value);
@@ -327,11 +382,41 @@ SolverExecutorResult Solve(const bridge::SetCoverBridgeRequest& request) {
   return SolverExecutorResult{true, std::move(payload), {}};
 }
 
+SolverExecutorResult Mutate(const bridge::SetCoverBridgeRequest& request) {
+  if (request.selected_size() != request.costs_size()) return Error("Set Cover selection dimensions do not match.");
+  auto model = BuildModel(request);
+  SetCoverInvariant invariant(&model);
+  SubsetBoolVector selected(SubsetIndex(request.selected_size()), false);
+  for (int i = 0; i < request.selected_size(); ++i) selected[SubsetIndex(i)] = request.selected(i);
+  invariant.LoadSolution(selected);
+  std::vector<SubsetIndex> focus;
+  for (int index : request.focus_indices()) focus.push_back(SubsetIndex(index));
+  const auto operation = request.operation() == bridge::SET_COVER_OPERATION_CLEAR_RANDOM_SUBSETS ? ortools_wasm::SetCoverMutation::kClearRandom :
+    request.operation() == bridge::SET_COVER_OPERATION_CLEAR_MOST_COVERED_ELEMENTS ? ortools_wasm::SetCoverMutation::kClearMostCovered : ortools_wasm::SetCoverMutation::kUpdateSelection;
+  const auto result = ortools_wasm::MutateSetCover(invariant, operation, request.perturbation_count(), focus,
+      request.has_focus(), request.subset_index(), request.subset_selected());
+  bridge::SetCoverBridgeResponse response;
+  for (bool value : invariant.is_selected().get()) response.add_selected(value);
+  for (const auto& decision : invariant.trace()) {
+    auto* item = response.mutable_trace()->add_decisions();
+    item->set_subset(decision.subset().value()); item->set_selected(decision.decision());
+  }
+  // An empty native trace still belongs to this mutation result.
+  response.mutable_trace();
+  if (operation == ortools_wasm::SetCoverMutation::kUpdateSelection) {
+    auto* output = response.mutable_removability(); output->set_changed(result.changed);
+    for (const auto index : result.newly_removable) output->add_newly_removable_subsets(index.value());
+    for (const auto index : result.newly_non_removable) output->add_newly_non_removable_subsets(index.value());
+  } else for (const auto index : result.focus) response.add_perturbation_focus(index.value());
+  return SolverExecutorResult{true, response.SerializeAsString(), {}};
+}
+
 }  // namespace
 
 std::string SetCoverExecutor::solver() const { return "set-cover"; }
 
-SetCoverExecutor::SetCoverExecutor() : sessions_(std::make_unique<ortools_wasm::SetCoverGuidedSessions>()) {}
+SetCoverExecutor::SetCoverExecutor(SessionLimits limits) : sessions_(std::make_unique<ortools_wasm::SetCoverGuidedSessions>(limits)) {}
+void SetCoverExecutor::ExpireIdleSessions() { sessions_->ExpireIdle(); }
 SetCoverExecutor::~SetCoverExecutor() = default;
 
 int SetCoverExecutor::RequestedThreads(const SolverExecutorRequest& request,
@@ -360,6 +445,50 @@ SolverExecutorResult SetCoverExecutor::Execute(const SolverExecutorRequest& requ
     return result;
   }
   try {
+    if (parsed.operation() == bridge::SET_COVER_OPERATION_MIP) {
+      if (parsed.selected_size() != parsed.costs_size()) return Error("Set Cover MIP selection dimensions do not match.");
+      auto model = BuildModel(parsed);
+      SetCoverInvariant invariant(&model);
+      SubsetBoolVector selected(SubsetIndex(parsed.selected_size()), false);
+      for (int i = 0; i < parsed.selected_size(); ++i) selected[SubsetIndex(i)] = parsed.selected(i);
+      invariant.LoadSolution(selected);
+      std::vector<SubsetIndex> focus;
+      for (int index : parsed.focus_indices()) focus.push_back(SubsetIndex(index));
+      const auto result = ortools_wasm::RunSetCoverMip(invariant, parsed.lp_relaxation(), focus,
+          parsed.has_focus(), parsed.has_time_limit_seconds() ? parsed.time_limit_seconds() : 0,
+          [&context](operations_research::MPSolver& solver) {
+            auto cancellation = context.OnCancellation([&solver] { solver.InterruptSolve(); });
+            if (context.cancellation_requested()) return operations_research::MPSolver::NOT_SOLVED;
+            return solver.Solve();
+          });
+      if (context.cancellation_requested()) {
+        auto cancelled = Error("Set Cover MIP solve was cancelled.");
+        cancelled.failure_kind = SolverExecutionFailureKind::kCancelled;
+        return cancelled;
+      }
+      bridge::SetCoverBridgeResponse response;
+      response.set_next_solution(result.next_solution);
+      response.set_cost(invariant.cost()); response.set_num_uncovered_elements(invariant.num_uncovered_elements());
+      for (bool value : invariant.is_selected().get()) response.add_selected(value);
+      response.set_run_time_seconds(result.run_time_seconds); response.set_run_time_microseconds(result.run_time_microseconds);
+      auto* mip = response.mutable_mip(); mip->set_subproblem_status(result.subproblem_status);
+      if (result.objective_value) mip->set_objective_value(*result.objective_value);
+      return SolverExecutorResult{true, response.SerializeAsString(), {}};
+    }
+    if (parsed.operation() == bridge::SET_COVER_OPERATION_READ_MODEL) {
+      const auto model = ortools_wasm::ReadSetCoverText(parsed.input(), parsed.format());
+      bridge::SetCoverBridgeResponse response; response.set_model_proto_json(ortools_wasm::SetCoverModelJson(model));
+      return SolverExecutorResult{true, response.SerializeAsString(), {}};
+    }
+    if (parsed.operation() == bridge::SET_COVER_OPERATION_WRITE_MODEL) {
+      const auto model = BuildModel(parsed);
+      bridge::SetCoverBridgeResponse response; response.set_text(ortools_wasm::WriteSetCoverText(model, parsed.format()));
+      return SolverExecutorResult{true, response.SerializeAsString(), {}};
+    }
+    if (parsed.operation() == bridge::SET_COVER_OPERATION_CLEAR_RANDOM_SUBSETS ||
+        parsed.operation() == bridge::SET_COVER_OPERATION_CLEAR_MOST_COVERED_ELEMENTS || parsed.operation() == bridge::SET_COVER_OPERATION_UPDATE_SELECTION) {
+      return Mutate(parsed);
+    }
     if (parsed.operation() == bridge::SET_COVER_OPERATION_COMPRESS_TRACE) {
       std::vector<operations_research::SetCoverDecision> trace;
       for (const auto& item : parsed.trace().decisions()) trace.emplace_back(SubsetIndex(item.subset()), item.selected());
@@ -372,7 +501,7 @@ SolverExecutorResult SetCoverExecutor::Execute(const SolverExecutorRequest& requ
       return SolverExecutorResult{true, response.SerializeAsString(), {}};
     }
     if (parsed.operation() == bridge::SET_COVER_OPERATION_SESSION_CREATE || parsed.operation() == bridge::SET_COVER_OPERATION_SESSION_NEXT ||
-        parsed.operation() == bridge::SET_COVER_OPERATION_SESSION_INITIALIZE || parsed.operation() == bridge::SET_COVER_OPERATION_SESSION_DELETE ||
+        parsed.operation() == bridge::SET_COVER_OPERATION_SESSION_STATISTICS || parsed.operation() == bridge::SET_COVER_OPERATION_SESSION_INITIALIZE || parsed.operation() == bridge::SET_COVER_OPERATION_SESSION_DELETE ||
         (parsed.operation() == bridge::SET_COVER_OPERATION_GUIDED_TABU_PARAMETERS && parsed.session_handle() != 0)) {
       return SessionOperation(parsed, *sessions_);
     }

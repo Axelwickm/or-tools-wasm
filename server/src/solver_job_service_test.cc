@@ -70,9 +70,12 @@ class FakeExecutor final : public SolverExecutor {
   using ExecuteFn = std::function<SolverExecutorResult(
       const SolverExecutorRequest&, const JobContext&, const SolverEventSink&)>;
 
-  explicit FakeExecutor(ExecuteFn execute) : execute_(std::move(execute)) {}
+  explicit FakeExecutor(ExecuteFn execute, std::string name = "fake", std::function<void()> expire = {})
+      : execute_(std::move(execute)), name_(std::move(name)), expire_(std::move(expire)) {}
 
-  std::string solver() const override { return "fake"; }
+  void ExpireIdleSessions() override { if (expire_) expire_(); }
+
+  std::string solver() const override { return name_; }
   int RequestedThreads(const SolverExecutorRequest&, int client_requested_threads,
                        int) const override {
     return client_requested_threads > 0 ? client_requested_threads : 1;
@@ -85,6 +88,8 @@ class FakeExecutor final : public SolverExecutor {
 
  private:
   ExecuteFn execute_;
+  std::string name_;
+  std::function<void()> expire_;
 };
 
 HttpBinaryRequest SubmitRequest(uint32_t request_id = 7) {
@@ -365,6 +370,44 @@ void QueuedJobsUsePollingInsteadOfHoldingEventStreams() {
   WaitForResult(&service, queued.job_id());
 }
 
+void DuplicateStreamsRejectAndReleaseTheirLease() {
+  ManualEvent started, finish;
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention);
+  service.Register(std::make_unique<FakeExecutor>(
+      [&](const SolverExecutorRequest&, const JobContext& context, const SolverEventSink&) {
+        auto cancellation = context.OnCancellation([&] { finish.Set(); });
+        started.Set(); finish.Wait();
+        return SolverExecutorResult{true, "finished", {}};
+      }));
+  const auto submitted = SubmitJob(&service);
+  Expect(started.WaitFor(2s), "Job is running before subscribing");
+  const auto request = EventsRequest(submitted.job_id());
+  std::vector<HttpEventStreamResponse> streams(16);
+  std::vector<std::thread> subscribers;
+  for (size_t index = 0; index < streams.size(); ++index) {
+    subscribers.emplace_back([&, index] { streams[index] = service.StreamEvents(request); });
+  }
+  for (auto& subscriber : subscribers) subscriber.join();
+  int accepted = 0;
+  for (const auto& stream : streams) {
+    if (stream.status == 200) ++accepted;
+    else Expect(stream.status == 409 && !stream.next, "Duplicate subscription uses polling");
+  }
+  ExpectEq(accepted, 1, "Concurrent subscriptions admit exactly one live stream");
+  HttpEventStreamResponse copy;
+  for (auto& stream : streams) if (stream.next) copy = stream;
+  streams.clear();
+  ExpectEq(service.StreamEvents(request).status, 409, "Copies retain the subscription lease");
+  copy.next = {};
+  auto reconnected = service.StreamEvents(request);
+  ExpectEq(reconnected.status, 200, "Disconnect releases the subscription lease");
+  finish.Set();
+  WaitForResult(&service, submitted.job_id());
+  while (const auto event = reconnected.next()) if (event->close) break;
+  ExpectEq(service.StreamEvents(request).status, 200, "Terminal delivery releases the lease even while the old source exists");
+}
+
 void ExecutorFailureMetadataIsPreserved() {
   JobScheduler scheduler({1, 8});
   SolverJobService service(scheduler, kTestCompletedJobRetention);
@@ -419,6 +462,35 @@ void CancellationUsesGenericProtocolAndInterruptsExecutor() {
            "cancelled job has execution failure result");
   ExpectEq(result.failure().kind(), bridge::SOLVER_FAILURE_KIND_CANCELLED,
            "cancelled job remains distinct from solver result semantics");
+}
+
+void NativeInterruptionRetainsResult() {
+  for (const std::string solver : {"mathopt", "cp-sat"}) {
+    JobScheduler scheduler({1, 8});
+    SolverJobService service(scheduler, kTestCompletedJobRetention);
+    ManualEvent registered, interrupted;
+    service.Register(std::make_unique<FakeExecutor>(
+        [&](const SolverExecutorRequest&, const JobContext& context, const SolverEventSink&) {
+          auto registration = context.OnInterruption([&] { interrupted.Set(); });
+          // Ensure a failed assertion cannot strand the fake executor on shutdown.
+          auto cancellation = context.OnCancellation([&] { interrupted.Set(); });
+          registered.Set(); interrupted.Wait();
+          return SolverExecutorResult{true, "native-stopped-response", {}};
+        }, solver));
+    auto submit = SubmitRequest();
+    bridge::SolverBridgeRequest input; input.ParseFromString(submit.body);
+    input.set_solver(solver); submit.body = input.SerializeAsString();
+    const auto accepted = DecodeResponse(service.Submit(submit));
+    Expect(registered.WaitFor(2s), "Executor installs interruption handler");
+    auto control = JobRequest(accepted.job_id());
+    input.Clear(); input.set_request_id(8); input.set_solver(solver);
+    input.mutable_interrupt()->set_target_request_id(7); control.body = input.SerializeAsString();
+    const auto acknowledgement = DecodeResponse(service.Interrupt(control));
+    Expect(acknowledgement.has_interrupted(), "Server acknowledges native interruption");
+    const auto result = WaitForResult(&service, accepted.job_id());
+    Expect(result.has_result_payload() && result.result_payload() == "native-stopped-response",
+        "Server preserves native response instead of returning cancellation");
+  }
 }
 
 void CompletedJobsCanBeReleased() {
@@ -672,10 +744,117 @@ void AcknowledgedCallbackPayloadsAreReleasedWhileJobRuns() {
   Expect(remaining.ByteSizeLong() < 4096, "Old cursor reaches terminal events without retained solutions");
 }
 
+void SessionCleanupRunsWithoutClientTraffic() {
+  JobScheduler scheduler({1, 8});
+  std::atomic<int> sweeps = 0;
+  SolverJobService service(scheduler, 10ms);
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&, const SolverEventSink&) { return SolverExecutorResult{}; },
+      "fake", [&] { ++sweeps; }));
+  const auto deadline = std::chrono::steady_clock::now() + 2s;
+  while (sweeps.load() == 0 && std::chrono::steady_clock::now() < deadline) std::this_thread::sleep_for(1ms);
+  Expect(sweeps.load() > 0, "idle session cleanup runs without submitted jobs or HTTP requests");
+}
+
+void ActiveStreamClosesWhenItsCursorExpires() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention, {8, 16384});
+  ManualEvent flood, emitted, release;
+  service.Register(std::make_unique<FakeExecutor>(
+      [&](const SolverExecutorRequest&, const JobContext&, const SolverEventSink& emit) {
+        flood.Wait();
+        for (int i = 0; i < 100; ++i) emit("event");
+        emitted.Set();
+        release.Wait();
+        return SolverExecutorResult{true, "done", {}};
+      }));
+  const auto accepted = SubmitJob(&service);
+  // Start only after scheduler admission so the endpoint does not reject a queued job.
+  auto stream = service.StreamEvents(EventsRequest(accepted.job_id(), accepted.sequence_id()));
+  while (stream.status == 409) {
+    std::this_thread::sleep_for(1ms);
+    stream = service.StreamEvents(EventsRequest(accepted.job_id(), accepted.sequence_id()));
+  }
+  flood.Set();
+  const bool ready = emitted.WaitFor(2s);
+  release.Set();
+  Expect(ready, "stream history flood completed");
+  ExpectEq(stream.status, 200, "stream opened before eviction");
+  Expect(!stream.next().has_value(), "expired stream closes without throwing from the HTTP provider");
+  ExpectEq(service.Events(EventsRequest(accepted.job_id(), accepted.sequence_id())).status, 410,
+           "next poll reports missing events");
+  ExpectEq(WaitForResult(&service, accepted.job_id()).result_payload(), std::string("done"), "result survives stream expiry");
+}
+
+void EventHistoryIsBoundedAndExpiredCursorsAreExplicit() {
+  for (const auto limits : {EventHistoryLimits{8, 16384}, EventHistoryLimits{4096, 2048}}) {
+    JobScheduler scheduler({1, 8});
+    SolverJobService service(scheduler, kTestCompletedJobRetention, limits);
+    ManualEvent emitted, release;
+    service.Register(std::make_unique<FakeExecutor>(
+        [&](const SolverExecutorRequest&, const JobContext&, const SolverEventSink& emit) {
+          for (int i = 0; i < 100; ++i) emit(std::string(250, 'x'));
+          emitted.Set();
+          release.Wait();
+          return SolverExecutorResult{true, std::string(32768, 'r'), {}};
+        }));
+    const auto accepted = SubmitJob(&service);
+    Expect(emitted.WaitFor(2s), "events emitted while solve remains active");
+    // Release before assertions so failures cannot leave the scheduler blocked.
+    release.Set();
+    ExpectEq(service.Events(EventsRequest(accepted.job_id())).status, 410, "expired polling cursor is explicit");
+    ExpectEq(service.StreamEvents(EventsRequest(accepted.job_id())).status, 410, "expired stream cursor is explicit");
+    // The final status/result can change the window, so inspect it after completion.
+    const auto result = WaitForResult(&service, accepted.job_id());
+    ExpectEq(result.result_payload().size(), size_t{32768}, "large final result remains available independently");
+    // Cursor 100 remains inside both configured windows.
+    const auto tail = DecodeBatch(service.Events(EventsRequest(accepted.job_id(), 100)));
+    Expect(tail.responses_size() > 0, "recent events remain readable");
+    Expect(tail.responses_size() <= limits.max_events, "retained event count bounded");
+    Expect(tail.ByteSizeLong() <= limits.max_bytes + 128, "retained event bytes bounded including batch framing");
+  }
+}
+
+void OversizedEventExpiresCursorWithoutThrowingThroughNativeCode() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention, {8, 2048});
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest&, const JobContext&, const SolverEventSink& emit) {
+        std::thread observer([&] { emit(std::string(32768, 'x')); });
+        observer.join();
+        return SolverExecutorResult{true, "native-finished", {}};
+      }));
+  const auto accepted = SubmitJob(&service);
+  const auto result = WaitForResult(&service, accepted.job_id());
+  ExpectEq(result.result_payload(), std::string("native-finished"), "oversized observer data does not throw through native code");
+  ExpectEq(service.Events(EventsRequest(accepted.job_id(), accepted.sequence_id())).status, 410,
+           "oversized event expires the cursor instead of silently losing data");
+}
+
+void OversizedCallbackStopsWithoutWaitingForReply() {
+  JobScheduler scheduler({1, 8});
+  SolverJobService service(scheduler, kTestCompletedJobRetention, {8, 2048});
+  service.Register(std::make_unique<FakeExecutor>(
+      [](const SolverExecutorRequest& request, const JobContext&, const SolverEventSink&) {
+        const auto reply = request.callback(std::string(32768, 'x'));
+        Expect(!reply, "oversized callback returns no native reply");
+        return SolverExecutorResult{true, "stopped", {}};
+      }));
+  const auto accepted = SubmitJob(&service);
+  const auto result = WaitForResult(&service, accepted.job_id());
+  Expect(result.has_failure(), "oversized callback fails instead of waiting for its 30-second reply deadline");
+  Expect(result.failure().message().find("byte limit") != std::string::npos, "callback failure explains byte limit");
+}
+
 using TestFn = void (*)();
 
 int RunAllTests() {
   const std::vector<std::pair<std::string, TestFn>> tests = {
+      {"OversizedCallbackStopsWithoutWaitingForReply", OversizedCallbackStopsWithoutWaitingForReply},
+      {"SessionCleanupRunsWithoutClientTraffic", SessionCleanupRunsWithoutClientTraffic},
+      {"ActiveStreamClosesWhenItsCursorExpires", ActiveStreamClosesWhenItsCursorExpires},
+      {"EventHistoryIsBoundedAndExpiredCursorsAreExplicit", EventHistoryIsBoundedAndExpiredCursorsAreExplicit},
+      {"OversizedEventExpiresCursorWithoutThrowingThroughNativeCode", OversizedEventExpiresCursorWithoutThrowingThroughNativeCode},
       {"AcknowledgedCallbackPayloadsAreReleasedWhileJobRuns", AcknowledgedCallbackPayloadsAreReleasedWhileJobRuns},
       {"CallbackRepliesAreCorrelatedAndCancellationWakesWaiters", CallbackRepliesAreCorrelatedAndCancellationWakesWaiters},
       {"DuplicateRegistrationPreservesExecutor", DuplicateRegistrationPreservesExecutor},
@@ -688,9 +867,11 @@ int RunAllTests() {
        EventStreamEndsWithSequencedResultAndResumes},
       {"QueuedJobsUsePollingInsteadOfHoldingEventStreams",
        QueuedJobsUsePollingInsteadOfHoldingEventStreams},
+      {"DuplicateStreamsRejectAndReleaseTheirLease", DuplicateStreamsRejectAndReleaseTheirLease},
       {"ExecutorFailureMetadataIsPreserved", ExecutorFailureMetadataIsPreserved},
       {"CancellationUsesGenericProtocolAndInterruptsExecutor",
        CancellationUsesGenericProtocolAndInterruptsExecutor},
+      {"NativeInterruptionRetainsResult", NativeInterruptionRetainsResult},
       {"CompletedJobsCanBeReleased", CompletedJobsCanBeReleased},
       {"RunningJobsCannotBeReleased", RunningJobsCannotBeReleased},
       {"CompletedJobsExpireWithoutExplicitRelease",

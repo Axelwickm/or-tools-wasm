@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <limits>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -21,6 +22,8 @@
 #include "ortools/constraint_solver/routing_parameters.h"
 #include "ortools/constraint_solver/routing_parameters.pb.h"
 #include "javascript/routing_search_parameters.h"
+#include "javascript/routing_model_builder.h"
+#include "javascript/routing_pickup_delivery.h"
 #include "javascript/routing_progress.h"
 #include "javascript/routing_index_validation.h"
 #include "javascript/routing_successor_domains.h"
@@ -28,10 +31,19 @@
 #include "javascript/routing_dimension_construction.h"
 #include <unordered_set>
 #include "javascript/routing_vehicle_costs.h"
+#include "javascript/routing_transit_matrix.h"
+#include "javascript/routing_state_dependent_transit.h"
 #include "javascript/routing_group_controls.h"
+#include "javascript/routing_search_configuration.h"
 #include "javascript/routing_visit_types.h"
 #include "javascript/routing_resources.h"
+#include "javascript/routing_breaks.h"
 #include "javascript/routing_finalizers.h"
+#include "javascript/routing_assignments.h"
+#include "javascript/routing_assignment_workflows.h"
+#include "javascript/routing_route_callbacks.h"
+#include "javascript/routing_dimension_inspection.h"
+#include "javascript/routing_model_inspection.h"
 #include "javascript/routing_linear_constraints.h"
 
 
@@ -48,23 +60,39 @@ using operations_research::RoutingModel;
 using operations_research::RoutingNodeIndex;
 using operations_research::RoutingSearchParameters;
 
-struct RoutingModelHandle {
+struct RoutingModelHandle : ortools_wasm::RoutingModelBuilder {
+  using RoutingModelBuilder::RoutingModelBuilder;
   std::unordered_map<int, operations_research::IntExpr*> expressions;
   int next_expression = 1;
-  ortools_wasm::RoutingExpressionVariables variables;
-  int manager_handle = 0;
-  std::unique_ptr<RoutingModel> model;
+  ortools_wasm::RoutingAssignmentWorkflow workflow;
   const Assignment* assignment = nullptr;
-  std::vector<std::vector<int64_t>> transit_matrices;
-  std::unordered_set<int> evaluators{0};
+  Assignment* input_assignment = nullptr;
 };
 
 int g_next_manager_handle = 1;
 int g_next_model_handle = 1;
-std::unordered_map<int, std::unique_ptr<RoutingIndexManager>> g_managers;
-std::unordered_map<int, RoutingModelHandle> g_models;
+std::unordered_map<int, std::shared_ptr<RoutingIndexManager>> g_managers;
+std::unordered_map<int, std::shared_ptr<RoutingModelHandle>> g_models;
 std::atomic<bool> g_routing_interrupt_requested = false;
 std::string g_routing_search_parameter_error;
+std::string g_routing_break_error;
+std::string g_routing_dimension_inspection_result;
+std::string g_routing_model_inspection_result;
+
+bool ReadRoutingSearchParameters(const char* bytes, int byte_count, const char* field_paths, RoutingSearchParameters* parameters) {
+  std::vector<std::string> paths;
+  const std::string fields(field_paths ? field_paths : "");
+  size_t begin = 0;
+  while (begin < fields.size()) {
+    const size_t end = fields.find(',', begin);
+    paths.push_back(fields.substr(begin, end == std::string::npos ? end : end - begin));
+    if (end == std::string::npos) break;
+    begin = end + 1;
+  }
+  return byte_count >= 0 && (byte_count == 0 || bytes != nullptr) &&
+      ortools_wasm::ParseRoutingSearchParameters(std::string(bytes ? bytes : "", byte_count), paths,
+          parameters, &g_routing_search_parameter_error);
+}
 
 class ResetRoutingInterruptOnExit {
  public:
@@ -94,19 +122,23 @@ bool BindRoutingWorkers(RoutingSearchParameters* parameters) {
 // atomic CP/CP-SAT cancellation; search itself stays on the calling thread.
 template <typename Solve>
 const Assignment* SolveInterruptibly(RoutingModel* model, int enable_interrupt,
-                                     Solve&& solve) {
+                                     Solve&& solve, const std::vector<RoutingModel*>& secondary = {}) {
   std::atomic<bool> finished = false;
   std::thread interrupt_thread;
   if (enable_interrupt != 0) {
     interrupt_thread = std::thread([&] {
       while (!finished.load()) {
-        if (g_routing_interrupt_requested.load()) model->CancelSearch();
+        if (g_routing_interrupt_requested.load()) {
+          model->CancelSearch();
+          for (auto* target : secondary) target->CancelSearch();
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
     });
   }
   const Assignment* assignment = nullptr;
   try { assignment = solve(); }
+  catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); }
   catch (...) { g_routing_search_parameter_error = "Native Routing search threw an exception."; }
   finished.store(true);
   if (interrupt_thread.joinable()) interrupt_thread.join();
@@ -120,7 +152,7 @@ RoutingIndexManager* GetManager(int handle) {
 
 RoutingModelHandle* GetModel(int handle) {
   const auto it = g_models.find(handle);
-  return it == g_models.end() ? nullptr : &it->second;
+  return it == g_models.end() ? nullptr : it->second.get();
 }
 
 std::vector<int> CopyInts(const int* values, int count) {
@@ -178,9 +210,172 @@ EM_JS(int64_t, CallRoutingTransitCallback,
   return exact;
 });
 
+std::optional<int64_t> CallRoutingEvaluator(int callback_id, int evaluator, const std::vector<int64_t>& indices, RoutingModel* model = nullptr) {
+  const auto bytes = ortools_wasm::RoutingRouteCallbackData(evaluator, indices);
+  auto* buffer = reinterpret_cast<uint8_t*>(MAIN_THREAD_EM_ASM_PTR({
+    return Module.__ortoolsRoutingRouteCallbacks.get($0)(HEAPU8.slice($1, $1 + $2));
+  }, callback_id, bytes.data(), bytes.size()));
+  if (!buffer) {
+    if (!model) throw std::runtime_error("Routing predicate callback failed.");
+    model->CancelSearch(); return std::nullopt;
+  }
+  uint32_t size; std::memcpy(&size, buffer, sizeof(size));
+  const std::string reply(reinterpret_cast<const char*>(buffer + sizeof(size)), size);
+  std::free(buffer);
+  return ortools_wasm::RoutingRouteCallbackCost(reply);
+}
+
 }  // namespace
 
 extern "C" {
+
+EMSCRIPTEN_KEEPALIVE const char* routing_inspect_model(int model_handle, int kind,
+    int64_t index, int64_t other_index, int vehicle_or_class, int64_t default_value, int callback_id, int predicate_evaluator, int64_t third_index) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle) throw std::invalid_argument("Invalid Routing model inspection input.");
+    std::function<bool(int64_t)> predicate;
+    if (kind == 27) {
+      if (callback_id <= 0 || predicate_evaluator < 0) throw std::invalid_argument("Routing sibling lookup requires callback transport.");
+      predicate = [callback_id, predicate_evaluator](int64_t sibling) {
+        const auto value = CallRoutingEvaluator(callback_id, predicate_evaluator, {sibling});
+        if (!value) throw std::invalid_argument("Routing sibling predicate requires a Boolean reply.");
+        return ortools_wasm::RoutingPredicateCallbackResult(*value);
+      };
+    }
+    const auto result = ortools_wasm::InspectRoutingModel(*handle->model, kind, index, other_index, vehicle_or_class, default_value, predicate, third_index);
+    g_routing_model_inspection_result = ortools_wasm::RoutingModelInspectionJson(result);
+    return g_routing_model_inspection_result.c_str();
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return nullptr; }
+}
+
+EMSCRIPTEN_KEEPALIVE const char* routing_inspect_model_parameters(int model_handle, int kind,
+    const char* bytes, int byte_count, const char* paths) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || kind != 30) throw std::invalid_argument("Invalid Routing parameter-dependent inspection.");
+    RoutingSearchParameters parameters;
+    if (!ReadRoutingSearchParameters(bytes, byte_count, paths, &parameters) || !BindRoutingWorkers(&parameters)) return nullptr;
+    const auto result = ortools_wasm::InspectRoutingModel(*handle->model, kind, 0, 0, 0, 0, {}, 0, &parameters);
+    g_routing_model_inspection_result = ortools_wasm::RoutingModelInspectionJson(result);
+    return g_routing_model_inspection_result.c_str();
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return nullptr; }
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_set_tabu_vars(int model_handle, const int32_t* kinds,
+    const int64_t* indices, const char* const* names, const int32_t* resource_groups, int count) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || count < -1 || (count > 0 && (!kinds || !indices || !names || !resource_groups)))
+      throw std::invalid_argument("Invalid Routing tabu variable references.");
+    if (count == -1) { ortools_wasm::SetRoutingTabuVars(*handle->model, std::nullopt); return 1; }
+    std::vector<IntVar*> variables;
+    for (int i = 0; i < count; ++i) {
+      if (!names[i]) throw std::invalid_argument("Invalid Routing tabu dimension name.");
+      variables.push_back(ortools_wasm::RoutingVariable(*handle->model, kinds[i], names[i], indices[i], resource_groups[i], &handle->variables));
+    }
+    ortools_wasm::SetRoutingTabuVars(*handle->model, std::move(variables)); return 1;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_set_sweep_arranger(int model_handle, const int32_t* data, int count) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || count <= 0 || !data) throw std::invalid_argument("Invalid Routing sweep points.");
+    std::vector<std::pair<int64_t, int64_t>> points;
+    for (int i = 0; i < count; ++i) points.emplace_back(data[2*i], data[2*i+1]);
+    ortools_wasm::SetRoutingSweepArranger(*handle->model, points); return 1;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
+}
+EMSCRIPTEN_KEEPALIVE int routing_add_ordered_activity_group(int model_handle, const int32_t* data, int count) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || count < 0 || (count && !data)) throw std::invalid_argument("Invalid Routing ordered activity group.");
+    std::vector<int> indices;
+    for (int i = 0; i < count; ++i) indices.push_back(data[i]);
+    ortools_wasm::AddRoutingOrderedActivityGroup(*handle->model, indices); return 1;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
+}
+EMSCRIPTEN_KEEPALIVE int routing_add_forbidden_intervals(int model_handle, const char* name, int64_t index,
+    const int64_t* data, int count) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || !name || count < 0 || (count && !data)) throw std::invalid_argument("Invalid Routing forbidden intervals input.");
+    std::vector<std::pair<int64_t, int64_t>> intervals;
+    for (int i = 0; i < count; ++i) intervals.emplace_back(data[2 * i], data[2 * i + 1]);
+    ortools_wasm::AddRoutingForbiddenIntervals(*handle->model, name, index, intervals);
+    return 1;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
+}
+EMSCRIPTEN_KEEPALIVE int routing_set_piecewise_cost(int model_handle, const char* name, int64_t index,
+    const int64_t* data, int count) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || !name || count <= 0 || !data) throw std::invalid_argument("Invalid Routing piecewise cost input.");
+    std::vector<ortools_wasm::RoutingCostSegment> segments;
+    for (int i = 0; i < count; ++i) segments.push_back({data[4 * i], data[4 * i + 1], data[4 * i + 2], data[4 * i + 3]});
+    ortools_wasm::SetRoutingPiecewiseCost(*handle->model, name, index, segments);
+    return 1;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
+}
+EMSCRIPTEN_KEEPALIVE const char* routing_inspect_dimension(int model_handle, const char* name, int kind,
+    int64_t index, int64_t other_index, int vehicle, int64_t lower, int64_t upper,
+    int pair_index, int pickup_alternative, int delivery_alternative) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || !name) throw std::invalid_argument("Invalid Routing dimension inspection input.");
+    ortools_wasm::RoutingDimensionInspection result;
+    if (kind == 13) result.value = ortools_wasm::InspectRoutingShortestTransitionSlack(*handle->model, name, index, handle->input_assignment);
+    else result = ortools_wasm::InspectRoutingDimension(*handle->model, name, kind, index, other_index, vehicle, lower, upper,
+        pair_index, pickup_alternative, delivery_alternative);
+    g_routing_dimension_inspection_result = ortools_wasm::RoutingDimensionInspectionJson(result);
+    return g_routing_dimension_inspection_result.c_str();
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return nullptr; }
+}
+EMSCRIPTEN_KEEPALIVE void routing_add_enter_search_callback(int model_handle, int callback_id) {
+  auto* handle = GetModel(model_handle); if (!handle || callback_id <= 0) return;
+  handle->model->AddEnterSearchCallback([callback_id] {
+    MAIN_THREAD_EM_ASM({
+      const sink = Module.__ortoolsRoutingCallbacks?.sinks.get($0);
+      if (sink) sink(new Uint8Array());
+    }, callback_id);
+  });
+}
+
+EMSCRIPTEN_KEEPALIVE const char* routing_get_route_cost(int model_handle, const int64_t* indices, int count) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || count < 0 || (count && !indices)) throw std::invalid_argument("Invalid Routing route cost query.");
+    std::vector<int64_t> route;
+    if (count) route.assign(indices, indices + count);
+    const auto cost = ortools_wasm::EvaluateRoutingRouteCost(*handle->model, route);
+    g_routing_model_inspection_result = cost ? std::to_string(*cost) : "null";
+    return g_routing_model_inspection_result.c_str();
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return nullptr; }
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_add_route_constraint(int model_handle, int evaluator, int callback_id, int homogeneous) {
+  auto* handle = GetModel(model_handle); if (!handle || evaluator < 0 || callback_id <= 0) return 0;
+  auto* model = handle->model.get();
+  handle->AddRouteConstraint([model, evaluator, callback_id](const std::vector<int64_t>& route) -> std::optional<int64_t> {
+    return CallRoutingEvaluator(callback_id, evaluator, route, model);
+  }, homogeneous != 0);
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_pickup_delivery_position(int model_handle, int index, int delivery, int field) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || index < 0 || index >= handle->model->Size()) return -2;
+  const auto position = delivery ? handle->model->GetDeliveryPosition(index) : handle->model->GetPickupPosition(index);
+  if (field == 2) return delivery ? handle->model->IsDelivery(index) : handle->model->IsPickup(index);
+  return !position ? -1 : field == 0 ? position->pd_pair_index : position->alternative_index;
+}
+
+EMSCRIPTEN_KEEPALIVE int64_t routing_break_configuration_value(int model_handle, const char* name, int vehicle, int kind, int index) {
+  auto* handle = GetModel(model_handle); if (!handle || !name) return -2;
+  try { return ortools_wasm::RoutingBreakConfigurationValue(*handle->model, handle->breaks, name, vehicle, kind, index); }
+  catch (const std::exception& error) { g_routing_break_error = error.what(); return -2; }
+}
 
 EMSCRIPTEN_KEEPALIVE uintptr_t routing_interrupt_address() {
   return reinterpret_cast<uintptr_t>(&g_routing_interrupt_requested);
@@ -189,30 +384,26 @@ EMSCRIPTEN_KEEPALIVE uintptr_t routing_interrupt_address() {
 EMSCRIPTEN_KEEPALIVE int routing_create_index_manager(int num_locations,
                                                       int num_vehicles,
                                                       int depot) {
-  const int handle = g_next_manager_handle++;
-  g_managers.emplace(
-      handle, std::make_unique<RoutingIndexManager>(
-                  num_locations, num_vehicles, RoutingNodeIndex(depot)));
-  return handle;
+  if (num_locations <= 0 || num_vehicles <= 0) return 0;
+  try {
+    auto manager = ortools_wasm::RoutingModelBuilder::CreateManager(num_locations, num_vehicles,
+        std::vector<int>(num_vehicles, depot), std::vector<int>(num_vehicles, depot));
+    const int handle = g_next_manager_handle++;
+    g_managers.emplace(handle, std::move(manager));
+    return handle;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_create_index_manager_starts_ends(
     int num_locations, int num_vehicles, const int* starts, const int* ends) {
-  if (starts == nullptr || ends == nullptr || num_vehicles <= 0) return 0;
-  std::vector<RoutingNodeIndex> start_nodes;
-  std::vector<RoutingNodeIndex> end_nodes;
-  start_nodes.reserve(num_vehicles);
-  end_nodes.reserve(num_vehicles);
-  for (int i = 0; i < num_vehicles; ++i) {
-    start_nodes.push_back(RoutingNodeIndex(starts[i]));
-    end_nodes.push_back(RoutingNodeIndex(ends[i]));
-  }
-
-  const int handle = g_next_manager_handle++;
-  g_managers.emplace(handle, std::make_unique<RoutingIndexManager>(
-                                 num_locations, num_vehicles, start_nodes,
-                                 end_nodes));
-  return handle;
+  if (!starts || !ends || num_vehicles <= 0) return 0;
+  try {
+    auto manager = ortools_wasm::RoutingModelBuilder::CreateManager(num_locations, num_vehicles,
+        CopyInts(starts, num_vehicles), CopyInts(ends, num_vehicles));
+    const int handle = g_next_manager_handle++;
+    g_managers.emplace(handle, std::move(manager));
+    return handle;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
 }
 
 EMSCRIPTEN_KEEPALIVE void routing_delete_index_manager(int manager_handle) {
@@ -285,10 +476,7 @@ EMSCRIPTEN_KEEPALIVE int routing_create_model_with_parameters(
       length ? std::string(reinterpret_cast<const char*>(data), length) : "", paths,
       &parameters, &g_routing_search_parameter_error)) return 0;
   const int handle = g_next_model_handle++;
-  RoutingModelHandle model_handle;
-  model_handle.manager_handle = manager_handle;
-  model_handle.model = std::make_unique<RoutingModel>(*manager, parameters);
-  g_models.emplace(handle, std::move(model_handle));
+  g_models.emplace(handle, std::make_shared<RoutingModelHandle>(g_managers.at(manager_handle), parameters));
   return handle;
 }
 
@@ -304,10 +492,7 @@ EMSCRIPTEN_KEEPALIVE int routing_create_model(int manager_handle) {
   if (manager == nullptr) return 0;
 
   const int handle = g_next_model_handle++;
-  RoutingModelHandle model_handle;
-  model_handle.manager_handle = manager_handle;
-  model_handle.model = std::make_unique<RoutingModel>(*manager);
-  g_models.emplace(handle, std::move(model_handle));
+  g_models.emplace(handle, std::make_shared<RoutingModelHandle>(g_managers.at(manager_handle)));
   return handle;
 }
 
@@ -319,27 +504,13 @@ EMSCRIPTEN_KEEPALIVE void routing_delete_model(int model_handle) {
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_register_matrix_transit_callback(
-    int model_handle, const int64_t* values, int value_count, int dimension) {
-  RoutingModelHandle* handle = GetModel(model_handle);
-  if (handle == nullptr || values == nullptr || dimension <= 0 ||
-      value_count != dimension * dimension) {
-    return -1;
-  }
-
-  handle->transit_matrices.emplace_back(values, values + value_count);
-  const int matrix_index = handle->transit_matrices.size() - 1;
-  const int evaluator = handle->model->RegisterTransitCallback(
-      [handle, matrix_index, dimension](int64_t from_index, int64_t to_index) {
-        const std::vector<int64_t>& matrix =
-            handle->transit_matrices[matrix_index];
-        if (from_index < 0 || to_index < 0 || from_index >= dimension ||
-            to_index >= dimension) {
-          return int64_t{0};
-        }
-        return matrix[from_index * dimension + to_index];
-      });
-  handle->evaluators.insert(evaluator);
-  return evaluator;
+    int model_handle, const int64_t* values, int value_count, int dimension, int unary) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || !values || value_count < 0 || (unary != 0 && unary != 1)) return -1;
+  try {
+    const int evaluator = handle->RegisterIndexMatrix(std::vector<int64_t>(values, values + value_count), dimension, unary != 0);
+    return evaluator;
+  } catch (const std::invalid_argument&) { return -1; }
 }
 
 EMSCRIPTEN_KEEPALIVE void routing_add_solution_callback(int model_handle, int callback_id, int unchecked) {
@@ -359,11 +530,10 @@ EMSCRIPTEN_KEEPALIVE int routing_register_transit_callback(int model_handle,
                                                            int callback_id) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return -1;
-  const int evaluator = handle->model->RegisterTransitCallback(
+  const int evaluator = handle->RegisterTransitCallback(
       [callback_id](int64_t from_index, int64_t to_index) {
         return CallRoutingTransitCallback(callback_id, from_index, to_index);
       });
-  handle->evaluators.insert(evaluator);
   return evaluator;
 }
 
@@ -375,8 +545,7 @@ EMSCRIPTEN_KEEPALIVE int routing_add_dimension(int model_handle,
                                                const char* name) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr || name == nullptr) return 0;
-  return handle->model
-             ->AddDimension(evaluator_index, slack_max, capacity,
+  return handle->AddDimension(evaluator_index, slack_max, capacity,
                             fix_start_cumul_to_zero != 0, name)
          ? 1
          : 0;
@@ -388,8 +557,7 @@ EMSCRIPTEN_KEEPALIVE int routing_add_dimension_with_vehicle_capacity(
     const char* name) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr || name == nullptr) return 0;
-  return handle->model
-             ->AddDimensionWithVehicleCapacity(
+  return handle->AddDimensionWithVehicleCapacity(
                  evaluator_index, slack_max, CopyInt64s(capacities, capacity_count),
                  fix_start_cumul_to_zero != 0, name)
          ? 1
@@ -402,8 +570,7 @@ EMSCRIPTEN_KEEPALIVE int routing_add_dimension_with_vehicle_transits(
     const char* name) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr || name == nullptr) return 0;
-  return handle->model
-             ->AddDimensionWithVehicleTransits(
+  return handle->AddDimensionWithVehicleTransits(
                  CopyInts(evaluator_indices, evaluator_count), slack_max, capacity,
                  fix_start_cumul_to_zero != 0, name)
          ? 1
@@ -438,10 +605,39 @@ EMSCRIPTEN_KEEPALIVE int routing_add_dimension_with_vehicle_transit_and_capacity
       || evaluator_count != handle->model->vehicles() || capacity_count != handle->model->vehicles()
       || (fixed_start != 0 && fixed_start != 1)) return 0;
   const auto limits = CopyInt64s(capacities, capacity_count);
-  if (!ortools_wasm::IsRoutingVehicleDimensionValid(handle->model->vehicles(), evaluator_count, limits, slack_max)) return 0;
-  const auto evaluators = CopyInts(evaluator_indices, evaluator_count);
-  for (int evaluator : evaluators) if (!handle->evaluators.count(evaluator)) return 0;
-  return handle->model->AddDimensionWithVehicleTransitAndCapacity(evaluators, slack_max, limits, fixed_start != 0, name) ? 1 : 0;
+  return handle->AddDimensionWithVehicleTransitAndCapacity(CopyInts(evaluator_indices, evaluator_count),
+      slack_max, limits, fixed_start != 0, name) ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_register_state_dependent_transit_matrix(
+    int model_handle, int64_t domain_start, int64_t domain_end, const int32_t* offsets,
+    int offset_count, const int64_t* x, const int64_t* y, int anchor_count) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || !offsets || !x || !y || anchor_count < 0 || offset_count < 1) return -1;
+  const int64_t dimension = handle->model->Size() + handle->model->vehicles();
+  if (offset_count != dimension * dimension + 1 || offsets[0] != 0 || offsets[offset_count - 1] != anchor_count) return -1;
+  try {
+    ortools_wasm::RoutingStateDependentMatrix matrix{domain_start, domain_end, {}};
+    for (int i = 0; i + 1 < offset_count; ++i) {
+      if (offsets[i] < 0 || offsets[i] > offsets[i + 1] || offsets[i + 1] > anchor_count) return -1;
+      matrix.functions.push_back({CopyInt64s(x + offsets[i], offsets[i + 1] - offsets[i]),
+          CopyInt64s(y + offsets[i], offsets[i + 1] - offsets[i])});
+    }
+    return handle->RegisterDependentMatrix(std::move(matrix));
+  } catch (const std::exception&) { return -1; }
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_add_dependent_dimension(int model_handle, const int32_t* fixed,
+    const int32_t* dependent, int count, const char* base_name, int64_t slack,
+    const int64_t* capacities, int fixed_start, const char* name) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || !fixed || !dependent || !capacities || !name || count != handle->model->vehicles()
+      || (fixed_start != 0 && fixed_start != 1)) return 0;
+  try {
+    const auto evaluators = CopyInts(fixed, count);
+    const std::string base = base_name ? base_name : "";
+    return handle->AddDependentDimension(evaluators, CopyInts(dependent, count), base_name ? &base : nullptr, slack, CopyInt64s(capacities, count), fixed_start != 0, name) ? 1 : 0;
+  } catch (const std::exception&) { return 0; }
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_add_constant_dimension_with_slack(
@@ -449,9 +645,7 @@ EMSCRIPTEN_KEEPALIVE int routing_add_constant_dimension_with_slack(
     int fixed_start, const char* name) {
   auto* handle = GetModel(model_handle);
   if (handle == nullptr || name == nullptr || (fixed_start != 0 && fixed_start != 1)) return -1;
-  const auto [evaluator, created] = ortools_wasm::AddRoutingConstantDimensionWithSlack(
-      *handle->model, value, capacity, slack_max, fixed_start != 0, name);
-  if (evaluator >= 0) handle->evaluators.insert(evaluator);
+  const auto [evaluator, created] = handle->AddConstantDimension(value, capacity, fixed_start != 0, name, slack_max);
   return created ? evaluator : -1;
 }
 
@@ -460,9 +654,8 @@ EMSCRIPTEN_KEEPALIVE int routing_add_constant_dimension(
     int fix_start_cumul_to_zero, const char* name) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr || name == nullptr) return -1;
-  const auto [evaluator_index, created] = handle->model->AddConstantDimension(
+  const auto [evaluator_index, created] = handle->AddConstantDimension(
       value, capacity, fix_start_cumul_to_zero != 0, name);
-  handle->evaluators.insert(evaluator_index);
   return created ? evaluator_index : -1;
 }
 
@@ -471,10 +664,9 @@ EMSCRIPTEN_KEEPALIVE int routing_add_vector_dimension(
     int fix_start_cumul_to_zero, const char* name) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr || name == nullptr) return -1;
-  const auto [evaluator_index, created] = handle->model->AddVectorDimension(
+  const auto [evaluator_index, created] = handle->AddVectorDimension(
       CopyInt64s(values, value_count), capacity, fix_start_cumul_to_zero != 0,
       name);
-  handle->evaluators.insert(evaluator_index);
   return created ? evaluator_index : -1;
 }
 
@@ -483,10 +675,9 @@ EMSCRIPTEN_KEEPALIVE int routing_add_matrix_dimension(
     int64_t capacity, int fix_start_cumul_to_zero, const char* name) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr || name == nullptr) return -1;
-  const auto [evaluator_index, created] = handle->model->AddMatrixDimension(
+  const auto [evaluator_index, created] = handle->AddMatrixDimension(
       CopyMatrix(values, value_count, dimension), capacity,
       fix_start_cumul_to_zero != 0, name);
-  handle->evaluators.insert(evaluator_index);
   return created ? evaluator_index : -1;
 }
 
@@ -527,14 +718,14 @@ EMSCRIPTEN_KEEPALIVE void routing_set_arc_cost_evaluator_of_all_vehicles(
     int model_handle, int evaluator_index) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return;
-  handle->model->SetArcCostEvaluatorOfAllVehicles(evaluator_index);
+  handle->SetArcCostEvaluator(evaluator_index);
 }
 
 EMSCRIPTEN_KEEPALIVE void routing_set_arc_cost_evaluator_of_vehicle(
     int model_handle, int evaluator_index, int vehicle) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return;
-  handle->model->SetArcCostEvaluatorOfVehicle(evaluator_index, vehicle);
+  handle->SetArcCostEvaluator(evaluator_index, vehicle);
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_status(int model_handle) {
@@ -552,35 +743,218 @@ EMSCRIPTEN_KEEPALIVE int routing_solve_with_parameters_proto(
   const ResetRoutingInterruptOnExit reset_interrupt;
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return 0;
-  std::vector<std::string> paths;
-  const std::string paths_text(field_paths ? field_paths : "");
-  size_t begin = 0;
-  while (begin < paths_text.size()) {
-    const size_t end = paths_text.find(',', begin);
-    paths.push_back(paths_text.substr(begin, end == std::string::npos ? end : end - begin));
-    if (end == std::string::npos) break;
-    begin = end + 1;
-  }
   RoutingSearchParameters parameters;
-  if (byte_count < 0 || (byte_count > 0 && bytes == nullptr) ||
-      !ortools_wasm::ParseRoutingSearchParameters(
-          std::string(bytes ? bytes : "", byte_count), paths, &parameters,
-          &g_routing_search_parameter_error)) return -1;
+  if (!ReadRoutingSearchParameters(bytes, byte_count, field_paths, &parameters)) return -1;
   const Assignment* initial_assignment = handle->assignment;
   if (from_assignment && initial_assignment == nullptr) return 0;
   if (!BindRoutingWorkers(&parameters)) return -1;
+  try {
+    ortools_wasm::ValidateRoutingSecondarySearch(parameters, handle->secondary != nullptr);
+    handle->workflow.Validate(parameters, from_assignment != 0);
+  }
+  catch (const std::invalid_argument& error) { g_routing_search_parameter_error = error.what(); return -1; }
+  std::vector<RoutingModel*> secondary;
+  for (auto* child = handle->secondary.get(); child; child = child->secondary.get()) secondary.push_back(child->model.get());
   handle->assignment = SolveInterruptibly(handle->model.get(), enable_interrupt, [&] {
-    return from_assignment
-        ? handle->model->SolveFromAssignmentWithParameters(initial_assignment, parameters)
-        : handle->model->SolveWithParameters(parameters);
-  });
+    return handle->workflow.Run(*handle->model, from_assignment ? initial_assignment : nullptr, parameters);
+  }, secondary);
   return handle->assignment == nullptr ? 0 : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_configure_assignment_workflow(int model_handle, int action, double duration, int check, int call_monitors) {
+  auto* handle = GetModel(model_handle); if (!handle) return 0;
+  handle->workflow.action = action;
+  handle->workflow.packing_duration_seconds = duration;
+  handle->workflow.check_solution_in_cp = check != 0;
+  handle->workflow.call_at_solution_monitors = call_monitors != 0;
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_assignment_feasible(int model_handle) {
+  auto* handle = GetModel(model_handle);
+  return handle && handle->workflow.assignment_feasible;
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_ignore_disjunctions_already_forced_to_zero(int model_handle) {
+  auto* handle = GetModel(model_handle);
+  if (!handle) return 0;
+  // Construction operations are replayed before any model closure or search.
+  handle->IgnoreForcedDisjunctions();
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_set_first_solution_evaluator(int model_handle, int evaluator) {
+  auto* handle = GetModel(model_handle);
+  return handle && handle->SetFirstSolutionEvaluator(evaluator);
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_set_secondary_model(int primary_handle, int secondary_handle,
+    const char* bytes, int byte_count, const char* paths) {
+  auto* primary = GetModel(primary_handle);
+  auto* secondary = GetModel(secondary_handle);
+  try {
+    if (!primary || !secondary) throw std::invalid_argument("Invalid Routing secondary model handle.");
+    if (primary->has_route_callbacks || secondary->has_route_callbacks)
+      throw std::invalid_argument("Native Routing secondary-model optimization does not safely support whole-route callbacks.");
+    for (auto* child = static_cast<ortools_wasm::RoutingModelBuilder*>(secondary); child; child = child->secondary.get())
+      if (child == primary) throw std::invalid_argument("Routing secondary models must not form a cycle.");
+    RoutingSearchParameters parameters;
+    if (!ReadRoutingSearchParameters(bytes, byte_count, paths, &parameters) || !BindRoutingWorkers(&parameters)) return 0;
+    ortools_wasm::ValidateRoutingSecondarySearch(parameters, secondary->secondary != nullptr);
+    const auto* a = primary->manager.get();
+    const auto* b = secondary->manager.get();
+    if (!a || !b || a->num_indices() != b->num_indices()) throw std::invalid_argument("Routing secondary model has a different index-manager layout.");
+    for (int index = 0; index < a->num_indices(); ++index)
+      if (a->IndexToNode(index) != b->IndexToNode(index)) throw std::invalid_argument("Routing secondary model has a different index-manager layout.");
+    primary->SetSecondaryModel(g_models.at(secondary_handle), parameters);
+    return 1;
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return 0; }
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_set_primary_constrained_dimension(int model_handle, const char* name) {
+  auto* handle = GetModel(model_handle);
+  return handle && name && handle->SetPrimaryConstrainedDimension(name);
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_cumul_optimizer_count(int model_handle, int global) {
+  auto* handle = GetModel(model_handle); if (!handle) return -1;
+  return global ? handle->model->GetDimensionsWithGlobalCumulOptimizers().size()
+                : handle->model->GetDimensionsWithLocalCumulOptimizers().size();
+}
+
+EMSCRIPTEN_KEEPALIVE const char* routing_cumul_optimizer_dimension_name(int model_handle, int global, int index) {
+  auto* handle = GetModel(model_handle); if (!handle) return "";
+  const auto dimensions = global ? handle->model->GetDimensionsWithGlobalCumulOptimizers()
+                                 : handle->model->GetDimensionsWithLocalCumulOptimizers();
+  return index < 0 || index >= dimensions.size() ? "" : dimensions[index]->name().c_str();
+}
+EMSCRIPTEN_KEEPALIVE int routing_add_candidate_assignment(int model_handle) {
+  auto* handle = GetModel(model_handle); if (!handle || !handle->input_assignment) return 0;
+  handle->workflow.candidates.push_back(handle->input_assignment);
+  return 1;
+}
+EMSCRIPTEN_KEEPALIVE int routing_collected_solution_count(int model_handle) {
+  auto* handle = GetModel(model_handle); return handle ? handle->workflow.collected.size() : 0;
+}
+EMSCRIPTEN_KEEPALIVE int routing_select_collected_solution(int model_handle, int index) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || index < 0 || index >= handle->workflow.collected.size()) return 0;
+  handle->assignment = handle->workflow.collected[index]; return 1;
+}
+EMSCRIPTEN_KEEPALIVE int routing_packing_time_limit_reached(int model_handle) {
+  auto* handle = GetModel(model_handle); return handle && handle->workflow.time_limit_reached;
+}
+EMSCRIPTEN_KEEPALIVE int64_t routing_computed_lower_bound(int model_handle) {
+  auto* handle = GetModel(model_handle); return handle ? handle->workflow.computed_lower_bound : 0;
+}
+EMSCRIPTEN_KEEPALIVE int64_t routing_objective_lower_bound(int model_handle) {
+  auto* handle = GetModel(model_handle); return handle ? handle->model->objective_lower_bound() : std::numeric_limits<int64_t>::min();
+}
+EMSCRIPTEN_KEEPALIVE int64_t routing_search_statistic(int model_handle, int kind) {
+  auto* handle = GetModel(model_handle); if (!handle) return 0;
+  const auto& stats = handle->model->search_stats();
+  switch (kind) {
+    case 0: return stats.num_cp_sat_calls_in_lp_scheduling;
+    case 1: return stats.num_glop_calls_in_lp_scheduling;
+    case 2: return stats.num_min_cost_flow_calls;
+    case 3: return stats.num_cp_sat_calls_in_routing;
+    case 4: return stats.num_generalized_cp_sat_calls_in_routing;
+    default: return 0;
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE int64_t routing_first_solution_statistic(int model_handle, int kind,
+    const char* bytes, int byte_count, const char* field_paths) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || handle->model->status() == operations_research::RoutingSearchStatus::ROUTING_INVALID) return -1;
+  RoutingSearchParameters parameters;
+  if (!ReadRoutingSearchParameters(bytes, byte_count, field_paths, &parameters)) return -1;
+  return kind == 0 ? handle->model->GetNumberOfDecisionsInFirstSolution(parameters)
+                   : handle->model->GetNumberOfRejectsInFirstSolution(parameters);
 }
 
 EMSCRIPTEN_KEEPALIVE void routing_close_model(int model_handle) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return;
   handle->model->CloseModelWithParameters(DefaultRoutingSearchParameters());
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_close_model_proto(int model_handle, const char* bytes, int byte_count, const char* paths) {
+  auto* handle = GetModel(model_handle); if (!handle) return 0;
+  RoutingSearchParameters parameters;
+  if (!ReadRoutingSearchParameters(bytes, byte_count, paths, &parameters) || !BindRoutingWorkers(&parameters)) return -1;
+  try { ortools_wasm::ValidateRoutingSecondarySearch(parameters, handle->secondary != nullptr); }
+  catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return -1; }
+  handle->model->CloseModelWithParameters(parameters);
+  if (handle->model->status() == operations_research::RoutingSearchStatus::ROUTING_INVALID) {
+    g_routing_search_parameter_error = "Invalid Routing search parameters for model closure.";
+    return -1;
+  }
+  return 1;
+}
+EMSCRIPTEN_KEEPALIVE int routing_apply_locks(int model_handle, const int64_t* values, const int* lengths, int count, int close_routes) {
+  auto* handle = GetModel(model_handle); if (!handle || count < 0 || (count > 0 && (!values || !lengths))) return 0;
+  std::vector<std::vector<int64_t>> routes;
+  int offset = 0;
+  for (int route = 0; route < count; ++route) {
+    if (lengths[route] < 0) return 0;
+    routes.emplace_back(values + offset, values + offset + lengths[route]); offset += lengths[route];
+  }
+  return handle->model->ApplyLocksToAllVehicles(routes, close_routes != 0);
+}
+EMSCRIPTEN_KEEPALIVE int64_t routing_preassignment_next(int model_handle, int index) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || index < 0 || index >= handle->model->Size()) return -1;
+  auto* variable = handle->model->NextVar(index); const auto* assignment = handle->model->PreAssignment();
+  return assignment->Contains(variable) && assignment->Bound(variable) ? assignment->Value(variable) : -1;
+}
+EMSCRIPTEN_KEEPALIVE const char* routing_transfer_assignment(int model_handle, const int64_t* next_values, int next_count,
+    const int64_t* vehicle_values, int vehicle_count) {
+  auto* handle = GetModel(model_handle);
+  try {
+    if (!handle || next_count < 0 || vehicle_count < 0 || (next_count && !next_values) || (vehicle_count && !vehicle_values))
+      throw std::invalid_argument("Invalid Routing assignment transfer buffers.");
+    std::vector<int64_t> next, vehicles;
+    if (next_count) next.assign(next_values, next_values + next_count);
+    if (vehicle_count) vehicles.assign(vehicle_values, vehicle_values + vehicle_count);
+    const auto snapshot = ortools_wasm::TransferRoutingAssignment(*handle->model, *handle->manager, next, vehicles);
+    g_routing_model_inspection_result = ortools_wasm::RoutingSeedSnapshotJson(snapshot);
+    return g_routing_model_inspection_result.c_str();
+  } catch (const std::exception& error) { g_routing_search_parameter_error = error.what(); return nullptr; }
+}
+EMSCRIPTEN_KEEPALIVE int routing_input_assignment_create(int model_handle, int has_objective, int64_t minimum, int64_t maximum) {
+  auto* handle = GetModel(model_handle); if (!handle) return 0;
+  if ((has_objective != 0 && has_objective != 1) || minimum > maximum || (has_objective && !handle->model->CostVar())) return 0;
+  handle->input_assignment = handle->model->solver()->MakeAssignment();
+  handle->assignment = handle->input_assignment;
+  if (has_objective) {
+    handle->input_assignment->AddObjective(handle->model->CostVar());
+    handle->input_assignment->SetObjectiveRange(minimum, maximum);
+  }
+  return 1;
+}
+EMSCRIPTEN_KEEPALIVE int routing_input_assignment_variable(int model_handle, int kind, const char* name, int64_t index,
+    int resource_group, int64_t minimum, int64_t maximum) {
+  auto* handle = GetModel(model_handle); if (!handle || !handle->input_assignment) return 0;
+  return ortools_wasm::SetRoutingAssignmentVariable(*handle->model, *handle->input_assignment, kind, name ? name : "", index,
+      resource_group, minimum, maximum, &handle->variables);
+}
+EMSCRIPTEN_KEEPALIVE int routing_input_assignment_interval(int model_handle, int index, const int64_t* bounds) {
+  auto* handle = GetModel(model_handle); if (!handle || !handle->input_assignment) return 0;
+  return ortools_wasm::SetRoutingAssignmentInterval(*handle->input_assignment, handle->breaks, index, bounds);
+}
+EMSCRIPTEN_KEEPALIVE int routing_set_first_solution_hint(int model_handle) {
+  auto* handle = GetModel(model_handle); if (!handle || !handle->input_assignment) return 0;
+  handle->model->SetFirstSolutionHint(handle->input_assignment);
+  return 1;
+}
+EMSCRIPTEN_KEEPALIVE int routing_restore_assignment(int model_handle, int enable_interrupt) {
+  const ResetRoutingInterruptOnExit reset;
+  auto* handle = GetModel(model_handle); if (!handle || !handle->input_assignment) return 0;
+  handle->assignment = SolveInterruptibly(handle->model.get(), enable_interrupt, [&] {
+    return handle->model->RestoreAssignment(*handle->input_assignment);
+  });
+  return handle->assignment ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_read_assignment_from_routes(
@@ -611,21 +985,11 @@ EMSCRIPTEN_KEEPALIVE int routing_read_assignment_from_routes_proto(
     int byte_count, const char* field_paths, int enable_interrupt) {
   RoutingModelHandle* handle = GetModel(model_handle);
   if (handle == nullptr) return 0;
-  std::vector<std::string> paths;
-  const std::string paths_text(field_paths ? field_paths : "");
-  size_t begin = 0;
-  while (begin < paths_text.size()) {
-    const size_t end = paths_text.find(',', begin);
-    paths.push_back(paths_text.substr(begin, end == std::string::npos ? end : end - begin));
-    if (end == std::string::npos) break;
-    begin = end + 1;
-  }
   RoutingSearchParameters parameters;
-  if (byte_count < 0 || (byte_count > 0 && bytes == nullptr) ||
-      !ortools_wasm::ParseRoutingSearchParameters(
-          std::string(bytes ? bytes : "", byte_count), paths, &parameters,
-          &g_routing_search_parameter_error)) return -1;
+  if (!ReadRoutingSearchParameters(bytes, byte_count, field_paths, &parameters)) return -1;
   if (!BindRoutingWorkers(&parameters)) return -1;
+  try { handle->workflow.Validate(parameters, true); }
+  catch (const std::invalid_argument& error) { g_routing_search_parameter_error = error.what(); return -1; }
   handle->assignment = SolveInterruptibly(handle->model.get(), enable_interrupt, [&] {
     handle->model->CloseModelWithParameters(parameters);
     routing_read_assignment_from_routes(model_handle, values, route_lengths,
@@ -644,40 +1008,34 @@ EMSCRIPTEN_KEEPALIVE int routing_get_automatic_first_solution_strategy(
 
 EMSCRIPTEN_KEEPALIVE int routing_add_pickup_and_delivery(
     int model_handle, int64_t pickup, int64_t delivery) {
-  RoutingModelHandle* handle = GetModel(model_handle);
-  if (handle == nullptr ||
-      !ortools_wasm::IsRoutingIndexValid(*handle->model, pickup, false) ||
-      !ortools_wasm::IsRoutingIndexValid(*handle->model, delivery, false)) return 0;
-  handle->model->AddPickupAndDelivery(pickup, delivery);
-  return 1;
+  auto* handle = GetModel(model_handle);
+  return handle && handle->AddPickupAndDelivery(pickup, delivery);
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_add_pickup_and_delivery_sets(int model_handle, int pickup_disjunction, int delivery_disjunction) {
+  auto* handle = GetModel(model_handle);
+  return handle && ortools_wasm::AddRoutingPickupAndDeliverySets(*handle->model, pickup_disjunction, delivery_disjunction);
+}
+
+EMSCRIPTEN_KEEPALIVE int routing_set_pickup_to_delivery_limits(int model_handle, const char* dimension_name,
+    int pair_index, const int64_t* limits, int count) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || !limits || count <= 0) return 0;
+  return ortools_wasm::SetRoutingPickupToDeliveryLimits(*handle->model, dimension_name ? dimension_name : "",
+      pair_index, {limits, limits + count});
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_add_vehicle_equality_constraint(
     int model_handle, int64_t left_index, int64_t right_index) {
-  RoutingModelHandle* handle = GetModel(model_handle);
-  if (handle == nullptr ||
-      !ortools_wasm::IsRoutingIndexValid(*handle->model, left_index) ||
-      !ortools_wasm::IsRoutingIndexValid(*handle->model, right_index)) return 0;
-  operations_research::Solver* solver = handle->model->solver();
-  solver->AddConstraint(solver->MakeEquality(
-      handle->model->VehicleVar(left_index),
-      handle->model->VehicleVar(right_index)));
-  return 1;
+  auto* handle = GetModel(model_handle);
+  return handle && handle->AddVehicleEquality(left_index, right_index);
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_add_dimension_cumul_less_or_equal_constraint(
     int model_handle, const char* dimension_name, int64_t left_index,
     int64_t right_index) {
-  RoutingModelHandle* handle = GetModel(model_handle);
-  RoutingDimension* dimension = GetDimension(handle, dimension_name);
-  if (handle == nullptr || dimension == nullptr ||
-      !ortools_wasm::IsRoutingIndexValid(*handle->model, left_index) ||
-      !ortools_wasm::IsRoutingIndexValid(*handle->model, right_index)) return 0;
-  operations_research::Solver* solver = handle->model->solver();
-  solver->AddConstraint(solver->MakeLessOrEqual(
-      dimension->CumulVar(left_index),
-      dimension->CumulVar(right_index)));
-  return 1;
+  auto* handle = GetModel(model_handle);
+  return handle && dimension_name && handle->AddCumulLessOrEqual(dimension_name, left_index, right_index);
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_modify_domain(int model_handle, int kind, const char* name,
@@ -743,19 +1101,19 @@ EMSCRIPTEN_KEEPALIVE int routing_create_integer_expression(int model_handle, int
 EMSCRIPTEN_KEEPALIVE int routing_register_integer_variable(int model_handle, int index, int expression) {
   auto* handle = GetModel(model_handle); if (!handle || index != handle->variables.integer.size()) return 0;
   const auto found = handle->expressions.find(expression); if (found == handle->expressions.end()) return 0;
-  handle->variables.integer.push_back(found->second->Var()); return 1;
+  return handle->RegisterIntegerVariable(index, found->second);
 }
 EMSCRIPTEN_KEEPALIVE int routing_register_boolean_variable(int model_handle, int index, int expression) {
   auto* handle = GetModel(model_handle); if (!handle || index != handle->variables.boolean.size()) return 0;
   const auto found = handle->expressions.find(expression);
   if (found == handle->expressions.end() || found->second->Min() < 0 || found->second->Max() > 1) return 0;
-  handle->variables.boolean.push_back(found->second->Var()); return 1;
+  return handle->RegisterBooleanVariable(index, found->second);
 }
 EMSCRIPTEN_KEEPALIVE int routing_add_boolean_constraint(int model_handle, int expression) {
   auto* handle = GetModel(model_handle); if (!handle) return 0;
   const auto found = handle->expressions.find(expression);
   if (found == handle->expressions.end() || found->second->Min() < 0 || found->second->Max() > 1) return 0;
-  handle->model->solver()->AddConstraint(handle->model->solver()->MakeEquality(found->second, 1)); return 1;
+  return handle->AddBooleanConstraint(found->second);
 }
 EMSCRIPTEN_KEEPALIVE int routing_add_linear_constraint(int model_handle, int left, int right, int comparison) {
   auto* handle = GetModel(model_handle);
@@ -826,28 +1184,18 @@ EMSCRIPTEN_KEEPALIVE int routing_dimension_set_slack_bounds(
 
 EMSCRIPTEN_KEEPALIVE int routing_set_vehicle_values(
     int model_handle, int64_t index, const int* values, int count) {
-  RoutingModelHandle* handle = GetModel(model_handle);
-  if (handle == nullptr || count < 0 || (count > 0 && values == nullptr) || index < 0 ||
-      index >= handle->model->Size() + handle->model->vehicles()) return 0;
-  for (int i = 0; i < count; ++i) {
-    if (values[i] < -1 || values[i] >= handle->model->vehicles()) return 0;
-  }
+  auto* handle = GetModel(model_handle);
+  if (!handle || count < 0 || (count > 0 && !values)) return 0;
   std::vector<int64_t> domain;
-  if (count > 0) domain.assign(values, values + count);
-  ortools_wasm::IntersectRoutingValues(*handle->model, *handle->model->VehicleVar(index), domain);
-  return 1;
+  if (count) domain.assign(values, values + count);
+  return handle->SetVehicleValues(index, domain);
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_set_allowed_vehicles_for_index(
     int model_handle, const int* vehicles, int count, int64_t index) {
-  RoutingModelHandle* handle = GetModel(model_handle);
-  if (handle == nullptr || count < 0 || (count > 0 && vehicles == nullptr) || index < 0 ||
-      index >= handle->model->Size() + handle->model->vehicles()) return 0;
-  for (int i = 0; i < count; ++i) {
-    if (vehicles[i] < 0 || vehicles[i] >= handle->model->vehicles()) return 0;
-  }
-  handle->model->SetAllowedVehiclesForIndex(absl::Span<const int>(vehicles, count), index);
-  return 1;
+  auto* handle = GetModel(model_handle);
+  if (!handle || count < 0 || (count > 0 && !vehicles)) return 0;
+  return handle->SetAllowedVehicles(index, CopyInts(vehicles, count));
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_dimension_set_cumul_bounds(
@@ -861,14 +1209,9 @@ EMSCRIPTEN_KEEPALIVE int routing_dimension_set_cumul_bounds(
 
 EMSCRIPTEN_KEEPALIVE int routing_dimension_add_node_precedence(
     int model_handle, const char* dimension_name, int64_t first, int64_t second,
-    int64_t offset) {
-  RoutingModelHandle* handle = GetModel(model_handle);
-  RoutingDimension* dimension = GetDimension(handle, dimension_name);
-  if (handle == nullptr || dimension == nullptr || first < 0 || second < 0 ||
-      first >= handle->model->Size() + handle->model->vehicles() ||
-      second >= handle->model->Size() + handle->model->vehicles()) return 0;
-  dimension->AddNodePrecedence(first, second, offset);
-  return 1;
+    int64_t offset, int performed_constraint) {
+  auto* handle = GetModel(model_handle);
+  return handle && dimension_name && handle->AddNodePrecedence(dimension_name, first, second, offset, performed_constraint);
 }
 
 EMSCRIPTEN_KEEPALIVE int routing_solve(int model_handle) {
@@ -933,7 +1276,7 @@ EMSCRIPTEN_KEEPALIVE int routing_capture_assignment_variables(int model_handle, 
 EMSCRIPTEN_KEEPALIVE int routing_add_resource_group(int model_handle) {
   auto* handle = GetModel(model_handle);
   if (!handle) return -1;
-  const int index = handle->model->GetResourceGroups().size(); handle->model->AddResourceGroup(); return index;
+  return handle->AddResourceGroup();
 }
 EMSCRIPTEN_KEEPALIVE int routing_add_resource(int model_handle, int group, const char* name,
     const int64_t* start, int start_count, const int64_t* end, int end_count) {
@@ -1025,9 +1368,60 @@ EMSCRIPTEN_KEEPALIVE int routing_set_maximum_active_vehicles(int model_handle, i
   auto* handle = GetModel(model_handle);
   return handle != nullptr && ortools_wasm::SetRoutingMaximumActiveVehicles(*handle->model, maximum);
 }
+
+EMSCRIPTEN_KEEPALIVE int routing_add_break_interval(int model_handle, int64_t start_min, int64_t start_max, int64_t duration, int optional, const char* name) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || !name) return -1;
+  try { return ortools_wasm::AddRoutingBreakInterval(*handle->model, handle->breaks, start_min, start_max, duration, optional != 0, name); }
+  catch (const std::invalid_argument&) { return -1; }
+}
+EMSCRIPTEN_KEEPALIVE int routing_set_break_intervals(int model_handle, const char* dimension, int vehicle,
+    const int* intervals, int count, int pre_travel, int post_travel) {
+  g_routing_break_error.clear();
+  auto* handle = GetModel(model_handle);
+  if (!handle || !dimension || count < 0 || (count > 0 && !intervals)
+      || (pre_travel != -1 && handle->evaluators.find(pre_travel) == handle->evaluators.end())
+      || (post_travel != -1 && handle->evaluators.find(post_travel) == handle->evaluators.end())) return 0;
+  try { ortools_wasm::SetRoutingBreakIntervals(*handle->model, handle->breaks, dimension, vehicle, CopyInts(intervals, count), pre_travel, post_travel); return 1; }
+  catch (const std::invalid_argument& error) { g_routing_break_error = error.what(); return 0; }
+}
+EMSCRIPTEN_KEEPALIVE int routing_set_break_distance_duration(int model_handle, const char* dimension, int vehicle, int64_t distance, int64_t duration) {
+  g_routing_break_error.clear();
+  auto* handle = GetModel(model_handle);
+  if (!handle || !dimension) return 0;
+  try { ortools_wasm::SetRoutingBreakDistanceDuration(*handle->model, dimension, vehicle, distance, duration); return 1; }
+  catch (const std::invalid_argument& error) { g_routing_break_error = error.what(); return 0; }
+}
+EMSCRIPTEN_KEEPALIVE const char* routing_last_break_error() { return g_routing_break_error.c_str(); }
+EMSCRIPTEN_KEEPALIVE int routing_assignment_break_bounds(int model_handle, int index, int64_t* output) {
+  auto* handle = GetModel(model_handle);
+  return handle && handle->assignment && ortools_wasm::RoutingBreakAssignmentBounds(*handle->assignment, handle->breaks, index, output);
+}
 EMSCRIPTEN_KEEPALIVE int routing_set_fixed_vehicle_cost(int model_handle, int vehicle, int64_t cost) {
   auto* handle = GetModel(model_handle);
   return handle != nullptr && ortools_wasm::SetRoutingFixedVehicleCost(*handle->model, vehicle, cost);
+}
+EMSCRIPTEN_KEEPALIVE int routing_set_path_energy_costs(int model_handle, const char* force, const char* distance,
+    int vehicle, int64_t threshold, int64_t below, int64_t above) {
+  auto* handle = GetModel(model_handle);
+  return handle && force && distance && ortools_wasm::SetRoutingPathEnergyCosts(*handle->model, force, distance, vehicle, threshold, below, above);
+}
+EMSCRIPTEN_KEEPALIVE int routing_add_same_activity_group(int model_handle, const int* indices, int count) {
+  auto* handle = GetModel(model_handle);
+  return handle && count >= 0 && (count == 0 || indices) && ortools_wasm::AddRoutingSameActivityGroup(*handle->model, CopyInts(indices, count));
+}
+EMSCRIPTEN_KEEPALIVE int routing_activity_groups(int model_handle, int group, int* output, int capacity) {
+  auto* handle = GetModel(model_handle);
+  if (!handle || capacity < 0 || (capacity && !output) || group < -1
+      || group >= handle->model->GetSameActivityGroupsCount()) return -1;
+  const auto& values = group == -1 ? handle->model->GetSameActivityGroups() : handle->model->GetSameActivityIndicesOfGroup(group);
+  if (capacity == 0) return values.size();
+  if (capacity < values.size()) return -1;
+  std::copy(values.begin(), values.end(), output); return values.size();
+}
+EMSCRIPTEN_KEEPALIVE int routing_activity_group_count(int model_handle) {
+  auto* handle = GetModel(model_handle);
+  return handle ? handle->model->GetSameActivityGroupsCount() : -1;
 }
 EMSCRIPTEN_KEEPALIVE int routing_set_amortized_vehicle_costs(int model_handle, int vehicle, int64_t linear, int64_t quadratic) {
   auto* handle = GetModel(model_handle);

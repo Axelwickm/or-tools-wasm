@@ -71,6 +71,8 @@ export type SolverExecutionOptions<Event> = {
   onEvent: SolverExecutorEventHandler<SolverJobEvent | Event>;
   /** A native callback requires a synchronous response before search continues. */
   onCallback?: (payload: Uint8Array) => Uint8Array;
+  /** Dispose resources in a late encoded bridge result after caller cancellation. */
+  onAbandonedResult?: (payload: Uint8Array) => void | Promise<void>;
 };
 
 export type SolverExecutor<Request, Response, Event> = {
@@ -122,4 +124,19 @@ export function createSolverFailureEvent(
       retryable,
     }),
   };
+}
+
+// Native synchronous emitters cannot await a lower-level async event handler.
+// Settled notifications must not remain retained until a long solve finishes.
+export function trackPendingEvent(
+  pending: Set<Promise<void>>,
+  result: void | Promise<void>,
+  onFailure: (error: unknown) => void,
+): void {
+  if (result === undefined) return;
+  const tracked = Promise.resolve(result).then(
+    () => { pending.delete(tracked); },
+    error => { pending.delete(tracked); onFailure(error); },
+  );
+  pending.add(tracked);
 }

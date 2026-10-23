@@ -1,3 +1,4 @@
+import { trackPendingEvent } from '../solver_executor.js';
 import { create } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
@@ -322,19 +323,17 @@ export class DirectPdlpExecutor implements PdlpExecutor {
         createdAtMs,
         BigInt(Date.now()),
       ));
-      const pendingCallbacks: Promise<void>[] = [];
-      let callbackError: unknown;
+      const pendingCallbacks = new Set<Promise<void>>();
+      let callbackError: { error: unknown } | undefined;
       const response = await withWasmRuntimeLock(module, () => this.invoke(module, request, event => {
         if (callbackError) return;
         try {
           const pending = options.onEvent(event);
-          if (pending) pendingCallbacks.push(Promise.resolve(pending).catch(error => {
-            callbackError ??= error;
-          }));
-        } catch (error) { callbackError ??= error; }
+          trackPendingEvent(pendingCallbacks, pending, error => { callbackError ??= { error }; });
+        } catch (error) { callbackError ??= { error }; }
       }));
       await Promise.all(pendingCallbacks);
-      if (callbackError) throw callbackError;
+      if (callbackError) throw callbackError.error;
       await options.onEvent(createSolverJobStatusEvent(
         this.solver,
         requestId,

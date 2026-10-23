@@ -10,10 +10,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "absl/random/random.h"
+#include "javascript/session_registry.h"
 #include "absl/time/time.h"
 #include "mp_solver.pb.h"
 #include "javascript/mp_solver_parameters.h"
+#include "javascript/mp_solver_search.h"
 #include "javascript/mp_solver_model_snapshot.h"
 #include "ortools/linear_solver/linear_solver.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
@@ -110,13 +111,15 @@ struct Session {
 // threads; each session serializes its native operations and cleanup.
 class Registry {
  public:
-  explicit Registry(bool reject_glpk = false) : reject_glpk_(reject_glpk) {}
+  explicit Registry(bool reject_glpk = false, SessionLimits limits = {})
+      : reject_glpk_(reject_glpk), sessions_(limits) {}
+
+  void ExpireIdle() { sessions_.ExpireIdle(); }
 
   std::shared_ptr<Session> Find(uint64_t handle) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    const auto found = sessions_.find(handle);
-    if (found == sessions_.end()) throw std::invalid_argument("MPSolver session handle is invalid or closed.");
-    return found->second;
+    auto session = sessions_.Find(handle);
+    if (!session) throw std::invalid_argument("MPSolver session handle is invalid, expired or closed.");
+    return session;
   }
 
   bridge::MpSolverBridgeResponse Create(const bridge::MpSolverSessionCreateRequest& input) {
@@ -131,10 +134,7 @@ class Registry {
     std::string error;
     const auto status = PopulateMpSolverSnapshot(request.model(), *session->solver, &error);
     if (status != operations_research::MPSOLVER_MODEL_IS_VALID) throw std::invalid_argument("MPSolver session model is invalid: " + error);
-    std::lock_guard<std::mutex> lock(mutex_);
-    uint64_t handle;
-    do { handle = absl::Uniform<uint64_t>(random_, 1, uint64_t{1} << 53); } while (sessions_.count(handle));
-    sessions_.emplace(handle, std::move(session));
+    const uint64_t handle = sessions_.Insert(std::move(session));
     bridge::MpSolverBridgeResponse response;
     response.set_session_handle(handle);
     return response;
@@ -183,6 +183,7 @@ class Registry {
         MPSolverParameters parameters;
         for (const auto& [key, value] : input.solve().parameters().double_params()) parameters.SetDoubleParam(static_cast<MPSolverParameters::DoubleParam>(key), value);
         for (const auto& [key, value] : input.solve().parameters().integer_params()) parameters.SetIntegerParam(static_cast<MPSolverParameters::IntegerParam>(key), value);
+        if (input.solve().has_starting_basis()) ApplyMpStartingBasis(solver, input.solve().starting_basis());
         solve(solver, parameters);
       } else { throw std::invalid_argument("Unknown MPSolver session action."); }
       MPSolutionResponse solution;
@@ -197,26 +198,19 @@ class Registry {
   bridge::MpSolverBridgeResponse Close(uint64_t handle) {
     bridge::MpSolverBridgeResponse response;
     response.mutable_session_result();
-    std::shared_ptr<Session> session;
-    {
-      std::lock_guard<std::mutex> registry_lock(mutex_);
-      const auto found = sessions_.find(handle);
-      if (found == sessions_.end()) return response;
-      session = found->second;
-    }
+    auto session = sessions_.Find(handle);
+    if (!session) return response;
     std::lock_guard<std::mutex> lock(session->mutex);
     if (session->closed) return response;
     session->closed = true;
     session->solver.reset();
-    { std::lock_guard<std::mutex> registry_lock(mutex_); sessions_.erase(handle); }
+    sessions_.Erase(handle);
     return response;
   }
 
  private:
   bool reject_glpk_;
-  std::mutex mutex_;
-  absl::BitGen random_;
-  std::unordered_map<uint64_t, std::shared_ptr<Session>> sessions_;
+  SessionRegistry<Session> sessions_;
 };
 }  // namespace mp_session
 }  // namespace ortools_wasm

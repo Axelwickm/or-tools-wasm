@@ -9,7 +9,7 @@ This repo is aiming for Python API parity where it is practical, while still pre
 
 Do not remove or obscure the proto path while adding higher-level wrappers. The goal is to support both styles cleanly.
 
-Current feature expansion is limited to MathOpt and RCPSP. The library owns model builders, typed serialization/results, native lifetimes and cross-runtime execution; upstream owns optimization, search, numerical accounting and native format conversion. Keep required native access hooks minimal. Separate demonstrated upstream bug fixes from integration hooks, preserve reproductions and document observable differences. Do not implement missing backend algorithms to fill a wrapper gap. See the current binding-scope audit in `tests/GAPS.MD`; historical completion notes do not supersede it.
+Feature expansion prioritizes practical native MathOpt and Routing capabilities and selected Set Cover operations. The library owns model builders, typed serialization/results, native lifetimes and cross-runtime execution; upstream owns optimization, search, numerical accounting and native format conversion. Expose existing native operations through minimal bindings and access hooks. Missing or incomplete native features remain missing or incomplete in this library; do not emulate them or add solver backends to fill a wrapper gap. Minimal fixes for reproduced upstream defects are allowed: keep them separate from integration hooks, preserve reproductions and document observable differences. Historical scope and completion notes do not supersede the current feature priorities.
 
 ## API Surface
 

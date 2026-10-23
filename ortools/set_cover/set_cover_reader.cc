@@ -17,9 +17,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -85,11 +88,11 @@ size_t SetCoverReader::SkipNonBlanks(size_t pos) const {
 }
 
 absl::string_view SetCoverReader::GetNextToken() {
-  const size_t size = line_.size();
   start_pos_ = SkipBlanks(end_pos_);
-  if (start_pos_ >= size) {
+  while (start_pos_ >= line_.size()) {
     ++line_iter_;
     line_ = *line_iter_;
+    if (!(line_iter_ != FileLineIterator(nullptr, 0))) throw std::invalid_argument("Unexpected end of Set Cover input.");
     start_pos_ = SkipBlanks(0);
   }
   end_pos_ = SkipNonBlanks(start_pos_);
@@ -98,13 +101,13 @@ absl::string_view SetCoverReader::GetNextToken() {
 
 double SetCoverReader::ParseNextDouble() {
   double value = 0;
-  CHECK(absl::SimpleAtod(GetNextToken(), &value));
+  if (!absl::SimpleAtod(GetNextToken(), &value) || !std::isfinite(value)) throw std::invalid_argument("Invalid Set Cover numeric token.");
   return value;
 }
 
 int64_t SetCoverReader::ParseNextInteger() {
   int64_t value = 0;
-  CHECK(absl::SimpleAtoi(GetNextToken(), &value));
+  if (!absl::SimpleAtoi(GetNextToken(), &value) || value < 0 || value > std::numeric_limits<BaseInt>::max()) throw std::invalid_argument("Invalid Set Cover integer token.");
   return value;
 }
 
@@ -123,6 +126,8 @@ SetCoverModel ReadOrlibScp(absl::string_view filename) {
   CHECK_OK(file::Exists(filename, file::Defaults()));
   SetCoverModel model;
   File* file(file::OpenOrDie(filename, "r", file::Defaults()));
+  const auto close_file = [](File* file) { file->Close(file::Defaults()).IgnoreError(); };
+  std::unique_ptr<File, decltype(close_file)> file_owner(file, close_file);
   SetCoverReader reader(file);
   const ElementIndex num_rows(reader.ParseNextInteger());
   const SubsetIndex num_cols(reader.ParseNextInteger());
@@ -139,12 +144,12 @@ SetCoverModel ReadOrlibScp(absl::string_view filename) {
     for (RowEntryIndex entry(0); entry < row_size; ++entry) {
       // Correct the 1-indexing.
       const SubsetIndex subset(reader.ParseNextInteger() - 1);
+      if (subset.value() < 0 || subset >= num_cols) throw std::invalid_argument("Invalid OR-Library subset index.");
       model.AddElementToSubset(element, subset);
     }
   }
   LOG(INFO) << "Read " << model.num_subsets() << " subsets, "
             << model.num_elements() << " elements";
-  file->Close(file::Defaults()).IgnoreError();
   model.CreateSparseRowView();
   return model;
 }
@@ -154,6 +159,8 @@ SetCoverModel ReadOrlibRail(absl::string_view filename) {
   CHECK_OK(file::Exists(filename, file::Defaults()));
   SetCoverModel model;
   File* file(file::OpenOrDie(filename, "r", file::Defaults()));
+  const auto close_file = [](File* file) { file->Close(file::Defaults()).IgnoreError(); };
+  std::unique_ptr<File, decltype(close_file)> file_owner(file, close_file);
   SetCoverReader reader(file);
   const ElementIndex num_rows(reader.ParseNextInteger());
   const SubsetIndex num_cols(reader.ParseNextInteger());
@@ -169,12 +176,12 @@ SetCoverModel ReadOrlibRail(absl::string_view filename) {
     for (const ColumnEntryIndex _ : ColumnEntryRange(column_size)) {
       // Correct the 1-indexing.
       const ElementIndex element(reader.ParseNextInteger() - 1);
+      if (element.value() < 0 || element >= num_rows) throw std::invalid_argument("Invalid OR-Library element index.");
       model.AddElementToSubset(element, subset);
     }
   }
   LOG(INFO) << "Read " << model.num_subsets() << " subsets, "
             << model.num_elements() << " elements";
-  file->Close(file::Defaults()).IgnoreError();
   model.CreateSparseRowView();
   return model;
 }
@@ -193,7 +200,7 @@ SetCoverModel ReadFimiDat(absl::string_view filename) {
     }
     for (const std::string& number_str : elements) {
       BaseInt element;
-      CHECK(absl::SimpleAtoi(number_str, &element));
+      if (!absl::SimpleAtoi(number_str, &element) || element < 0 || element == std::numeric_limits<BaseInt>::max()) throw std::invalid_argument("Invalid FIMI element token.");
       smallest_element = std::min(smallest_element, element);
       largest_element = std::max(largest_element, element);
     }
@@ -214,7 +221,7 @@ SetCoverModel ReadFimiDat(absl::string_view filename) {
     std::vector<ElementIndex> elements_list;
     for (const std::string& number_str : elements) {
       BaseInt raw_element;
-      CHECK(absl::SimpleAtoi(number_str, &raw_element));
+      if (!absl::SimpleAtoi(number_str, &raw_element) || raw_element < 0) throw std::invalid_argument("Invalid FIMI element token.");
       // Re-index the elements starting from 0.
       ElementIndex element(raw_element - smallest_element);
       if (element_seen[element]) {

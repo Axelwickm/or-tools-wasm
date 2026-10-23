@@ -20,14 +20,34 @@
       #status { min-height: 7rem; }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
     </nav>
     <h1>Network Flow - max flow</h1>
     <p><em>Problem: send as much flow as possible from a source node to a sink node through arcs with limited capacities.</em></p>
-    <div class="code-toggle">
+
+    <ul class="example-notes">
+      <li>Flow starts at the green source node and must reach the red sink node.</li>
+      <li>Each directed arc has a capacity: the maximum flow it can carry.</li>
+      <li>The solver chooses arc flows that maximize total source-to-sink throughput.</li>
+      <li>After solving, thicker blue arcs carry more flow and labels show flow/capacity.</li>
+      <li>The min cut identifies the bottleneck separating source-side and sink-side nodes.</li>
+    </ul>
+    <div class="controls">
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+      <label>Transit nodes <input id="middle-count" class="short-number" type="number" min="3" value="8"></label>
+
+    <div class="control-actions"><button id="run" data-idle-label="Solve Max Flow">Solve Max Flow</button><button id="randomize" type="button">Randomize</button></div>
+</div>
+    <svg id="flow-graph" viewBox="0 0 960 620" role="img" aria-label="Max flow network"></svg>
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the max-flow solution.</div>
+    </section>
+    <details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import { SimpleMaxFlow } from 'or-tools-wasm/network-flow';
@@ -42,23 +62,7 @@ const result = await maxFlow.solve({
 console.log(result.status, result.optimalFlow);</code></pre>
       </details>
     </div>
-    <ul class="example-notes">
-      <li>Flow starts at the green source node and must reach the red sink node.</li>
-      <li>Each directed arc has a capacity: the maximum flow it can carry.</li>
-      <li>The solver chooses arc flows that maximize total source-to-sink throughput.</li>
-      <li>After solving, thicker blue arcs carry more flow and labels show flow/capacity.</li>
-      <li>The min cut identifies the bottleneck separating source-side and sink-side nodes.</li>
-    </ul>
-    <div class="controls">
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <label>Transit nodes <input id="middle-count" class="short-number" type="number" min="3" value="8"></label>
-      <button id="randomize" type="button">Randomize</button>
-      <button id="run" data-idle-label="Solve Max Flow">Solve Max Flow</button>
-    </div>
-    <svg id="flow-graph" viewBox="0 0 960 620" role="img" aria-label="Max flow network"></svg>
-    <div id="solution-output">Run the solver to view the max-flow solution.</div>
-    <p>Status:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./network_flow_max_flow.ts"></script>
   </body>

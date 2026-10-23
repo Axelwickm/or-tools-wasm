@@ -10,52 +10,59 @@
       #status { min-height: 8rem; }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
       <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>
     </nav>
-    <h1>MathOpt - solver backend sample</h1>
-    <p><em>Problem: solve a tiny linear model and compare how the MathOpt frontend sends it to different solver backends.</em></p>
-    <div class="code-toggle">
+    <h1>MathOpt — two choices</h1>
+    <p><em>Problem: choose the most valuable combination of two items within a shared capacity.</em></p>
+
+    <div class="example-explanation">
+      <h2>Model</h2>
+      <ul>
+        <li>Choose the most valuable combination of two items within one shared capacity.</li>
+        <li>LP solvers allow fractions; CP-SAT and SCIP choose whole items.</li>
+        <li>The result shows the objective value and how much of each item was chosen.</li>
+      </ul>
+    </div>
+    <div class="controls">
+<label>
+        Backend
+        <select id="solver">
+          <option value="GLOP">GLOP</option>
+          <option value="GLPK">GLPK</option>
+          <option value="GSCIP">GSCIP</option>
+          <option value="CP_SAT">CP-SAT</option>
+        </select>
+      </label>
+<label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+<label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>
+
+<div class="control-actions"><button id="run" data-idle-label="Solve model">Solve model</button></div>
+</div>
+<details class="advanced-settings" id="advanced-settings"><summary>Advanced settings</summary>
+<section class="settings-group"><h3>Model and callbacks</h3><div class="option-grid"><label hidden>Constraint (SCIP): <select id="choice-constraint"><option value="linear">Linear capacity</option><option value="sos1">SOS1: one choice</option><option value="sos2">SOS2: two adjacent choices</option><option value="robust">Robust: uncertain capacity</option><option value="indicatorMip">Indicator: native MIP conversion</option></select></label>
+<label hidden title="SCIP can enforce the capacity constraint lazily by returning it from a solution callback."><input id="lazy-constraint" type="checkbox"> Lazy capacity constraint</label>
+<label hidden title="CP-SAT and SCIP report incumbent solutions and can stop after the first one."><input id="stop-after-solution" type="checkbox"> Stop after first solution</label>
+<label title="Use native MathOpt to improve a feasible starting point by adjusting x and y before solving."><input id="improve-point" type="checkbox"> Improve starting point</label>
+</div></section>
+<section class="settings-group"><h3>Serialization and logging</h3><div class="option-grid"><label title="Serialized-model solving sends protobuf bytes directly to the same backend, with the same callbacks and solve settings."><input id="raw-proto" type="checkbox"> Use serialized model</label>
+<label hidden title="The native update option sets x&#x27;s upper bound to zero and solves again in the same solver. The backend returns whether it supports that update."><input id="raw-incremental" type="checkbox" disabled> Update x and solve again</label>
+<label title="Live solver logs show native message batches as the solve runs."><input id="live-logs" type="checkbox"> Show live solver logs</label>
+</div></section>
+</details>
+
+    <section class="solution-panel">
+      <h2>Solution</h2>
+      <div id="solution-output">Run the solver to view the solution.</div>
+    </section>
+    <details class="solve-log" open><summary>Solve log</summary><pre id="status" aria-live="polite"></pre></details>
+    <div class="code-toggle code-samples" title="Adapted from the OR-Tools basic MathOpt example.">
       <details>
-        <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { MathOpt } from 'or-tools-wasm/mathopt';
-
-const model = MathOpt.Model('basic');
-const x = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'x' });
-const y = model.addVariable({ lowerBound: 0, upperBound: 1, name: 'y' });
-
-model.addLinearConstraint({ upperBound: 1, terms: [
-  { variable: x, coefficient: 1 },
-  { variable: y, coefficient: 1 },
-]});
-model.maximize([
-  { variable: x, coefficient: 2 },
-  { variable: y, coefficient: 1 },
-]);
-
-console.log(await model.exportMps({ executor: 'worker' }));
-
-const result = await MathOpt.solve(model, {
-  executor: 'worker',
-  solverType: MathOpt.SolverType.GLOP,
-  timeLimitSeconds: 5,
-  messageCallback: messages => console.log(messages.join('\n')),
-  glop: new MathOpt.GlopParameters({
-    usePreprocessing: true,
-    useScaling: true,
-  }),
-});
-const restored = await MathOpt.parseSolveResult(result.toProtoBytes(), model, { executor: 'worker' });
-console.log(restored.objectiveValue, restored.variableValuesById);
-// Standalone native conversion for saving a solution separately.
-const savedPrimal = await MathOpt.convertSolutionProto('primalSolution', {
-  variableValues: { ids: [x.id, y.id], values: [result.value(x), result.value(y)] },
-  objectiveValue: result.objectiveValue!, feasibilityStatus: 'SOLUTION_STATUS_FEASIBLE',
-}, model, { executor: 'worker' });
-console.log(savedPrimal.bytes);</code></pre>
+        <summary title="Updates when you change the example settings.">Show code</summary>
+        <pre class="code-block"><code data-highlight="ts"></code></pre>
       </details>
       <details>
         <summary>Show serialized-model solve</summary>
@@ -96,9 +103,9 @@ const result = await MathOpt.solve(model, {
     requestRegistration: [MathOptCallbackEventProto.CALLBACK_EVENT_MIP_SOLUTION],
     addLazyConstraints: true,
   },
-  callback: data => {
-    const sum = (data.primalSolutionVector?.values ?? []).reduce((a, b) => a + b, 0);
-    if (sum > 1 + 1e-6) return { cuts: [{
+  callback: data =&gt; {
+    const sum = (data.primalSolutionVector?.values ?? []).reduce((a, b) =&gt; a + b, 0);
+    if (sum &gt; 1 + 1e-6) return { cuts: [{
       linearExpression: { ids: [x.id, y.id], values: [1, 1] },
       lowerBound: -Infinity, upperBound: 1, isLazy: true,
     }] };
@@ -107,49 +114,9 @@ const result = await MathOpt.solve(model, {
 console.log(result.objectiveValue, result.variableValuesById);</code></pre>
       </details>
     </div>
-    <p>
-      Adapted from <code>ortools/math_opt/samples/python/basic_example.py</code>.
-      The browser demo solves the same two-variable linear model with a selectable MathOpt backend.
-      GLPK runs with a single thread.
-    </p>
-    <div class="example-explanation">
-      <h2>Model</h2>
-      <ul>
-        <li>The model has two variables, one capacity constraint, and one linear objective.</li>
-        <li>Objective names and exact priorities are model metadata. Auxiliary objectives can be built and serialized; the bundled backends do not support solving them.</li>
-        <li>The backend selector sends the same MathOpt model to different solver backends.</li>
-        <li>Integer-capable backends use binary variables; LP backends use continuous variables between 0 and 1.</li>
-        <li>The solution table shows how the selected backend values the same small model.</li>
-        <li>CP-SAT and SCIP report incumbent solutions and can stop after the first one.</li>
-        <li>SCIP can enforce the capacity constraint lazily by returning it from a solution callback.</li>
-        <li>Live solver logs show native message batches as the solve runs.</li>
-        <li>Serialized-model solving sends protobuf bytes directly to the same backend, with the same callbacks and solve settings.</li>
-        <li>The native update option sets x's upper bound to zero and solves again in the same solver. The backend returns whether it supports that update.</li>
-      </ul>
-    </div>
-    <div class="controls">
-      <label>
-        Backend
-        <select id="solver">
-          <option value="GLOP">GLOP</option>
-          <option value="GLPK">GLPK</option>
-          <option value="GSCIP">GSCIP</option>
-          <option value="CP_SAT">CP-SAT</option>
-        </select>
-      </label>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <label>Threads <input id="worker-count" class="short-number" type="number" min="1" max="8" value="4"></label>
-      <label><input id="stop-after-solution" type="checkbox"> Stop after the first incumbent (CP-SAT / SCIP)</label>
-      <label><input id="lazy-constraint" type="checkbox"> Add capacity constraint from a callback (SCIP)</label>
-      <label><input id="live-logs" type="checkbox"> Show live solver logs</label>
-      <label><input id="raw-proto" type="checkbox"> Solve serialized model</label>
-      <label><input id="raw-incremental" type="checkbox" disabled> Apply native bound update (x = 0)</label>
-      <button id="run" data-idle-label="Solve model">Solve model</button>
-    </div>
-    <div id="solution-output">Run the solver to view the solution.</div>
-    <p>Status / Response:</p>
-    <pre id="status"></pre>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./mathopt_basic.ts"></script>
-  </body>
+    <script type="module" src="./live_example_code.ts"></script>
+</body>
 </html>

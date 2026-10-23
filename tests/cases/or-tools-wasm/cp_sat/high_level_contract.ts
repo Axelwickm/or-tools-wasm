@@ -419,7 +419,7 @@ async function runCancellationCase(api: HighLevelCpSatPackage, mode: ExecutorFix
     executor: executorForMode(mode), numWorkers: 1, enumerateAllSolutions: true,
     maxTimeInSeconds: 20, solutionCallback: callback,
   });
-  assert(stopped.hasSolution && solver.statusName(stopped.status) === 'FEASIBLE', 'CpSat.solve must honor callback stopSearch');
+  assert(stopped.hasSolution && ['FEASIBLE', 'OPTIMAL'].includes(solver.statusName(stopped.status)), 'CpSat.solve preserves the native final response after stopSearch, including searches already completed');
   assert(callback.count === 3, 'convenience solve must stop at requested solution count');
   return { solverStatus: solver.statusName(status) };
 }

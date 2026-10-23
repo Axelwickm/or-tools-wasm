@@ -91,6 +91,7 @@ SolverExecutorResult SolveMinCostFlow(const bridge::MinCostFlowRequest& request)
     return Error("SimpleMinCostFlow: too many supply nodes.");
   }
   SimpleMinCostFlow solver;
+  if (request.has_price_scaling()) solver.SetPriceScaling(request.price_scaling());
   for (int arc = 0; arc < request.tails_size(); ++arc) {
     solver.AddArcWithCapacityAndUnitCost(request.tails(arc), request.heads(arc),
                                         request.capacities(arc), request.unit_costs(arc));

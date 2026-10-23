@@ -4,55 +4,57 @@
 #include <string>
 #include <vector>
 #include "javascript/routing_index_validation.h"
+#include "routing.pb.h"
 namespace ortools_wasm {
+using ::ortools_wasm::bridge::v1::RoutingVariableKind;
 struct RoutingExpressionVariables {
   std::vector<operations_research::IntVar*> boolean;
   std::vector<operations_research::IntVar*> integer;
 };
-// Values match RoutingVariableKind in the bridge.
+
 inline operations_research::IntVar* RoutingVariable(operations_research::RoutingModel& model,
     int kind, const std::string& name, int64_t index, int resource_group = 0, const RoutingExpressionVariables* variables = nullptr) {
-  if (kind == 11 || kind == 12) {
+  if (kind == RoutingVariableKind::ROUTING_VARIABLE_BOOLEAN || kind == RoutingVariableKind::ROUTING_VARIABLE_EXPRESSION) {
     if (!variables || !name.empty()) return nullptr;
-    const auto& values = kind == 11 ? variables->boolean : variables->integer;
+    const auto& values = kind == RoutingVariableKind::ROUTING_VARIABLE_BOOLEAN ? variables->boolean : variables->integer;
     return index >= 0 && index < values.size() ? values[index] : nullptr;
   }
-  if (kind == 10) {
+  if (kind == RoutingVariableKind::ROUTING_VARIABLE_RESOURCE) {
     if (!name.empty() || index < 0 || index >= model.vehicles() || resource_group < 0 || resource_group >= model.GetResourceGroups().size()) return nullptr;
     return model.ResourceVar(static_cast<int>(index), resource_group);
   }
-  if (kind == 8 || kind == 9) {
+  if (kind == RoutingVariableKind::ROUTING_VARIABLE_ACTIVE_VEHICLE || kind == RoutingVariableKind::ROUTING_VARIABLE_ROUTE_CONSIDERED) {
     if (!name.empty() || index < 0 || index >= model.vehicles()) return nullptr;
-    return kind == 8 ? model.ActiveVehicleVar(static_cast<int>(index))
+    return kind == RoutingVariableKind::ROUTING_VARIABLE_ACTIVE_VEHICLE ? model.ActiveVehicleVar(static_cast<int>(index))
                      : model.VehicleRouteConsideredVar(static_cast<int>(index));
   }
-  if (kind < 1 || kind > 7 || !IsRoutingIndexValid(model, index, kind == 1 || kind == 4)) return nullptr;
-  if (kind == 1 || kind == 2 || kind == 6 || kind == 7) {
+  if (kind < RoutingVariableKind::ROUTING_VARIABLE_CUMUL || kind > RoutingVariableKind::ROUTING_VARIABLE_FIXED_TRANSIT || !IsRoutingIndexValid(model, index, kind == RoutingVariableKind::ROUTING_VARIABLE_CUMUL || kind == RoutingVariableKind::ROUTING_VARIABLE_VEHICLE)) return nullptr;
+  if (kind == RoutingVariableKind::ROUTING_VARIABLE_CUMUL || kind == RoutingVariableKind::ROUTING_VARIABLE_SLACK || kind == RoutingVariableKind::ROUTING_VARIABLE_TRANSIT || kind == RoutingVariableKind::ROUTING_VARIABLE_FIXED_TRANSIT) {
     auto* dimension = model.GetMutableDimension(name);
     if (!dimension) return nullptr;
     switch (kind) {
-      case 1: return dimension->CumulVar(index);
-      case 2: return dimension->SlackVar(index);
-      case 6: return dimension->TransitVar(index);
-      case 7: return dimension->FixedTransitVar(index);
+      case RoutingVariableKind::ROUTING_VARIABLE_CUMUL: return dimension->CumulVar(index);
+      case RoutingVariableKind::ROUTING_VARIABLE_SLACK: return dimension->SlackVar(index);
+      case RoutingVariableKind::ROUTING_VARIABLE_TRANSIT: return dimension->TransitVar(index);
+      case RoutingVariableKind::ROUTING_VARIABLE_FIXED_TRANSIT: return dimension->FixedTransitVar(index);
     }
   }
   if (!name.empty()) return nullptr;
   switch (kind) {
-    case 3: return model.NextVar(index);
-    case 4: return model.VehicleVar(index);
-    case 5: return model.ActiveVar(index);
+    case RoutingVariableKind::ROUTING_VARIABLE_NEXT: return model.NextVar(index);
+    case RoutingVariableKind::ROUTING_VARIABLE_VEHICLE: return model.VehicleVar(index);
+    case RoutingVariableKind::ROUTING_VARIABLE_ACTIVE: return model.ActiveVar(index);
   }
   return nullptr;
 }
 // Register native variables for collection without adding finalizers or constraints.
 inline bool CaptureRoutingVariables(operations_research::RoutingModel& model, int kind, const std::string& name, const RoutingExpressionVariables* variables = nullptr) {
-  int64_t count = (kind == 8 || kind == 9) ? model.vehicles() : model.Size();
-  if (kind == 11 || kind == 12) {
+  int64_t count = (kind == RoutingVariableKind::ROUTING_VARIABLE_ACTIVE_VEHICLE || kind == RoutingVariableKind::ROUTING_VARIABLE_ROUTE_CONSIDERED) ? model.vehicles() : model.Size();
+  if (kind == RoutingVariableKind::ROUTING_VARIABLE_BOOLEAN || kind == RoutingVariableKind::ROUTING_VARIABLE_EXPRESSION) {
     if (!variables) return false;
-    count = (kind == 11 ? variables->boolean : variables->integer).size();
+    count = (kind == RoutingVariableKind::ROUTING_VARIABLE_BOOLEAN ? variables->boolean : variables->integer).size();
   }
-  if (kind != 2 && kind != 6 && kind != 7 && kind != 8 && kind != 9 && kind != 11 && kind != 12) return false;
+  if (kind != RoutingVariableKind::ROUTING_VARIABLE_SLACK && kind != RoutingVariableKind::ROUTING_VARIABLE_TRANSIT && kind != RoutingVariableKind::ROUTING_VARIABLE_FIXED_TRANSIT && kind != RoutingVariableKind::ROUTING_VARIABLE_ACTIVE_VEHICLE && kind != RoutingVariableKind::ROUTING_VARIABLE_ROUTE_CONSIDERED && kind != RoutingVariableKind::ROUTING_VARIABLE_BOOLEAN && kind != RoutingVariableKind::ROUTING_VARIABLE_EXPRESSION) return false;
   for (int64_t index = 0; index < count; ++index) {
     auto* variable = RoutingVariable(model, kind, name, index, 0, variables);
     if (!variable) return false;

@@ -1,3 +1,4 @@
+import { ObserverScope } from '../solver_job.js';
 import { CloudExecutor } from '../cloud_executor.js';
 import {
   resolveExecutorConfiguration,
@@ -13,6 +14,8 @@ import {
   type SetCoverExecutor,
   type SetCoverOperation,
   type SetCoverSearchOperation,
+  type SetCoverMutationOperation,
+  type SetCoverRemovability,
   type SetCoverResult as SetCoverBridgeResult,
   type GuidedTabuParameters,
 } from './protocol.js';
@@ -34,6 +37,8 @@ export type SetCoverSolutionResponse = {
 };
 
 export type SetCoverEvent = SolverJobEvent;
+export type { SetCoverRemovability } from './protocol.js';
+export type SetCoverPerturbationOptions = SetCoverSolveOptions & { focus?: readonly number[] };
 export type SetCoverSolveOptions = {
   executor?: ExecutorSelection;
   onEvent?: (event: SetCoverEvent) => void | Promise<void>;
@@ -48,15 +53,24 @@ export type SetCoverOneShotOptions = SetCoverSolveOptions & {
 };
 
 /** Snapshot returned by a one-shot solve; iterative generators remain separate. */
+export type SetCoverSearchStatistics = { runTimeSeconds: number; runTimeMicroseconds: number };
+export type SetCoverSearchResult = { nextSolution: boolean; statistics: SetCoverSearchStatistics | null };
+function nativeSearchStatistics(result: SetCoverBridgeResult): SetCoverSearchStatistics | null {
+  if (result.runTimeSeconds === undefined || result.runTimeMicroseconds === undefined) return null;
+  return { runTimeSeconds: result.runTimeSeconds, runTimeMicroseconds: result.runTimeMicroseconds };
+}
+
 let createSetCoverResult: (result: SetCoverBridgeResult) => SetCoverResult;
 
 export class SetCoverResult {
+  readonly statistics: SetCoverSearchStatistics | null;
   readonly cost: number;
   readonly numUncoveredElements: number;
   readonly hasSolution: boolean;
   private readonly selected: readonly boolean[];
 
   private constructor(result: SetCoverBridgeResult) {
+    this.statistics = nativeSearchStatistics(result);
     this.cost = result.cost;
     this.numUncoveredElements = result.numUncoveredElements;
     this.hasSolution = result.numUncoveredElements === 0;
@@ -75,7 +89,83 @@ export class SetCoverResult {
   }
 }
 
+/** Native MPSolver status for the restricted subproblem, not an optimality claim about the returned cover. */
+export enum SetCoverMipStatus {
+  OPTIMAL = 0, FEASIBLE = 1, INFEASIBLE = 2, UNBOUNDED = 3, ABNORMAL = 4, MODEL_INVALID = 5, NOT_SOLVED = 6,
+}
+export type SetCoverMipOptions = SetCoverSolveOptions & {
+  /** Native initial selection; integer search retains these subsets rather than using them as a solver hint. */
+  initialSelectedSubsets?: readonly number[];
+  /** Subsets in the native subproblem. Omit for all subsets; [] means none. */
+  focus?: readonly number[];
+  /** Native integer-millisecond limit. Omitted/zero means unlimited; must be finite. */
+  timeLimitSeconds?: number;
+};
+export type SetCoverMipResult = {
+  /** Native subproblem status; OPTIMAL does not certify optimality of the returned cover. */
+  subproblemStatus: SetCoverMipStatus;
+  /** Native NextSolution() return value; not a feasibility certificate. */
+  nextSolution: boolean;
+  /** Owned selection snapshot; hasSolution reports full-model coverage independently of subproblemStatus. */
+  cover: SetCoverResult;
+};
+export type SetCoverLpResult = {
+  subproblemStatus: SetCoverMipStatus;
+  nextSolution: boolean;
+  /** Native reported objective for the focused subproblem; null if no relaxation was reported. */
+  objectiveValue: number | null;
+  statistics: SetCoverSearchStatistics | null;
+};
+
+async function runSetCoverMip(model: SetCoverModel, lpRelaxation: boolean, options: SetCoverMipOptions) {
+  const { initialSelectedSubsets = [], focus, timeLimitSeconds = 0, ...execution } = options;
+  if (!Number.isFinite(timeLimitSeconds) || timeLimitSeconds < 0 || timeLimitSeconds * 1000 >= 9223372036854775808)
+    throw new RangeError('Set Cover MIP time limit must be finite non-negative seconds representable as int64 milliseconds.');
+  const selected = Array<boolean>(model.numSubsets).fill(false);
+  for (const subset of initialSelectedSubsets) { assertSubsetIndex(subset, model.numSubsets); selected[subset] = true; }
+  const focusIndices = focus === undefined ? undefined : Array.from(focus, subset => { assertSubsetIndex(subset, model.numSubsets); return subset; });
+  if (focusIndices && new Set(focusIndices).size !== focusIndices.length) throw new RangeError('Set Cover MIP focus must contain distinct subset indices.');
+  const result = await runNativeSetCover({ type: 'mip', lpRelaxation, selected, focusIndices, timeLimitSeconds, ...serializeSetCoverModel(model) }, execution);
+  if (!result.mip) throw new Error('Set Cover executor returned no MIP result.');
+  return { result, mip: result.mip };
+}
+
+export type SetCoverCftOptions = SetCoverSolveOptions & {
+  /** A complete initial cover. Omit to use native initialization. */
+  initialSelectedSubsets?: readonly number[];
+};
+export type SetCoverCftResult = {
+  cover: SetCoverResult;
+  /** Native full-model dual state; CFT is a heuristic, not an exact solver. */
+  dual: import('./protocol.js').SetCoverLagrangianBound;
+};
+
 export const SetCover = {
+  /** Native CFT heuristic for nonempty, coverable models with non-negative costs and nonempty subsets.
+   * Uses native stopping rules; no native time-limit or interruption control is available. */
+  async solveCft(model: SetCoverModel, options: SetCoverCftOptions = {}): Promise<SetCoverCftResult> {
+    const { initialSelectedSubsets, ...execution } = options;
+    const selected = initialSelectedSubsets === undefined ? undefined : Array<boolean>(model.numSubsets).fill(false);
+    for (const subset of initialSelectedSubsets ?? []) { assertSubsetIndex(subset, model.numSubsets); selected![subset] = true; }
+    const result = await runNativeSetCover({ type: 'cft', ...serializeSetCoverModel(model), selected }, execution);
+    if (!result.cftDual) throw new Error('Set Cover executor returned no CFT dual state.');
+    return { cover: createSetCoverResult(result), dual: {
+      lowerBound: result.cftDual.lowerBound, reducedCosts: [...result.cftDual.reducedCosts], multipliers: [...result.cftDual.multipliers],
+    } };
+  },
+  /** Calls native SetCoverMip::NextSolution() with SCIP. Retains initial selections and native focus semantics;
+   * inspect subproblemStatus and cover.hasSolution separately. */
+  async solveMip(model: SetCoverModel, options: SetCoverMipOptions = {}): Promise<SetCoverMipResult> {
+    const { result, mip } = await runSetCoverMip(model, false, options);
+    return { subproblemStatus: mip.subproblemStatus, nextSolution: result.nextSolution, cover: createSetCoverResult(result) };
+  },
+  /** Calls native SetCoverMip::NextSolution() with GLOP and continuous variables.
+   * Reports the native subproblem objective; upstream exposes no fractional assignment. */
+  async solveLpRelaxation(model: SetCoverModel, options: SetCoverMipOptions = {}): Promise<SetCoverLpResult> {
+    const { result, mip } = await runSetCoverMip(model, true, options);
+    return { subproblemStatus: mip.subproblemStatus, nextSolution: result.nextSolution,
+      objectiveValue: mip.objectiveValue ?? null, statistics: nativeSearchStatistics(result) };
+  },
   async solve(model: SetCoverModel, options: SetCoverOneShotOptions = {}): Promise<SetCoverResult> {
     const { algorithm = 'greedy', maxIterations = Number.POSITIVE_INFINITY, timeLimitSeconds = Number.POSITIVE_INFINITY, ...execution } = options;
     const selected = Array.from({ length: model.numSubsets }, () => false);
@@ -173,6 +263,18 @@ const modelVersions = new WeakMap<SetCoverModel, number>();
 const invariantVersions = new WeakMap<SetCoverInvariant, number>();
 const invariantCommits = new WeakMap<SetCoverInvariant, (result: SetCoverBridgeResult) => void>();
 function bumpVersion<T extends object>(versions: WeakMap<T, number>, object: T): void { versions.set(object, (versions.get(object) ?? 0) + 1); }
+function runNativeInvariantOperation(invariant: SetCoverInvariant, operation: SetCoverOperation, options: SetCoverSolveOptions,
+    action: 'search' | 'trace compression' | 'mutation',
+    commit: (result: SetCoverBridgeResult) => void = invariantCommits.get(invariant)!): Promise<SetCoverBridgeResult> {
+  const model = invariant.model(), modelVersion = modelVersions.get(model) ?? 0;
+  const invariantVersion = invariantVersions.get(invariant) ?? 0;
+  return runNativeSetCover(operation, options, result => {
+    if (invariant.model() !== model || (modelVersions.get(model) ?? 0) !== modelVersion ||
+        (invariantVersions.get(invariant) ?? 0) !== invariantVersion)
+      throw new Error(`Set Cover invariant or model was modified during ${action}; its stale result was discarded.`);
+    commit(result);
+  });
+}
 function modelIndex(value: number, label: string): void {
   if (!Number.isInteger(value) || value < 0 || value >= 0x7fffffff)
     throw new RangeError(`Set Cover ${label} must be a nonnegative index below 2147483647.`);
@@ -181,7 +283,32 @@ function subsetCost(cost: number): void {
   if (!Number.isFinite(cost)) throw new RangeError('Set Cover subset cost must be finite.');
 }
 
+export type { SetCoverLagrangianBound } from './protocol.js';
+
 export class SetCoverModel {
+  static async fromText(input: string, format: 'orlibScp' | 'orlibRail' | 'fimi', options: SetCoverSolveOptions = {}): Promise<SetCoverModel> {
+    if (typeof input !== 'string') throw new TypeError('Set Cover input must be text.');
+    const formatId = new Map([['orlibScp', 0], ['orlibRail', 1], ['fimi', 2]]).get(format);
+    if (formatId === undefined) throw new Error('Unknown Set Cover input format.');
+    const result = await runNativeSetCover({ type: 'readModel', input: new TextEncoder().encode(input), format: formatId }, options);
+    if (result.modelProtoJson === undefined) throw new Error('Native Set Cover executor did not return a model.');
+    // Protobuf JSON represents int64 element IDs as strings; the native model
+    // uses int32 indices, validated again by the existing model importer.
+    const proto = JSON.parse(result.modelProtoJson) as { name?: string; subset?: Array<{ cost?: number; element?: string[] }> };
+    const model = new SetCoverModel();
+    model.importModelFromProto({ name: proto.name, subset: (proto.subset ?? []).map(subset => ({
+      cost: subset.cost ?? 0, element: (subset.element ?? []).map(Number),
+    })) });
+    return model;
+  }
+
+  async exportText(format: 'orlibScp' | 'orlibRail', options: SetCoverSolveOptions = {}): Promise<string> {
+    const formatId = new Map([['orlibScp', 0], ['orlibRail', 1]]).get(format);
+    if (formatId === undefined) throw new Error('Native Set Cover has no writer for this format.');
+    const result = await runNativeSetCover({ type: 'writeModel', ...serializeSetCoverModel(this), format: formatId }, options);
+    if (result.text === undefined) throw new Error('Native Set Cover executor did not return exported text.');
+    return result.text;
+  }
   private modelName = 'SetCoverModel';
   private costs: number[] = [];
   private subsetElements: number[][] = [];
@@ -336,6 +463,15 @@ export class SetCoverModel {
     this.subsetElements = elements;
     this.validRows = false;
     bumpVersion(modelVersions, this);
+  }
+
+  /** Native Lagrangian relaxation; upperBound must be a valid finite cover-cost upper bound.
+   * Returned vectors are native iteration state, not a certificate for the retained best bound. */
+  async computeLagrangianLowerBound(upperBound: number, options: SetCoverSolveOptions = {}): Promise<import('./protocol.js').SetCoverLagrangianBound> {
+    if (!Number.isFinite(upperBound) || upperBound < 0) throw new RangeError('Set Cover upper bound must be finite and non-negative.');
+    const { lagrangianBound } = await runNativeSetCover({ type: 'lagrangianBound', upperBound, ...serializeSetCoverModel(this) }, options);
+    if (!lagrangianBound) throw new Error('Set Cover executor returned no Lagrangian bound.');
+    return { lowerBound: lagrangianBound.lowerBound, reducedCosts: [...lagrangianBound.reducedCosts], multipliers: [...lagrangianBound.multipliers] };
   }
 
   computeCostStats(options: SetCoverSolveOptions = {}) { return this.computeStatistics(0, options); }
@@ -506,14 +642,9 @@ export class SetCoverInvariant {
 
   async compressTrace(options: SetCoverSolveOptions = {}): Promise<void> {
     beginSetCoverSolve(this);
-    const model = this.currentModel;
-    const modelVersion = modelVersions.get(model) ?? 0;
-    const invariantVersion = invariantVersions.get(this) ?? 0;
     const trace = this.solutionTrace.map(item => ({ subset: item.subset(), selected: item.decision() }));
     try {
-      await runNativeSetCover({ type: 'compressTrace', numSubsets: model.numSubsets, trace }, options, result => {
-        if (this.currentModel !== model || (modelVersions.get(model) ?? 0) !== modelVersion ||
-            (invariantVersions.get(this) ?? 0) !== invariantVersion) throw new Error('Set Cover invariant or model was modified during trace compression; its stale result was discarded.');
+      await runNativeInvariantOperation(this, { type: 'compressTrace', numSubsets: this.currentModel.numSubsets, trace }, options, 'trace compression', result => {
         if (!result.trace) throw new Error('Set Cover executor returned no compressed trace.');
         this.solutionTrace = result.trace.map(item => new SetCoverDecision(item.subset, item.selected));
         bumpVersion(invariantVersions, this);
@@ -537,6 +668,45 @@ export class SetCoverInvariant {
     const result = await this.inspect(options);
     if (!result.computedRedundancy) throw new Error('Set Cover executor returned no native redundancy result.');
     return result.computedRedundancy[subset];
+  }
+
+  /** Apply a native selection update and return its removability notifications. */
+  async updateSelection(subset: number, selected: boolean, options: SetCoverSolveOptions = {}): Promise<SetCoverRemovability> {
+    assertSubsetIndex(subset, this.currentModel.numSubsets);
+    if (typeof selected !== 'boolean') throw new TypeError('Set Cover selection must be a Boolean.');
+    const result = await this.mutate({ type: 'updateSelection', subset, select: selected,
+      ...serializeSetCoverModel(this.currentModel), selected: this.isSelected() }, options);
+    if (!result.removability) throw new Error('Set Cover executor returned no native removability information.');
+    return result.removability;
+  }
+
+  /** Native random perturbation may also clear intersecting subsets outside focus. */
+  async clearRandomSubsets(numSubsets: number, options: SetCoverPerturbationOptions = {}): Promise<number[]> {
+    return this.perturb('clearRandomSubsets', numSubsets, options);
+  }
+
+  async clearMostCoveredElements(numSubsets: number, options: SetCoverPerturbationOptions = {}): Promise<number[]> {
+    return this.perturb('clearMostCoveredElements', numSubsets, options);
+  }
+
+  private async perturb(type: 'clearRandomSubsets' | 'clearMostCoveredElements', numSubsets: number,
+      { focus, ...options }: SetCoverPerturbationOptions): Promise<number[]> {
+    if (!Number.isInteger(numSubsets) || numSubsets < 0 || numSubsets > 0x7fffffff)
+      throw new RangeError('Set Cover perturbation count must be a nonnegative int32.');
+    const focusIndices = focus === undefined ? undefined : Array.from(focus, subset => {
+      assertSubsetIndex(subset, this.currentModel.numSubsets); return subset;
+    });
+    const result = await this.mutate({ type, numSubsets, focusIndices,
+      ...serializeSetCoverModel(this.currentModel), selected: this.isSelected() }, options);
+    if (!result.perturbationFocus) throw new Error('Set Cover executor returned no native perturbation focus.');
+    return result.perturbationFocus;
+  }
+
+  private async mutate(operation: SetCoverMutationOperation, options: SetCoverSolveOptions): Promise<SetCoverBridgeResult> {
+    beginSetCoverSolve(this);
+    try {
+      return await runNativeInvariantOperation(this, operation, options, 'mutation');
+    } finally { finishSetCoverSolve(this); }
   }
 
   select(subset: number) {
@@ -617,20 +787,12 @@ abstract class SetCoverSolutionGenerator {
   }
 
   protected executeSearch(operation: SetCoverSearchOperation, options: SetCoverSolveOptions): Promise<SetCoverBridgeResult> {
-    const model = this.invariant.model();
-    const modelVersion = modelVersions.get(model) ?? 0;
-    const invariantVersion = invariantVersions.get(this.invariant) ?? 0;
-    return runNativeSetCover(operation, options, result => {
-      if (this.invariant.model() !== model || (modelVersions.get(model) ?? 0) !== modelVersion ||
-          (invariantVersions.get(this.invariant) ?? 0) !== invariantVersion)
-        throw new Error('Set Cover invariant or model was modified during search; its stale result was discarded.');
-      invariantCommits.get(this.invariant)!(result);
-    });
+    return runNativeInvariantOperation(this.invariant, operation, options, 'search');
   }
 
   protected modelSnapshot() { return serializeSetCoverModel(this.invariant.model()); }
 
-  async nextSolution(focus?: number[] | boolean[], options: SetCoverSolveOptions = {}) {
+  private async runSolution(focus?: number[] | boolean[], options: SetCoverSolveOptions = {}) {
     beginSetCoverSolve(this.invariant);
     try {
       const model = this.invariant.model();
@@ -660,10 +822,18 @@ abstract class SetCoverSolutionGenerator {
       );
       if (this.guidedTabuParameters) operation.guidedTabuParameters = { ...this.guidedTabuParameters };
       const result = await this.executeSearch(operation, options);
-      return result.nextSolution;
+      return result;
     } finally {
       finishSetCoverSolve(this.invariant);
     }
+  }
+
+  async nextSolution(focus?: number[] | boolean[], options: SetCoverSolveOptions = {}): Promise<boolean> {
+    return (await this.runSolution(focus, options)).nextSolution;
+  }
+  async nextSolutionWithStats(focus?: number[] | boolean[], options: SetCoverSolveOptions = {}): Promise<SetCoverSearchResult> {
+    const result = await this.runSolution(focus, options);
+    return { nextSolution: result.nextSolution, statistics: nativeSearchStatistics(result) };
   }
 
   name() {
@@ -707,6 +877,11 @@ export class SteepestSearch extends SetCoverSolutionGenerator {
   }
 }
 
+/** Native lazy redundancy search; upstream does not enforce iteration/time limits. */
+export class LazySteepestSearch extends SetCoverSolutionGenerator {
+  constructor(invariant: SetCoverInvariant) { super(invariant, 'lazySteepest', 'LazySteepestSearch'); }
+}
+
 class SetCoverRuntimeLostError extends Error {
   constructor() { super('Set Cover guided search runtime was replaced; close this instance and create a new one.'); }
 }
@@ -724,7 +899,7 @@ abstract class SetCoverGuidedSearch extends SetCoverSolutionGenerator {
   private state: 'open' | 'failed' | 'closing' | 'closed' = 'open';
   private active?: Promise<unknown>;
   private closePromise?: Promise<void>;
-  private callbackDepth = 0;
+  private readonly eventScope = new ObserverScope();
   protected tuningVersions: TuningVersions = {};
   private appliedTuningVersions: TuningVersions = {};
   protected tuningVersion = 0;
@@ -753,7 +928,7 @@ abstract class SetCoverGuidedSearch extends SetCoverSolutionGenerator {
     if (this.active) return Promise.reject(new Error('Set Cover guided search already has an operation in progress.'));
     if (options.signal?.aborted) return Promise.reject(createAbortError(options.signal));
     let pending!: Promise<T>;
-    pending = action().finally(() => { if (this.active === pending) this.active = undefined; });
+    pending = action().finally(() => { this.eventScope.finish(); if (this.active === pending) this.active = undefined; });
     this.active = pending;
     return pending;
   }
@@ -783,7 +958,7 @@ abstract class SetCoverGuidedSearch extends SetCoverSolutionGenerator {
   private lifecycleOptions(options: SetCoverSolveOptions): SetCoverSolveOptions {
     const onEvent = options.onEvent;
     if (!onEvent) return options;
-    return { ...options, onEvent: async event => { this.callbackDepth++; try { await onEvent(event); } finally { this.callbackDepth--; } } };
+    return { ...options, onEvent: this.eventScope.wrap(onEvent) };
   }
 
   private async execute(operation: SetCoverOperation, options: SetCoverSolveOptions, onSuccess: (result: SetCoverBridgeResult) => void, create = false): Promise<SetCoverBridgeResult> {
@@ -796,6 +971,11 @@ abstract class SetCoverGuidedSearch extends SetCoverSolutionGenerator {
         onDispatch: runtime => { if (create) this.runtime = runtime; else this.assertRuntime(runtime); },
         onEvent: this.lifecycleOptions(options).onEvent,
         onSuccess: result => { onSuccess(result); committed = true; },
+        onAbandonedResult: create ? async payload => {
+          const result = setCoverProtocol.decodeResult(payload);
+          if (!result.sessionHandle) throw new Error('Set Cover guided search creation returned no handle.');
+          await executeSolverJob(executor, { type: 'sessionDelete', handle: result.sessionHandle }, { showCloudNotice: false });
+        } : undefined,
       });
     } catch (error) {
       if (!committed && this.state === 'open') this.state = 'failed';
@@ -852,6 +1032,15 @@ abstract class SetCoverGuidedSearch extends SetCoverSolutionGenerator {
     } finally { finishSetCoverSolve(this.invariant); }
   }
 
+  async statistics(options: SetCoverSolveOptions = {}): Promise<SetCoverSearchStatistics | null> {
+    return this.launch(options, async () => {
+      if (this.handle === undefined) throw new Error('Initialize or run guided search before reading native session statistics.');
+      this.bind(options); this.assertModel();
+      const result = await this.execute({ type: 'sessionStatistics', handle: this.handle }, options, () => {});
+      return nativeSearchStatistics(result);
+    });
+  }
+
   protected readGuidedTabuParameters(options: SetCoverSolveOptions): Promise<GuidedTabuParameters> {
     const snapshot = this.capture();
     return this.launch(options, async () => {
@@ -869,7 +1058,7 @@ abstract class SetCoverGuidedSearch extends SetCoverSolutionGenerator {
   }
 
   close(): Promise<void> {
-    if (this.callbackDepth) return Promise.reject(new Error('Set Cover guided search cannot be closed inside its event handler.'));
+    if (this.eventScope.running) return Promise.reject(new Error('Set Cover guided search cannot be closed inside its event handler.'));
     if (this.state === 'closed') return Promise.resolve();
     if (this.closePromise) return this.closePromise;
     this.state = 'closing';

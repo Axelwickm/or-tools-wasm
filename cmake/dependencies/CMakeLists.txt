@@ -392,14 +392,23 @@ endif()
 if(BUILD_SCIP)
   message(CHECK_START "Fetching SCIP")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
+  file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/../apply_scip_patches.cmake" scip_patch_signature)
+  file(GLOB scip_patch_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/../../patches/scip-v10.0.0*.patch")
+  foreach(scip_patch_file IN LISTS scip_patch_files)
+    file(SHA256 "${scip_patch_file}" scip_patch_hash)
+    string(APPEND scip_patch_signature "${scip_patch_hash}")
+  endforeach()
+  string(SHA256 scip_patch_signature "${scip_patch_signature}")
+  set(scip_patch_command ${CMAKE_COMMAND}
+    "-DPATCH_DIRECTORY=${CMAKE_CURRENT_LIST_DIR}/../../patches"
+    "-DPATCH_SIGNATURE=${scip_patch_signature}"
+    -P "${CMAKE_CURRENT_LIST_DIR}/../apply_scip_patches.cmake")
   FetchContent_Declare(
     scip
     GIT_REPOSITORY "https://github.com/scipopt/scip.git"
     GIT_TAG        "v10.0.0"
     GIT_SHALLOW TRUE
-    PATCH_COMMAND ${CMAKE_COMMAND}
-    "-DPATCH_DIRECTORY=${CMAKE_CURRENT_LIST_DIR}/../../patches"
-    -P "${CMAKE_CURRENT_LIST_DIR}/../apply_scip_patches.cmake"
+    PATCH_COMMAND ${scip_patch_command}
   )
   set(SHARED ${BUILD_SHARED_LIBS} CACHE BOOL "Scip param" FORCE)
   set(ZLIB ON CACHE BOOL "Scip param" FORCE)
@@ -414,6 +423,14 @@ if(BUILD_SCIP)
   set(LPS "spx" CACHE STRING "Scip param" FORCE)
   set(SYM "none" CACHE STRING "Scip param" FORCE)
   FetchContent_MakeAvailable(scip)
+  # A source override skips FetchContent's patch step, including cached builds.
+  if(FETCHCONTENT_SOURCE_DIR_SCIP)
+    execute_process(COMMAND ${scip_patch_command} WORKING_DIRECTORY "${scip_SOURCE_DIR}"
+      RESULT_VARIABLE scip_patch_result)
+    if(NOT scip_patch_result EQUAL 0)
+      message(FATAL_ERROR "Cannot apply patches to the SCIP source override")
+    endif()
+  endif()
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   message(CHECK_PASS "fetched")
 endif()

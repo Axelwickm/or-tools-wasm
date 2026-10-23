@@ -55,14 +55,14 @@ export async function runVisitTypes({ api, mode, executor }: RoutingControlConte
   for (const index of [1, 2, 3, 4, 5]) metadata.setVisitType(index, 2, index === 2 || index === 4
     ? policies.ADDED_TYPE_REMOVED_FROM_VEHICLE : policies.TYPE_ADDED_TO_VEHICLE);
   metadata.setVisitType(0, 3, policies.TYPE_ON_VEHICLE_UP_TO_VISIT);
-  assert(metadata.getNumberOfVisitTypes() === 4 && metadata.getSingleNodesOfType(2).join(',') === '5'
-    && metadata.getSingleNodesOfType(3).join(',') === '0' && metadata.getPairIndicesOfType(2).join(',') === '1,0'
-    && metadata.getSingleNodesOfType(0).length === 0, 'Type count includes sparse IDs; singleton/pair order follows native node scanning');
-  metadata.getSingleNodesOfType(2).push(99); metadata.getPairIndicesOfType(2).reverse();
-  assert(metadata.getSingleNodesOfType(2).join(',') === '5' && metadata.getPairIndicesOfType(2).join(',') === '1,0', 'Returned type lists are independent snapshots');
+  assert(metadata.getNumberOfVisitTypes() === 4 && (await metadata.getSingleNodesOfType(2, { executor })).join(',') === '5'
+    && (await metadata.getSingleNodesOfType(3, { executor })).join(',') === '0' && (await metadata.getPairIndicesOfType(2, { executor })).join(',') === '1,0'
+    && (await metadata.getSingleNodesOfType(0, { executor })).length === 0, 'Type count includes sparse IDs; singleton/pair order follows native node scanning');
+  (await metadata.getSingleNodesOfType(2, { executor })).push(99); (await metadata.getPairIndicesOfType(2, { executor })).reverse();
+  assert((await metadata.getSingleNodesOfType(2, { executor })).join(',') === '5' && (await metadata.getPairIndicesOfType(2, { executor })).join(',') === '1,0', 'Returned type lists are independent snapshots');
   metadata.setVisitType(5, 4, policies.TYPE_SIMULTANEOUSLY_ADDED_AND_REMOVED);
   metadata.setVisitType(5, -1, policies.ADDED_TYPE_REMOVED_FROM_VEHICLE);
-  assert(metadata.getNumberOfVisitTypes() === 5 && metadata.getVisitType(5) === -1 && metadata.getSingleNodesOfType(4).length === 0
+  assert(metadata.getNumberOfVisitTypes() === 5 && metadata.getVisitType(5) === -1 && (await metadata.getSingleNodesOfType(4, { executor })).length === 0
     && metadata.getVisitTypePolicy(5) === policies.ADDED_TYPE_REMOVED_FROM_VEHICLE, 'Clearing/replacement preserves the native highest-type count and configured policy');
   metadata.addHardTypeIncompatibility(2, 3); metadata.addHardTypeIncompatibility(3, 2); metadata.addHardTypeIncompatibility(2, 2);
   metadata.getHardTypeIncompatibilitiesOfType(2).push(99);

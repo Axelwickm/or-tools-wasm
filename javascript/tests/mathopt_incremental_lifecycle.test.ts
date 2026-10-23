@@ -150,6 +150,7 @@ test('incremental handles belong to the local runtime that created them', { time
             const aborted = new AbortController(); aborted.abort();
             const beforeAbort = native.calls.length;
             await assert.rejects(old.solve({ signal: aborted.signal }), { name: 'AbortError' });
+            await assert.rejects(old.computeInfeasibleSubsystem({ signal: aborted.signal }), { name: 'AbortError' });
             if (raw) await assert.rejects(old.update({}, { signal: aborted.signal }), { name: 'AbortError' });
             assert.equal(native.calls.length, beforeAbort, 'Pre-aborted operations never dispatch against the native handle');
             assert.equal(objective(await old.solve()), 1, 'Pre-aborted operations leave the session reusable');
@@ -176,7 +177,7 @@ test('incremental handles belong to the local runtime that created them', { time
             // Close a dormant session directly, without a failed solve first.
             await unused.close();
             if (racing) {
-              await assert.rejects(racing.solve(), /runtime was replaced/);
+              await assert.rejects(racing.computeInfeasibleSubsystem(), /runtime was replaced/);
               await racing.close();
             }
             assert.deepEqual(replacement.calls, calls, 'stale handles never reach the new native runtime');
@@ -200,4 +201,85 @@ test('incremental handles belong to the local runtime that created them', { time
     delete globals.__mathoptLifecycleModule;
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('cancelled server creation deletes late native sessions even after close', { timeout: 10_000 }, async t => {
+  const directory = await mkdtemp(fileURLToPath(new URL('.mathopt-abandoned-', import.meta.url)));
+  try {
+    const outfile = `${directory}/api.mjs`;
+    await build({ stdin: { resolveDir: fileURLToPath(new URL('../lib', import.meta.url)), contents: `
+      export * from './mathopt.ts';
+      export { mathOptProtocol } from './mathopt/protocol.ts';
+      export * from './solver_bridge.ts';
+      export { createSolverJobStatusEvent, SolverJobState } from './solver_executor.ts';
+    ` }, outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external' });
+    const api = await import(outfile);
+    for (const raw of [false, true]) for (const stage of ['headers', 'body', 'result', 'normal-close']) {
+      await t.test(`${raw ? 'proto' : 'model'} ${stage}`, async () => {
+        const controller = new AbortController(), reason = new Error('creation cancelled');
+        const handles = new Set<number>();
+        let deleted = 0, interrupted = 0;
+        let deliver!: (response: Response) => void, body!: ReadableStreamDefaultController<Uint8Array>;
+        let resultStream!: ReadableStreamDefaultController<Uint8Array>;
+        let accepted!: Uint8Array, terminal!: Uint8Array;
+        let submissionSignal: AbortSignal | undefined;
+        const executor = { type: 'server', url: 'http://unused.invalid', fetch: async (url: URL, init?: RequestInit) => {
+          if (url.pathname === '/jobs') {
+            const outer = api.decodeSolverBridgeRequest(new Uint8Array(init!.body as ArrayBuffer));
+            const operation = api.mathOptProtocol.decodeRequest(outer.operation.value);
+            if (operation.type === 'incrementalDelete') {
+              assert.equal(operation.handle, 77n);
+              assert.ok(handles.delete(77), 'Native session deleted exactly once'); ++deleted;
+              return new Response(api.encodeSolverBridgeResult(outer.requestId, 'mathopt',
+                api.mathOptProtocol.encodeResult({ response: new Uint8Array() })));
+            }
+            assert.equal(operation.type, 'incrementalCreate'); handles.add(77);
+            accepted = api.encodeSolverBridgeStatus(outer.requestId, 'mathopt',
+              api.createSolverJobStatusEvent('mathopt', outer.requestId, api.SolverJobState.RUNNING, 0n).status, 7n, 1n);
+            terminal = api.encodeSolverBridgeResult(outer.requestId, 'mathopt', api.mathOptProtocol.encodeResult({
+              response: responseType.encode({ messages: '77' }).finish(),
+            }), 7n, 2n);
+            submissionSignal = init?.signal ?? undefined;
+            if (stage === 'headers') return new Promise<Response>(resolve => { deliver = resolve; });
+            if (stage === 'body') return new Response(new ReadableStream<Uint8Array>({ start(controller) { body = controller; } }), { status: 202 });
+            return new Response(new Uint8Array(accepted), { status: 202 });
+          }
+          if (url.pathname.endsWith('/interrupt')) { ++interrupted; return new Response(null, { status: 204 }); }
+          if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+          if (url.pathname.endsWith('/stream')) return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+            resultStream = controller;
+            if (stage !== 'result') {
+              controller.enqueue(new TextEncoder().encode(`data: ${Buffer.from(terminal).toString('base64')}\n\n`)); controller.close();
+            }
+          } }), { headers: { 'content-type': 'text/event-stream' } });
+          throw new Error(`Unexpected request: ${url}`);
+        } };
+        const session = raw
+          ? new api.MathOptProtoIncrementalSolver(new Uint8Array(), api.MathOptSolverType.GLOP, { executor, signal: controller.signal })
+          : new api.MathOptIncrementalSolver(api.MathOpt.Model(), api.MathOptSolverType.GLOP, { executor, signal: controller.signal });
+        if (stage === 'normal-close') {
+          await session.close();
+        } else {
+          // Creation is eager: cleanup must also work when no solve was started.
+          const failed = stage === 'body' ? Promise.resolve() : assert.rejects(session.solve(), error => error === reason);
+          if (stage === 'result') for (let turn = 0; !resultStream && turn < 20; ++turn) await nextTurn();
+          controller.abort(reason);
+          await failed;
+          await session.close();
+          await session.close();
+          assert.equal(handles.size, 1, 'Native creation has happened but the handle is still in transit');
+          assert.notEqual(submissionSignal?.aborted, true, 'Resource-creation submission stays readable for cleanup');
+          if (stage === 'headers') deliver(new Response(new Uint8Array(accepted), { status: 202 }));
+          if (stage === 'body') { body.enqueue(accepted); body.close(); }
+          if (stage === 'result') {
+            resultStream.enqueue(new TextEncoder().encode(`data: ${Buffer.from(terminal).toString('base64')}\n\n`)); resultStream.close();
+          }
+          for (let turn = 0; deleted === 0 && turn < 30; ++turn) await nextTurn();
+          assert.equal(interrupted, 0, 'Abandoned creation finishes without a stop request');
+        }
+        assert.equal(deleted, 1);
+        assert.equal(handles.size, 0, 'No native solver remains after late creation completes');
+      });
+    }
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

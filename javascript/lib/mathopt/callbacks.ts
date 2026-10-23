@@ -1,3 +1,4 @@
+import { synchronousCallbackResult } from '../callback_validation.js';
 import * as protobuf from 'protobufjs';
 import { mathOptCallbackDescriptor } from '../generated/mathopt_callback_schemas.js';
 import type { MathOptCallbackDataProto, MathOptCallbackRegistrationProto, MathOptCallbackResultProto } from '../generated/mathopt_callback_types.js';
@@ -27,11 +28,7 @@ export const encodeMathOptCallbackResult = (input: MathOptCallbackResult | Uint8
 
 export function callbackHandler(callback: MathOptCallback): (payload: Uint8Array) => Uint8Array {
   return payload => {
-    const result = callback(decodeMathOptCallbackData(payload));
-    if (result && typeof (result as { then?: unknown }).then === 'function') {
-      void Promise.resolve(result).catch(() => undefined);
-      throw new TypeError('MathOpt callbacks must return synchronously.');
-    }
+    const result = synchronousCallbackResult(callback(decodeMathOptCallbackData(payload)), 'MathOpt callbacks must return synchronously.');
     return encodeMathOptCallbackResult(result ?? {});
   };
 }

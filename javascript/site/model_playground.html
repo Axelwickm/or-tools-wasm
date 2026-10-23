@@ -19,7 +19,7 @@
     }
   </style>
 </head>
-<body>
+<body class="example-page">
   <main class="stack">
     <nav>
       <a href="./index.html">← All examples</a>
@@ -27,33 +27,7 @@
     </nav>
     <h1>CP-SAT - Model Playground</h1>
     <p><em>Problem: load a user-provided CP-SAT model, validate it, and solve it with editable search parameters.</em></p>
-    <div class="code-toggle">
-      <details>
-        <summary>Show code</summary>
-        <pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm/cp-sat';
 
-const modelJson = JSON.parse(textarea.value);
-const workers = 4;
-const params: SatParameters = {
-  ...JSON.parse(paramsTextarea.value),
-  numWorkers: workers,
-};
-
-const model = await CpSat.createModel(modelJson);
-const validation = await CpSat.validate(model, { executor: 'worker' });
-if (!validation.ok) throw new Error(validation.message);
-
-const controller = new AbortController();
-const result = await CpSat.solveProto(model, {
-  ...params,
-  executor: 'worker',
-  eventMask: { solution: true, bestBound: true, log: true },
-  onEvent: (event) => console.log(event),
-  signal: controller.signal,
-});
-console.log(result.response);</code></pre>
-      </details>
-    </div>
     <p>Paste a JSON-shaped <code>CpModelProto</code>, optionally edit SAT parameters, then validate or solve it in the browser.</p>
     <div class="example-explanation">
       <h2>Model</h2>
@@ -66,10 +40,7 @@ console.log(result.response);</code></pre>
     </div>
 
     <div class="controls">
-      <button id="load-sample">Load sample</button>
-      <button id="validate">Validate</button>
-      <button id="solve">Solve</button>
-      <button id="cancel" disabled>Cancel</button>
+
       <label>Workers <input id="workers" class="short-number" type="number" value="1" min="1"></label>
       <label>Executor <select id="cp-sat-executor">
         <option value="direct">Direct</option>
@@ -79,8 +50,9 @@ console.log(result.response);</code></pre>
       <label><input id="solution-events" type="checkbox" checked> Solutions</label>
       <label><input id="bound-events" type="checkbox" checked> Best bounds</label>
       <label><input id="log-events" type="checkbox" checked> Logs</label>
-      <button id="clear-events">Clear events</button>
-    </div>
+
+    <div class="control-actions"><button id="solve">Solve</button><button id="load-sample">Load sample</button><button id="validate">Validate</button><button id="cancel" disabled>Cancel</button><button id="clear-events">Clear events</button></div>
+</div>
     <div id="status" class="status-line" role="status" aria-live="polite"></div>
 
     <div class="two-column">
@@ -99,7 +71,15 @@ console.log(result.response);</code></pre>
     </div>
   </main>
 
+    <div class="code-toggle code-samples">
+      <details>
+        <summary title="Updates when you change the example settings.">Show code</summary>
+        <pre class="code-block"><code data-highlight="ts"></code></pre>
+      </details>
+    </div>
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
     <script type="module" src="./model_playground.ts"></script>
+  <script type="module" src="./live_example_code.ts"></script>
 </body>
 </html>

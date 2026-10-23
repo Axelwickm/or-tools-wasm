@@ -5,10 +5,13 @@ const site = new URL('../../site/', import.meta.url);
 const pages = readdirSync(site).filter((file) => file.endsWith('.html'));
 
 for (const file of pages) {
-  test(`${file}: readable mobile viewport`, async ({ browser }) => {
+  test(`${file}: readable mobile viewport`, async ({ browser, baseURL }) => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     try {
-      await page.goto(`http://127.0.0.1:4190/${file}`);
+      await page.goto(new URL(file, baseURL).href);
+      const redirect = readFileSync(new URL(file, site), 'utf8').match(/http-equiv="refresh" content="0;url=([^"]+)"/);
+      if (redirect) await expect(page).toHaveURL(new URL(redirect[1], page.url()).href);
+      await expect(page.locator('h1')).toBeVisible();
       // Expanding code and server settings must not widen the whole page.
       const code = page.locator('.code-toggle summary').first();
       if (await code.count()) await code.click();

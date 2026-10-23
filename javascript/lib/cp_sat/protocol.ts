@@ -13,6 +13,7 @@ import {
   CpSatSolveResultSchema,
   CpSatValidateRequestSchema,
   CpSatValidateResultSchema,
+  CpSatCheckSolutionRequestSchema,
 } from '../generated/bridge/cp_sat_pb.js';
 
 export type CpSatCallbackMask = {
@@ -34,13 +35,15 @@ export type CpSatOperation =
   }
   | { type: 'modelStats'; input: Uint8Array }
   | { type: 'responseStats'; input: Uint8Array }
-  | { type: 'exportModelText'; input: Uint8Array };
+  | { type: 'exportModelText'; input: Uint8Array }
+  | { type: 'checkSolution'; model: Uint8Array; values: bigint[] };
 
 export type CpSatResult =
   | { type: 'solve'; response: Uint8Array; statistics?: string }
   | { type: 'validate'; ok: boolean; message: string }
   | { type: 'statistics'; report: string }
-  | { type: 'modelText'; text: string };
+  | { type: 'modelText'; text: string }
+  | { type: 'solutionFeasible'; feasible: boolean };
 
 export type CpSatSolverEvent =
   | { type: 'solution'; response: Uint8Array }
@@ -58,6 +61,8 @@ export type CpSatJob = SolverJob<CpSatResult>;
 function decodeRequest(payload: Uint8Array): CpSatOperation {
   const request = fromBinary(CpSatBridgeRequestSchema, payload);
   switch (request.payload.case) {
+    case 'checkSolution': return { type: 'checkSolution',
+      model: request.payload.value.cpModelProto, values: request.payload.value.variableValues };
     case 'solve': {
       const { cpModelProto, satParametersProto, callbackMask } = request.payload.value;
       return {
@@ -93,7 +98,11 @@ export const cpSatProtocol: SolverBridgeCodec<
   solver: 'cp-sat',
   label: 'CP-SAT',
   encodeRequest: (operation) => {
-    const payload = operation.type === 'solve'
+    const payload = operation.type === 'checkSolution'
+      ? { case: 'checkSolution' as const, value: create(CpSatCheckSolutionRequestSchema, {
+        cpModelProto: operation.model, variableValues: operation.values,
+      }) }
+      : operation.type === 'solve'
       ? {
         case: 'solve' as const,
         value: create(CpSatSolveRequestSchema, {
@@ -117,7 +126,9 @@ export const cpSatProtocol: SolverBridgeCodec<
   },
   decodeRequest,
   encodeResult: (result) => {
-    const payload = result.type === 'solve'
+    const payload = result.type === 'solutionFeasible'
+      ? { case: 'solutionFeasible' as const, value: result.feasible }
+      : result.type === 'solve'
       ? {
         case: 'solveResult' as const,
         value: create(CpSatSolveResultSchema, {
@@ -144,6 +155,7 @@ export const cpSatProtocol: SolverBridgeCodec<
   decodeResult: (payload) => {
     const response = decodeResponse(payload);
     switch (response.payload.case) {
+      case 'solutionFeasible': return { type: 'solutionFeasible', feasible: response.payload.value };
       case 'solveResult':
         return {
           type: 'solve',

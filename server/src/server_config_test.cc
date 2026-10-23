@@ -58,6 +58,27 @@ void LoadsValidConfig() {
   ExpectEq(config.bearer_token, std::string("secret"), "bearer token");
 }
 
+void ResourceLimitsAreFiniteAndConfigurable() {
+  auto values = ValidEnv();
+  const auto defaults = LoadServerConfig(MapEnv(values));
+  ExpectEq(defaults.event_history_max_events, 4096, "event count default");
+  ExpectEq(defaults.event_history_max_bytes, 16777216, "event byte default");
+  ExpectEq(defaults.max_sessions_per_solver, 64, "session default");
+  ExpectEq(defaults.session_idle_timeout_seconds, 1800, "idle default");
+  for (const auto& name : {"ORTOOLS_SERVER_EVENT_HISTORY_MAX_EVENTS", "ORTOOLS_SERVER_EVENT_HISTORY_MAX_BYTES",
+                          "ORTOOLS_SERVER_MAX_SESSIONS_PER_SOLVER", "ORTOOLS_SERVER_SESSION_IDLE_TIMEOUT_SECONDS"}) {
+    values[name] = "2048";
+    LoadServerConfig(MapEnv(values));
+    for (const auto& invalid : {"0", "-1", "2048junk", ""}) {
+      values[name] = invalid;
+      bool rejected = false;
+      try { LoadServerConfig(MapEnv(values)); } catch (const std::runtime_error&) { rejected = true; }
+      Expect(rejected, std::string("invalid resource limit: ") + name);
+    }
+    values.erase(name);
+  }
+}
+
 void AllowsMissingBearerToken() {
   auto values = ValidEnv();
   values.erase("ORTOOLS_SERVER_BEARER_TOKEN");
@@ -136,6 +157,7 @@ struct TestCase {
 int RunAllTests() {
   const TestCase tests[] = {
       {"LoadsValidConfig", LoadsValidConfig},
+      {"ResourceLimitsAreFiniteAndConfigurable", ResourceLimitsAreFiniteAndConfigurable},
       {"AllowsMissingBearerToken", AllowsMissingBearerToken},
       {"ResolvesAutoThreads", ResolvesAutoThreads},
       {"RejectsMissingRequiredValue", RejectsMissingRequiredValue},

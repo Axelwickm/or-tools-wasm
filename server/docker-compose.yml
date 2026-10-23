@@ -4,20 +4,28 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,noexec,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     ports:
-      - "${ORTOOLS_SERVER_PORT:-17827}:${ORTOOLS_SERVER_PORT:-17827}"
+      - "${ORTOOLS_SERVER_BIND_ADDRESS:-127.0.0.1}:${ORTOOLS_SERVER_PORT:-17827}:${ORTOOLS_SERVER_PORT:-17827}"
     environment:
       ORTOOLS_SERVER_HOST: ${ORTOOLS_SERVER_HOST:-0.0.0.0}
       ORTOOLS_SERVER_PORT: ${ORTOOLS_SERVER_PORT:-17827}
       ORTOOLS_SERVER_TOTAL_THREADS: ${ORTOOLS_SERVER_TOTAL_THREADS:-auto}
       ORTOOLS_SERVER_MAX_QUEUE_SIZE: ${ORTOOLS_SERVER_MAX_QUEUE_SIZE:-100000}
       ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS: ${ORTOOLS_SERVER_COMPLETED_JOB_RETENTION_SECONDS:-3600}
+      ORTOOLS_SERVER_EVENT_HISTORY_MAX_EVENTS: ${ORTOOLS_SERVER_EVENT_HISTORY_MAX_EVENTS:-4096}
+      ORTOOLS_SERVER_EVENT_HISTORY_MAX_BYTES: ${ORTOOLS_SERVER_EVENT_HISTORY_MAX_BYTES:-16777216}
+      ORTOOLS_SERVER_MAX_SESSIONS_PER_SOLVER: ${ORTOOLS_SERVER_MAX_SESSIONS_PER_SOLVER:-64}
+      ORTOOLS_SERVER_SESSION_IDLE_TIMEOUT_SECONDS: ${ORTOOLS_SERVER_SESSION_IDLE_TIMEOUT_SECONDS:-1800}
       ORTOOLS_SERVER_BEARER_TOKEN: ${ORTOOLS_SERVER_BEARER_TOKEN:-}
 
   ortools-native-test:
     <<: *ortools-native
     ports: []
-    command:
-      - /bin/sh
-      - -c
-      - /build/server/server_job_scheduler_test && /build/server/server_cp_sat_executor_test && /build/server/server_knapsack_executor_test && /build/server/server_mathopt_executor_test && /build/server/server_mp_solver_executor_test && /build/server/server_network_flow_executor_test && /build/server/server_pdlp_executor_test && /build/server/server_routing_executor_test && /build/server/server_set_cover_executor_test && /build/server/server_solver_job_service_test && /build/server/server_http_integration_test && /build/server/server_config_test
+    command: ["/bin/sh", "/build/server/run_server_tests.sh"]

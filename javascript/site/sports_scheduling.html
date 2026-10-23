@@ -101,24 +101,54 @@
 			.legend-swatch.home { background: #dff7df; border-color: #1a7f37; }
 			.legend-swatch.away { background: #ffebe9; border-color: #cf222e; }
 			.legend-swatch.break { background: linear-gradient(to top, #bf8700 0 30%, #fff 30%); }
-			.solution-panel {
-				margin: 0.75rem 0;
-			}
-			.summary-value {
-				font-size: 1.35rem;
-				font-weight: 700;
-				margin-bottom: 0.35rem;
-			}
 		</style>
 	</head>
-	<body>
+	<body class="example-page">
 		<nav>
 			<a href="./index.html">← All examples</a>
 			<a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
 		</nav>
 		<h1>CP-SAT - Sports Scheduling</h1>
 		<p><em>Problem: build a double round-robin schedule where teams play balanced home and away games with as few breaks as possible.</em></p>
-		<div class="code-toggle">
+
+		<ul class="example-notes">
+			<li>Each team plays exactly one match per day.</li>
+			<li>Every pair of teams plays twice: once home and once away.</li>
+			<li>The season is split into two halves, and each pair meets once per half.</li>
+			<li>A break is two home games in a row or two away games in a row for the same team.</li>
+			<li>The solver minimizes total breaks while satisfying the round-robin constraints.</li>
+		</ul>
+		<div class="controls">
+			<label>Teams <input id="teams" class="medium-number" type="number" value="6" min="2" step="2"></label>
+			<label>Workers <input id="workers" class="short-number" type="number" value="4" min="1"></label>
+			<label>Executor <select id="cp-sat-executor">
+				<option value="direct">Direct</option>
+				<option value="worker" selected>Worker</option>
+				<option value="server">Server</option>
+			</select></label>
+
+		<div class="control-actions"><button id="run">Build schedule</button><button id="stop" disabled>Stop</button></div>
+</div>
+		<div id="schedule-output" class="schedule-wrap">
+			<p id="schedule-message">Provide parameters and run the solver to see a schedule.</p>
+			<div class="schedule-legend hidden" id="schedule-legend">
+				<span><span class="legend-swatch home"></span>Home</span>
+				<span><span class="legend-swatch away"></span>Away</span>
+				<span><span class="legend-swatch break"></span>Break</span>
+			</div>
+			<div id="day-grid" class="day-grid hidden"></div>
+			<div id="streak-panel" class="streak-panel hidden">
+				<h2>Home/away rhythm</h2>
+				<div id="streak-grid" class="streak-grid"></div>
+			</div>
+		</div>
+		<section class="solution-panel">
+			<h2>Solution</h2>
+			<div id="solution-output">Run the solver to view the solution.</div>
+		</section>
+		<details class="solve-log" open><summary>Solve log</summary><pre aria-live="polite" id="status"></pre></details>
+
+		<div class="code-toggle code-samples">
 			<details>
 				<summary>Show code</summary>
 				<pre class="code-block"><code data-highlight="ts">import { CpSat, type SatParameters } from 'or-tools-wasm/cp-sat';
@@ -228,45 +258,8 @@ const result = await CpSat.solveProto(model, { ...params, executor: 'worker' });
 console.log(result.response?.objectiveValue, result.response?.solution);</code></pre>
 			</details>
 		</div>
-		<ul class="example-notes">
-			<li>Each team plays exactly one match per day.</li>
-			<li>Every pair of teams plays twice: once home and once away.</li>
-			<li>The season is split into two halves, and each pair meets once per half.</li>
-			<li>A break is two home games in a row or two away games in a row for the same team.</li>
-			<li>The solver minimizes total breaks while satisfying the round-robin constraints.</li>
-		</ul>
-		<div class="controls">
-			<label>Teams <input id="teams" class="medium-number" type="number" value="6" min="2" step="2"></label>
-			<label>Workers <input id="workers" class="short-number" type="number" value="4" min="1"></label>
-			<label>Executor <select id="cp-sat-executor">
-				<option value="direct">Direct</option>
-				<option value="worker" selected>Worker</option>
-				<option value="server">Server</option>
-			</select></label>
-			<button id="run">Build schedule</button>
-			<button id="stop" disabled>Stop</button>
-		</div>
-		<div id="schedule-output" class="schedule-wrap">
-			<p id="schedule-message">Provide parameters and run the solver to see a schedule.</p>
-			<div class="schedule-legend hidden" id="schedule-legend">
-				<span><span class="legend-swatch home"></span>Home</span>
-				<span><span class="legend-swatch away"></span>Away</span>
-				<span><span class="legend-swatch break"></span>Break</span>
-			</div>
-			<div id="day-grid" class="day-grid hidden"></div>
-			<div id="streak-panel" class="streak-panel hidden">
-				<h2>Home/away rhythm</h2>
-				<div id="streak-grid" class="streak-grid"></div>
-			</div>
-		</div>
-		<section class="solution-panel">
-			<h2>Solution</h2>
-			<div id="solution-output">Run the solver to view the solution.</div>
-		</section>
-		<p>Status:</p>
-		<pre id="status"></pre>
-
-		<script type="module" src="./code_highlight.ts"></script>
+    <script type="module" src="./example_controls.ts"></script>
+    <script type="module" src="./code_highlight.ts"></script>
 		<script type="module" src="./sports_scheduling.ts"></script>
 	</body>
 </html>

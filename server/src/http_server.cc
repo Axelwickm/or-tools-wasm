@@ -1,6 +1,7 @@
 #include "server/src/http_server.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -17,6 +18,14 @@ constexpr const char* kBinaryContentType = "application/octet-stream";
 constexpr const char* kPlainTextContentType = "text/plain; charset=utf-8";
 constexpr const char* kEventStreamContentType = "text/event-stream";
 constexpr size_t kHttpControlThreads = 4;
+
+struct EventStreamSlot {
+  explicit EventStreamSlot(std::shared_ptr<std::atomic<size_t>> count)
+      : count(std::move(count)), position(this->count->fetch_add(1) + 1) {}
+  ~EventStreamSlot() { count->fetch_sub(1); }
+  const std::shared_ptr<std::atomic<size_t>> count;
+  const size_t position;
+};
 
 void AddCorsHeaders(httplib::Response& response) {
   response.set_header("Access-Control-Allow-Origin", "*");
@@ -75,6 +84,7 @@ class HttpServer::Impl {
         static_cast<size_t>(std::max(1, config_.total_threads));
     const size_t worker_count =
         std::max<size_t>(8, solver_threads + kHttpControlThreads);
+    stream_limit_ = worker_count - kHttpControlThreads;
     server_.new_task_queue = [worker_count] {
       return new httplib::ThreadPool(worker_count);
     };
@@ -111,7 +121,19 @@ class HttpServer::Impl {
     server_.Get(path, [this, handler = std::move(handler)](
                           const httplib::Request& request,
                           httplib::Response& response) {
+      // Return the worker when the stream ends instead of holding it idle for
+      // keep-alive. Rejected subscriptions must release their connection too.
+      response.set_header("Connection", "close");
       if (!Authorize(request, response)) return;
+
+      auto slot = std::make_shared<EventStreamSlot>(active_streams_);
+      if (slot->position > stream_limit_) {
+        AddCorsHeaders(response);
+        response.status = 503;
+        response.set_header("Retry-After", "1");
+        response.set_content("Event stream capacity reached; use polling.\n", kPlainTextContentType);
+        return;
+      }
 
       HttpBinaryRequest binary_request;
       binary_request.headers = HeadersFromRequest(request);
@@ -135,7 +157,7 @@ class HttpServer::Impl {
           std::move(stream.next));
       response.set_chunked_content_provider(
           kEventStreamContentType,
-          [next](size_t, httplib::DataSink& sink) {
+          [next, slot](size_t, httplib::DataSink& sink) {
             const std::optional<HttpServerSentEvent> event = (*next)();
             if (!event.has_value()) {
               sink.done();
@@ -221,6 +243,9 @@ class HttpServer::Impl {
   }
 
   ServerConfig config_;
+  std::shared_ptr<std::atomic<size_t>> active_streams_ =
+      std::make_shared<std::atomic<size_t>>(0);
+  size_t stream_limit_ = 0;
   httplib::Server server_;
 };
 

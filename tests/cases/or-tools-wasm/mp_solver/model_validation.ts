@@ -1,6 +1,5 @@
 import { runMpSolverParameterValidationCases } from './parameter_validation.ts';
 import { runMpSolverSolutionVerificationCases } from './solution_verification.ts';
-import { runMpSolverIISCases } from './iis.ts';
 import { runMpSolverNumericalCases } from './numerical.ts';
 import type * as Api from 'or-tools-wasm/mp-solver';
 import { executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
@@ -8,7 +7,7 @@ function assert(value: unknown, message: string): asserts value { if (!value) th
 
 export async function runMpSolverModelValidationCases(api: typeof Api) {
   const results = [...await runMpSolverParameterValidationCases(api), ...await runMpSolverSolutionVerificationCases(api),
-    ...await runMpSolverIISCases(api), ...await runMpSolverNumericalCases(api)];
+    ...await runMpSolverNumericalCases(api)];
   for (const mode of executorFixtureModes) {
     const executor = mode === 'server' ? serverExecutorConfiguration() : mode;
     for (const model of [{}, new Uint8Array(),

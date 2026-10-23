@@ -10,6 +10,7 @@ import {
   renderSimpleMpResult,
   setRunning,
 } from './mp_solver_helpers.js';
+import { setControlAvailable } from './example_controls.js';
 import { getMaxWorkerCount } from './worker_limits.js';
 
 const solutionOutput = document.getElementById('solution-output');
@@ -26,10 +27,13 @@ const solverId = document.body.dataset.solverId === 'CLP'
 
 configureMPSolverExecutor(executorSelector);
 configureSolverThreadsInput(workerInput, maxWorkerCount);
+if (workerInput) workerInput.value = '1';
+setControlAvailable(workerInput, false);
 
 async function runSimpleGlop() {
   setRunning(runButton, true);
   if (statusEl) statusEl.textContent = '';
+  if (solutionOutput) solutionOutput.textContent = 'Solving…';
   try {
     appendStatus(statusEl, 'Initializing MPSolver runtime...');
     const executionOptions = currentMPSolverExecutionOptions();
@@ -77,6 +81,7 @@ async function runSimpleGlop() {
       appendStatus(statusEl, `y = ${formatNumber(result.value(y))}`);
     }
   } catch (error) {
+    if (solutionOutput) solutionOutput.textContent = 'No solution available for this run.';
     appendStatus(statusEl, `Solve failed: ${(error as Error).message}`);
   } finally {
     setRunning(runButton, false);

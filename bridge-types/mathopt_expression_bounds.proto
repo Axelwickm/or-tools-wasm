@@ -1,0 +1,14 @@
+syntax = "proto3";
+package ortools_wasm.bridge.v1;
+
+message MathOptExpressionBoundsRequest {
+  bytes model_proto = 1;
+  repeated int64 variable_ids = 2;
+  repeated double coefficients = 3;
+  double offset = 4;
+}
+message MathOptExpressionBoundsResponse {
+  double lower_bound = 1;
+  double upper_bound = 2;
+  string error = 3;
+}

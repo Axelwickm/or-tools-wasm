@@ -1,4 +1,6 @@
+import { trackPendingEvent } from '../solver_executor.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
+import { allocateWasm } from '../wasm_memory.js';
 import { loadRoutingRuntime } from '../runtime_loader.js';
 import {
   createSolverFailureEvent,
@@ -10,6 +12,7 @@ import {
 } from '../solver_executor.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { solveRoutingWithModule } from './native_runtime.js';
+import { RoutingModelQueryKind } from './protocol.js';
 import type {
   RoutingExecutor,
   RoutingJob,
@@ -86,21 +89,40 @@ export class DirectRoutingExecutor implements RoutingExecutor {
         createdAt,
         BigInt(Date.now()),
       ));
-      const pendingCallbacks: Promise<void>[] = [];
+      const pendingCallbacks = new Set<Promise<void>>();
       let callbackFailure: { error: unknown } | undefined;
       const result = await withWasmRuntimeLock(module, async () => {
         const registry: { nextId: number; sinks: Map<number, (bytes: Uint8Array) => void> } =
           module.__ortoolsRoutingCallbacks ??= { nextId: 1, sinks: new Map() };
-        const callbackId = operation.request.solutionEvents ? registry.nextId++ : 0;
-        if (callbackId) registry.sinks.set(callbackId, bytes => {
+        const routes = operation.request.operations.some(value => value.type === 'addRouteConstraint')
+          || operation.request.modelQuery?.kind === RoutingModelQueryKind.ROUTING_MODEL_QUERY_FIRST_MATCHING_PICKUP_DELIVERY_SIBLING;
+        if (routes && !options.onCallback) throw new Error('Routing callback operations require a callback handler.');
+        const callbackId = operation.request.solutionEvents || operation.request.searchEntryEvents || routes ? registry.nextId++ : 0;
+        const routeCallbacks: Map<number, (bytes: Uint8Array) => number> = module.__ortoolsRoutingRouteCallbacks ??= new Map();
+        if (routes) routeCallbacks.set(callbackId, bytes => {
+          if (callbackFailure) return 0;
+          let pointer = 0;
+          try {
+            const reply = options.onCallback!(bytes);
+            if (!((reply.length === 1 && reply[0] === 0) || (reply.length === 9 && reply[0] === 1)))
+              throw new Error('Invalid Routing route callback reply.');
+            pointer = allocateWasm(module, reply.length + 4);
+            new DataView(module.HEAPU8.buffer).setUint32(pointer, reply.length, true);
+            module.HEAPU8.set(reply, pointer + 4);
+            return pointer;
+          } catch (error) {
+            if (pointer) module._free(pointer);
+            callbackFailure ??= { error };
+            return 0;
+          }
+        });
+        if (operation.request.solutionEvents || operation.request.searchEntryEvents) registry.sinks.set(callbackId, bytes => {
           if (callbackFailure) return;
           const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
           try {
-            const pending = options.onEvent({ type: 'solution', objectiveValue: view.getBigInt64(0, true),
+            const pending = options.onEvent(bytes.length === 0 ? { type: 'searchEntered' } : { type: 'solution', objectiveValue: view.getBigInt64(0, true),
               solutionCount: view.getBigInt64(8, true), unchecked: view.getBigInt64(16, true) !== 0n });
-            if (pending) pendingCallbacks.push(Promise.resolve(pending).catch(error => {
-              callbackFailure ??= { error };
-            }));
+            trackPendingEvent(pendingCallbacks, pending, error => { callbackFailure ??= { error }; });
           } catch (error) { callbackFailure ??= { error }; }
         });
         const state = this.activeJob;
@@ -108,9 +130,11 @@ export class DirectRoutingExecutor implements RoutingExecutor {
         state.nativeRunning = true;
         if (state.cancelled && operation.interruptible) this.interrupt(module);
         try { return await solveRoutingWithModule(module, operation.request, operation.interruptible, callbackId); }
+        catch (error) { throw callbackFailure ? callbackFailure.error : error; }
         finally {
           state.nativeRunning = false;
           if (callbackId) registry.sinks.delete(callbackId);
+          routeCallbacks.delete(callbackId);
         }
       });
       await Promise.all(pendingCallbacks);

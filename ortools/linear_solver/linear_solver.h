@@ -154,7 +154,6 @@
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
@@ -866,27 +865,6 @@ class MPSolver {
   // nullptr removes the callback. Configure only while no solve is running.
   bool SetMessageCallback(std::function<void(const std::string&)> callback);
   bool SupportsMessageCallbacks() const;
-
-  struct InfeasibleSubsystem {
-    struct VariableBounds {
-      int variable_index;
-      bool lower_bound;
-      bool upper_bound;
-    };
-    bool is_infeasible = false;
-    bool is_irreducible = false;
-    double time_seconds = 0;
-    int64_t nodes = 0;
-    std::vector<int> constraint_indices;
-    std::vector<VariableBounds> variable_bounds;
-  };
-  // Uses the native backend IIS finder (currently SCIP). Returned indices refer
-  // to this solver's mathematical model. Limits/irreducibility remain native.
-  absl::StatusOr<InfeasibleSubsystem> ComputeIrreducibleInfeasibleSubset(
-      const std::atomic<bool>* interrupt = nullptr,
-      std::optional<double> time_limit_seconds = std::nullopt,
-      std::optional<int64_t> node_limit = std::nullopt);
-
 
   // Global counters of variables and constraints ever created across all
   // MPSolver instances. Those are only updated after the destruction
@@ -1870,13 +1848,6 @@ class MPSolverInterface {
 
   virtual bool SupportsCallbacks() const { return false; }
   virtual bool SupportsMessageCallbacks() const { return false; }
-  virtual absl::StatusOr<MPSolver::InfeasibleSubsystem>
-  ComputeIrreducibleInfeasibleSubset(
-      const std::atomic<bool>* /*interrupt*/,
-      std::optional<double> /*time_limit_seconds*/,
-      std::optional<int64_t> /*node_limit*/) {
-    return absl::UnimplementedError("IIS is not supported by this MPSolver backend.");
-  }
 
 
   friend class MPSolver;

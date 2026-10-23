@@ -476,7 +476,7 @@
       }
     </style>
   </head>
-  <body>
+  <body class="example-page">
     <nav>
       <a href="./index.html">← All examples</a>
       <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>
@@ -491,7 +491,35 @@
       <li>The production planner keeps one MathOpt IncrementalSolver alive, mutating bounds and objective terms as orders, WIP, stock, ingredients, and processor reservations change.</li>
       <li>A second short-horizon CP-SAT solve schedules conveyor dispatch timing so raw materials do not collide on shared directed lanes.</li>
     </ul>
-    <div class="code-toggle">
+
+    <div class="controls runtime-controls">
+
+      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
+      <label>Threads <input id="worker-threads" class="short-number" type="number" value="4" min="1"></label>
+    <div class="control-actions"><button id="toggle-running" type="button">Start</button><button id="reset-floor" type="button">Reset</button></div>
+</div>
+
+    <div class="factory-shell">
+      <section class="factory-stage">
+        <div id="factory-board-wrap" class="factory-board-wrap">
+          <div id="factory-board" class="factory-board" role="grid" aria-label="Bakery factory floor"></div>
+          <div id="entity-layer" class="entity-layer" aria-hidden="true"></div>
+          <div id="shop-clock" class="shop-clock" aria-label="Bakery clock">06:00</div>
+        </div>
+        <aside class="storefront-panel" aria-label="Storefront customers">
+          <h2 class="storefront-title">Storefront</h2>
+          <div id="storefront"></div>
+        </aside>
+      </section>
+
+      <section class="factory-status">
+        <h2 class="factory-status-title">Factory state <span id="factory-planning-status" class="planning-badge ready">Ready</span></h2>
+        <div id="metrics" class="metric-grid"></div>
+        <div id="order-panel" class="order-panel"></div>
+      </section>
+    </div>
+
+    <div class="code-toggle code-samples">
       <details>
         <summary>Show code</summary>
         <pre class="code-block"><code data-highlight="ts">import { MathOpt } from 'or-tools-wasm/mathopt';
@@ -539,34 +567,7 @@ async function stopPlanner() {
 window.addEventListener('pagehide', () => void stopPlanner().catch(console.error), { once: true });</code></pre>
       </details>
     </div>
-
-    <div class="runtime-controls">
-      <button id="toggle-running" type="button">Start</button>
-      <button id="reset-floor" type="button">Reset</button>
-      <label>Executor <select id="solver-executor"><option value="direct">Direct</option><option value="worker" selected>Worker</option><option value="server">Server</option></select></label>
-      <label>Threads <input id="worker-threads" class="short-number" type="number" value="4" min="1"></label>
-    </div>
-
-    <div class="factory-shell">
-      <section class="factory-stage">
-        <div id="factory-board-wrap" class="factory-board-wrap">
-          <div id="factory-board" class="factory-board" role="grid" aria-label="Bakery factory floor"></div>
-          <div id="entity-layer" class="entity-layer" aria-hidden="true"></div>
-          <div id="shop-clock" class="shop-clock" aria-label="Bakery clock">06:00</div>
-        </div>
-        <aside class="storefront-panel" aria-label="Storefront customers">
-          <h2 class="storefront-title">Storefront</h2>
-          <div id="storefront"></div>
-        </aside>
-      </section>
-
-      <section class="factory-status">
-        <h2 class="factory-status-title">Factory state <span id="factory-planning-status" class="planning-badge ready">Ready</span></h2>
-        <div id="metrics" class="metric-grid"></div>
-        <div id="order-panel" class="order-panel"></div>
-      </section>
-    </div>
-
+    <script type="module" src="./example_controls.ts"></script>
     <script type="module" src="./mathopt_factory_floor.ts"></script>
     <script type="module" src="./code_highlight.ts"></script>
   </body>

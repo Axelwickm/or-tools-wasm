@@ -1,0 +1,14 @@
+syntax = "proto3";
+package ortools_wasm.bridge.v1;
+
+// Native result bytes retain the vendored MathOpt schema. The envelope has the
+// same result/message/status layout as other MathOpt operation replies.
+message MathOptInfeasibleSubsystemResponse {
+  message Status {
+    int32 code = 1;
+    string message = 2;
+  }
+  bytes result_proto = 1;
+  repeated string messages = 2;
+  Status status = 3;
+}

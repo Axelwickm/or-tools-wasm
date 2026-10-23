@@ -91,7 +91,12 @@ export class ManagedWorker<Request, Response> {
     const generation = this.generation;
     const worker = await this.ensureReady(generation);
     if (generation !== this.generation) throw this.terminationError;
-    beforePost?.();
+    try { beforePost?.(); }
+    catch (error) {
+      // Loading creates a referenced worker even if dispatch is rejected.
+      if (this.pendingRequests.size === 0) worker.unref?.();
+      throw error;
+    }
     worker.ref?.();
     return new Promise<Response>((resolve, reject) => {
       const id = this.options.getRequestId(request);

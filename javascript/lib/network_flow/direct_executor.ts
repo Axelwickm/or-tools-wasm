@@ -153,9 +153,9 @@ export class DirectNetworkFlowExecutor implements NetworkFlowExecutor {
         const supplies = copyInt64ToHeap(allocate, operation.supplies);
         return parseResult(await module.ccall(
           'graph_min_cost_flow_solve_serialized', 'string',
-          ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+          ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
           [tails, heads, capacities, costs, operation.tails.length, supplies, operation.supplies.length,
-            operation.solveMaxFlowWithMinCost ? 1 : 0],
+            operation.solveMaxFlowWithMinCost ? 1 : 0, Number(operation.priceScaling ?? true)],
           { async: true },
         ) as string);
       }

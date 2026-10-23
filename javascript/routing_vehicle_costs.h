@@ -6,6 +6,15 @@
 #include "ortools/constraint_solver/routing.h"
 
 namespace ortools_wasm {
+inline bool SetRoutingPathEnergyCosts(operations_research::RoutingModel& model,
+    const std::string& force, const std::string& distance, int vehicle,
+    int64_t threshold, int64_t below, int64_t above) {
+  if (vehicle < 0 || vehicle >= model.vehicles() || threshold < 0 || below < 0 || above < 0
+      || !model.HasDimension(force) || !model.HasDimension(distance)) return false;
+  if (!model.GetDimensionOrDie(force).IsUnary()) return false;
+  model.SetPathEnergyCostsOfVehicle(force, distance, threshold, below, above, vehicle);
+  return true;
+}
 inline bool SetRoutingMaximumActiveVehicles(operations_research::RoutingModel& model, int maximum) {
   if (maximum < 0) return false;
   model.SetMaximumNumberOfActiveVehicles(maximum);

@@ -45,6 +45,28 @@ test('server failures distinguish HTTP, transport and protocol errors', async (t
     await assert.rejects(executor.execute({}, { onEvent: () => {} }).result, failure => failure === error);
     assert.deepEqual(requests, ['POST /jobs', 'GET /jobs/7/stream', 'DELETE /jobs/7']);
   });
+  for (const polling of [false, true]) {
+    await t.test(`expired ${polling ? 'polling' : 'stream'} cursor fails explicitly and cancels native work`, async () => {
+      const requests: string[] = [];
+      const accepted = encodeSolverBridgeStatus(1, 'test',
+        createSolverJobStatusEvent('test', 1, State.RUNNING, 0n).status, 7n, 1n);
+      const executor = new SolverServerExecutor(codec, {
+        url: 'http://unused.invalid', fetch: async (url: URL) => {
+          requests.push(url.pathname);
+          if (url.pathname === '/jobs') return new Response(accepted, { status: 202 });
+          if (url.pathname.endsWith('/cancel')) return new Response(null, { status: 204 });
+          if (url.pathname.endsWith('/events') || url.pathname.endsWith('/stream'))
+            return new Response('Event history expired', { status: 410 });
+          throw new Error(`Unexpected request: ${url.pathname}`);
+        },
+      });
+      await assert.rejects(executor.execute({}, { onEvent: () => {},
+        ...(polling ? { onCallback: () => new Uint8Array() } : {}),
+      }).result, /410.*Event history expired/);
+      await nextTurn();
+      assert.deepEqual(requests, ['/jobs', `/jobs/7/${polling ? 'events' : 'stream'}`, '/jobs/7/cancel']);
+    });
+  }
   for (const solver of ['cp-sat', 'mathopt', 'mp-solver']) {
     for (const stage of ['headers', 'body'] as const) {
       await t.test(`${solver} cancellation during submission ${stage} settles even if fetch ignores abort`, async () => {
@@ -93,6 +115,222 @@ test('server failures distinguish HTTP, transport and protocol errors', async (t
     const rejected = assert.rejects(result, { name: 'AbortError' });
     controller.abort();
     await rejected;
+  });
+  for (const solver of ['test', 'mathopt']) {
+    for (const stage of ['stream-headers', 'stream-body', 'events-headers', 'events-body', 'result-headers', 'result-body', 'stop-headers', 'stop-body']) {
+      await t.test(`${solver}: accepted cancellation bounds stalled ${stage}`, async t => {
+        t.mock.timers.enable({ apis: ['setTimeout'] });
+        const controller = new AbortController(), reason = new Error('caller stopped this solve');
+        const accepted = encodeSolverBridgeStatus(1, solver,
+          createSolverJobStatusEvent(solver, 1, State.RUNNING, 0n).status, 7n, 1n);
+        const terminal = encodeSolverBridgeResult(1, solver, new Uint8Array(), 7n, 2n);
+        const events: SolverJobEvent[] = [], requests: string[] = [];
+        const signals: AbortSignal[] = [];
+        let deliver: ((response: Response) => void) | undefined;
+        let body: ReadableStreamDefaultController<Uint8Array> | undefined;
+        let streamCancelled = false, settled = false, commits = 0;
+        const stalledResponse = (headers: boolean, signal: AbortSignal) => {
+          signals.push(signal);
+          if (headers) return new Promise<Response>(resolve => { deliver = resolve; });
+          return new Response(new ReadableStream<Uint8Array>({
+            start(value) { body = value; }, cancel() { streamCancelled = true; },
+          }), { headers: { 'content-type': 'text/event-stream' } });
+        };
+        const executor = new SolverServerExecutor({ ...codec, solver }, { url: 'http://unused.invalid', statusIntervalMs: 0,
+          fetch: async (url: URL, init?: RequestInit) => {
+            requests.push(url.pathname);
+            if (url.pathname === '/jobs') return new Response(accepted, { status: 202 });
+            if (url.pathname.endsWith('/cancel') || url.pathname.endsWith('/interrupt')) {
+              if (stage.startsWith('stop-')) return stalledResponse(stage === 'stop-headers', init!.signal!);
+              return new Response(null, { status: 204 });
+            }
+            if (url.pathname.endsWith('/stream')) {
+              if (stage.startsWith('stream-') || stage.startsWith('stop-')) {
+                if (stage.startsWith('stop-')) return new Promise<Response>(() => {});
+                return stalledResponse(stage === 'stream-headers', init!.signal!);
+              }
+              return new Response(null, { status: 409 });
+            }
+            if (url.pathname.endsWith('/events')) {
+              if (stage.startsWith('events-')) return stalledResponse(stage === 'events-headers', init!.signal!);
+              return new Response(new Uint8Array());
+            }
+            if (url.pathname.endsWith('/result')) return stalledResponse(stage === 'result-headers', init!.signal!);
+            if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+            throw new Error(`Unexpected request ${url.pathname}`);
+          },
+        });
+        const result = executeSolverJob(executor, {}, { signal: controller.signal,
+          onEvent: (event: SolverJobEvent) => { events.push(event); }, onSuccess: () => { ++commits; } });
+        void result.then(() => { settled = true; }, () => { settled = true; });
+        const rejected = assert.rejects(result, failure => failure === reason);
+        try {
+          await nextTurn();
+          t.mock.timers.tick(60_000); await nextTurn();
+          assert.equal(settled, false, 'healthy long solves have no result deadline before cancellation');
+          controller.abort(reason); await nextTurn();
+          assert.equal(requests.filter(path => path.endsWith(solver === 'mathopt' ? '/interrupt' : '/cancel')).length, 1);
+          t.mock.timers.tick(29_999); await nextTurn();
+          assert.equal(settled, false, 'native settlement gets its full grace period');
+          t.mock.timers.tick(1); await rejected;
+          assert.equal(commits, 0); assert.ok(signals.every(signal => signal.aborted));
+          if (stage === 'stream-body') assert.equal(streamCancelled, true, 'the SSE reader cancels its body');
+          const count = requests.length;
+          deliver?.(new Response(stage === 'stream-headers' ? `data: ${Buffer.from(terminal).toString('base64')}\n\n` : terminal,
+            { headers: { 'content-type': 'text/event-stream' } }));
+          if (stage !== 'stream-body' && body) { body.enqueue(terminal); body.close(); body = undefined; }
+          await nextTurn();
+          assert.deepEqual(requests.slice(count), stage === 'result-body' ? ['/jobs/7'] : [],
+            'late terminal data may release the remote job but cannot restart polling');
+          assert.equal(commits, 0);
+          assert.equal(events.filter(event => event.type === 'failure').length, 0, 'cancellation rejects the solve without scheduling further observers');
+        } finally { if (stage !== 'stream-body') body?.error(new Error('release stalled test stream')); }
+      });
+    }
+  }
+  for (const solver of ['mathopt', 'cp-sat']) for (const stage of ['headers', 'body'] as const) {
+    await t.test(`${solver} interruption during submission ${stage} preserves the native result`, async () => {
+      const controller = new AbortController();
+      const accepted = encodeSolverBridgeStatus(1, solver, createSolverJobStatusEvent(solver, 1, State.RUNNING, 0n).status, 7n, 1n);
+      const terminal = encodeSolverBridgeResult(1, solver, new Uint8Array(), 7n, 2n);
+      let deliver!: (response: Response) => void, body!: ReadableStreamDefaultController<Uint8Array>;
+      let submissionSignal: AbortSignal | undefined, stops = 0, reads = 0, commits = 0;
+      const events: SolverJobEvent[] = [];
+      const executor = new SolverServerExecutor({ ...codec, solver }, { url: 'http://unused.invalid',
+        fetch: async (url: URL, init?: RequestInit) => {
+          if (url.pathname === '/jobs') {
+            submissionSignal = init?.signal ?? undefined;
+            if (stage === 'headers') return new Promise<Response>(resolve => { deliver = resolve; });
+            return new Response(new ReadableStream<Uint8Array>({ start(controller) { body = controller; } }), { status: 202 });
+          }
+          if (url.pathname.endsWith('/interrupt')) { ++stops; return new Response(null, { status: 204 }); }
+          if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+          if (url.pathname.endsWith('/stream')) {
+            ++reads;
+            return new Response(`data: ${Buffer.from(terminal).toString('base64')}\n\n`, { headers: { 'content-type': 'text/event-stream' } });
+          }
+          throw new Error(`Unexpected request: ${url}`);
+        },
+      });
+      const result = executeSolverJob(executor, {}, { interruptSignal: controller.signal,
+        onEvent: (event: SolverJobEvent) => { events.push(event); }, onSuccess: () => { ++commits; } });
+      controller.abort();
+      await nextTurn();
+      assert.equal(submissionSignal!.aborted, false);
+      assert.equal(stops, 0, 'Interruption waits for the job id');
+      if (stage === 'headers') deliver(new Response(accepted, { status: 202 }));
+      else { body.enqueue(accepted); body.close(); }
+      assert.equal(await result, 1);
+      assert.equal(stops, 1); assert.equal(reads, 1); assert.equal(commits, 1);
+      assert.ok(events.every(event => event.type !== 'failure'));
+    });
+  }
+  await t.test('pending MathOpt interruption has a deadline without becoming cancellation', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const executor = new SolverServerExecutor({ ...codec, solver: 'mathopt' }, {
+      url: 'http://unused.invalid', fetch: async () => new Promise<Response>(() => {}),
+    });
+    const job = executor.execute({}, { onEvent: () => {} });
+    const checked = assert.rejects(job.result, { name: 'TimeoutError' });
+    await job.interrupt();
+    t.mock.timers.tick(30_000);
+    await checked;
+  });
+  await t.test('timed-out resource creation still disposes a late result', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const accepted = encodeSolverBridgeStatus(1, 'mathopt', createSolverJobStatusEvent('mathopt', 1, State.RUNNING, 0n).status, 7n, 1n);
+    const terminal = encodeSolverBridgeResult(1, 'mathopt', new Uint8Array(), 7n, 2n);
+    let deliver!: (response: Response) => void, stops = 0, cleanups = 0;
+    const events: SolverJobEvent[] = [];
+    const executor = new SolverServerExecutor({ ...codec, solver: 'mathopt', encodeResult: (result: number) => new Uint8Array([result]) }, {
+      url: 'http://unused.invalid', fetch: async (url: URL, init?: RequestInit) => {
+        if (url.pathname === '/jobs') return new Promise<Response>(resolve => { deliver = resolve; });
+        if (url.pathname.endsWith('/interrupt')) { ++stops; return new Response(null, { status: 204 }); }
+        if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+        if (url.pathname.endsWith('/stream')) return new Response(`data: ${Buffer.from(terminal).toString('base64')}\n\n`,
+          { headers: { 'content-type': 'text/event-stream' } });
+        throw new Error(`Unexpected request: ${url}`);
+      },
+    });
+    const job = executor.execute({}, { onEvent: (event: SolverJobEvent) => { events.push(event); },
+      onAbandonedResult: (payload: Uint8Array) => { assert.deepEqual(payload, new Uint8Array([1])); ++cleanups; } });
+    const checked = assert.rejects(job.result, { name: 'TimeoutError' });
+    await job.interrupt();
+    t.mock.timers.tick(30_000); await checked;
+    assert.equal(cleanups, 0);
+    deliver(new Response(accepted, { status: 202 }));
+    for (let turn = 0; cleanups === 0 && turn < 30; ++turn) await nextTurn();
+    assert.equal(cleanups, 1); assert.equal(stops, 0, 'Late creation finishes without a stop request');
+    assert.equal(events.length, 1, 'Abandoned jobs stop forwarding late events');
+    assert.equal((events[0] as any).failure.kind, Kind.TIMEOUT);
+  });
+  await t.test('MathOpt interruption preserves a native result and commits it before a caller abort', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const accepted = encodeSolverBridgeStatus(1, 'mathopt', createSolverJobStatusEvent('mathopt', 1, State.RUNNING, 0n).status, 7n, 1n);
+    const terminal = encodeSolverBridgeResult(1, 'mathopt', new Uint8Array(), 7n, 2n);
+    for (const cancellation of [false, true]) {
+      const controller = new AbortController(), reason = new Error('caller abort');
+      let send!: ReadableStreamDefaultController<Uint8Array>, commits = 0, stops = 0;
+      const executor = new SolverServerExecutor({ ...codec, solver: 'mathopt' }, { url: 'http://unused.invalid',
+        fetch: async (url: URL, init?: RequestInit) => {
+          if (url.pathname === '/jobs') return new Response(accepted, { status: 202 });
+          if (url.pathname.endsWith('/interrupt')) { ++stops; return new Response(null, { status: 204 }); }
+          if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+          return new Response(new ReadableStream<Uint8Array>({ start(controller) { send = controller; } }),
+            { headers: { 'content-type': 'text/event-stream' } });
+        },
+      });
+      const result = executeSolverJob(executor, {}, { ...(cancellation ? { signal: controller.signal } : { interruptSignal: controller.signal }),
+        onSuccess: () => { ++commits; } });
+      const checked = cancellation ? assert.rejects(result, failure => failure === reason) : result.then((value: number) => assert.equal(value, 1));
+      await nextTurn(); controller.abort(reason); await nextTurn();
+      t.mock.timers.tick(29_999);
+      send.enqueue(new TextEncoder().encode(`data: ${Buffer.from(terminal).toString('base64')}\n\n`));
+      await checked;
+      assert.equal(commits, 1); assert.equal(stops, 1);
+      t.mock.timers.tick(30_000); await nextTurn();
+      assert.equal(commits, 1, 'no stale stop timer runs after terminal delivery');
+    }
+  });
+  await t.test('MathOpt interruption times out without a result; caller cancellation can supersede it', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    for (const cancelLater of [false, true]) {
+      const accepted = encodeSolverBridgeStatus(1, 'mathopt', createSolverJobStatusEvent('mathopt', 1, State.RUNNING, 0n).status, 7n, 1n);
+      let stops = 0;
+      const executor = new SolverServerExecutor({ ...codec, solver: 'mathopt' }, { url: 'http://unused.invalid',
+        fetch: async (url: URL) => {
+          if (url.pathname === '/jobs') return new Response(accepted, { status: 202 });
+          if (url.pathname.endsWith('/interrupt')) { ++stops; return new Response(null, { status: 204 }); }
+          return new Promise<Response>(() => {});
+        },
+      });
+      const job = executor.execute({}, { onEvent: () => {} });
+      const checked = assert.rejects(job.result, { name: cancelLater ? 'AbortError' : 'TimeoutError' });
+      await nextTurn(); await job.interrupt();
+      t.mock.timers.tick(10_000);
+      if (cancelLater) await job.cancel();
+      t.mock.timers.tick(20_000); await checked;
+      assert.equal(stops, 1, 'repeated stop requests share one native interruption and deadline');
+    }
+  });
+  await t.test('a callback reply deadline after caller cancellation preserves the original reason', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const accepted = encodeSolverBridgeStatus(1, 'test', createSolverJobStatusEvent('test', 1, State.RUNNING, 0n).status, 7n, 1n);
+    const callback = decodeSolverBridgeResponse(encodeSolverBridgeCallbackRequest(1, 'test', 1n, new Uint8Array(), 7n, 2n));
+    const controller = new AbortController(), reason = new Error('caller cancelled during callback reply');
+    const executor = new SolverServerExecutor(codec, { url: 'http://unused.invalid',
+      fetch: async (url: URL) => {
+        if (url.pathname === '/jobs') return new Response(accepted, { status: 202 });
+        if (url.pathname.endsWith('/events')) return new Response(toBinary(SolverEventBatchSchema, create(SolverEventBatchSchema, { responses: [callback] })));
+        if (url.pathname.endsWith('/callback')) return new Promise<Response>(() => {});
+        if (url.pathname.endsWith('/cancel')) return new Response(null, { status: 204 });
+        throw new Error('Timed-out callback must not resume polling');
+      },
+    });
+    const result = executeSolverJob(executor, {}, { signal: controller.signal, onCallback: () => new Uint8Array() });
+    const rejected = assert.rejects(result, failure => failure === reason);
+    await nextTurn(); t.mock.timers.tick(1000); controller.abort(reason); await nextTurn();
+    t.mock.timers.tick(29_000); await rejected;
   });
   for (const stalled of ['request', 200, 409, 503] as const) {
     await t.test(`callback deadline covers a stalled ${stalled === 'request' ? 'request' : `${stalled} response body`}`, async t => {
@@ -410,7 +648,8 @@ test('server failures distinguish HTTP, transport and protocol errors', async (t
   const accepted = encodeSolverBridgeStatus(1, 'test', createSolverJobStatusEvent('test', 1, State.QUEUED, 0n).status, 7n, 1n);
   const running = encodeSolverBridgeStatus(1, 'test', createSolverJobStatusEvent('test', 1, State.RUNNING, 0n).status, 7n, 2n);
   const resultBytes = encodeSolverBridgeResult(1, 'test', new Uint8Array(), 7n, 3n);
-  for (const streamMode of ['connection failure', 'broken stream', 'closed stream'] as const) {
+  for (const streamMode of ['connection failure', 'broken stream', 'closed stream', 409, 503] as const) {
+    const receivedStreamEvent = typeof streamMode === 'string' && streamMode !== 'connection failure';
     for (const terminalFailure of [false, true]) {
       await t.test(`${streamMode}: polling resumes and releases a terminal ${terminalFailure ? 'failure' : 'result'}`, async () => {
         const requests: string[] = [];
@@ -422,6 +661,7 @@ test('server failures distinguish HTTP, transport and protocol errors', async (t
             requests.push(`${init?.method ?? 'GET'} ${path}`);
             if (path === '/jobs') return new Response(accepted, { status: 202 });
             if (path === '/jobs/7/stream?after=1') {
+              if (typeof streamMode === 'number') return new Response('Use polling', { status: streamMode });
               if (streamMode === 'connection failure') throw new TypeError('stream unavailable');
               let sent = false;
               const body = new ReadableStream<Uint8Array>({ pull(controller) {
@@ -444,13 +684,13 @@ test('server failures distinguish HTTP, transport and protocol errors', async (t
         else assert.equal(await job.result, 1);
         assert.deepEqual(requests, [
           'POST /jobs', 'GET /jobs/7/stream?after=1',
-          `GET /jobs/7/events?after=${streamMode === 'connection failure' ? 1 : 2}`,
+          `GET /jobs/7/events?after=${receivedStreamEvent ? 2 : 1}`,
           'GET /jobs/7/result', 'DELETE /jobs/7',
         ]);
         assert.deepEqual(events.filter((event) => event.type === 'failure'),
           terminalFailure ? [{ type: 'failure', failure: remoteFailure }] : []);
         assert.equal(events.filter((event) => event.type === 'status').length,
-          streamMode === 'connection failure' ? 1 : 2);
+          receivedStreamEvent ? 2 : 1);
       });
     }
   }

@@ -1,6 +1,7 @@
 import * as protobuf from 'protobufjs';
 import { mathOptModelDescriptor } from '../generated/mathopt_model_schemas.js';
-import type { math_opt_ModelProto, math_opt_ModelUpdateProto, math_opt_ObjectiveProto, math_opt_SparseDoubleVectorProto, math_opt_SparseDoubleMatrixProto } from '../generated/mathopt_model_types.js';
+import type { math_opt_ModelProto, math_opt_ModelUpdateProto, math_opt_ObjectiveProto, math_opt_SparseDoubleVectorProto,
+  math_opt_SparseDoubleMatrixProto, math_opt_LinearExpressionProto } from '../generated/mathopt_model_types.js';
 import { decodeProtobufWithExactLongs, encodeProtobufBigInts, normalizeProtobufInput } from '../protobufjs_helpers.js';
 import { toIndex, toInt64 } from '../int64.js';
 
@@ -19,7 +20,12 @@ export type ImportedMathOptModel = {
   auxiliaryObjectives: Array<ImportedObjective & { id: number }>;
   quadraticConstraints: Array<ImportedBounds & { linearTerms: ImportedLinearTerm[]; quadraticTerms: ImportedQuadraticTerm[] }>;
   indicatorConstraints: Array<ImportedBounds & { indicatorId?: number; activateOnZero: boolean; terms: ImportedLinearTerm[] }>;
+  sos1Constraints: ImportedSosConstraint[];
+  sos2Constraints: ImportedSosConstraint[];
+  secondOrderConeConstraints: Array<{ id: number; name: string; upperBound: ImportedAffineExpression; argumentsToNorm: ImportedAffineExpression[] }>;
 };
+type ImportedAffineExpression = { terms: ImportedLinearTerm[]; offset: number };
+type ImportedSosConstraint = { id: number; name: string; weights: number[]; expressions: ImportedAffineExpression[] };
 
 let modelType: protobuf.Type | undefined;
 let updateType: protobuf.Type | undefined;
@@ -77,9 +83,6 @@ export function decodeMathOptModel(input: Uint8Array | MathOptModelProto): Impor
   const bytes = encodeMathOptModelProto(input);
   // Preserve optional indicator presence and exact IDs before range checking.
   const model = type.toObject(type.decode(bytes), { longs: String, arrays: true, objects: true }) as MathOptModelProto;
-  for (const field of ['secondOrderConeConstraints', 'sos1Constraints', 'sos2Constraints'] as const) {
-    if (Object.keys(model[field] ?? {}).length > 0) throw new Error(`MathOpt editable model import does not support ${field}.`);
-  }
   const variableProto = model.variables ?? {}, rowProto = model.linearConstraints ?? {}, objectiveProto = model.objective ?? {};
   const variableIds = (variableProto.ids ?? []).map(id => modelId(id, 'Variable ID')), rowIds = (rowProto.ids ?? []).map(id => modelId(id, 'Linear constraint ID'));
   const variableLower = variableProto.lowerBounds ?? [], variableUpper = variableProto.upperBounds ?? [], integers = variableProto.integers ?? [];
@@ -101,5 +104,18 @@ export function decodeMathOptModel(input: Uint8Array | MathOptModelProto): Impor
     const indicatorId = data.indicatorId === undefined ? undefined : modelId(data.indicatorId);
     return { ...bounds, indicatorId, activateOnZero: data.activateOnZero ?? false, terms: linearTerms(data.expression, 'Indicator expression') };
   });
-  return { name: model.name ?? '', variables, linearConstraints, objective, auxiliaryObjectives, quadraticConstraints, indicatorConstraints };
+  const affineExpression = (expression: math_opt_LinearExpressionProto = {}): ImportedAffineExpression => ({
+    offset: expression.offset ?? 0,
+    terms: (expression.ids ?? []).map((id, i) => ({ variableId: modelId(id), coefficient: expression.coefficients![i] })),
+  });
+  const sosConstraints = (values: MathOptModelProto['sos1Constraints'] = {}): ImportedSosConstraint[] =>
+    Object.entries(values).map(([id, data]) => ({ id: modelId(id), name: data.name ?? '', weights: data.weights ?? [],
+      expressions: (data.expressions ?? []).map(affineExpression)
+    })).sort((a, b) => a.id - b.id);
+  const secondOrderConeConstraints = Object.entries(model.secondOrderConeConstraints ?? {}).map(([id, data]) => ({
+    id: modelId(id), name: data.name ?? '', upperBound: affineExpression(data.upperBound),
+    argumentsToNorm: (data.argumentsToNorm ?? []).map(affineExpression),
+  })).sort((a, b) => a.id - b.id);
+  return { name: model.name ?? '', variables, linearConstraints, objective, auxiliaryObjectives, quadraticConstraints, indicatorConstraints,
+    sos1Constraints: sosConstraints(model.sos1Constraints), sos2Constraints: sosConstraints(model.sos2Constraints), secondOrderConeConstraints };
 }
