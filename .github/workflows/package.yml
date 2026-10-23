@@ -86,8 +86,8 @@ jobs:
       - name: Test example models
         run: npm --prefix javascript run test:site
 
-      - name: Install site test browser
-        run: cd javascript && npx playwright install --with-deps chromium
+      - name: Install site test browsers
+        run: cd javascript && npx playwright install --with-deps chromium firefox
 
       - name: Test example interactions and mobile layout
         run: npm --prefix javascript run test:site:browser
