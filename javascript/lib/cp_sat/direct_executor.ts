@@ -275,13 +275,15 @@ export class DirectCpSatExecutor implements CpSatExecutor {
       const modelPtr = allocate(modelBytes);
       const paramsPtr = allocate(paramsBytes);
       let callbackId = 0;
+      let interruptAddress: number | undefined;
 
       const state = this.activeJob;
       if (!state) throw new Error('CP-SAT solve has no active job.');
-      state.nativeRunning = true;
-      if (state.cancelled) this.interrupt(module);
       try {
         const bytes = await readWasmResult(module, async (lengthPointer) => {
+          interruptAddress = module.ccall('cp_sat_interrupt_address', 'number', [], []) as number;
+          state.nativeRunning = true;
+          if (state.cancelled) Atomics.store(module.HEAPU8, interruptAddress, 1);
           if (!flags) {
             return await module.ccall(
               'solve_model',
@@ -315,6 +317,9 @@ export class DirectCpSatExecutor implements CpSatExecutor {
         return { bytes, statistics: await nativeStatistics(module, bytes, true) };
       } finally {
         state.nativeRunning = false;
+        // A queued JS stop can arrive after the native exit guard resets this.
+        // Clear it while holding the runtime lock so the next solve starts clean.
+        if (interruptAddress !== undefined) Atomics.store(module.HEAPU8, interruptAddress, 0);
         if (callbackId) cpSatWasmCallbacks(module).sinks.delete(callbackId);
       }
     }));
