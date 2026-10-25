@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { installSolverWorker } from '../solver_worker.js';
-import { loadRuntime } from '../runtime_loader.js';
+import { loadRuntime } from '../runtime/cp_sat.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { cpSatProtocol } from './protocol.js';
 import { DirectCpSatExecutor } from './direct_executor.js';

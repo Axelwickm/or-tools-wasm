@@ -69,7 +69,7 @@ test('guided tabu settings preserve optional zeros and reach native search witho
         resolveDir: fileURLToPath(new URL('../lib/set_cover/', import.meta.url)) },
       outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
       plugins: [{ name: 'native-runtime', setup(builder) {
-        builder.onResolve({ filter: /runtime_loader\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
+        builder.onResolve({ filter: /(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
         builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export function loadSetCoverRuntime() { return globalThis.__setCoverTuningModule; } export function loadMPSolverRuntime() { throw new Error("Heuristics must not load the MIP runtime"); }' }));
       } }],
     });

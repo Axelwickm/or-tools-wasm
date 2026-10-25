@@ -62,7 +62,7 @@ test('direct route callback failures stop native evaluation and release registra
         resolveDir: fileURLToPath(new URL('../lib', import.meta.url)) },
       outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
       plugins: [{ name: 'native-callback-probe', setup(builder) {
-        builder.onResolve({ filter: /\/runtime_loader\.js$/ }, () => ({ path: 'loader', namespace: 'probe' }));
+        builder.onResolve({ filter: /\/(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => ({ path: 'loader', namespace: 'probe' }));
         builder.onResolve({ filter: /^\.\/native_runtime\.js$/ }, () => ({ path: 'solve', namespace: 'probe' }));
         builder.onLoad({ filter: /.*/, namespace: 'probe' }, ({ path }) => ({ contents: path === 'loader'
           ? `export function loadRoutingRuntime() { throw new Error('Unexpected native load'); }`

@@ -13,7 +13,7 @@ test('native model queries capture snapshots, forward options and release buffer
       resolveDir: fileURLToPath(new URL('../lib/mp_solver/', import.meta.url)) }, outfile,
       bundle: true, platform: 'node', format: 'esm', packages: 'external',
       plugins: [{ name: 'query-module', setup(builder) {
-        builder.onResolve({ filter: /runtime_loader\.js$/ }, () => ({ path: 'module', namespace: 'test' }));
+        builder.onResolve({ filter: /(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => ({ path: 'module', namespace: 'test' }));
         builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents:
           'export async function loadMPSolverRuntime(){return globalThis.__mpQueryModule;}' }));
       } }] });

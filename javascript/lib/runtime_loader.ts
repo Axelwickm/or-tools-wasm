@@ -1,132 +1,38 @@
 import {
   createRuntimeLoader,
-  isJspiSupported,
   type RuntimeFlavor,
   type RuntimeModuleFactory,
   type RuntimeName,
 } from './runtime_loader_core.js';
 
-type RuntimeAsset = {
-  jsUrl: string;
-  wasmUrl: string;
-};
+export { isJspiSupported } from './runtime_loader_core.js';
 
-const runtimeAssets: Record<RuntimeName, Record<RuntimeFlavor, RuntimeAsset>> = {
-  cp_sat_runtime: {
-    jspi: {
-      jsUrl: new URL('#internal-wasm/cp_sat_runtime.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/cp_sat_runtime.wasm?no-inline', import.meta.url).href,
-    },
-    asyncify: {
-      jsUrl: new URL('#internal-wasm/cp_sat_runtime_asyncify.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/cp_sat_runtime_asyncify.wasm?no-inline', import.meta.url).href,
-    },
-  },
-  routing_runtime: {
-    jspi: {
-      jsUrl: new URL('#internal-wasm/routing_runtime.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/routing_runtime.wasm?no-inline', import.meta.url).href,
-    },
-    asyncify: {
-      jsUrl: new URL('#internal-wasm/routing_runtime_asyncify.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/routing_runtime_asyncify.wasm?no-inline', import.meta.url).href,
-    },
-  },
-  mp_solver_runtime: {
-    jspi: {
-      jsUrl: new URL('#internal-wasm/mp_solver_runtime.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/mp_solver_runtime.wasm?no-inline', import.meta.url).href,
-    },
-    asyncify: {
-      jsUrl: new URL('#internal-wasm/mp_solver_runtime_asyncify.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/mp_solver_runtime_asyncify.wasm?no-inline', import.meta.url).href,
-    },
-  },
-  mathopt_runtime: {
-    jspi: {
-      jsUrl: new URL('#internal-wasm/mathopt_runtime.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/mathopt_runtime.wasm?no-inline', import.meta.url).href,
-    },
-    asyncify: {
-      jsUrl: new URL('#internal-wasm/mathopt_runtime_asyncify.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/mathopt_runtime_asyncify.wasm?no-inline', import.meta.url).href,
-    },
-  },
-  pdlp_runtime: {
-    jspi: {
-      jsUrl: new URL('#internal-wasm/pdlp_runtime.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/pdlp_runtime.wasm?no-inline', import.meta.url).href,
-    },
-    asyncify: {
-      jsUrl: new URL('#internal-wasm/pdlp_runtime_asyncify.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/pdlp_runtime_asyncify.wasm?no-inline', import.meta.url).href,
-    },
-  },
-  graph_runtime: {
-    jspi: {
-      jsUrl: new URL('#internal-wasm/graph_runtime.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/graph_runtime.wasm?no-inline', import.meta.url).href,
-    },
-    asyncify: {
-      jsUrl: new URL('#internal-wasm/graph_runtime_asyncify.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/graph_runtime_asyncify.wasm?no-inline', import.meta.url).href,
-    },
-  },
-  set_cover_runtime: {
-    jspi: {
-      jsUrl: new URL('#internal-wasm/set_cover_runtime.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/set_cover_runtime.wasm?no-inline', import.meta.url).href,
-    },
-    asyncify: {
-      jsUrl: new URL('#internal-wasm/set_cover_runtime_asyncify.js?no-inline', import.meta.url).href,
-      wasmUrl: new URL('#internal-wasm/set_cover_runtime_asyncify.wasm?no-inline', import.meta.url).href,
-    },
-  },
-};
-
-async function loadFactory(runtimeUrl: string): Promise<RuntimeModuleFactory> {
-  const { default: createModule } = await import(/* webpackIgnore: true */ /* @vite-ignore */ runtimeUrl);
-  return createModule as RuntimeModuleFactory;
-}
-
-function locateRuntimeFile(fileName: string) {
-  for (const [runtimeName, flavors] of Object.entries(runtimeAssets)) {
-    for (const [flavor, asset] of Object.entries(flavors)) {
-      const baseName = flavor === 'asyncify' ? `${runtimeName}_asyncify` : runtimeName;
-      if (fileName === `${baseName}.js`) return asset.jsUrl;
-      if (fileName === `${baseName}.wasm`) return asset.wasmUrl;
-    }
-  }
-  return fileName;
-}
+export type BrowserRuntimeAsset = { jsUrl: string; wasmUrl: string };
 
 const loader = createRuntimeLoader({
   logFlavorSelection: true,
-  loadFactory,
-  async resolveAsset(runtimeName, flavor) {
-    const asset = runtimeAssets[runtimeName][flavor];
-    // Let Emscripten compile the response as it streams instead of buffering it.
-    return {
-      jsUrl: asset.jsUrl,
-      locateFile: locateRuntimeFile,
-      mainScriptUrlOrBlob: asset.jsUrl,
-    };
+  async loadFactory(runtimeUrl): Promise<RuntimeModuleFactory> {
+    const { default: createModule } = await import(/* webpackIgnore: true */ /* @vite-ignore */ runtimeUrl);
+    return createModule as RuntimeModuleFactory;
   },
 });
 
-export { isJspiSupported };
 export const terminateLoadedRuntimeThreads = loader.terminateLoadedRuntimeThreads;
-export const loadRuntime = loader.loadRuntime;
-export const loadRuntimeAsyncify = loader.loadRuntimeAsyncify;
-export const loadRoutingRuntime = loader.loadRoutingRuntime;
-export const loadRoutingRuntimeAsyncify = loader.loadRoutingRuntimeAsyncify;
-export const loadMPSolverRuntime = loader.loadMPSolverRuntime;
-export const loadMPSolverRuntimeAsyncify = loader.loadMPSolverRuntimeAsyncify;
-export const loadMathOptRuntime = loader.loadMathOptRuntime;
-export const loadMathOptRuntimeAsyncify = loader.loadMathOptRuntimeAsyncify;
-export const loadPdlpRuntime = loader.loadPdlpRuntime;
-export const loadPdlpRuntimeAsyncify = loader.loadPdlpRuntimeAsyncify;
-export const loadGraphRuntime = loader.loadGraphRuntime;
-export const loadGraphRuntimeAsyncify = loader.loadGraphRuntimeAsyncify;
-export const loadSetCoverRuntime = loader.loadSetCoverRuntime;
-export const loadSetCoverRuntimeAsyncify = loader.loadSetCoverRuntimeAsyncify;
+
+export function loadBrowserRuntime(
+  name: RuntimeName,
+  resolveAsset: (flavor: RuntimeFlavor) => BrowserRuntimeAsset,
+  flavor?: RuntimeFlavor,
+) {
+  return loader.loadRuntime(name, selectedFlavor => {
+    const asset = resolveAsset(selectedFlavor);
+    const baseName = selectedFlavor === 'asyncify' ? `${name}_asyncify` : name;
+    return {
+      jsUrl: asset.jsUrl,
+      // Let Emscripten compile the response as it streams instead of buffering it.
+      locateFile: file => file === `${baseName}.wasm` ? asset.wasmUrl
+        : file === `${baseName}.js` ? asset.jsUrl : file,
+      mainScriptUrlOrBlob: asset.jsUrl,
+    };
+  }, flavor);
+}

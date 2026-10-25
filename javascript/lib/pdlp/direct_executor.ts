@@ -3,7 +3,7 @@ import { create } from '@bufbuild/protobuf';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { allocateWasmBytes, readWasmResult } from '../wasm_memory.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
-import { loadPdlpRuntime } from '../runtime_loader.js';
+import { loadPdlpRuntime } from '../runtime/pdlp.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,

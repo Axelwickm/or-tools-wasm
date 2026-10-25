@@ -13,7 +13,7 @@ before(async () => {
   await build({ entryPoints: [fileURLToPath(new URL('../lib/cp_sat/direct_executor.ts', import.meta.url))],
     outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
     plugins: [{ name: 'injected-runtime', setup(builder) {
-      builder.onResolve({ filter: /runtime_loader\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
+      builder.onResolve({ filter: /(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
       builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export function loadRuntime() { throw new Error("Inject the test runtime"); }' }));
     } }] });
   ({ DirectCpSatExecutor } = await import(pathToFileURL(outfile).href));

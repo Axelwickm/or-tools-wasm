@@ -5,6 +5,8 @@ import path from 'node:path';
 const rootDir = path.resolve(import.meta.dirname, '..');
 const require = createRequire(new URL('../javascript/package.json', import.meta.url));
 const { build, transform } = require('esbuild');
+// Share one Long implementation between ESM imports and protobufjs's require().
+const dependencyAliases = { long: require.resolve('long') };
 const sourceDir = path.join(rootDir, 'javascript/lib');
 const packageBuildDir = path.join(rootDir, 'javascript/build/javascript');
 const outDir = path.join(packageBuildDir, 'browser');
@@ -31,23 +33,6 @@ const solverBuilds = [
   { directory: 'set_cover', publicEntries: ['set-cover'] },
 ];
 
-async function* listTypeScriptFiles(directory) {
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      yield* listTypeScriptFiles(entryPath);
-    } else if (
-      entry.isFile()
-      && entry.name.endsWith('.ts')
-      && !entry.name.endsWith('.d.ts')
-      && entry.name !== 'runtime_loader_node.ts'
-      && entry.name !== 'server.ts'
-    ) {
-      yield entryPath;
-    }
-  }
-}
-
 async function* listDeclarationFiles(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const entryPath = path.join(directory, entry.name);
@@ -72,10 +57,8 @@ async function transpileSource(sourcePath) {
   });
 
   await mkdir(path.dirname(outputPath), { recursive: true });
-  const code = relativePath === 'runtime_loader.ts'
-    ? result.code.replaceAll('#internal-wasm/', '../wasm/')
-      .replaceAll('?no-inline', '')
-    : result.code;
+  const wasmPrefix = path.relative(path.dirname(outputPath), path.join(packageBuildDir, 'wasm')).split(path.sep).join('/');
+  const code = result.code.replaceAll('#internal-wasm/', `${wasmPrefix}/`).replaceAll('?no-inline', '');
 
   await writeFile(outputPath, code);
 }
@@ -87,14 +70,8 @@ const externalRuntimeLoaderPlugin = {
       path: args.path,
       external: true,
     }));
-    buildContext.onResolve({ filter: /^@bufbuild\/protobuf(?:\/.*)?$/ }, (args) => ({
-      path: require.resolve(args.path),
-    }));
-    buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
-      path: require.resolve('protobufjs'),
-    }));
-    buildContext.onResolve({ filter: /^(?:\.\.?\/)+runtime_loader\.js$/ }, () => ({
-      path: './runtime_loader.js',
+    buildContext.onResolve({ filter: /^(?:\.\.?\/)+(?:runtime_loader|runtime\/[^/]+)\.js$/ }, (args) => ({
+      path: `./${args.path.match(/(?:runtime_loader|runtime\/[^/]+)\.js$/)[0]}`,
       external: true,
     }));
   },
@@ -107,12 +84,6 @@ const workerBundlePlugin = {
       path: args.path,
       external: true,
     }));
-    buildContext.onResolve({ filter: /^@bufbuild\/protobuf(?:\/.*)?$/ }, (args) => ({
-      path: require.resolve(args.path),
-    }));
-    buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
-      path: require.resolve('protobufjs'),
-    }));
   },
 };
 
@@ -122,6 +93,7 @@ async function bundleBrowserEntry() {
       entryPoints: [path.join(sourceDir, `${entryName}.ts`)],
       outfile: path.join(outDir, `${entryName}.js`),
       bundle: true,
+      alias: dependencyAliases,
       format: 'esm',
       platform: 'browser',
       target: 'es2020',
@@ -139,6 +111,7 @@ async function bundleSolverWorkers() {
       entryPoints: [path.join(sourceDir, directory, 'worker.ts')],
       outfile,
       bundle: true,
+      alias: dependencyAliases,
       format: 'esm',
       platform: 'browser',
       target: 'es2020',
@@ -179,8 +152,12 @@ async function patchBundledSolverWorkerUrls() {
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
 
-for await (const sourcePath of listTypeScriptFiles(sourceDir)) {
-  await transpileSource(sourcePath);
+// Public entries and workers are bundled. Only the shared runtime loader and
+// per-runtime asset modules remain external so consumers can omit unused WASM.
+for (const sourceName of ['runtime_loader.ts', 'runtime_loader_core.ts',
+  ...(await readdir(path.join(sourceDir, 'runtime'))).filter(name => name.endsWith('.ts'))
+    .map(name => `runtime/${name}`)]) {
+  await transpileSource(path.join(sourceDir, sourceName));
 }
 
 await bundleBrowserEntry();

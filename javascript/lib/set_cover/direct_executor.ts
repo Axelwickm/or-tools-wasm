@@ -1,4 +1,5 @@
-import { loadSetCoverRuntime, loadMPSolverRuntime } from '../runtime_loader.js';
+import { loadSetCoverRuntime } from '../runtime/set_cover.js';
+import { loadMPSolverRuntime } from '../runtime/mp_solver.js';
 import { withWasmAllocations, type WasmByteAllocator } from '../wasm_memory.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import {

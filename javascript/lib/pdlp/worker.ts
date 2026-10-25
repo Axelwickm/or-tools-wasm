@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { installSolverWorker } from '../solver_worker.js';
-import { loadPdlpRuntime } from '../runtime_loader.js';
+import { loadPdlpRuntime } from '../runtime/pdlp.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { pdlpProtocol } from './protocol.js';
 import { DirectPdlpExecutor } from './direct_executor.js';

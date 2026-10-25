@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { installSolverWorker } from '../solver_worker.js';
-import { loadRoutingRuntime } from '../runtime_loader.js';
+import { loadRoutingRuntime } from '../runtime/routing.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { DirectRoutingExecutor } from './direct_executor.js';
 import { routingProtocol } from './protocol.js';

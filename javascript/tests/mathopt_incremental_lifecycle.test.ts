@@ -28,7 +28,7 @@ test('incremental handles belong to the local runtime that created them', { time
       outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
       define: { Worker: 'globalThis.__mathoptLifecycleWorker' },
       plugins: [{ name: 'controlled-runtime', setup(builder) {
-        builder.onResolve({ filter: /runtime_loader\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
+        builder.onResolve({ filter: /(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
         builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: `
           export const loadMathOptRuntime = async () => globalThis.__mathoptLifecycleModule;
           export const terminateLoadedRuntimeThreads = async () => {};

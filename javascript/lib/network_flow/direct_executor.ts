@@ -1,6 +1,6 @@
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { withWasmAllocations, type WasmByteAllocator } from '../wasm_memory.js';
-import { loadGraphRuntime } from '../runtime_loader.js';
+import { loadGraphRuntime } from '../runtime/graph.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,

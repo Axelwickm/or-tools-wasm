@@ -1,5 +1,5 @@
 import Long from 'long';
-import * as protobufModule from 'protobufjs';
+import * as protobufModule from 'protobufjs/light.js';
 
 protobufModule.util.Long = Long;
 protobufModule.configure();

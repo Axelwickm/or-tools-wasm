@@ -2,7 +2,7 @@
 import { installSolverWorker } from '../solver_worker.js';
 import { DirectMathOptExecutor } from './direct_executor.js';
 import { mathOptProtocol } from './protocol.js';
-import { loadMathOptRuntime } from '../runtime_loader.js';
+import { loadMathOptRuntime } from '../runtime/mathopt.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 let modulePromise: Promise<OrToolsWasmModule> | null = null;
 function loadWorkerRuntime() { return modulePromise ??= loadMathOptRuntime(); }

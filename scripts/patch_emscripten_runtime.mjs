@@ -1,3 +1,4 @@
+import { patchJspiAsyncCtors } from './patch_jspi_ctors.ts';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { initializeBunPthread } from './bun_pthread_bootstrap.ts';
@@ -198,21 +199,6 @@ for (const webRuntimePath of webRuntimePaths) {
   }
 }
 
-function patchJspiAsyncCtors(runtime) {
-  if (!runtime.includes('WebAssembly.promising')) return runtime;
-
-  if (runtime.includes('async function initRuntime()')) return runtime;
-
-  return runtime
-    // Release builds omit assertions, stack cookies and the debug worker hook.
-    .replace(
-      /function initRuntime\(\)\{([^{}]*?)wasmExports\["__wasm_call_ctors"\]\(\);([^{}]*)\}/,
-      'async function initRuntime(){$1await wasmExports["__wasm_call_ctors"]();$2}',
-    )
-    .replaceAll('initRuntime();readyPromiseResolve?.(Module);', 'await initRuntime();readyPromiseResolve?.(Module);')
-    .replaceAll('initRuntime();postRun()', 'await initRuntime();postRun()')
-    .replaceAll('if(ENVIRONMENT_IS_PTHREAD){initRuntime();return}', 'if(ENVIRONMENT_IS_PTHREAD){await initRuntime();return}');
-}
 
 function patchJspiInvokeTableEntries(runtime) {
   if (!runtime.includes('WebAssembly.promising')) return runtime;

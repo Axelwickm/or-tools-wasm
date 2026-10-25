@@ -1,7 +1,7 @@
 import { fromBinary } from '@bufbuild/protobuf';
 import { MathOptModelTransformationResponseSchema } from '../generated/bridge/mathopt_model_transform_pb.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
-import { loadMathOptRuntime } from '../runtime_loader.js';
+import { loadMathOptRuntime } from '../runtime/mathopt.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { installSolverWorker } from '../solver_worker.js';
-import { loadGraphRuntime } from '../runtime_loader.js';
+import { loadGraphRuntime } from '../runtime/graph.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { DirectNetworkFlowExecutor } from './direct_executor.js';
 import { networkFlowProtocol } from './protocol.js';

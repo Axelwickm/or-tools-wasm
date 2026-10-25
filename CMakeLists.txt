@@ -345,7 +345,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     # Avoid a shared allocator lock bottleneck across solver threads.
     "-sMALLOC=mimalloc"
     "-sWASM_BIGINT=1"
-    "--bind"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,allocateUTF8,HEAPU8,PThread"
     "-sINCOMING_MODULE_JS_API=['locateFile','wasmBinary','mainScriptUrlOrBlob','noExitRuntime']"
@@ -598,6 +597,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
           ${RUNTIME_NAME}_node ${RUNTIME_NAME}_node_asyncify)
         target_link_options(${PDLP_TARGET} PRIVATE
           "-sEXPORTED_FUNCTIONS=['_malloc','_free','_pdlp_interrupt_address']")
+      endforeach()
+    endif()
+
+    if(RUNTIME_NAME STREQUAL "graph_runtime" OR RUNTIME_NAME STREQUAL "pdlp_runtime")
+      # These APIs exchange in-memory data, including PDLP's model imports.
+      # CP-SAT proof output and Routing profile export still require files.
+      foreach(IN_MEMORY_TARGET ${RUNTIME_NAME} ${RUNTIME_NAME}_asyncify
+          ${RUNTIME_NAME}_node ${RUNTIME_NAME}_node_asyncify)
+        target_link_options(${IN_MEMORY_TARGET} PRIVATE "-sFILESYSTEM=0")
       endforeach()
     endif()
 

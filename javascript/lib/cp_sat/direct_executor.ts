@@ -2,7 +2,7 @@ import { trackPendingEvent } from '../solver_executor.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { allocateWasmBytes, readWasmResult, withWasmAllocations } from '../wasm_memory.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
-import { loadRuntime } from '../runtime_loader.js';
+import { loadRuntime } from '../runtime/cp_sat.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,

@@ -34,16 +34,9 @@ function externalSharedRuntimePlugin(name, sharedImportPrefix) {
   return {
     name,
     setup(buildContext) {
-      buildContext.onResolve({ filter: /^@bufbuild\/protobuf(?:\/.*)?$/ }, (args) => ({
-        path: require.resolve(args.path),
-      }));
-      buildContext.onResolve({ filter: /^protobufjs$/ }, () => ({
-        path: require.resolve('protobufjs'),
-      }));
-      buildContext.onResolve({ filter: /^(?:\.\.?\/)+runtime_loader\.js$/ }, (args) => {
-        const moduleName = path.basename(args.path);
+      buildContext.onResolve({ filter: /^(?:\.\.?\/)+(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => {
         return {
-          path: `${sharedImportPrefix}/${moduleName}`,
+          path: `${sharedImportPrefix}/runtime_loader.js`,
           external: true,
         };
       });
@@ -78,6 +71,8 @@ const nestedExternalLoaderPlugin = externalSharedRuntimePlugin(
 
 const commonNodeBuildOptions = {
   bundle: true,
+  // Share one Long implementation between ESM imports and protobufjs's require().
+  alias: { long: require.resolve('long') },
   format: 'esm',
   platform: 'node',
   target: 'node22',

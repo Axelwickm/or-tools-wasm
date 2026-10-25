@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { installSolverWorker } from '../solver_worker.js';
-import { loadSetCoverRuntime } from '../runtime_loader.js';
+import { loadSetCoverRuntime } from '../runtime/set_cover.js';
 import type { OrToolsWasmModule } from '../wasm_module_types.js';
 import { DirectSetCoverExecutor } from './direct_executor.js';
 import { setCoverProtocol } from './protocol.js';

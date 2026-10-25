@@ -18,7 +18,7 @@ test('MP solve parameters survive transport and reach native setters, with clean
       plugins: [{
         name: 'unused-runtime-loader',
         setup(builder) {
-          builder.onResolve({ filter: /runtime_loader\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
+          builder.onResolve({ filter: /(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
           builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({
             contents: 'export function loadMPSolverRuntime() { return globalThis.__mpSolverValidationModule; }',
           }));
@@ -116,7 +116,7 @@ test('native solution verification transports false results and frees both snaps
       },
       outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
       plugins: [{ name: 'unused-runtime', setup(builder) {
-        builder.onResolve({ filter: /runtime_loader\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
+        builder.onResolve({ filter: /(?:runtime_loader|runtime\/[^/]+)\.js$/ }, () => ({ path: 'runtime', namespace: 'test' }));
         builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export function loadMPSolverRuntime() { throw new Error("unused"); }' }));
       } }],
     });

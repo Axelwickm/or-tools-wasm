@@ -1,4 +1,4 @@
-import * as protobuf from 'protobufjs';
+import * as protobuf from 'protobufjs/light.js';
 import { encodeProtobufBigInts, normalizeProtobufInput } from '../protobufjs_helpers.js';
 import { routingParametersDescriptor } from '../generated/routing_schemas.js';
 import type { RoutingSearchParameters, RoutingModelParameters } from '../generated/routing_parameters.js';

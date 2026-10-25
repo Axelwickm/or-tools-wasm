@@ -1,7 +1,7 @@
 import { trackPendingEvent } from '../solver_executor.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import { allocateWasm } from '../wasm_memory.js';
-import { loadRoutingRuntime } from '../runtime_loader.js';
+import { loadRoutingRuntime } from '../runtime/routing.js';
 import {
   createSolverFailureEvent,
   createSolverJobStatusEvent,

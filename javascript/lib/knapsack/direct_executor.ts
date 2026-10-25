@@ -1,4 +1,4 @@
-import { loadMPSolverRuntime } from '../runtime_loader.js';
+import { loadMPSolverRuntime } from '../runtime/mp_solver.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import {
   createSolverFailureEvent,

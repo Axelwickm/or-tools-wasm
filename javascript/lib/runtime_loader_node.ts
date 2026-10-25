@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import {
   createRuntimeLoader,
   isJspiSupported,
-  RUNTIME_ARTIFACTS,
+  type RuntimeFlavor,
+  type RuntimeName,
   type RuntimeModuleFactory,
 } from './runtime_loader_core.js';
 
@@ -43,10 +44,16 @@ function bunWebRuntimeGlobalCleanup() {
   };
 }
 
-const loader = createRuntimeLoader({
-  loadFactory,
-  async resolveAsset(runtimeName, flavor) {
-    const artifact = RUNTIME_ARTIFACTS[runtimeName][flavor];
+const loader = createRuntimeLoader({ loadFactory });
+
+function loadNamedRuntime(runtimeName: RuntimeName, flavor?: RuntimeFlavor) {
+  return loader.loadRuntime(runtimeName, async selectedFlavor => {
+    const suffix = selectedFlavor === 'asyncify' ? '_asyncify' : '';
+    const artifact = {
+      webJs: `${runtimeName}${suffix}.js`,
+      nodeJs: `${runtimeName}_node${suffix}.js`,
+      wasm: `${runtimeName}${suffix}.wasm`,
+    };
     if (shouldUseWebRuntimeAssets()) {
       const wasmUrl = new URL(`../wasm/${artifact.wasm}`, import.meta.url);
       return {
@@ -60,22 +67,22 @@ const loader = createRuntimeLoader({
       jsUrl: new URL(`../node-wasm/${artifact.nodeJs}`, import.meta.url).href,
       locateFile: locateNodeRuntimeFile,
     };
-  },
-});
+  }, flavor);
+}
 
 export { isJspiSupported };
 export const terminateLoadedRuntimeThreads = loader.terminateLoadedRuntimeThreads;
-export const loadRuntime = loader.loadRuntime;
-export const loadRuntimeAsyncify = loader.loadRuntimeAsyncify;
-export const loadRoutingRuntime = loader.loadRoutingRuntime;
-export const loadRoutingRuntimeAsyncify = loader.loadRoutingRuntimeAsyncify;
-export const loadMPSolverRuntime = loader.loadMPSolverRuntime;
-export const loadMPSolverRuntimeAsyncify = loader.loadMPSolverRuntimeAsyncify;
-export const loadMathOptRuntime = loader.loadMathOptRuntime;
-export const loadMathOptRuntimeAsyncify = loader.loadMathOptRuntimeAsyncify;
-export const loadPdlpRuntime = loader.loadPdlpRuntime;
-export const loadPdlpRuntimeAsyncify = loader.loadPdlpRuntimeAsyncify;
-export const loadGraphRuntime = loader.loadGraphRuntime;
-export const loadGraphRuntimeAsyncify = loader.loadGraphRuntimeAsyncify;
-export const loadSetCoverRuntime = loader.loadSetCoverRuntime;
-export const loadSetCoverRuntimeAsyncify = loader.loadSetCoverRuntimeAsyncify;
+export const loadRuntime = () => loadNamedRuntime('cp_sat_runtime');
+export const loadRuntimeAsyncify = () => loadNamedRuntime('cp_sat_runtime', 'asyncify');
+export const loadRoutingRuntime = () => loadNamedRuntime('routing_runtime');
+export const loadRoutingRuntimeAsyncify = () => loadNamedRuntime('routing_runtime', 'asyncify');
+export const loadMPSolverRuntime = () => loadNamedRuntime('mp_solver_runtime');
+export const loadMPSolverRuntimeAsyncify = () => loadNamedRuntime('mp_solver_runtime', 'asyncify');
+export const loadMathOptRuntime = () => loadNamedRuntime('mathopt_runtime');
+export const loadMathOptRuntimeAsyncify = () => loadNamedRuntime('mathopt_runtime', 'asyncify');
+export const loadPdlpRuntime = () => loadNamedRuntime('pdlp_runtime');
+export const loadPdlpRuntimeAsyncify = () => loadNamedRuntime('pdlp_runtime', 'asyncify');
+export const loadGraphRuntime = () => loadNamedRuntime('graph_runtime');
+export const loadGraphRuntimeAsyncify = () => loadNamedRuntime('graph_runtime', 'asyncify');
+export const loadSetCoverRuntime = () => loadNamedRuntime('set_cover_runtime');
+export const loadSetCoverRuntimeAsyncify = () => loadNamedRuntime('set_cover_runtime', 'asyncify');
