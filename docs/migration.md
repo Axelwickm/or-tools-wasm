@@ -1,19 +1,35 @@
 # Migrating to the next major release
 
-This release includes breaking changes. Upgrade the package and solver server
-together; the expanded binary bridge is not a compatibility promise for older
-clients or servers. Nothing is published by the cleanup itself.
+This guide covers changes since `1.0.0`, including breaking changes. Upgrade the
+package and solver server together. The expanded binary bridge is not a
+compatibility promise for older clients or servers.
 
-## Changes since the current committed API
+## Reference map
 
-Relative to commit `2bcb92763f`, four additional Routing queries now return
-promises: `getDisjunctionMaxCardinality()`,
+The solver references document the current contracts, including the new native
+operations. Generated TypeScript declarations remain the complete field-level
+reference for native protobuf messages and parameter enums.
+
+| Area | Reference |
+| --- | --- |
+| CP-SAT model/proto snapshots, feasibility checks, native diagnostics and interruption | [CP-SAT](solvers/cp-sat/api.md) |
+| Routing dimensions, resource groups, callbacks, assignment workflows and inspection | [Routing](solvers/routing/api.md) |
+| MathOpt constraints, proto sessions, callbacks, result conversion and native utilities | [MathOpt](solvers/mathopt/api.md) |
+| MPSolver independent results, retained sessions, basis and callbacks | [MPSolver](solvers/mp-solver/api.md) |
+| PDLP model import, typed parameters and iteration events | [PDLP](solvers/pdlp/api.md) |
+| Independent integer results | [Knapsack](solvers/knapsack/api.md), [Network Flow](solvers/network-flow/api.md) |
+| Set Cover formats, retained heuristics, MIP/LP steps, CFT and bounds | [Set Cover](solvers/set-cover/api.md) |
+| RCPSP multimode, RCPSP/Max, consumer-producer and investment models | [RCPSP](solvers/rcpsp/api.md) |
+| Executor selection, callback rules, cancellation and runtime cleanup | [Shared APIs](execution.md) |
+
+## Awaited Routing metadata
+
+These Routing queries now return promises: `getDisjunctionMaxCardinality()`,
 `hasMaxCardinalityConstrainedDisjunctions()`, `getSingleNodesOfType()` and
 `getPairIndicesOfType()`. Await them and pass executor options when appropriate.
 They read finalized native metadata rather than construction-time JS state.
 `addPickupAndDelivery()` now returns the pair index; callers that ignore its
-return value can continue unchanged. The broader migration notes below also
-cover changes already present in that commit.
+return value can continue unchanged.
 
 ## Results and retained solvers
 
@@ -89,7 +105,7 @@ const version = await solver.solverVersion(options);
 Routing restoration/domain/cost queries and Set Cover native state/diagnostic
 operations also require awaiting their current declaration signatures. Local
 model edits and getters on completed results remain synchronous. Consult the
-[API reference](api.md) and exported declarations for individual methods.
+[API reference](README.md) and exported declarations for individual methods.
 
 ## Native reports and validation
 

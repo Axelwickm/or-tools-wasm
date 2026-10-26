@@ -63,46 +63,53 @@
     <a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>, and the package is on
     <a href="https://www.npmjs.com/package/or-tools-wasm" rel="noopener">npm</a>.
   </p>
-  <h2>MathOpt (frontend)</h2>
-  <p class="solver-description">
-    Use <a href="https://developers.google.com/optimization/math_opt" rel="noopener">MathOpt</a> to route one model through selectable solver backends.
-  </p>
-  <ul>
-    <li><a href="./mathopt_basic.html">Basic Model - switch between GLOP, GLPK, GSCIP, and CP-SAT</a></li>
-    <li><a href="./mathopt_factory_floor.html">Bakery Floor Planner - rolling MathOpt CP-SAT simulation with IncrementalSolver</a></li>
-    <li><a href="./sudoku_generator.html">Sudoku Generator - MathOpt binary model with CP-SAT backend uniqueness checks</a></li>
-  </ul>
-  <h2>MPSolver (frontend)</h2>
-  <p class="solver-description">
-    Use <a href="https://developers.google.com/optimization/lp/mpsolver" rel="noopener">MPSolver</a>
-    to route one linear model through selectable LP and integer backends.
-  </p>
-  <ul>
-    <li><a href="./mp_simple_lp.html">Basic Model - switch between GLOP, CLP, GLPK, SCIP, CBC, BOP, Knapsack, and SAT</a></li>
-    <li><a href="./mpsolver_network_design.html">Network Design MIP - open shipping lanes and route demand</a></li>
-  </ul>
   <h2>CP-SAT</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/cp-sat/api.md">CP-SAT API reference</a>
+    <a href="https://www.npmjs.com/package/@or-tools-wasm/cp-sat"><img alt="npm: @or-tools-wasm/cp-sat" src="https://img.shields.io/npm/v/@or-tools-wasm/cp-sat?logo=npm&amp;label=%40or-tools-wasm%2Fcp-sat"></a></p>
   <p class="solver-description">
     Use <a href="https://developers.google.com/optimization/cp/cp_solver" rel="noopener">CP-SAT</a> for discrete optimization problems with integer, Boolean, scheduling, and logical constraints.
   </p>
   <ul>
-    <li><a href="./project_calendar.html">Calendar scheduling - task times, prerequisites and staff availability</a></li>
     <li><a href="./magic_square.html">Magic Square - fill a grid where every row, column, and diagonal has the same sum</a></li>
+    <li><a href="./steel_mill_slab.html"><strong>Steel Mill Slab - pack steel orders into slabs while minimizing wasted material</strong></a></li>
+    <li><a href="./project_calendar.html"><strong>Calendar scheduling - task times, prerequisites and employee availability</strong></a></li>
+    <li><a href="./sports_scheduling.html">Sports Scheduling - double round-robin minimization</a></li>
     <li><a href="./model_playground.html">Model Playground - paste JSON CpModelProto text and solve it</a></li>
     <li><a href="./schema_viewer.html">Schema Viewer - print embedded proto schemas</a></li>
-    <li><a href="./sports_scheduling.html">Sports Scheduling - double round-robin minimization</a></li>
-    <li><a href="./steel_mill_slab.html">Steel Mill Slab - compare three solver variants</a></li>
   </ul>
   <h2>Routing</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/routing/api.md">Routing API reference</a>
+    <a href="https://www.npmjs.com/package/@or-tools-wasm/routing"><img alt="npm: @or-tools-wasm/routing" src="https://img.shields.io/npm/v/@or-tools-wasm/routing?logo=npm&amp;label=%40or-tools-wasm%2Frouting"></a></p>
   <p class="solver-description">
     Use <a href="https://developers.google.com/optimization/routing" rel="noopener">routing</a> for vehicle routing, traveling salesperson, pickups and deliveries, capacities, and route constraints.
   </p>
   <ul>
     <li><a href="./routing_simple.html">Simple Routing - direct port of the basic OR-Tools example</a></li>
     <li><a href="./routing_vrp.html">Vehicle Routing Problem - direct port of the VRP example</a></li>
-    <li><a href="./routing_dispatch.html">Dispatch Map - multi-depot pallet delivery with animated routes</a></li>
+    <li><a href="./routing_dispatch.html"><strong>Dispatch Map - multi-depot pallet delivery with animated routes</strong></a></li>
+  </ul>
+  <h2>MathOpt (frontend)</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mathopt/api.md">MathOpt API reference</a></p>
+  <p class="solver-description">
+    Use <a href="https://developers.google.com/optimization/math_opt" rel="noopener">MathOpt</a> to route one model through selectable solver backends.
+  </p>
+  <ul>
+    <li><a href="./mathopt_basic.html">Basic Model - switch between GLOP, GLPK, GSCIP, and CP-SAT</a></li>
+    <li><a href="./mathopt_factory_floor.html"><strong>Bakery Floor Planner - rolling MathOpt CP-SAT simulation with IncrementalSolver</strong></a></li>
+    <li><a href="./sudoku_generator.html">Sudoku Generator - MathOpt binary model with CP-SAT backend uniqueness checks</a></li>
+  </ul>
+  <h2>MPSolver (frontend)</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
+  <p class="solver-description">
+    Use <a href="https://developers.google.com/optimization/lp/mpsolver" rel="noopener">MPSolver</a>
+    to route one linear model through selectable LP and integer backends.
+  </p>
+  <ul>
+    <li><a href="./mp_simple_lp.html">Basic Model - switch between GLOP, CLP, GLPK, SCIP, CBC, BOP, Knapsack, and SAT</a></li>
+    <li><a href="./mpsolver_network_design.html"><strong>Network Design MIP - open shipping lanes and route demand</strong></a></li>
   </ul>
   <h2>Network Flow</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/network-flow/api.md">Network Flow API reference</a></p>
   <p class="solver-description">
     Use OR-Tools graph algorithms for max-flow, min-cost-flow, and linear sum assignment problems.
   </p>
@@ -112,6 +119,7 @@
     <li><a href="./network_flow_assignment.html">Linear Sum Assignment - direct port of assignment_linear_sum_assignment.py</a></li>
   </ul>
   <h2>GLOP</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
   <p class="solver-description">
     Use GLOP for continuous linear programs through the MPSolver API.
   </p>
@@ -120,8 +128,10 @@
     <li><a href="./glop_stigler_diet.html">Stigler Diet - cost-minimizing diet LP with nutrient lower bounds</a></li>
   </ul>
   <h2>PDLP</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/pdlp/api.md">PDLP API reference</a></p>
   <ul><li><a href="./pdlp_import.html">Import and solve an MPS or protobuf model</a></li></ul>
   <h2>CLP</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
   <p class="solver-description">
     Use CLP for continuous linear programs through the MPSolver API.
   </p>
@@ -130,6 +140,7 @@
     <li><a href="./clp_transportation.html">Transportation LP - minimum-cost shipment planning</a></li>
   </ul>
   <h2>GLPK</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
   <p class="solver-description">
     Use GLPK for continuous and mixed-integer linear programs through MPSolver, or as a MathOpt backend.
   </p>
@@ -138,6 +149,7 @@
     <li><a href="./glpk_simple_mip.html">Simple MIP - simple_mip_program.py model with GLPK</a></li>
   </ul>
   <h2>SCIP</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
   <p class="solver-description">
     Use SCIP for mixed-integer linear programs through MPSolver.
   </p>
@@ -146,6 +158,7 @@
     <li><a href="./scip_assignment.html">Assignment With Task Sizes - binary MIP from the OR-Tools samples</a></li>
   </ul>
   <h2>CBC</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
   <p class="solver-description">
     Use CBC for mixed-integer linear programs through MPSolver.
   </p>
@@ -153,6 +166,7 @@
     <li><a href="./cbc_simple_mip.html">Simple MIP - simple_mip_program.py model with CBC</a></li>
   </ul>
   <h2>BOP</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
   <p class="solver-description">
     Use BOP for Boolean and integer programming models through MPSolver.
   </p>
@@ -160,6 +174,7 @@
     <li><a href="./bop_project_selection.html">Binary Project Selection - choose projects under budget and team constraints</a></li>
   </ul>
   <h2>Knapsack</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/knapsack/api.md">Knapsack API reference</a></p>
   <p class="solver-description">
     Use the dedicated Knapsack API for 0-1 and multi-dimensional knapsack problems.
   </p>
@@ -167,6 +182,7 @@
     <li><a href="./knapsack_simple.html">Simple Knapsack - choose valuable items under a capacity limit</a></li>
   </ul>
   <h2>Set Cover</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/set-cover/api.md">Set Cover API reference</a></p>
   <p class="solver-description">
     Use the dedicated Set Cover API for weighted set covering models and OR-Tools covering heuristics.
   </p>
@@ -174,6 +190,7 @@
     <li><a href="./set_cover_simple.html">Simple Set Cover - direct port of set_cover.py</a></li>
   </ul>
   <h2>RCPSP</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/rcpsp/api.md">RCPSP API reference</a></p>
   <p class="solver-description">
     Use the CP-SAT-backed RCPSP API for resource-constrained project scheduling.
   </p>
@@ -181,6 +198,7 @@
     <li><a href="./rcpsp_project.html">Project Schedule - visual Gantt and resource timeline</a></li>
   </ul>
   <h2>GSCIP</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mathopt/api.md">MathOpt API reference</a></p>
   <p class="solver-description">
     Use GSCIP for SCIP-backed mixed-integer optimization through MathOpt.
   </p>
@@ -188,6 +206,7 @@
     <li><a href="./gscip_simple_mip.html">Simple MIP - MathOpt model with GSCIP</a></li>
   </ul>
   <h2>SAT</h2>
+  <p class="solver-package-links"><a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/mp-solver/api.md">MPSolver API reference</a></p>
   <p class="solver-description">
     Use the SAT integer backend for MPSolver mixed-integer linear models.
   </p>

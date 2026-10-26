@@ -343,3 +343,8 @@ th {
 
 .solution-panel { margin: 0.75rem 0; }
 .summary-value { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.35rem; }
+
+/* Solver documentation and standalone package links. */
+nav, .solver-package-links { align-items: center; }
+.solver-package-links { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+nav img, .solver-package-links img { display: block; max-width: 100%; }

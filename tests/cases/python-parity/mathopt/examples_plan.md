@@ -2,7 +2,7 @@
 
 These are model-selection notes, not a current coverage checklist. Cases now
 live in the shared MathOpt fixture catalog rather than a browser-only runner.
-See the [parity audit](../../../../docs/test-audit/solver-python-test-parity-audit.md)
+See the [parity audit](../../../../docs/development/audits/solver-python-test-parity-audit.md)
 for current classifications.
 
 ## Selected examples (in order of increasing complexity)

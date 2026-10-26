@@ -1,0 +1,20 @@
+{
+  "name": "or-tools-wasm-solver-packages-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsc --noEmit && node --experimental-strip-types run.ts",
+    "build": "tsc --noEmit && vite build",
+    "test:browser": "npm run build && playwright test"
+  },
+  "dependencies": {
+    "@or-tools-wasm/cp-sat": "file:../../../javascript/build/solver-packages/cp-sat.tgz",
+    "@or-tools-wasm/routing": "file:../../../javascript/build/solver-packages/routing.tgz"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

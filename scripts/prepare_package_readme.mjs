@@ -36,10 +36,11 @@ if (releaseRef) {
 
 readme = readme
   .replaceAll('src="docs/media/', `src="${rawBase}/docs/media/`)
-  .replace(/\((docs\/(?:api|bundlers|testing)\.md)(#[^)]*)?\)/g,
+  .replace(/\((docs\/[A-Za-z0-9_./-]+\.md)(#[^)]*)?\)/g,
     (_match, file, anchor = '') => `(${repoBlobBase}/${file}${anchor})`)
   .replaceAll('(server/README.md)', `(${repoBlobBase}/server/README.md)`)
-  .replaceAll('(benchmarking/)', `(${repoTreeBase}/benchmarking)`);
+  .replaceAll('(benchmarking/)', `(${repoTreeBase}/benchmarking)`)
+  .replaceAll('(benchmarking/README.md)', `(${repoBlobBase}/benchmarking/README.md)`);
 
 mkdirSync(packageDir, { recursive: true });
 writeFileSync(path.join(packageDir, 'README.md'), readme);

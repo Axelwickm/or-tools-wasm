@@ -83,6 +83,34 @@ jobs:
         if: ${{ env.ACT }}
         run: test -n "$(find javascript/build/javascript/lib -maxdepth 1 -name '*.tgz' -print -quit)"
 
+      - name: Pack standalone solver packages
+        run: npm --prefix javascript run pack:solvers
+
+      - name: Verify release package names and versions
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, readdirSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('javascript/package.json', 'utf8'));
+          if (process.env.GITHUB_REF?.startsWith('refs/tags/v')) {
+            assert.equal(process.env.GITHUB_REF_NAME, `v${version}`, 'Release tag must match package.json');
+          }
+          const directory = 'javascript/build/javascript/lib';
+          const full = readdirSync(directory).filter(file => file.endsWith('.tgz'));
+          assert.equal(full.length, 1, 'Expected exactly one full-library tarball');
+          for (const [name, tarball] of [
+            ['or-tools-wasm', `${directory}/${full[0]}`],
+            ['@or-tools-wasm/cp-sat', 'javascript/build/solver-packages/cp-sat.tgz'],
+            ['@or-tools-wasm/routing', 'javascript/build/solver-packages/routing.tgz'],
+          ]) {
+            const manifest = JSON.parse(execFileSync('tar', ['-xOf', tarball, 'package/package.json'], { encoding: 'utf8' }));
+            assert.equal(manifest.name, name, `Unexpected package in ${tarball}`);
+            assert.equal(manifest.version, version, `Version mismatch in ${tarball}`);
+            console.log(`${name}@${version}`);
+          }
+          JS
+
       - name: Test example models
         run: npm --prefix javascript run test:site
 
@@ -100,6 +128,68 @@ jobs:
           path: javascript/build/javascript/lib/*.tgz
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload standalone package artifacts
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-solver-packages
+          path: |
+            javascript/build/solver-packages/cp-sat.tgz
+            javascript/build/solver-packages/routing.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  solver-packages-fixture:
+    name: Standalone CP-SAT and Routing packages
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Download standalone package artifacts
+        if: ${{ !env.ACT }}
+        uses: actions/download-artifact@v8
+        with:
+          name: npm-solver-packages
+          path: javascript/build/solver-packages
+
+      - name: Install standalone packages
+        run: node tests/fixtures/solver-packages/install.mjs
+
+      - name: Test types and Node execution
+        run: npm --prefix tests/fixtures/solver-packages test
+
+      - name: Test Bun execution
+        run: bun tests/fixtures/solver-packages/run.ts
+
+      - name: Test Deno execution
+        run: deno run --no-lock --node-modules-dir=manual --allow-read --allow-sys --allow-env tests/fixtures/solver-packages/run.ts
+
+      - name: Install test browsers
+        working-directory: tests/fixtures/solver-packages
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Test browser JSPI and Asyncify execution
+        run: npm --prefix tests/fixtures/solver-packages run test:browser
 
   vite-fixture:
     name: Vite 8 / ${{ matrix.mode }} / ${{ matrix.browser }}
@@ -486,9 +576,10 @@ jobs:
         run: docker compose -f server/docker-compose.yml down --remove-orphans
 
   publish:
-    name: Publish release
+    name: Publish ${{ matrix.package }}
     needs:
       - package
+      - solver-packages-fixture
       - vite-fixture
       - webpack-fixture
       - rollup-fixture
@@ -499,8 +590,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     if: ${{ startsWith(github.ref, 'refs/tags/v') && github.actor != 'nektos/act' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: or-tools-wasm
+            artifact: npm-package
+            tarball: release-packages/*.tgz
+          - package: '@or-tools-wasm/cp-sat'
+            artifact: npm-solver-packages
+            tarball: release-packages/cp-sat.tgz
+          - package: '@or-tools-wasm/routing'
+            artifact: npm-solver-packages
+            tarball: release-packages/routing.tgz
     permissions:
-      contents: write
+      contents: read
       id-token: write
 
     steps:
@@ -512,17 +616,43 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - name: Download package artifact
         uses: actions/download-artifact@v8
         with:
-          name: npm-package
-          path: javascript/build/javascript/lib
+          name: ${{ matrix.artifact }}
+          path: release-packages
 
       - name: Publish to npm
-        run: npm publish javascript/build/javascript/lib/*.tgz --access public --provenance
+        run: npm publish ${{ matrix.tarball }} --access public --provenance
+
+  release:
+    name: Create GitHub release
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.actor != 'nektos/act' }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download full package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: npm-package
+          path: release-packages/full
+
+      - name: Download standalone package artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: npm-solver-packages
+          path: release-packages/solvers
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" javascript/build/javascript/lib/*.tgz --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" release-packages/full/*.tgz release-packages/solvers/*.tgz --generate-notes --verify-tag

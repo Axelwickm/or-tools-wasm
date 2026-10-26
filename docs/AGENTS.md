@@ -24,7 +24,7 @@ When adding or changing solver functionality, check the public API entry points 
 
 Python parity tests should be converted assertion-by-assertion from the upstream Python tests. When TypeScript behavior is ambiguous, upstream Python behavior is the reference.
 
-`docs/test-audit/solver-python-test-parity-audit.md` is the working source of truth for Python solver-test parity. Keep it current whenever you inspect, convert, defer, or discover a mismatch in an upstream Python test. When a test is known to match upstream behavior and assertions through the high-level API, mark it with a `TEMP: parity` comment in the test code and update the audit.
+`docs/development/audits/solver-python-test-parity-audit.md` is the working source of truth for Python solver-test parity. Keep it current whenever you inspect, convert, defer, or discover a mismatch in an upstream Python test. When a test is known to match upstream behavior and assertions through the high-level API, mark it with a `TEMP: parity` comment in the test code and update the audit.
 
 Fixture location is not the API contract. Node may be the first runner used while iterating, but parity cases should live under shared fixture case modules and target the public package API. Add runner-specific glue only to pass the public API objects into those shared cases, so the same cases can later be executed by browser, webpack, Vite, Deno, Bun, or other fixture suites.
 

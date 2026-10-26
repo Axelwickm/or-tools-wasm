@@ -1,12 +1,14 @@
-# Google OR-Tools for Web
+# Google OR-Tools for JavaScript
 
-Solve complex optimization models from TypeScript with Google OR-Tools running
-as multithreaded WebAssembly.
-Solve directly in the browser or on a native C++ server, using the same
-TypeScript API.
+Build schedules, optimize delivery routes, and solve assignment and packing problems
+in TypeScript or JavaScript. Run Google OR-Tools in the browser with multithreaded
+WebAssembly, in Node.js, or on a native server through the same API.
 
 [![GitHub](https://img.shields.io/badge/GitHub-or--tools--wasm-181717?logo=github)](https://github.com/Axelwickm/or-tools-wasm)
 [![npm](https://img.shields.io/npm/v/or-tools-wasm?logo=npm&label=npm)](https://www.npmjs.com/package/or-tools-wasm)
+
+**Standalone packages:** [![npm: @or-tools-wasm/cp-sat](https://img.shields.io/npm/v/@or-tools-wasm/cp-sat?logo=npm&label=%40or-tools-wasm%2Fcp-sat)](https://www.npmjs.com/package/@or-tools-wasm/cp-sat)
+[![npm: @or-tools-wasm/routing](https://img.shields.io/npm/v/@or-tools-wasm/routing?logo=npm&label=%40or-tools-wasm%2Frouting)](https://www.npmjs.com/package/@or-tools-wasm/routing)
 
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Native Server](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml)
@@ -25,52 +27,74 @@ TypeScript API.
 [![Deno 2.9.7](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Deno%202.9.7&nameFilter=Deno%202.9.7%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Bun 1.4.2](https://img.shields.io/github/check-runs/Axelwickm/or-tools-wasm/stable?label=Bun%201.4.2&nameFilter=Bun%201.4.2%20%2F%20solve)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 
-- **Supported runtimes:** Chromium, Firefox, Node.js, Deno, Bun, and the native C++ server.
-- **Tested bundlers:** Vite, Webpack, and Rollup.
-
-[Try online in your browser](https://axelwickman.com/or-tools-wasm?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=try_online)
-
-Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in)
-
-<p>
-  <img src="docs/media/factory_floor.gif" alt="Factory floor optimization in PragmaPlanner" height="180">
-  <img src="docs/media/sudoku.gif" alt="Sudoku optimization example in PragmaPlanner" height="180">
-</p>
-<p>
-  <img src="docs/media/network_design.gif" alt="Network design optimization in PragmaPlanner" height="160">
-  <img src="docs/media/vrp.gif" alt="Vehicle routing optimization in PragmaPlanner" height="160">
-  <img src="docs/media/steel_mill_slab.png" alt="Steel mill slab optimization in PragmaPlanner" height="160">
-</p>
-<p>
-  <img src="docs/media/calendar_scheduling.gif" alt="CP-SAT calendar scheduling: moving tasks, resolving conflicts, and changing the deadline" width="800">
-</p>
-
-The next major release includes breaking native-operation and report changes; see the [migration guide](docs/migration.md).
-
-## What is it?
-
-**or-tools-wasm brings Google OR-Tools to TypeScript and JavaScript**, with support for running optimization models directly in the browser using multithreaded WebAssembly, in Node.js, Deno, or Bun, or on a native C++ server through the same API.
-
-[Google OR-Tools](https://developers.google.com/optimization) is a collection of optimization solvers for problems such as **scheduling, vehicle routing, assignment, packing, resource allocation, constraint programming, and linear and integer programming**. Its CP-SAT and routing solvers can search enormous numbers of possible solutions to find feasible or optimal decisions under complex constraints.
-
-or-tools-wasm provides TypeScript model builders, solver controls, and typed result APIs on top of these solvers. This makes it possible to build applications such as calendar and staff scheduling, delivery route optimization, production planning, job assignment, and other constraint-based optimization tools without maintaining a separate optimization backend.
-
-## Usage
-
-Install from npm:
+**Install:**
 
 ```sh
 npm install or-tools-wasm
 ```
 
-Public APIs use solver-scoped imports. For example, build a CP-SAT model and
-solve it:
+**[Documentation](docs/README.md)** · **[Try the examples](https://axelwickman.com/or-tools-wasm)** · Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in).
+
+> [!TIP]
+> **Same API. Fast solves on any device.**
+>
+> [Sign up for the hosted cloud version](https://or-tools-wasm-api.axelwickman.com/info).
+
+- **Scheduling and routing:** build employee rosters, shift schedules, school
+  timetables, production plans, and delivery route planners. Solve traveling
+  salesman (TSP) and vehicle routing (VRP) problems.
+- **Optimization solvers:** Google OR-Tools for constraint programming, linear
+  programming (LP), mixed-integer programming (MIP), assignment, bin packing,
+  resource allocation, knapsack, and network flow.
+- **TypeScript and JavaScript:** build models with typed variables and constraints,
+  then read solutions through a consistent API.
+- **Browser and server:** run multithreaded WebAssembly in the browser, use Node.js,
+  Deno, or Bun, or send the same model to a native server.
+
+### Examples
+
+**Click an image to try it.**
+
+<p>
+  <a href="https://axelwickman.com/or-tools-wasm/project_calendar.html"><img src="docs/media/calendar_scheduling.gif" alt="CP-SAT calendar scheduling with task dependencies and employee availability" width="49%"></a>
+</p>
+<p>
+  <a href="https://axelwickman.com/or-tools-wasm/mathopt_factory_floor.html"><img src="docs/media/factory_floor.gif" alt="Factory floor optimization" height="180"></a>
+  <a href="https://axelwickman.com/or-tools-wasm/sudoku_generator.html"><img src="docs/media/sudoku.gif" alt="Sudoku solver" height="180"></a>
+</p>
+<p>
+  <a href="https://axelwickman.com/or-tools-wasm/mpsolver_network_design.html"><img src="docs/media/network_design.gif" alt="Network design optimization" height="160"></a>
+  <a href="https://axelwickman.com/or-tools-wasm/routing_dispatch.html"><img src="docs/media/vrp.gif" alt="Vehicle routing optimization" height="160"></a>
+  <a href="https://axelwickman.com/or-tools-wasm/steel_mill_slab.html"><img src="docs/media/steel_mill_slab.png" alt="Steel mill slab optimization" height="160"></a>
+</p>
+
+## Install
+
+```sh
+npm install or-tools-wasm
+```
+
+Only need one solver? Install [CP-SAT](docs/solvers/cp-sat/README.md) or
+[Routing](docs/solvers/routing/README.md) as a smaller standalone package.
+
+```sh
+npm install @or-tools-wasm/cp-sat
+# Or:
+npm install @or-tools-wasm/routing
+```
+
+For browser headers, bundler configuration, and jsDelivr imports, see
+[Setup](docs/setup.md). Local browser WASM requires cross-origin isolation.
+
+## Solve your first problem
+
+A workshop has 12 hours available. A desk takes 3 hours and earns 20.
+A table takes 4 hours and earns 30. What should it make to maximize profit?
 
 ```ts
 import { CpModel, CpSat } from 'or-tools-wasm/cp-sat';
 
 const model = new CpModel();
-
 const desks = model.newIntVar(0, 4, 'desks');
 const tables = model.newIntVar(0, 3, 'tables');
 
@@ -79,7 +103,6 @@ model.maximize(desks.times(20).plus(tables.times(30)));
 
 const result = await CpSat.solve(model, { numWorkers: 1 });
 
-console.log(result.status);
 if (result.hasSolution) {
   console.log({
     desks: result.value(desks),
@@ -89,200 +112,88 @@ if (result.hasSolution) {
 }
 ```
 
-Browser calls use a worker by default to keep the main thread responsive.
-Choose `executor: 'direct'` or `'worker'` explicitly, or pass
-`executor: { type: 'server', url: 'http://localhost:17827' }` for native execution.
+The optimal plan is **3 tables, no desks, and a profit of 90**.
 
-Start the native server from the repository root:
+Browser solves use a worker by default to keep the page responsive.
+[Execution options](docs/execution.md) cover direct, worker, and server execution,
+progress events, and cancellation.
+
+**[Explore the API documentation](docs/README.md)**
+
+## Browser import with jsDelivr
+
+You can import the standalone CP-SAT package without a bundler. Replace `VERSION`
+with an exact published version. This example sends the solve to your native server.
+Start it from the repository root:
 
 ```sh
 docker compose -f server/docker-compose.yml up --build
 ```
 
-Solve calls share execution controls: `executor` selects where to run,
-`onEvent` reports progress, and `signal` requests cancellation.
+Then import and solve:
 
-### Managed cloud
+```html
+<script type="module">
+  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/@or-tools-wasm/cp-sat@VERSION/build/javascript/browser/cp-sat.js';
 
-**Build your app. Let us run the solvers.** Send optimization jobs through an API.
-We handle the compute, queues, and scaling.
-[Explore cloud / early access](https://or-tools-wasm-api.axelwickman.com/info).
-Cloud execution currently checks service status and reports unavailability;
-it does not upload or solve models.
+  const model = new CpModel();
+  const x = model.newIntVar(0, 10, 'x');
+  model.maximize(x);
 
-After the first completed local solve, the library prints a cloud notice with
-`console.info`, once per JavaScript context (page, process, or independent worker).
-The notice makes no network request. To suppress it before solving:
-
-```ts
-import { setCloudNoticeEnabled } from 'or-tools-wasm';
-setCloudNoticeEnabled(false);
+  const result = await CpSat.solve(model, {
+    executor: { type: 'server', url: 'http://localhost:17827' },
+  });
+  if (result.hasSolution) console.log(result.value(x));
+</script>
 ```
 
-The setting is also exported by every solver subpath. Command-line applications
-can instead set `ORTOOLS_WASM_CLOUD_NOTICE=0`. Explicit cloud status messages are
-unaffected.
+For local WASM execution, use npm and a bundler or serve the package assets from
+your own origin so browser workers can load. See [CDN setup](docs/setup.md#import-from-jsdelivr)
+and [server setup](server/README.md).
 
-To explore locally, see the [example site guide](docs/testing.md) and
-[native server setup](server/README.md).
+## Supported solvers
 
-> [!WARNING]
-> Local browser WASM requires cross-origin isolation headers for WebAssembly threads.
-> See [Browser requirements](#browser-requirements) below.
-
-## API reference
-
-See [docs/api.md](docs/api.md) for the full TypeScript API reference.
-
-## Benchmarking
-
-See [benchmarking/](benchmarking/).
-
-## Supported OR-Tools surface
-
-| OR-Tools surface | or-tools-wasm | Description |
+| Supported | Solver | What it does |
 | --- | --- | --- |
-| CP-SAT | ✅ | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
-| Routing | ✅ | Vehicle routing (VRP), TSP, pickup-delivery, capacity constraints, and route dimensions. |
-| MPSolver API | ✅ | Linear and mixed-integer programming wrapper; this package includes GLOP LP, CLP LP, PDLP LP, GLPK LP/MIP, SCIP MIP, CBC MIP, BOP MIP, Knapsack MIP, and SAT MIP backends. |
-| MathOpt API | ✅ | Unified modeling and solve API with incremental solving and callback support; this package includes GLOP, GLPK, GSCIP, CP-SAT, and PDLP backends. |
-| GLOP | ✅ | Google's simplex linear programming solver. |
-| PDLP | ✅ | First-order LP and convex diagonal quadratic solver for very large models. |
-| SAT integer programming | ✅ | CP-SAT-backed integer programming backend for pure integer linear models. |
-| CLP | ✅ | COIN-OR linear programming backend. |
-| GLPK | ✅ | GNU linear and mixed-integer programming backend. |
-| SCIP / GSCIP | ✅ | SCIP-based mixed-integer backend through MPSolver and MathOpt. |
-| CBC | ✅ | COIN-OR branch-and-cut mixed-integer programming backend through MPSolver. |
-| BOP | ✅ | Boolean/integer optimization backend through MPSolver. |
-| Knapsack | ✅ | Dedicated 0-1 and multi-dimensional knapsack solver, plus the MPSolver Knapsack backend. |
-| Network flow algorithms | ✅ | Dedicated max-flow, min-cost-flow, and linear-sum assignment graph algorithms. |
-| Assignment algorithms | ✅ | Linear-sum assignment through the dedicated Network Flow API. |
-| Set cover | ✅ | Dedicated weighted set cover model, invariant, and heuristic search API. |
-| RCPSP | ✅ | CP-SAT-backed resource-constrained project scheduling model, parser, and visual scheduling surface. |
-| Linear Solver ModelBuilder |  | Ergonomic LP/MIP modeling API with import/export helpers and backend solve helpers. |
+| ✅ | [CP-SAT](docs/solvers/cp-sat/api.md) | Constraint and integer optimization for Boolean, integer, scheduling, and logical models. |
+| ✅ | [Routing](docs/solvers/routing/api.md) | Vehicle routing (VRP), TSP, pickup-delivery, time windows, breaks, resource groups, state-dependent transit, and route reoptimization. |
+| ✅ | [MPSolver](docs/solvers/mp-solver/api.md) | Linear and mixed-integer programming with selectable backends, incremental sessions, native MIP callbacks, and solution pools where supported. |
+| ✅ | [MathOpt](docs/solvers/mathopt/api.md) | Linear, quadratic, and multi-objective models, incremental solving, and native callbacks. Capabilities depend on the selected backend. |
+| ✅ | [GLOP](docs/solvers/mp-solver/api.md) | Google's simplex linear programming solver. |
+| ✅ | [PDLP](docs/solvers/pdlp/api.md) | First-order LP and convex diagonal quadratic solving, with native model import and iteration statistics. |
+| ✅ | [SAT integer programming](docs/solvers/mp-solver/api.md) | CP-SAT-backed integer programming backend for pure integer linear models. |
+| ✅ | [CLP](docs/solvers/mp-solver/api.md) | COIN-OR linear programming backend. |
+| ✅ | [GLPK](docs/solvers/mp-solver/api.md) | GNU linear and mixed-integer programming backend. |
+| ✅ | [SCIP](docs/solvers/mp-solver/api.md) / [GSCIP](docs/solvers/mathopt/api.md) | SCIP-based mixed-integer optimization through MPSolver and MathOpt. |
+| ✅ | [CBC](docs/solvers/mp-solver/api.md) | COIN-OR branch-and-cut mixed-integer programming backend. |
+| ✅ | [BOP](docs/solvers/mp-solver/api.md) | Boolean/integer optimization backend through MPSolver. |
+| ✅ | [Knapsack](docs/solvers/knapsack/api.md) | Dedicated 0-1 and multi-dimensional knapsack solver, plus the MPSolver Knapsack backend. |
+| ✅ | [Network flow](docs/solvers/network-flow/api.md) | Dedicated max-flow, min-cost-flow, and linear-sum assignment algorithms. |
+| ✅ | [Assignment](docs/solvers/network-flow/api.md) | Linear-sum assignment through the dedicated Network Flow API. |
+| ✅ | [Set Cover](docs/solvers/set-cover/api.md) | Weighted set covering with construction and local-search heuristics, MIP and LP methods, and Lagrangian bounds. |
+| ✅ | [RCPSP](docs/solvers/rcpsp/api.md) | Resource-constrained scheduling through CP-SAT, including multimode, RCPSP/Max, consumer-producer, and resource-investment models. |
 
-Unchecked rows are planned OR-Tools targets that are not exposed by this package
-yet. Commercial and large third-party native backends such as Gurobi, CPLEX,
-XPRESS, HiGHS, OSQP, ECOS, and SCS are not planned.
+## Compatibility
 
-The TypeScript modeling APIs follow OR-Tools concepts, and the fixture suite
-tracks upstream Python behavior where supported. One-shot `solve()` calls take
-an options object and return an independent result. CP-SAT also preserves the
-serialized-model path through `CpSat.solveProto()`. Specialized stateful APIs,
-including `CpSolver`, the `pywraplp`-style MPSolver interface, and incremental
-MathOpt, remain available; see the API reference for their contracts.
+| Supported | Runtime |
+| --- | --- |
+| ✅ | Chromium browsers |
+| ✅ | Firefox |
+| ✅ | Node.js |
+| ✅ | Deno |
+| ✅ | Bun |
+| ✅ | Native C++ solver server |
 
-Each solver has a [dedicated API section](docs/api.md) and an example on the site:
+Local WebAssembly includes JSPI and Asyncify runtimes, with automatic selection
+for the current environment. Only the selected runtime is loaded.
 
-- [CP-SAT](docs/api.md#cp-sat): integer/logical/scheduling models, exact bigint
-  values, live callbacks, detached proto snapshots and native diagnostics/export.
-- [Routing](docs/api.md#routing): time windows, vehicle eligibility and costs,
-  pickup/delivery, visit types, dimensions, native expressions and finalizers.
-  Route restoration and domain/cost inspection are awaitable native operations.
-  Assignments retain their own values and bounds after later model edits.
-- [Routing resource groups](docs/api.md#routing-resource-groups): resource slots
-  with start/end domains, vehicle eligibility and native assignment/class inspection.
-- [MPSolver](docs/api.md#mpsolver): editable LP/MIP models, native validation,
-  model/solution import/export and awaitable verification. `MpModel.incremental()`
-  retains native state and returns independent `MpResult` answers with native
-  diagnostics. The Python-style `IncrementalSolver`
-  retains native state across edits and supports SCIP solution-pool enumeration.
-- [MathOpt](docs/api.md#mathopt): editable or raw protobuf models, native callbacks,
-  filtered/full results, validated imports and native MPS conversion.
-  `IncrementalSolver` tracks editable-model changes; `ProtoIncrementalSolver`
-  accepts explicit native updates. Close persistent sessions in `finally`.
-- [Knapsack](docs/api.md#knapsack) and [Network Flow](docs/api.md#network-flow):
-  specialized builders with exact integer results and independent solve snapshots.
-- [Set Cover](docs/api.md#set-cover): native invariant queries, trace compression,
-  heuristic construction, retained guided search, MIP covers, LP relaxations, CFT covers and
-  Lagrangian bounds. Native queries are awaitable;
-  construction generators ignore iteration limits; the pinned heuristics do not
-  enforce time settings.
-- [RCPSP](docs/api.md#rcpsp): standard renewable-resource scheduling and PSPLIB parsing.
-  Parsed advanced variants currently require their own model translation.
-- [PDLP](docs/api.md#pdlp): LP/convex diagonal QP models, native model import and
-  typed logs/iteration events. It is also available through MPSolver and MathOpt.
+**Tested bundlers:** Vite, Webpack, and Rollup.
 
-Select execution with `executor` on each operation. Direct, worker and native
-server execution use the same model/result APIs; cloud execution is reserved.
-GLPK persistent sessions work locally but require a stable thread and are not
-supported on the server. See [execution options](docs/api.md#executor-selection)
-for cancellation, callbacks and runtime requirements.
+See [testing](docs/development/testing.md) for the fixture matrix and
+[benchmarks](benchmarking/README.md) for performance measurements.
 
-The worker script and WebAssembly files are emitted automatically from package
-imports, with no manual copying into `public/` or `static/` required.
+## About
 
-## Fixture test matrix
-
-Shared solver tests run across Vite, Webpack, Rollup, Node, Deno, and Bun.
-Browser coverage includes Chromium and Firefox. CI checks direct and worker
-execution, plus native server execution in Node, Bun, Deno, and Vite Chromium.
-
-The example site is tested too: every solver example runs a real solve, with
-additional checks for main parameters, mobile layouts, server errors, and
-optional authentication.
-
-See the [testing guide](docs/testing.md) for commands, matrix details, and site
-test coverage.
-
-## Browser requirements
-
-Local browser WASM builds use WebAssembly threads, so pages must be served with
-cross-origin isolation enabled:
-
-```http
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
-```
-
-Without these headers, solving can fail during WebAssembly runtime or worker
-startup.
-
-Server-only execution does not load local WASM and does not require these
-headers. The server must still be reachable from the page under the browser's
-CORS and mixed-content rules.
-
-See [Bundler configuration](#bundler-configuration) for Vite, Webpack, and
-Rollup setup.
-
-## Bundler configuration
-
-See [docs/bundlers.md](docs/bundlers.md) for Vite, Webpack, and Rollup setup.
-
-## Node, Deno, and Bun
-
-Node and Bun work with normal ESM imports and do not need browser
-cross-origin-isolation headers.
-
-Deno needs permissions to read package assets and inspect CPU count:
-
-```sh
-deno run --allow-read --allow-sys=cpus your-script.ts
-```
-
-Server execution also needs `--allow-net` permission for the server endpoint.
-
-Node uses the JSPI runtime when `WebAssembly.promising` is available and falls
-back to Asyncify otherwise. Deno and Bun use the package's Asyncify runtime
-path.
-
-## Upstream OR-Tools
-
-This repository vendors Google OR-Tools and adds a JavaScript/WebAssembly
-packaging layer on top. OR-Tools is Google's open-source suite for solving
-combinatorial optimization problems, including CP-SAT, linear programming,
-routing, bin packing, and graph algorithms.
-
-Upstream project:
-
-- Source: [github.com/google/or-tools](https://github.com/google/or-tools)
-- Documentation: [developers.google.com/optimization](https://developers.google.com/optimization/)
-- License: Apache License 2.0
-
-## Maintainer
-
+Built on [Google OR-Tools](https://github.com/google/or-tools).
 Maintained by [Axel Wickman](https://axelwickman.com).
-
-## License
-
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+Licensed under [Apache 2.0](LICENSE).

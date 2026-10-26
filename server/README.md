@@ -19,7 +19,7 @@ To try it from the example site, select **Server** and enter the server endpoint
 If authentication is enabled, enter the token in **Bearer token (optional)**
 without the `Bearer` prefix. The field is masked and the site does not persist
 the token; enter it again after reloading or changing pages. Use HTTPS for remote
-authenticated servers. See the [example site guide](../docs/testing.md#example-site)
+authenticated servers. See the [example site guide](../docs/development/testing.md#example-site)
 to run the site locally.
 
 Run the native server tests in the same Docker Compose build:
@@ -179,7 +179,7 @@ queue limits, and solver failures. It has no default connection timeout; a
 custom `fetch` can supply one. The example site adds a 10-second timeout until
 response headers arrive, leaving long solves and event streams unrestricted.
 
-See the [executor API](../docs/api.md#server-execution-and-errors) for options
+See the [executor API](../docs/execution.md#server-execution-and-errors) for options
 and failure behavior. Server-only browser clients do not need local WASM
 isolation headers, but browser CORS and mixed-content rules still apply. Do not
 expose an unauthenticated server to an untrusted network; use authentication and

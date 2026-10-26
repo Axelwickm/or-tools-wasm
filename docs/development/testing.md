@@ -34,8 +34,8 @@ package types from the same packed artifact as each fixture; the fixture
 installer installs it into both the fixture and `tests`.
 
 Run the full matrix before landing solver API, worker bridge, threading, or
-packaging changes. See [shared test cases](../tests/cases/README.md) for case
-organization and the [parity audit](test-audit/solver-python-test-parity-audit.md)
+packaging changes. See [shared test cases](../../tests/cases/README.md) for case
+organization and the [parity audit](audits/solver-python-test-parity-audit.md)
 for upstream Python coverage.
 
 ## Example site
@@ -56,7 +56,7 @@ npm --prefix javascript run dev
 starting the site, use `npm --prefix javascript run build:lib`.
 
 On any example page, select an executor to choose local or server execution.
-See [native server setup](../server/README.md) for the Docker command and
+See [native server setup](../../server/README.md) for the Docker command and
 optional authentication.
 
 After building the library, run the site model and support tests:
@@ -101,4 +101,4 @@ and configuration:
 docker compose -f server/docker-compose.yml run --build --rm ortools-native-test
 ```
 
-See [server setup](../server/README.md) for deployment and protocol details.
+See [server setup](../../server/README.md) for deployment and protocol details.

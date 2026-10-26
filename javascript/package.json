@@ -161,7 +161,9 @@
     "test:fixtures:runtime": "npm run test:fixture:deno && npm run test:fixture:node && npm run test:fixture:bun",
     "test:fixtures:full": "npm run test:fixtures:browser && npm run test:fixtures:runtime",
     "test:fixtures": "npm run test:fixtures:full",
-    "gen:mp-solver-types": "node ../scripts/generate_mp_solver_types.mjs"
+    "gen:mp-solver-types": "node ../scripts/generate_mp_solver_types.mjs",
+    "pack:solvers": "npm run patch:wasm-runtime && node ../scripts/verify_shared_wasm.mjs && node ../scripts/package_solvers.mjs",
+    "test:fixture:solver-packages": "npm run pack:solvers && node ../tests/fixtures/solver-packages/install.mjs && npm --prefix ../tests/fixtures/solver-packages test"
   },
   "files": [
     "build/javascript/lib/**/*.d.ts",

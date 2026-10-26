@@ -2,7 +2,7 @@
 
 This file records integration reports from 0.9.1 and proposed diagnostics, not
 a verified list of failures in the current worktree. The current API reference
-is [docs/api.md](docs/api.md). Old worker-toggle and `CpSat.cancelSolve()`
+is [documentation index](docs/README.md). Old worker-toggle and `CpSat.cancelSolve()`
 examples below are historical: current cancellation uses a per-solve
 `AbortSignal`. CP-SAT now exports parameter and decision-strategy enums and
 uses numeric enum values in the high-level API. The runtime-inspection methods

@@ -20,5 +20,5 @@ jobs or immediate native cancellation.
 Knapsack input limits, and Network Flow recovery after rejected arc insertion.
 These are package contracts, not additional Python parity claims. Site model,
 layout, and interaction tests live in `javascript/site` and
-`javascript/tests/site`; see the [testing guide](../../docs/testing.md) for their
+`javascript/tests/site`; see the [testing guide](../../docs/development/testing.md) for their
 commands and scope.
