@@ -10,6 +10,39 @@ import type { ManagedWorker, WorkerLike } from '../lib/worker_helpers.ts';
 type Request = { id: number; value: number };
 type Response = { ready?: boolean; id?: number; value?: number; custom?: boolean; event?: boolean };
 
+test('browser worker startup failures preserve the original diagnostic event', { timeout: 10_000 }, async () => {
+  const bundled = await build({ stdin: { resolveDir: fileURLToPath(new URL('../lib', import.meta.url)),
+    contents: `export { ManagedWorker } from './worker_helpers.ts';` },
+    bundle: true, write: false, platform: 'node', format: 'esm' });
+  const api = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+  const worker: WorkerLike<Request, Response> = { postMessage() {}, terminate() {} };
+  const original = new Error('Failed to evaluate runtime module');
+  // Model the browser callback, including details absent from its message.
+  const event = {
+    type: 'error', message: original.message, error: original,
+    filename: 'https://example.test/assets/solver-worker.js', lineno: 17, colno: 9,
+  } as ErrorEvent;
+  const manager: ManagedWorker<Request, Response> = new api.ManagedWorker({
+    createWorker: async () => worker,
+    isReady: (response: Response) => response.ready === true,
+    getRequestId: (request: Request) => request.id,
+    getResponseId: (response: Response) => response.id,
+  });
+  try {
+    const rejected = assert.rejects(manager.load(), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.message, `Worker failed to load: ${original.message}`);
+      assert.equal((error as Error & { cause?: unknown }).cause, event,
+        'Preserve the event, source location, and underlying exception');
+      return true;
+    });
+    await nextTurn();
+    assert.equal(typeof worker.onerror, 'function');
+    worker.onerror!(event);
+    await rejected;
+  } finally { manager.terminate(); }
+});
+
 test('concurrent loads and posts share worker readiness and deliver events once', { timeout: 10_000 }, async () => {
   const bundled = await build({ stdin: { resolveDir: fileURLToPath(new URL('../lib', import.meta.url)),
     contents: `export { ManagedWorker } from './worker_helpers.ts';` },

@@ -223,9 +223,10 @@ export class ManagedWorker<Request, Response> {
         const message = this.options.loadErrorMessage?.(errorLike)
           ?? defaultLoadErrorMessage(errorLike);
         const error = new Error(message);
+        Object.defineProperty(error, 'cause', { value: errorLike, configurable: true, writable: true });
         this.rejectReady = null;
         reject(error);
-        this.terminate(error.message);
+        this.terminate(error);
       };
 
       if (typeof worker.on === 'function') {
