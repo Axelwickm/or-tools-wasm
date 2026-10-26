@@ -36,6 +36,7 @@ const examples: Record<string, [string, RegExp]> = {
   sports_scheduling: ['#status', /Objective: \d+/],
   steel_mill_slab: ['#summary', /used \d+ slabs with total loss \d+/],
   sudoku_generator: ['#status', /Solved, status=/],
+  warehouse_storage: ['#placement-status', /Placement updated · [1-9]\d* pallets moved/],
 };
 
 for (const executor of ['direct', 'worker', 'server']) for (const variant of ['investment', 'consumer']) {
@@ -144,9 +145,12 @@ for (const scenario of scenarios) {
     test.setTimeout(90_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
+    if (scenario.page === 'warehouse_storage') await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(`/${scenario.page}.html`);
     for (const summary of await page.locator('details.advanced-settings > summary').all()) await summary.click();
-    await page.locator('select').filter({ has: page.locator('option[value="worker"]') }).selectOption('worker');
+    // The warehouse owns its worker and has no executor selector.
+    if (scenario.page !== 'warehouse_storage')
+      await page.locator('select').filter({ has: page.locator('option[value="worker"]') }).selectOption('worker');
     // Keep CI resource use bounded without changing the displayed problem.
     for (const input of await page.locator('#workers, #worker-count, #worker-threads').all()) if (await input.isVisible()) await input.fill('1');
     for (const [selector, value] of Object.entries(scenario.selects ?? {})) await page.locator(selector).selectOption(value);
@@ -162,6 +166,7 @@ for (const scenario of scenarios) {
     }
     if (scenario.inputs?.['#resource-slots']) await page.locator('#resource-slots').fill(scenario.inputs['#resource-slots']);
     const run = page.locator(scenario.page === 'mathopt_factory_floor' ? '#toggle-running'
+      : scenario.page === 'warehouse_storage' ? '#optimize-placement'
       : ['sudoku_generator', 'model_playground'].includes(scenario.page) ? '#solve' : '#run');
     await run.click();
     const [selector, success] = examples[scenario.page];
