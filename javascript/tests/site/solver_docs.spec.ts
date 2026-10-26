@@ -8,7 +8,7 @@ test('every example section and example links to its API reference', async ({ pa
     await expect(section.locator('xpath=following-sibling::*[1]').getByRole('link', { name: /API reference/ })).toBeVisible();
   }
   for (const solver of ['cp-sat', 'routing']) {
-    await expect(page.locator(`a[href="https://www.npmjs.com/package/@or-tools-wasm/${solver}"] img`)).toBeVisible();
+    await expect(page.locator(`a[href="https://www.npmjs.com/package/${solver}-wasm"] img`)).toBeVisible();
   }
   const examples = await page.locator('li a[href$=".html"]').evaluateAll(links => links.map(a => a.getAttribute('href')!));
   for (const example of examples) {
