@@ -5,8 +5,6 @@ on:
     branches:
       - main
       - stable
-    tags:
-      - 'v*'
   pull_request:
   workflow_dispatch:
 
@@ -71,9 +69,8 @@ jobs:
         if: ${{ !env.ACT }}
         run: npm --prefix javascript run test:unit
 
-      - name: Prepare package README for release tag
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        run: node scripts/prepare_package_readme.mjs "$GITHUB_REF_NAME"
+      - name: Prepare package README
+        run: node scripts/prepare_package_readme.mjs
 
       - name: Build and pack library
         if: ${{ !env.ACT }}
@@ -93,16 +90,13 @@ jobs:
           import { execFileSync } from 'node:child_process';
           import { readFileSync, readdirSync } from 'node:fs';
           const { version } = JSON.parse(readFileSync('javascript/package.json', 'utf8'));
-          if (process.env.GITHUB_REF?.startsWith('refs/tags/v')) {
-            assert.equal(process.env.GITHUB_REF_NAME, `v${version}`, 'Release tag must match package.json');
-          }
           const directory = 'javascript/build/javascript/lib';
           const full = readdirSync(directory).filter(file => file.endsWith('.tgz'));
           assert.equal(full.length, 1, 'Expected exactly one full-library tarball');
           for (const [name, tarball] of [
             ['or-tools-wasm', `${directory}/${full[0]}`],
-            ['@or-tools-wasm/cp-sat', 'javascript/build/solver-packages/cp-sat.tgz'],
-            ['@or-tools-wasm/routing', 'javascript/build/solver-packages/routing.tgz'],
+            ['cp-sat-wasm', 'javascript/build/solver-packages/cp-sat.tgz'],
+            ['routing-wasm', 'javascript/build/solver-packages/routing.tgz'],
           ]) {
             const manifest = JSON.parse(execFileSync('tar', ['-xOf', tarball, 'package/package.json'], { encoding: 'utf8' }));
             assert.equal(manifest.name, name, `Unexpected package in ${tarball}`);
@@ -589,20 +583,20 @@ jobs:
       - server-fixture
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.actor != 'nektos/act' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/stable' && github.actor != 'nektos/act' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - package: or-tools-wasm
             artifact: npm-package
-            tarball: release-packages/*.tgz
-          - package: '@or-tools-wasm/cp-sat'
+            tarball: ./release-packages/*.tgz
+          - package: 'cp-sat-wasm'
             artifact: npm-solver-packages
-            tarball: release-packages/cp-sat.tgz
-          - package: '@or-tools-wasm/routing'
+            tarball: ./release-packages/cp-sat.tgz
+          - package: 'routing-wasm'
             artifact: npm-solver-packages
-            tarball: release-packages/routing.tgz
+            tarball: ./release-packages/routing.tgz
     permissions:
       contents: read
       id-token: write
@@ -610,6 +604,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Require the version tag at the current stable commit
+        run: bash scripts/verify_release_ref.sh
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -632,7 +629,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.actor != 'nektos/act' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/stable' && github.actor != 'nektos/act' }}
     permissions:
       contents: write
 
@@ -655,4 +652,6 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release-packages/full/*.tgz release-packages/solvers/*.tgz --generate-notes --verify-tag
+        run: |
+          version=$(node -p "require('./javascript/package.json').version")
+          gh release create "v${version}" release-packages/full/*.tgz release-packages/solvers/*.tgz --generate-notes --verify-tag

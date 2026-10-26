@@ -7,8 +7,8 @@ WebAssembly, in Node.js, or on a native server through the same API.
 [![GitHub](https://img.shields.io/badge/GitHub-or--tools--wasm-181717?logo=github)](https://github.com/Axelwickm/or-tools-wasm)
 [![npm](https://img.shields.io/npm/v/or-tools-wasm?logo=npm&label=npm)](https://www.npmjs.com/package/or-tools-wasm)
 
-**Standalone packages:** [![npm: @or-tools-wasm/cp-sat](https://img.shields.io/npm/v/@or-tools-wasm/cp-sat?logo=npm&label=%40or-tools-wasm%2Fcp-sat)](https://www.npmjs.com/package/@or-tools-wasm/cp-sat)
-[![npm: @or-tools-wasm/routing](https://img.shields.io/npm/v/@or-tools-wasm/routing?logo=npm&label=%40or-tools-wasm%2Frouting)](https://www.npmjs.com/package/@or-tools-wasm/routing)
+**Standalone packages:** [![npm: cp-sat-wasm](https://img.shields.io/npm/v/cp-sat-wasm?logo=npm&label=cp-sat-wasm)](https://www.npmjs.com/package/cp-sat-wasm)
+[![npm: routing-wasm](https://img.shields.io/npm/v/routing-wasm?logo=npm&label=routing-wasm)](https://www.npmjs.com/package/routing-wasm)
 
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Native Server](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml)
@@ -35,7 +35,6 @@ npm install or-tools-wasm
 
 **[Documentation](docs/README.md)** · **[Try the examples](https://axelwickman.com/or-tools-wasm)** · Used in [PragmaPlanner](https://pragmaplanner.com/?utm_source=or-tools-wasm&utm_medium=readme&utm_campaign=used_in).
 
-> [!TIP]
 > **Same API. Fast solves on any device.**
 >
 > [Sign up for the hosted cloud version](https://or-tools-wasm-api.axelwickman.com/info).
@@ -79,12 +78,12 @@ Only need one solver? Install [CP-SAT](docs/solvers/cp-sat/README.md) or
 [Routing](docs/solvers/routing/README.md) as a smaller standalone package.
 
 ```sh
-npm install @or-tools-wasm/cp-sat
+npm install cp-sat-wasm
 # Or:
-npm install @or-tools-wasm/routing
+npm install routing-wasm
 ```
 
-For browser headers, bundler configuration, and jsDelivr imports, see
+For browser headers and bundler configuration, see
 [Setup](docs/setup.md). Local browser WASM requires cross-origin isolation.
 
 ## Solve your first problem
@@ -120,37 +119,6 @@ Browser solves use a worker by default to keep the page responsive.
 progress events, and cancellation.
 
 **[Explore the API documentation](docs/README.md)**
-
-## Browser import with jsDelivr
-
-You can import the standalone CP-SAT package without a bundler. Replace `VERSION`
-with an exact published version. This example sends the solve to your native server.
-Start it from the repository root:
-
-```sh
-docker compose -f server/docker-compose.yml up --build
-```
-
-Then import and solve:
-
-```html
-<script type="module">
-  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/@or-tools-wasm/cp-sat@VERSION/build/javascript/browser/cp-sat.js';
-
-  const model = new CpModel();
-  const x = model.newIntVar(0, 10, 'x');
-  model.maximize(x);
-
-  const result = await CpSat.solve(model, {
-    executor: { type: 'server', url: 'http://localhost:17827' },
-  });
-  if (result.hasSolution) console.log(result.value(x));
-</script>
-```
-
-For local WASM execution, use npm and a bundler or serve the package assets from
-your own origin so browser workers can load. See [CDN setup](docs/setup.md#import-from-jsdelivr)
-and [server setup](server/README.md).
 
 ## Supported solvers
 

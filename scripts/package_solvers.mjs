@@ -50,7 +50,7 @@ for (const { entry, directory, runtime, label } of solvers) {
 
   const exports = parent.exports[`./${entry}`];
   const manifest = {
-    name: `@or-tools-wasm/${entry}`, version: parent.version,
+    name: `${entry}-wasm`, version: parent.version,
     description: `Google OR-Tools ${label} for JavaScript and TypeScript, with browser and Node WASM runtimes.`,
     license: parent.license, repository: parent.repository, homepage: parent.homepage, bugs: parent.bugs,
     type: 'module', main: exports.node, types: exports.types,
@@ -62,6 +62,8 @@ for (const { entry, directory, runtime, label } of solvers) {
   const readme = await readFile(path.join(root, 'docs/solvers', entry, 'README.md'), 'utf8');
   await writeFile(path.join(destination, 'README.md'), readme.replaceAll(
     '(api.md)', `(https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/${entry}/api.md)`,
+  ).replaceAll(
+    'src="../../media/', 'src="https://raw.githubusercontent.com/Axelwickm/or-tools-wasm/stable/docs/media/',
   ));
   const packed = spawnSync('npm', ['pack', '--json', '--pack-destination', outputRoot], {
     cwd: destination, encoding: 'utf8',

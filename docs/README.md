@@ -2,7 +2,7 @@
 
 ## Setup and execution
 
-- [Setup](setup.md): full and standalone packages, jsDelivr imports, a first solve, browser requirements, Node, Deno, Bun and bundlers.
+- [Setup](setup.md): full and standalone packages, a first solve, browser requirements, Node, Deno, Bun and bundlers.
 - [Execution and shared APIs](execution.md): executors, results, callbacks, events, cancellation, runtime cleanup, server errors, cloud notice and protobuf access.
 - [Native server](../server/README.md): building, running and configuring the server.
 - [Migration](migration.md): changes since 1.0.0, breaking contracts and upgrading.

@@ -4,7 +4,9 @@ import path from 'node:path';
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const packageDir = path.join(repoRoot, 'javascript');
 const releaseRef = process.argv[2]
-  ?? (process.env.GITHUB_REF?.startsWith('refs/tags/v') ? process.env.GITHUB_REF_NAME : undefined);
+  ?? (process.env.GITHUB_REF === 'refs/heads/stable'
+    ? `v${JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8')).version}`
+    : undefined);
 
 const readmePath = path.join(repoRoot, 'README.md');
 
@@ -16,11 +18,11 @@ const rawBase = `https://raw.githubusercontent.com/Axelwickm/or-tools-wasm/${doc
 
 if (releaseRef) {
   const encodedReleaseRef = encodeURIComponent(releaseRef);
-  const workflowUrl = `https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml?query=ref%3A${encodedReleaseRef}`;
+  const workflowUrl = 'https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml?query=branch%3Astable';
 
   readme = readme.replace(
     'https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg',
-    `https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg?branch=${encodedReleaseRef}`
+    'https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg?branch=stable'
   );
 
   readme = readme.replaceAll(

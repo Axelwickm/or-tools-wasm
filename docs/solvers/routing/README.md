@@ -1,56 +1,57 @@
 # OR-Tools Routing for JavaScript
 
-[![npm: @or-tools-wasm/routing](https://img.shields.io/npm/v/@or-tools-wasm/routing?logo=npm&label=%40or-tools-wasm%2Frouting)](https://www.npmjs.com/package/@or-tools-wasm/routing)
+[![npm: routing-wasm](https://img.shields.io/npm/v/routing-wasm?logo=npm&label=routing-wasm)](https://www.npmjs.com/package/routing-wasm)
+[![npm: or-tools-wasm](https://img.shields.io/npm/v/or-tools-wasm?logo=npm&label=or-tools-wasm)](https://www.npmjs.com/package/or-tools-wasm)
+[![GitHub](https://img.shields.io/badge/GitHub-or--tools--wasm-181717?logo=github)](https://github.com/Axelwickm/or-tools-wasm)
 
 **Install:**
 
 ```sh
-npm install @or-tools-wasm/routing
+npm install routing-wasm
 ```
 
 [**Main repository**](https://github.com/Axelwickm/or-tools-wasm) · [Documentation](https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/README.md) · [Full library on npm](https://www.npmjs.com/package/or-tools-wasm) · [Google OR-Tools](https://github.com/google/or-tools)
 
-> [!TIP]
 > **Same API. Fast solves on any device.**
 >
 > [Sign up for the hosted cloud version](https://or-tools-wasm-api.axelwickman.com/info).
 
-Build delivery route planners, courier dispatch tools, and field-service schedules
-in JavaScript or TypeScript. Solve traveling salesman (TSP) and vehicle routing
-(VRP) problems with capacity limits, time windows, and pickup and delivery stops.
-Runs locally in your browser or Node.js, with no solver server required.
+- **Route optimization and fleet planning:** build last-mile delivery planners,
+  courier dispatch tools, and field-service schedules. Solve traveling salesman
+  (TSP) and vehicle routing (VRP) problems.
+- **Capacity and delivery windows:** solve capacitated vehicle routing (CVRP) and
+  vehicle routing with time windows (VRPTW). Optimize travel distance or cost while
+  respecting vehicle capacities, pickups and deliveries, and driver breaks.
+- **TypeScript and JavaScript:** define travel costs with callbacks, inspect routes
+  and schedules, and reuse assignments to reoptimize routes.
+- **Browser and server:** run multithreaded WebAssembly locally in browsers, Node.js,
+  Deno, or Bun without sending your model data to a server. Use a native server when
+  you want remote execution through the same API.
 
+Native Google OR-Tools Routing, directly in JavaScript. No Python service required.
 The same API as `or-tools-wasm/routing`, in a smaller standalone package.
+
+### Examples
+
+**Click the image to try delivery routing.**
+
+<p>
+  <a href="https://axelwickman.com/or-tools-wasm/routing_dispatch.html"><img src="../../media/vrp.gif" alt="OR-Tools vehicle routing and delivery dispatch on a map" width="100%"></a>
+</p>
 
 ## Installation
 
 ```sh
-npm install @or-tools-wasm/routing
+npm install routing-wasm
 ```
 
 The package includes TypeScript declarations and Routing's native solver
 dependencies. No separate CP-SAT package is required.
 
-### Browser import with jsDelivr
-
-Replace `VERSION` with an exact published version:
-
-```html
-<script type="module">
-  import { RoutingIndexManager, RoutingModel } from 'https://cdn.jsdelivr.net/npm/@or-tools-wasm/routing@VERSION/build/javascript/browser/routing.js';
-</script>
-```
-
-For a direct CDN import, use Server execution with
-`executor: { type: 'server', url: 'http://localhost:17827' }`.
-For local WASM execution, use npm and a bundler or serve package assets from your
-own origin so browser workers can load. See
-[CDN and browser setup](https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/setup.md#import-from-jsdelivr).
-
 ## Quick start
 
 ```ts
-import { RoutingIndexManager, RoutingModel } from '@or-tools-wasm/routing';
+import { RoutingIndexManager, RoutingModel } from 'routing-wasm';
 
 const distances = [[0, 2, 3], [2, 0, 1], [3, 1, 0]];
 const manager = new RoutingIndexManager(3, 1, 0);

@@ -77,26 +77,31 @@ trap 'exit 143' TERM
 
 cleanup_containers
 
-for required_dir in \
-  "${ROOT}/javascript/build/javascript/node" \
-  "${ROOT}/javascript/build/javascript/node-wasm" \
-  "${ROOT}/javascript/build/javascript/browser" \
-  "${ROOT}/javascript/build/javascript/wasm"
-do
-  if [[ ! -d "${required_dir}" ]]; then
-    fail "Missing ${required_dir}. Run npm --prefix javascript run build:lib before benchmarking."
-  fi
-done
+if [[ -n "${BENCH_PACKAGE_TARBALL:-}" ]]; then
+  cp "${BENCH_PACKAGE_TARBALL}" "${PACKAGE_TARBALL}"
+  GIT_SHA="${BENCH_GIT_SHA:?Set BENCH_GIT_SHA to the source commit of BENCH_PACKAGE_TARBALL}"
+else
+  for required_dir in \
+    "${ROOT}/javascript/build/javascript/node" \
+    "${ROOT}/javascript/build/javascript/node-wasm" \
+    "${ROOT}/javascript/build/javascript/browser" \
+    "${ROOT}/javascript/build/javascript/wasm"
+  do
+    if [[ ! -d "${required_dir}" ]]; then
+      fail "Missing ${required_dir}. Run npm --prefix javascript run build:lib before benchmarking."
+    fi
+  done
 
-printf 'Packing local npm package into %s\n' "${PACKAGE_DIR}"
-rm -f "${PACKAGE_DIR}"/or-tools-wasm-*.tgz "${PACKAGE_TARBALL}"
-(cd "${ROOT}/javascript" && npm pack --pack-destination "${PACKAGE_DIR}")
-packed_tarballs=("${PACKAGE_DIR}"/or-tools-wasm-*.tgz)
-if [[ ${#packed_tarballs[@]} -ne 1 ]]; then
-  fail "Expected exactly one packed tarball in ${PACKAGE_DIR}, found ${#packed_tarballs[@]}."
+  printf 'Packing local npm package into %s\n' "${PACKAGE_DIR}"
+  rm -f "${PACKAGE_DIR}"/or-tools-wasm-*.tgz "${PACKAGE_TARBALL}"
+  (cd "${ROOT}/javascript" && npm pack --pack-destination "${PACKAGE_DIR}")
+  packed_tarballs=("${PACKAGE_DIR}"/or-tools-wasm-*.tgz)
+  if [[ ${#packed_tarballs[@]} -ne 1 ]]; then
+    fail "Expected exactly one packed tarball in ${PACKAGE_DIR}, found ${#packed_tarballs[@]}."
+  fi
+  mv "${packed_tarballs[0]}" "${PACKAGE_TARBALL}"
+  printf 'Packed %s\n' "${PACKAGE_TARBALL}"
 fi
-mv "${packed_tarballs[0]}" "${PACKAGE_TARBALL}"
-printf 'Packed %s\n' "${PACKAGE_TARBALL}"
 
 docker build -f "${ROOT}/benchmarking/docker/native-python.Dockerfile" -t "${PYTHON_IMAGE}" "${ROOT}"
 docker build -f "${ROOT}/benchmarking/docker/wasm-node.Dockerfile" -t "${NODE_IMAGE}" "${ROOT}"
