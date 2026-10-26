@@ -309,7 +309,7 @@ th {
 .example-page input:not([type="checkbox"]):not([type="file"]),
 .example-page select { padding: 0.4rem 0.5rem; border: 1px solid #b8c1cc; border-radius: 4px; }
 .example-page .controls button { min-height: 2.25rem; cursor: pointer; }
-.example-page .controls button:is(#run, #solve, #toggle-running) { background: #175cd3; border: 1px solid #175cd3; border-radius: 4px; color: white; }
+.example-page .controls button:is(#run, #solve, #toggle-running, .primary-action) { background: #175cd3; border: 1px solid #175cd3; border-radius: 4px; color: white; }
 .example-page .controls button:disabled { opacity: 0.65; cursor: progress; }
 .advanced-settings, .solve-log, .code-samples { margin: 0.8rem 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 0.65rem 0.85rem; }
 .advanced-settings > summary, .solve-log > summary, .code-samples > summary { cursor: pointer; font-weight: 600; }

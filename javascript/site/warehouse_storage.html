@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CP-SAT - Warehouse Logistics Optimization</title>
+  <link rel="stylesheet" href="./example.css">
+  <link rel="stylesheet" href="./warehouse/styles.css">
+</head>
+<body class="example-page warehouse-page">
+  <nav><a href="./index.html">← All examples</a><a href="https://github.com/Axelwickm/or-tools-wasm" rel="noopener">GitHub</a>  <a href="https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/solvers/cp-sat/api.md">CP-SAT API reference</a>
+    <a href="https://www.npmjs.com/package/@or-tools-wasm/cp-sat"><img alt="npm: @or-tools-wasm/cp-sat" src="https://img.shields.io/npm/v/@or-tools-wasm/cp-sat?logo=npm&amp;label=%40or-tools-wasm%2Fcp-sat"></a>
+  </nav>
+  <h1>CP-SAT - Warehouse Logistics Optimization</h1>
+  <p><em>Problem: assign pallets to shelf slots to minimize demand-weighted handling time, respecting load size and weight limits.</em></p>
+  <main>
+    <div id="warehouse-workbench" class="warehouse-workbench">
+    <section class="warehouse-dashboard" aria-label="Demand and efficiency">
+      <div class="demand-panel">
+        <h2>Product demand</h2>
+        <div id="product-demand"></div>
+        <div class="controls placement-actions"><div class="control-actions"><button id="optimize-placement" class="primary-action" type="button">Optimize placement</button><button id="randomize-placement" type="button">Randomize placement</button></div></div>
+      </div>
+      <div class="efficiency-panel">
+        <div class="efficiency-heading"><div><h2>Average handling time</h2><p class="panel-note">Seconds per job · Lower is better</p></div><span id="efficiency-average">—</span></div>
+        <svg id="efficiency-chart" viewBox="0 0 800 150" role="img" aria-label="Rolling average handling time over elapsed time"></svg>
+        <span id="efficiency-detail">Sampling the current layout…</span>
+        <p id="placement-status" role="status"></p>
+      </div>
+    </section>
+    <section class="warehouse-viewer" aria-label="Interactive warehouse preview">
+      <div id="warehouse-stage">
+        <canvas id="warehouse-canvas" aria-label="3D warehouse with three racks of colored pallets. Drag pallets to move or swap them. Drag empty space to orbit, or scroll to zoom."></canvas>
+        <div class="scene-navigation" role="group" aria-label="Simulation controls"><button id="pause-forklift" type="button" aria-label="Pause" title="Pause" data-paused="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="pause-icon" d="M7 5h3v14H7zm7 0h3v14h-3z"/><path class="play-icon" d="m8 5 11 7-11 7z"/></svg></button><button id="zoom-in" type="button" aria-label="Zoom in">+</button><button id="zoom-out" type="button" aria-label="Zoom out">−</button><button id="reset-view" type="button" aria-label="Reset camera">↺</button></div>
+        <p id="scene-error" role="alert" hidden></p>
+        <p id="shelf-stability" class="scene-stability" role="status" title="Shelf limits: bottom 700 kg, middle 550 kg, top 400 kg. Amber outlines mark loads above their shelf limit."></p>
+        <p id="spill-status" class="spill-status" role="status" hidden></p>
+        <p id="move-status" class="scene-hint" role="status">Drag a pallet to move · Drag empty space to orbit · Scroll to zoom</p>
+      </div>
+    </section>
+    </div>
+    <details class="advanced-settings"><summary>How it works</summary>
+      <ul>
+        <li>Three aligned rows provide 36 pallet slots in a square arrangement. An offset passage splits the middle row into one bay on the left and three on the right. The forklift compares this shortcut with routes around the rack ends.</li>
+        <li>The green Receiving pad marks arrivals; the blue Dispatch pad marks departures.</li>
+        <li>Colors identify product groups. Each crate has its own width, depth, and height, which determine its rendered shape and how the load stacks.</li>
+        <li>The forklift follows the aisles, turns toward a load, raises its forks, collects the pallet, and lowers it for transport.</li>
+        <li>About once per minute of unpaused playback, an oil spill closes a crossing for 20 seconds. Cones mark the closure, and new jobs take a detour. Spills avoid the forklift’s committed path. The graph and optimizer use the currently open routes; clearing a spill restores the shortcut without rearranging stock.</li>
+        <li>Heavier pallets slow loaded driving, increasing travel time by up to 50% at 700 kg. The graph and placement optimizer account for the same payload-dependent travel times.</li>
+        <li>Demo shelf limits decrease with height: 700 kg at the bottom, 550 kg in the middle, and 400 kg on top. Dragging or randomizing can exceed these limits; amber outlines mark top-heavy loads, and the entire affected rack sways with its posts, shelves, and stored pallets. This is an illustrative effect. Optimize respects the limits for every movable pallet. The active job stays reserved until it finishes; optimize again afterward if its load is still too high.</li>
+        <li>Dispatch goals send pallets to the blue pad. Matching replenishments arrive on the green pad and return to the reserved shelf slot, keeping inventory steady.</li>
+        <li>The graph samples independent dispatch-and-receive pairs against the current arrangement, using the same routes, turns, lift speeds, and handling times as the forklift. Each goal starts from a fixed reference position. The rolling window contains up to 200 jobs; the visual 4× playback speed does not change these times.</li>
+        <li>Trials do not change inventory. Active transfers retain their reserved shelf position in the estimate. Every order is replenished, and product demand sets the relative order mix.</li>
+        <li>CP-SAT minimizes demand-weighted handling time with one pallet per slot, shelf weight limits, and load-size clearance. Correcting a top-heavy arrangement can increase handling time. Button-driven layout changes animate over 0.2 seconds; rearrangement labor and order queues are outside this model.</li>
+      </ul>
+    </details>
+    <details class="code-toggle code-samples">
+      <summary>Show problem and solver code</summary>
+      <h3>CP-SAT model and solver</h3>
+      <p>Assign each pallet to one shelf slot, respect size and weight limits, preserve active transfers, and minimize demand-weighted handling time.</p>
+      <pre class="code-block"><code id="solver-code" data-highlight="ts"></code></pre>
+      <h3>Problem data and shelf constraints</h3>
+      <pre class="code-block"><code id="problem-code" data-highlight="ts"></code></pre>
+    </details>
+  </main>
+  <script type="module" src="./warehouse/main.ts"></script>
+</body>
+</html>

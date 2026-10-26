@@ -57,6 +57,7 @@ npm install or-tools-wasm
 
 <p>
   <a href="https://axelwickman.com/or-tools-wasm/project_calendar.html"><img src="docs/media/calendar_scheduling.gif" alt="CP-SAT calendar scheduling with task dependencies and employee availability" width="49%"></a>
+  <a href="https://axelwickman.com/or-tools-wasm/warehouse_storage.html"><img src="docs/media/warehouse_storage.gif" alt="CP-SAT warehouse logistics optimization with pallet placement and shelf weight limits" width="49%"></a>
 </p>
 <p>
   <a href="https://axelwickman.com/or-tools-wasm/mathopt_factory_floor.html"><img src="docs/media/factory_floor.gif" alt="Factory floor optimization" height="180"></a>
