@@ -7,8 +7,8 @@ WebAssembly, in Node.js, or on a native server through the same API.
 [![GitHub](https://img.shields.io/badge/GitHub-or--tools--wasm-181717?logo=github)](https://github.com/Axelwickm/or-tools-wasm)
 [![npm](https://img.shields.io/npm/v/or-tools-wasm?logo=npm&label=npm)](https://www.npmjs.com/package/or-tools-wasm)
 
-**Standalone packages:** [![npm: @or-tools-wasm/cp-sat](https://img.shields.io/npm/v/@or-tools-wasm/cp-sat?logo=npm&label=%40or-tools-wasm%2Fcp-sat)](https://www.npmjs.com/package/@or-tools-wasm/cp-sat)
-[![npm: @or-tools-wasm/routing](https://img.shields.io/npm/v/@or-tools-wasm/routing?logo=npm&label=%40or-tools-wasm%2Frouting)](https://www.npmjs.com/package/@or-tools-wasm/routing)
+**Standalone packages:** [![npm: cp-sat-wasm](https://img.shields.io/npm/v/cp-sat-wasm?logo=npm&label=cp-sat-wasm)](https://www.npmjs.com/package/cp-sat-wasm)
+[![npm: routing-wasm](https://img.shields.io/npm/v/routing-wasm?logo=npm&label=routing-wasm)](https://www.npmjs.com/package/routing-wasm)
 
 [![Package](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/package.yml)
 [![Native Server](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml/badge.svg)](https://github.com/Axelwickm/or-tools-wasm/actions/workflows/server.yml)
@@ -79,9 +79,9 @@ Only need one solver? Install [CP-SAT](docs/solvers/cp-sat/README.md) or
 [Routing](docs/solvers/routing/README.md) as a smaller standalone package.
 
 ```sh
-npm install @or-tools-wasm/cp-sat
+npm install cp-sat-wasm
 # Or:
-npm install @or-tools-wasm/routing
+npm install routing-wasm
 ```
 
 For browser headers, bundler configuration, and jsDelivr imports, see
@@ -135,7 +135,7 @@ Then import and solve:
 
 ```html
 <script type="module">
-  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/@or-tools-wasm/cp-sat@VERSION/build/javascript/browser/cp-sat.js';
+  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/cp-sat-wasm@VERSION/build/javascript/browser/cp-sat.js';
 
   const model = new CpModel();
   const x = model.newIntVar(0, 10, 'x');

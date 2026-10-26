@@ -5,8 +5,8 @@
 | Package | Includes | Import |
 | --- | --- | --- |
 | [`or-tools-wasm`](https://www.npmjs.com/package/or-tools-wasm) | All solvers | `or-tools-wasm/<solver>` |
-| [`@or-tools-wasm/cp-sat`](https://www.npmjs.com/package/@or-tools-wasm/cp-sat) | CP-SAT and its runtimes | `@or-tools-wasm/cp-sat` |
-| [`@or-tools-wasm/routing`](https://www.npmjs.com/package/@or-tools-wasm/routing) | Routing and its runtimes | `@or-tools-wasm/routing` |
+| [`cp-sat-wasm`](https://www.npmjs.com/package/cp-sat-wasm) | CP-SAT and its runtimes | `cp-sat-wasm` |
+| [`routing-wasm`](https://www.npmjs.com/package/routing-wasm) | Routing and its runtimes | `routing-wasm` |
 
 The standalone packages expose the same solver APIs as the full library, with a
 smaller installation. Choose either distribution for a solver; installing both
@@ -15,13 +15,13 @@ duplicates its runtime assets.
 ```sh
 npm install or-tools-wasm
 # Or install just the solver you need:
-npm install @or-tools-wasm/cp-sat
-npm install @or-tools-wasm/routing
+npm install cp-sat-wasm
+npm install routing-wasm
 ```
 
 ```ts
-import { CpModel, CpSat } from '@or-tools-wasm/cp-sat';
-import { RoutingIndexManager, RoutingModel } from '@or-tools-wasm/routing';
+import { CpModel, CpSat } from 'cp-sat-wasm';
+import { RoutingIndexManager, RoutingModel } from 'routing-wasm';
 ```
 
 See the [CP-SAT](solvers/cp-sat/README.md) and
@@ -34,7 +34,7 @@ script. Replace `VERSION` with an exact published version:
 
 ```html
 <script type="module">
-  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/@or-tools-wasm/cp-sat@VERSION/build/javascript/browser/cp-sat.js';
+  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/cp-sat-wasm@VERSION/build/javascript/browser/cp-sat.js';
 
   const model = new CpModel();
   const x = model.newIntVar(0, 10, 'x');
@@ -48,7 +48,7 @@ script. Replace `VERSION` with an exact published version:
 ```
 
 For Routing, use
-`https://cdn.jsdelivr.net/npm/@or-tools-wasm/routing@VERSION/build/javascript/browser/routing.js`.
+`https://cdn.jsdelivr.net/npm/routing-wasm@VERSION/build/javascript/browser/routing.js`.
 Use these browser files directly, without adding `/+esm`, to preserve the package's
 relative asset URLs. [jsDelivr](https://www.jsdelivr.com/documentation) serves npm
 package files, including their WASM assets; its package-size limit makes the

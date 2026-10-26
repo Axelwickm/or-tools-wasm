@@ -8,8 +8,8 @@
     "test:browser": "npm run build && playwright test"
   },
   "dependencies": {
-    "@or-tools-wasm/cp-sat": "file:../../../javascript/build/solver-packages/cp-sat.tgz",
-    "@or-tools-wasm/routing": "file:../../../javascript/build/solver-packages/routing.tgz"
+    "cp-sat-wasm": "file:../../../javascript/build/solver-packages/cp-sat.tgz",
+    "routing-wasm": "file:../../../javascript/build/solver-packages/routing.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

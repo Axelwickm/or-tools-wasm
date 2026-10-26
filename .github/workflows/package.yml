@@ -101,8 +101,8 @@ jobs:
           assert.equal(full.length, 1, 'Expected exactly one full-library tarball');
           for (const [name, tarball] of [
             ['or-tools-wasm', `${directory}/${full[0]}`],
-            ['@or-tools-wasm/cp-sat', 'javascript/build/solver-packages/cp-sat.tgz'],
-            ['@or-tools-wasm/routing', 'javascript/build/solver-packages/routing.tgz'],
+            ['cp-sat-wasm', 'javascript/build/solver-packages/cp-sat.tgz'],
+            ['routing-wasm', 'javascript/build/solver-packages/routing.tgz'],
           ]) {
             const manifest = JSON.parse(execFileSync('tar', ['-xOf', tarball, 'package/package.json'], { encoding: 'utf8' }));
             assert.equal(manifest.name, name, `Unexpected package in ${tarball}`);
@@ -596,13 +596,13 @@ jobs:
         include:
           - package: or-tools-wasm
             artifact: npm-package
-            tarball: release-packages/*.tgz
-          - package: '@or-tools-wasm/cp-sat'
+            tarball: ./release-packages/*.tgz
+          - package: 'cp-sat-wasm'
             artifact: npm-solver-packages
-            tarball: release-packages/cp-sat.tgz
-          - package: '@or-tools-wasm/routing'
+            tarball: ./release-packages/cp-sat.tgz
+          - package: 'routing-wasm'
             artifact: npm-solver-packages
-            tarball: release-packages/routing.tgz
+            tarball: ./release-packages/routing.tgz
     permissions:
       contents: read
       id-token: write

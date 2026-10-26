@@ -8,10 +8,10 @@
     "noEmit": true,
     "paths": {
       "or-tools-wasm/cp-sat": [
-        "./node_modules/@or-tools-wasm/cp-sat/build/javascript/lib/cp-sat.d.ts"
+        "./node_modules/cp-sat-wasm/build/javascript/lib/cp-sat.d.ts"
       ],
       "or-tools-wasm/routing": [
-        "./node_modules/@or-tools-wasm/routing/build/javascript/lib/routing.d.ts"
+        "./node_modules/routing-wasm/build/javascript/lib/routing.d.ts"
       ]
     }
   },

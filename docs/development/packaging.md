@@ -10,8 +10,8 @@ npm --prefix javascript run pack:solvers
 
 Outputs:
 
-- `javascript/build/solver-packages/cp-sat.tgz` — `@or-tools-wasm/cp-sat`
-- `javascript/build/solver-packages/routing.tgz` — `@or-tools-wasm/routing`
+- `javascript/build/solver-packages/cp-sat.tgz` — `cp-sat-wasm`
+- `javascript/build/solver-packages/routing.tgz` — `routing-wasm`
 
 The package version comes from `javascript/package.json`. The script requires existing build artifacts and the JavaScript development dependencies; it does not compile native code or publish anything. Each standalone solver uses `docs/solvers/<solver>/README.md` as both its documentation landing page and npm README source. Its detailed API is in `api.md` beside it. Packaging makes the relative reference link absolute for npm. The example site links directly to the Markdown references on GitHub. `docs/README.md` is the documentation index; `docs/execution.md` covers shared execution.
 

@@ -50,7 +50,7 @@ for (const { entry, directory, runtime, label } of solvers) {
 
   const exports = parent.exports[`./${entry}`];
   const manifest = {
-    name: `@or-tools-wasm/${entry}`, version: parent.version,
+    name: `${entry}-wasm`, version: parent.version,
     description: `Google OR-Tools ${label} for JavaScript and TypeScript, with browser and Node WASM runtimes.`,
     license: parent.license, repository: parent.repository, homepage: parent.homepage, bugs: parent.bugs,
     type: 'module', main: exports.node, types: exports.types,

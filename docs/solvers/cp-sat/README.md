@@ -1,11 +1,11 @@
 # OR-Tools CP-SAT for JavaScript
 
-[![npm: @or-tools-wasm/cp-sat](https://img.shields.io/npm/v/@or-tools-wasm/cp-sat?logo=npm&label=%40or-tools-wasm%2Fcp-sat)](https://www.npmjs.com/package/@or-tools-wasm/cp-sat)
+[![npm: cp-sat-wasm](https://img.shields.io/npm/v/cp-sat-wasm?logo=npm&label=cp-sat-wasm)](https://www.npmjs.com/package/cp-sat-wasm)
 
 **Install:**
 
 ```sh
-npm install @or-tools-wasm/cp-sat
+npm install cp-sat-wasm
 ```
 
 [**Main repository**](https://github.com/Axelwickm/or-tools-wasm) · [Documentation](https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/README.md) · [Full library on npm](https://www.npmjs.com/package/or-tools-wasm) · [Google OR-Tools](https://github.com/google/or-tools)
@@ -25,7 +25,7 @@ The same API as `or-tools-wasm/cp-sat`, in a smaller standalone package.
 ## Installation
 
 ```sh
-npm install @or-tools-wasm/cp-sat
+npm install cp-sat-wasm
 ```
 
 The package includes TypeScript declarations and the required runtime. No other
@@ -37,7 +37,7 @@ Replace `VERSION` with an exact published version:
 
 ```html
 <script type="module">
-  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/@or-tools-wasm/cp-sat@VERSION/build/javascript/browser/cp-sat.js';
+  import { CpModel, CpSat } from 'https://cdn.jsdelivr.net/npm/cp-sat-wasm@VERSION/build/javascript/browser/cp-sat.js';
 </script>
 ```
 
@@ -50,7 +50,7 @@ own origin so browser workers can load. See
 ## Quick start
 
 ```ts
-import { CpModel, CpSat } from '@or-tools-wasm/cp-sat';
+import { CpModel, CpSat } from 'cp-sat-wasm';
 
 const model = new CpModel();
 const x = model.newIntVar(0, 10, 'x');

@@ -1,5 +1,5 @@
-import * as CpSat from '@or-tools-wasm/cp-sat';
-import * as Routing from '@or-tools-wasm/routing';
+import * as CpSat from 'cp-sat-wasm';
+import * as Routing from 'routing-wasm';
 import { runCpSatHighLevelParityCasesForPackage } from '../../cases/python-parity/cp_sat/high_level_runner.ts';
 import { runCpSatCases } from '../../cases/python-parity/cp_sat/runner.ts';
 import { runCpSatWorkerLifecycleCase } from '../../cases/or-tools-wasm/cp_sat/worker_lifecycle.ts';

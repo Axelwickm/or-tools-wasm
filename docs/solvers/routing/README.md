@@ -1,11 +1,11 @@
 # OR-Tools Routing for JavaScript
 
-[![npm: @or-tools-wasm/routing](https://img.shields.io/npm/v/@or-tools-wasm/routing?logo=npm&label=%40or-tools-wasm%2Frouting)](https://www.npmjs.com/package/@or-tools-wasm/routing)
+[![npm: routing-wasm](https://img.shields.io/npm/v/routing-wasm?logo=npm&label=routing-wasm)](https://www.npmjs.com/package/routing-wasm)
 
 **Install:**
 
 ```sh
-npm install @or-tools-wasm/routing
+npm install routing-wasm
 ```
 
 [**Main repository**](https://github.com/Axelwickm/or-tools-wasm) · [Documentation](https://github.com/Axelwickm/or-tools-wasm/blob/main/docs/README.md) · [Full library on npm](https://www.npmjs.com/package/or-tools-wasm) · [Google OR-Tools](https://github.com/google/or-tools)
@@ -25,7 +25,7 @@ The same API as `or-tools-wasm/routing`, in a smaller standalone package.
 ## Installation
 
 ```sh
-npm install @or-tools-wasm/routing
+npm install routing-wasm
 ```
 
 The package includes TypeScript declarations and Routing's native solver
@@ -37,7 +37,7 @@ Replace `VERSION` with an exact published version:
 
 ```html
 <script type="module">
-  import { RoutingIndexManager, RoutingModel } from 'https://cdn.jsdelivr.net/npm/@or-tools-wasm/routing@VERSION/build/javascript/browser/routing.js';
+  import { RoutingIndexManager, RoutingModel } from 'https://cdn.jsdelivr.net/npm/routing-wasm@VERSION/build/javascript/browser/routing.js';
 </script>
 ```
 
@@ -50,7 +50,7 @@ own origin so browser workers can load. See
 ## Quick start
 
 ```ts
-import { RoutingIndexManager, RoutingModel } from '@or-tools-wasm/routing';
+import { RoutingIndexManager, RoutingModel } from 'routing-wasm';
 
 const distances = [[0, 2, 3], [2, 0, 1], [3, 1, 0]];
 const manager = new RoutingIndexManager(3, 1, 0);
