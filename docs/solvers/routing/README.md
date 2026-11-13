@@ -71,6 +71,11 @@ Use `executor: 'direct'` for in-process execution, or
 Browser local execution requires cross-origin isolation (COOP/COEP headers).
 Worker execution keeps solving off the application's main thread.
 
+In Node.js, `executor: 'direct'` can block the event loop during a solve, even
+when awaited. Timers and timer-driven cancellation cannot run while it is blocked.
+Use `executor: 'worker'` when your application needs to stay responsive or cancel
+a solve from a timer.
+
 The runtime uses **JSPI** when supported and automatically falls back to
 **Asyncify** when JSPI is unavailable. Both runtimes are included in the package.
 Only the selected runtime is loaded.
@@ -79,6 +84,15 @@ When shutting down a Node application after direct execution, call
 `terminateLoadedRuntimeThreads()` to release retained runtime threads.
 
 The existing `or-tools-wasm/routing` import remains supported. Choose either distribution; installing both duplicates runtime assets. Model objects should be used with the API that created them.
+
+## Compatibility
+
+`routing-wasm` runs in Chromium browsers and Firefox, and in Node.js, Deno,
+and Bun. Browser WebAssembly execution requires cross-origin isolation
+(COOP/COEP headers). JSPI and Asyncify runtimes are included and selected automatically.
+
+Supported bundlers include Vite, Webpack, and Rollup. The same API also supports
+execution on a native C++ OR-Tools solver server.
 
 ## Reference and examples
 

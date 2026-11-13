@@ -115,6 +115,9 @@ if (result.hasSolution) {
 The optimal plan is **3 tables, no desks, and a profit of 90**.
 
 Browser solves use a worker by default to keep the page responsive.
+In Node.js, direct execution can block the event loop, delaying timers and
+timer-driven cancellation. Use `executor: 'worker'` for responsive applications
+and cancellation from timers.
 [Execution options](docs/execution.md) cover direct, worker, and server execution,
 progress events, and cancellation.
 

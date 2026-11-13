@@ -83,6 +83,9 @@ jobs:
       - name: Pack standalone solver packages
         run: npm --prefix javascript run pack:solvers
 
+      - name: Test Node inline execution and pthread startup recovery
+        run: node scripts/package-audit/node-eval.mjs
+
       - name: Verify release package names and versions
         run: |
           node --input-type=module <<'JS'

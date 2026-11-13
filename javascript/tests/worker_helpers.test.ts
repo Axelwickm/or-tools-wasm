@@ -260,7 +260,7 @@ test('a retired worker startup failure cannot discard its replacement startup', 
   });
   try {
     const old = manager.load();
-    const rejected = assert.rejects(old, /retired failure/);
+    const rejected = assert.rejects(old, /Worker terminated/);
     manager.terminate();
     const replacement = manager.load();
     fail(new Error('retired failure'));
@@ -306,4 +306,61 @@ test('a rejected pre-dispatch hook releases idle workers while preserving active
     assert.deepEqual(await active, { id: 2, value: 2 });
     assert.equal(referenced, false);
   } finally { manager.terminate(); }
+});
+
+test('aborting a stalled worker startup releases the executor before loading resumes', { timeout: 10_000 }, async t => {
+  const bundled = await build({ stdin: { resolveDir: fileURLToPath(new URL('../lib', import.meta.url)),
+    contents: `export { SolverWorkerExecutor } from './worker_helpers.ts';
+      export { executeSolverJob } from './solver_job.ts';
+      export * from './solver_bridge.ts';` },
+    bundle: true, write: false, platform: 'node', format: 'esm' });
+  const api = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+  for (const solver of ['cp-sat', 'routing', 'mathopt', 'mp-solver']) {
+    for (const stage of ['creation', 'ready', 'dispatch']) {
+      await t.test(`${solver}: abort during ${stage}`, async () => {
+        const codec = { solver, label: solver,
+          encodeRequest: () => new Uint8Array([7]), decodeResult: (bytes: Uint8Array) => bytes[0] };
+        let finishCreation!: (worker: any) => void;
+        const workers: any[] = [];
+        const executor = new api.SolverWorkerExecutor(codec, () => {
+          const events = new EventEmitter();
+          const worker = { events, terminated: 0, posts: 0, on: events.on.bind(events),
+            terminate() { ++this.terminated; },
+            postMessage(bytes: Uint8Array) {
+              ++this.posts;
+              const request = api.decodeSolverBridgeRequest(bytes);
+              events.emit('message', api.encodeSolverBridgeResult(request.requestId, solver, new Uint8Array([42])));
+            },
+          };
+          workers.push(worker);
+          if (workers.length === 1 && stage === 'creation') return new Promise(resolve => { finishCreation = resolve; });
+          if (workers.length > 1 || stage === 'dispatch') setImmediate(() => events.emit('message', api.encodeSolverBridgeReady(solver)));
+          return Promise.resolve(worker);
+        }, true);
+        const controller = new AbortController();
+        const reason = new Error('cancel startup');
+        try {
+          // Retained-session requests must also be cancellable before dispatch.
+          const result = api.executeSolverJob(executor, { type: 'sessionRun' }, {
+            showCloudNotice: false, signal: controller.signal,
+            onDispatch: stage === 'dispatch' ? () => controller.abort(reason) : undefined,
+          });
+          const rejected = assert.rejects(result, (error: unknown) => error === reason);
+          if (stage !== 'dispatch') { await nextTurn(); controller.abort(reason); }
+          await rejected;
+          assert.equal(workers[0].posts, 0);
+          if (stage !== 'creation') assert.equal(workers[0].terminated, 1);
+          const next = api.executeSolverJob(executor, { type: 'sessionRun' }, { showCloudNotice: false });
+          if (stage === 'creation') finishCreation(workers[0]);
+          await nextTurn();
+          // Retired ready messages cannot revive the abandoned operation.
+          workers[0].events.emit('message', api.encodeSolverBridgeReady(solver));
+          assert.equal(await next, 42);
+          assert.equal(workers[0].terminated, 1);
+          assert.equal(workers[1].terminated, 0);
+          assert.equal(workers.length, 2);
+        } finally { executor.terminate(); }
+      });
+    }
+  }
 });

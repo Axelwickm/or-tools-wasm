@@ -44,6 +44,7 @@ type PendingRequest<Response> = {
 
 type WorkerJobState<Request> = {
   cancelled: boolean;
+  dispatched: boolean;
   createdAtMs: bigint;
   request: Request;
   error?: Error;
@@ -65,6 +66,7 @@ export type ManagedWorkerOptions<Request, Response> = {
 export class ManagedWorker<Request, Response> {
   private worker: WorkerLike<Request, Response> | null = null;
   private workerPromise: Promise<WorkerLike<Request, Response>> | null = null;
+  private rejectCreation: ((reason: unknown) => void) | null = null;
   private readyPromise: Promise<void> | null = null;
   private rejectReady: ((reason: unknown) => void) | null = null;
   private readonly pendingRequests = new Map<number, PendingRequest<Response>>();
@@ -122,6 +124,8 @@ export class ManagedWorker<Request, Response> {
     this.options.onTerminate?.();
     this.worker?.terminate();
     this.worker = null;
+    this.rejectCreation?.(error);
+    this.rejectCreation = null;
     this.workerPromise = null;
     this.rejectReady?.(error);
     this.rejectReady = null;
@@ -146,12 +150,26 @@ export class ManagedWorker<Request, Response> {
     if (generation !== this.generation) throw this.terminationError;
     if (this.worker) return this.worker;
 
-    this.workerPromise ??= this.options.createWorker();
+    if (!this.workerPromise) {
+      const cancelled = new Promise<never>((_, reject) => { this.rejectCreation = reject; });
+      cancelled.catch(() => {});
+      const creating = this.options.createWorker().then(worker => {
+        if (generation !== this.generation) {
+          worker.terminate();
+          throw this.terminationError;
+        }
+        return worker;
+      });
+      this.workerPromise = Promise.race([creating, cancelled]);
+    }
     const loading = this.workerPromise;
     let worker: WorkerLike<Request, Response>;
     try { worker = await loading; }
     catch (error) {
-      if (this.workerPromise === loading) this.workerPromise = null;
+      if (this.workerPromise === loading) {
+        this.workerPromise = null;
+        this.rejectCreation = null;
+      }
       throw error;
     }
     if (generation !== this.generation) {
@@ -162,6 +180,7 @@ export class ManagedWorker<Request, Response> {
     if (this.worker === worker) return worker;
     this.worker = worker;
     this.workerPromise = null;
+    this.rejectCreation = null;
     this.readyPromise = new Promise<void>((resolve, reject) => {
       this.rejectReady = reject;
       const handleMessage = (message: Response) => {
@@ -333,6 +352,7 @@ implements SolverExecutor<Request, Response, Event> {
     const requestId = this.nextRequestId++;
     const state: WorkerJobState<Request> = {
       cancelled: false,
+      dispatched: false,
       createdAtMs: BigInt(Date.now()),
       request,
     };
@@ -424,6 +444,7 @@ implements SolverExecutor<Request, Response, Event> {
           );
         }
         if (state.cancelled) throw state.error;
+        state.dispatched = true;
       });
       this.stopCallbackReplies();
       if (!(resultBytes instanceof Uint8Array)) {
@@ -484,6 +505,15 @@ implements SolverExecutor<Request, Response, Event> {
     options: SolverExecutionOptions<Event>,
     state: WorkerJobState<Request>,
   ): Promise<void> {
+    if (this.activeJob !== state || state.cancelled) return;
+    // No native work has been dispatched yet. Waiting for readiness here can
+    // deadlock cancellation on a stalled WASM download or worker import.
+    if (!state.dispatched) {
+      state.cancelled = true;
+      state.error = new SolverJobCancelledError(this.codec.label, targetRequestId);
+      this.worker.terminate(state.error);
+      return;
+    }
     if (this.codec.solver === 'mathopt') return this.interrupt(state);
     if (this.codec.solver === 'mp-solver' &&
         ['sessionCreate', 'sessionRun', 'sessionClose'].includes((state.request as { type?: string }).type ?? '')) {

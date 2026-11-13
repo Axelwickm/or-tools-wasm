@@ -72,6 +72,12 @@ but also catch the operation's rejected promise.
 
 ## Executor Selection
 
+In Node.js, `executor: 'direct'` can block the calling thread's event loop during
+native solving, even when the solve returns a Promise. Timers, I/O callbacks, and
+timer-driven `AbortController` cancellation cannot run until that thread yields.
+Use `executor: 'worker'` when the application must remain responsive or cancel
+from a timer. Native solver time limits can still bound direct execution.
+
 The CP-SAT, MathOpt, Routing, MPSolver, Knapsack, Network Flow, Set
 Cover, RCPSP, and PDLP paths can use the shared worker bridge. Worker bridge
 availability is independent of solver threading support; for example GLPK, BOP,

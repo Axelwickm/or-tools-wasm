@@ -2,6 +2,7 @@ import { patchJspiAsyncCtors } from './patch_jspi_ctors.ts';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { initializeBunPthread } from './bun_pthread_bootstrap.ts';
+import { patchNodePthreads } from './node_pthread_support.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const packageBuildRoot = path.join(repoRoot, 'javascript/build/javascript');
@@ -73,6 +74,7 @@ for (const nodeRuntimePath of nodeRuntimePaths) {
   }
   runtime = patchJspiAsyncCtors(runtime);
   runtime = patchJspiInvokeTableEntries(runtime);
+  runtime = patchNodePthreads(runtime);
 
   if (runtime !== original) {
     await writeFile(nodeRuntimePath, runtime);

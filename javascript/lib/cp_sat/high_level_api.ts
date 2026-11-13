@@ -246,17 +246,13 @@ function evaluateLinearExpression(response: CpSolverResponse, expression: Linear
 }
 
 function evaluateBooleanLiteral(response: CpSolverResponse, literal: LiteralLike) {
-  if (typeof literal === 'number') {
-    return literal !== 0;
-  }
-  if (literal === true || literal === false) {
-    return literal;
-  }
-  const index = literal instanceof NotBoolVar ? literal.variable.index : literal.index;
+  const reference = literalIndex(literal);
+  if (typeof reference === 'boolean') return reference;
+  const index = reference < 0 ? -reference - 1 : reference;
   const value = response.solution?.[index];
   assert(typeof value === 'bigint', `missing exact integer solution value for literal ${index}`);
   const truth = value !== 0n;
-  return literal instanceof NotBoolVar ? !truth : truth;
+  return reference < 0 ? !truth : truth;
 }
 
 function literalIndex(literal: LiteralLike) {
@@ -2274,6 +2270,7 @@ export class CpSolver {
   stopSearch() { this.stopAction?.(); }
 
   private lastResponse: CpSolverResponse | null = null;
+  private lastResult: CpResult | null = null;
   private lastResponseStatistics: string | null = null;
   private solving = false;
   readonly parameters: CpSatSolverParameters = {};
@@ -2306,11 +2303,13 @@ export class CpSolver {
     const controller = new AbortController();
     let stopped = false;
     this.lastResponse = null;
+    this.lastResult = null;
     this.lastResponseStatistics = null;
     this.stopAction = () => { stopped = true; controller.abort(); };
     if (solutionCallback) setCallbackStopAction(solutionCallback, this.stopAction);
     try {
       const mergedParams = { ...this.parameters, ...solverParameters };
+      const variableCount = liveModelProto(model).variables?.length ?? 0;
       const modelBytes = await CpSat.createModel(liveModelProto(model));
       const userEventMask = requestedEventMask ?? (onEvent
         ? { solution: true, bestBound: true, log: true }
@@ -2343,6 +2342,7 @@ export class CpSolver {
       });
       this.lastResponse = result.response;
       this.lastResponseStatistics = result.statistics ?? null;
+      this.lastResult = createCpResult(model, this.lastResponse, variableCount, this.lastResponseStatistics);
       return result.response?.status;
     } finally {
       this.stopAction = null;
@@ -2408,14 +2408,20 @@ export class CpSolver {
     return this.requireResponse().wallTime ?? 0;
   }
 
+  /** @deprecated Use value() on the CpResult returned by CpSat.solve(model). */
   value(expression: IntVar | NotBoolVar): bigint;
+  /** @deprecated Use value() on the CpResult returned by CpSat.solve(model). */
   value(expression: LinearExprLike): NumericValue;
+  /** @deprecated Use value() on the CpResult returned by CpSat.solve(model). */
   value(expression: LinearExprLike): NumericValue {
-    return evaluateLinearExpression(this.requireResponse(), expression);
+    this.requireResponse();
+    return this.lastResult!.value(expression);
   }
 
+  /** @deprecated Use booleanValue() on the CpResult returned by CpSat.solve(model). */
   booleanValue(literal: LiteralLike) {
-    return evaluateBooleanLiteral(this.requireResponse(), literal);
+    this.requireResponse();
+    return this.lastResult!.booleanValue(literal);
   }
 
   get objectiveValue() {

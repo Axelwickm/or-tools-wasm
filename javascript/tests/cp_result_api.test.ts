@@ -9,7 +9,7 @@ import { cpModelProtoSchema } from '../lib/generated/cp_sat_schemas.ts';
 test('CpSat.solve(model) owns its result and keeps the proto solve path', async () => {
   const type = protobuf.parse(cpModelProtoSchema).root.lookupType('operations_research.sat.CpSolverResponse');
   const responses = [3, 7].map((value) => [...type.encode(type.fromObject({
-    status: 'OPTIMAL', solution: [value], objectiveValue: value, wallTime: value / 10,
+    status: 'OPTIMAL', solution: [value, 1, 0], objectiveValue: value, wallTime: value / 10,
     numBranches: value, numConflicts: value, userTime: value / 20, deterministicTime: value / 100,
   })).finish()]);
   const directory = await mkdtemp(fileURLToPath(new URL('.cp-result-', import.meta.url)));
@@ -35,6 +35,8 @@ test('CpSat.solve(model) owns its result and keeps the proto solve path', async 
     const { CpSat, CpModel, CpSolver, CpSolverSolutionCallback } = await import(outfile);
     const model = new CpModel();
     const x = model.newIntVar(0, 10, 'x');
+    const yes = model.newBoolVar('yes');
+    const no = model.newBoolVar('no');
     const first = await CpSat.solve(model, { executor: 'direct' });
     const second = await CpSat.solve(model, { executor: 'direct' });
     assert.equal(first.hasSolution, true);
@@ -62,6 +64,27 @@ test('CpSat.solve(model) owns its result and keeps the proto solve path', async 
     const later = model.newIntVar(0, 1, 'later');
     assert.throws(() => first.value(later), /added after this solve/);
     assert.throws(() => first.value(new CpModel().newIntVar(0, 1, 'foreign')), /different CpModel/);
+    const foreignModel = new CpModel();
+    const foreign = foreignModel.newIntVar(99, 99, 'foreign');
+    const foreignBool = foreignModel.newBoolVar('foreignBool');
+    for (const result of [first, second, solver]) {
+      assert.throws(() => result.value(foreign), /different CpModel/);
+      assert.throws(() => result.value(foreign.plus(1)), /different CpModel/);
+      assert.throws(() => result.value(later), /added after this solve/);
+      assert.throws(() => result.booleanValue(later), /added after this solve/);
+      assert.throws(() => result.booleanValue(foreignBool), /different CpModel/);
+      assert.throws(() => result.booleanValue(foreignBool.not()), /different CpModel/);
+      for (const invalid of [NaN, Infinity, -Infinity, 2, -1, 0.5]) {
+        assert.throws(() => result.booleanValue(invalid), /numeric constants must be 0 or 1/);
+      }
+      assert.throws(() => result.booleanValue(x), /Boolean variable/);
+      for (const [literal, expected] of [[true, true], [false, false], [1, true], [0, false],
+        [yes, true], [no, false], [yes.not(), false], [no.not(), true]]) {
+        assert.equal(result.booleanValue(literal), expected);
+      }
+    }
+    await solver.solve(foreignModel, { executor: 'direct' });
+    assert.throws(() => solver.value(x), /different CpModel/);
     const copy = first.response;
     copy.solution[0] = 99n;
     assert.equal(first.value(x), 3n);
