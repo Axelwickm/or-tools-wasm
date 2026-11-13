@@ -7,12 +7,32 @@ const packageRoot = path.join(root, 'javascript');
 const buildRoot = path.join(packageRoot, 'build/javascript');
 const outputRoot = path.join(packageRoot, 'build/solver-packages');
 const parent = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8'));
+const commonKeywords = [
+  'or-tools', 'ortools', 'google-or-tools', 'optimization', 'operations-research',
+  'solver', 'combinatorial-optimization', 'wasm', 'webassembly',
+  'nodejs', 'client-side',
+];
 const solvers = [
-  { entry: 'cp-sat', directory: 'cp_sat', runtime: 'cp_sat_runtime', label: 'CP-SAT' },
-  { entry: 'routing', directory: 'routing', runtime: 'routing_runtime', label: 'Routing' },
+  {
+    entry: 'cp-sat', directory: 'cp_sat', runtime: 'cp_sat_runtime', label: 'CP-SAT',
+    keywords: [
+      'cp-sat', 'sat', 'constraint', 'constraint-programming', 'constraint-solver',
+      'integer-programming', 'scheduling', 'job-shop-scheduling', 'timetabling',
+      'assignment', 'bin-packing', 'knapsack', 'resource-allocation',
+      'shift-scheduling', 'constraint-satisfaction',
+    ],
+  },
+  {
+    entry: 'routing', directory: 'routing', runtime: 'routing_runtime', label: 'Routing',
+    keywords: [
+      'routing', 'vehicle-routing', 'vehicle-routing-problem', 'vrp', 'cvrp', 'vrptw',
+      'tsp', 'traveling-salesman', 'traveling-salesman-problem', 'route-optimization', 'delivery-routing',
+      'logistics', 'fleet-optimization', 'pickup-and-delivery', 'time-windows',
+    ],
+  },
 ];
 
-for (const { entry, directory, runtime, label } of solvers) {
+for (const { entry, directory, runtime, label, keywords } of solvers) {
   const destination = path.join(outputRoot, entry);
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
@@ -52,6 +72,7 @@ for (const { entry, directory, runtime, label } of solvers) {
   const manifest = {
     name: `${entry}-wasm`, version: parent.version,
     description: `Google OR-Tools ${label} for JavaScript and TypeScript, with browser and Node WASM runtimes.`,
+    keywords: [...commonKeywords, ...keywords],
     license: parent.license, repository: parent.repository, homepage: parent.homepage, bugs: parent.bugs,
     type: 'module', main: exports.node, types: exports.types,
     exports: { '.': exports },
