@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: 26.10.0
+  NODE_VERSION: 26.13.1
   DENO_VERSION: 2.9.7
-  BUN_VERSION: 1.4.2
+  BUN_VERSION: 1.4.4
   ORTOOLS_SERVER_IMAGE: ortools-wasm-native-server:ci
   ORTOOLS_WASM_SKIP_PACKAGE_BUILD: '1'
 
@@ -112,7 +112,7 @@ jobs:
         run: npm --prefix javascript run test:site
 
       - name: Install site test browsers
-        run: cd javascript && npx playwright install --with-deps chromium firefox
+        run: cd javascript && npx playwright install --with-deps chromium firefox webkit
 
       - name: Test example interactions and mobile layout
         run: npm --prefix javascript run test:site:browser
@@ -183,7 +183,7 @@ jobs:
 
       - name: Install test browsers
         working-directory: tests/fixtures/solver-packages
-        run: npx playwright install --with-deps chromium firefox
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Test browser JSPI and Asyncify execution
         run: npm --prefix tests/fixtures/solver-packages run test:browser
@@ -203,12 +203,18 @@ jobs:
           - mode: dev
             browser: firefox
             project: vite-dev-firefox
+          - mode: dev
+            browser: webkit
+            project: vite-dev-webkit
           - mode: static
             browser: chromium
             project: vite-static-chromium
           - mode: static
             browser: firefox
             project: vite-static-firefox
+          - mode: static
+            browser: webkit
+            project: vite-static-webkit
 
     steps:
       - name: Checkout
@@ -257,12 +263,18 @@ jobs:
           - mode: dev
             browser: firefox
             project: webpack-dev-firefox
+          - mode: dev
+            browser: webkit
+            project: webpack-dev-webkit
           - mode: static
             browser: chromium
             project: webpack-static-chromium
           - mode: static
             browser: firefox
             project: webpack-static-firefox
+          - mode: static
+            browser: webkit
+            project: webpack-static-webkit
 
     steps:
       - name: Checkout
@@ -309,6 +321,8 @@ jobs:
             project: rollup-static-chromium
           - browser: firefox
             project: rollup-static-firefox
+          - browser: webkit
+            project: rollup-static-webkit
 
     steps:
       - name: Checkout
@@ -387,7 +401,7 @@ jobs:
       matrix:
         version:
           - '24'
-          - '26.10.0'
+          - '26.13.1'
 
     steps:
       - name: Checkout
@@ -414,7 +428,7 @@ jobs:
         run: npm --prefix javascript run test:fixture:node
 
   bun-fixture:
-    name: Bun 1.4.2 / solve
+    name: Bun 1.4.4 / solve
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 25

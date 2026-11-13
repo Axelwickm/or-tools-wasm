@@ -2,6 +2,11 @@ import { expect, test } from '@playwright/test';
 for (const flavor of ['jspi', 'asyncify']) {
   for (const solver of ['cp-sat', 'routing']) {
     test(`${solver} ${flavor}`, async ({ page }) => {
+      if (flavor === 'jspi') {
+        const supportsJspi = await page.evaluate(() =>
+          typeof (WebAssembly as typeof WebAssembly & { promising?: unknown }).promising === 'function');
+        test.skip(!supportsJspi, 'This browser uses the Asyncify fallback instead of JSPI.');
+      }
       const disableJspi = 'Object.defineProperty(WebAssembly,"promising",{value:undefined,configurable:true});';
       if (flavor === 'asyncify') {
         await page.addInitScript(disableJspi);

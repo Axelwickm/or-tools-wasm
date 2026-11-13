@@ -4,7 +4,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { dirname, extname, resolve, normalize, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { chromium, firefox } from 'playwright-core';
+import { chromium, firefox, webkit } from 'playwright-core';
 
 const HEADER = [
   'git_sha',
@@ -30,7 +30,7 @@ const CONTENT_TYPES = {
   '.map': 'application/json; charset=utf-8',
 };
 
-const BROWSER_TYPES = { chromium, firefox };
+const BROWSER_TYPES = { chromium, firefox, webkit };
 const BROWSER_NAME = process.env.BENCH_BROWSER ?? 'chromium';
 const IMPLEMENTATION = process.env.BENCH_IMPLEMENTATION ?? `web-${BROWSER_NAME}`;
 const ENVIRONMENT = process.env.BENCH_ENVIRONMENT ?? `${BROWSER_NAME}-headless-main-thread`;

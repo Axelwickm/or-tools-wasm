@@ -1,4 +1,4 @@
-FROM node:26.10.0-trixie-slim AS deps
+FROM node:26.13.1-trixie-slim AS deps
 
 WORKDIR /bench
 

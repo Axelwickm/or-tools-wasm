@@ -71,6 +71,13 @@ export default defineConfig({
       },
     },
     {
+      name: 'vite-dev-webkit',
+      use: {
+        ...devices['Desktop Safari'],
+        baseURL: 'http://127.0.0.1:4174',
+      },
+    },
+    {
       name: 'vite-static-chromium',
       use: {
         ...devices['Desktop Chrome'],
@@ -81,6 +88,13 @@ export default defineConfig({
       name: 'vite-static-firefox',
       use: {
         ...devices['Desktop Firefox'],
+        baseURL: 'http://127.0.0.1:4175',
+      },
+    },
+    {
+      name: 'vite-static-webkit',
+      use: {
+        ...devices['Desktop Safari'],
         baseURL: 'http://127.0.0.1:4175',
       },
     },
@@ -99,6 +113,13 @@ export default defineConfig({
       },
     },
     {
+      name: 'webpack-dev-webkit',
+      use: {
+        ...devices['Desktop Safari'],
+        baseURL: 'http://127.0.0.1:4176',
+      },
+    },
+    {
       name: 'webpack-static-chromium',
       use: {
         ...devices['Desktop Chrome'],
@@ -113,6 +134,13 @@ export default defineConfig({
       },
     },
     {
+      name: 'webpack-static-webkit',
+      use: {
+        ...devices['Desktop Safari'],
+        baseURL: 'http://127.0.0.1:4177',
+      },
+    },
+    {
       name: 'rollup-static-chromium',
       use: {
         ...devices['Desktop Chrome'],
@@ -123,6 +151,13 @@ export default defineConfig({
       name: 'rollup-static-firefox',
       use: {
         ...devices['Desktop Firefox'],
+        baseURL: 'http://127.0.0.1:4178',
+      },
+    },
+    {
+      name: 'rollup-static-webkit',
+      use: {
+        ...devices['Desktop Safari'],
         baseURL: 'http://127.0.0.1:4178',
       },
     },

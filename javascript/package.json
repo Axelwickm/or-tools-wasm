@@ -1,7 +1,7 @@
 {
   "name": "or-tools-wasm",
   "private": false,
-  "version": "2.0.1",
+  "version": "2.1.0",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -141,16 +141,16 @@
     "test:fixture:vite:build": "npm run test:fixture:vite:install && npm --prefix ../tests/fixtures/vite-basic run build",
     "test:fixture:vite:serve-dev": "npm --prefix ../tests/fixtures/vite-basic run dev -- --host 127.0.0.1 --port 4174",
     "test:fixture:vite:serve-static": "npm --prefix ../tests/fixtures/vite-basic run preview -- --host 127.0.0.1 --port 4175",
-    "test:fixture:vite": "npm run test:fixture:vite:build && FIXTURE_GROUP=vite playwright test --config tests/playwright.config.ts --project=vite-dev-chromium --project=vite-dev-firefox --project=vite-static-chromium --project=vite-static-firefox",
+    "test:fixture:vite": "npm run test:fixture:vite:build && FIXTURE_GROUP=vite playwright test --config tests/playwright.config.ts --project=vite-dev-chromium --project=vite-dev-firefox --project=vite-dev-webkit --project=vite-static-chromium --project=vite-static-firefox --project=vite-static-webkit",
     "test:fixture:webpack:install": "node ../tests/fixtures/install-packed-package.mjs webpack-basic",
     "test:fixture:webpack:build": "npm run test:fixture:webpack:install && npm --prefix ../tests/fixtures/webpack-basic run build",
     "test:fixture:webpack:serve": "npm --prefix ../tests/fixtures/webpack-basic run serve",
     "test:fixture:webpack:serve-static": "npm --prefix ../tests/fixtures/webpack-basic run serve-static",
-    "test:fixture:webpack": "npm run test:fixture:webpack:build && FIXTURE_GROUP=webpack playwright test --config tests/playwright.config.ts --project=webpack-dev-chromium --project=webpack-dev-firefox --project=webpack-static-chromium --project=webpack-static-firefox",
+    "test:fixture:webpack": "npm run test:fixture:webpack:build && FIXTURE_GROUP=webpack playwright test --config tests/playwright.config.ts --project=webpack-dev-chromium --project=webpack-dev-firefox --project=webpack-dev-webkit --project=webpack-static-chromium --project=webpack-static-firefox --project=webpack-static-webkit",
     "test:fixture:rollup:install": "node ../tests/fixtures/install-packed-package.mjs rollup-basic",
     "test:fixture:rollup:build": "npm run test:fixture:rollup:install && npm --prefix ../tests/fixtures/rollup-basic run build && cp ../tests/fixtures/rollup-basic/index.html ../tests/fixtures/rollup-basic/dist/index.html",
     "test:fixture:rollup:serve-static": "npm --prefix ../tests/fixtures/rollup-basic run serve-static",
-    "test:fixture:rollup": "npm run test:fixture:rollup:build && FIXTURE_GROUP=rollup playwright test --config tests/playwright.config.ts --project=rollup-static-chromium --project=rollup-static-firefox",
+    "test:fixture:rollup": "npm run test:fixture:rollup:build && FIXTURE_GROUP=rollup playwright test --config tests/playwright.config.ts --project=rollup-static-chromium --project=rollup-static-firefox --project=rollup-static-webkit",
     "test:fixture:deno:install": "node ../tests/fixtures/install-packed-package.mjs deno-basic",
     "test:fixture:deno": "npm run test:fixture:deno:install && npm --prefix ../tests/fixtures/deno-basic run test",
     "test:fixture:node:install": "node ../tests/fixtures/install-packed-package.mjs node-basic",
@@ -173,22 +173,22 @@
     "build/javascript/node-wasm/*.js"
   ],
   "dependencies": {
-    "@bufbuild/protobuf": "^2.14.0",
+    "@bufbuild/protobuf": "^2.17.0",
     "long": "^5.3.2",
-    "protobufjs": "^8.8.0"
+    "protobufjs": "^8.8.1"
   },
   "devDependencies": {
-    "@bufbuild/buf": "^1.72.0",
-    "@bufbuild/protoc-gen-es": "^2.14.0",
-    "@playwright/test": "^1.63.0",
-    "@types/node": "^26.4.0",
-    "@types/three": "^0.186.0",
+    "@bufbuild/buf": "^1.75.0",
+    "@bufbuild/protoc-gen-es": "^2.17.0",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
     "@typescript/typescript6": "^6.0.2",
-    "esbuild": "^0.27.7",
-    "three": "^0.186.1",
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0",
     "typescript": "^7.0.2",
-    "unplugin-dts": "^1.0.3",
-    "vite": "^8.2.2"
+    "unplugin-dts": "^1.1.2",
+    "vite": "^8.3.8"
   },
   "keywords": [
     "or-tools",

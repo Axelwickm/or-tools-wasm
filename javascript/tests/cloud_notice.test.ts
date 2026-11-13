@@ -65,6 +65,28 @@ test('cloud notice is local, suppressible and once per context across bundled co
   assert.equal(new Set(messages[0].split('\n').map((line) => line.length)).size, 1);
 });
 
+for (const solver of ['cp-sat', 'routing', 'mathopt']) {
+  test(`cloud notice recommends only an available standalone package for ${solver}`, async () => {
+    const messages: string[] = [];
+    const context = createContext({ console: { info: (message: string) => messages.push(message) } });
+    runInContext(bundled.outputFiles[0].text, context);
+    const api: Api = context.api;
+    await api.executeSolverJob({ ...executor, solver }, {}, { showCloudNotice: true });
+    assert.equal(messages.length, 1);
+    if (solver === 'mathopt') {
+      assert.doesNotMatch(messages[0], /standalone package|npm install/);
+    } else {
+      assert.ok(messages[0].includes(`npm install ${solver}-wasm`));
+      assert.ok(messages[0].includes(`https://www.npmjs.com/package/${solver}-wasm`));
+      const other = solver === 'cp-sat' ? 'routing' : 'cp-sat';
+      assert.ok(!messages[0].includes(`${other}-wasm`));
+    }
+    assert.equal(new Set(messages[0].split('\n').map(line => line.length)).size, 1);
+    await api.executeSolverJob({ ...executor, solver }, {}, { showCloudNotice: true });
+    assert.equal(messages.length, 1, 'package guidance shares the once-per-context notice');
+  });
+}
+
 test('cloud notice uses terminal color and cannot fail a completed solve', async () => {
   const messages: string[] = [];
   const context = createContext({

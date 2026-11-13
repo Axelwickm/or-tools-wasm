@@ -77,6 +77,9 @@ export class ManagedWorker<Request, Response> {
   constructor(private readonly options: ManagedWorkerOptions<Request, Response>) {}
 
   get runtimeIdentity(): object { return this.identity; }
+  get isReady(): boolean {
+    return this.worker !== null && this.readyPromise !== null && this.rejectReady === null;
+  }
 
   async load(): Promise<void> {
     const worker = await this.ensureReady();
@@ -138,6 +141,7 @@ export class ManagedWorker<Request, Response> {
 
   private async ensureReady(generation = this.generation): Promise<WorkerLike<Request, Response>> {
     const worker = await this.ensureWorker(generation);
+    if (generation !== this.generation) throw this.terminationError;
     if (!this.readyPromise) {
       throw new Error('Worker ready state unavailable.');
     }
@@ -264,6 +268,9 @@ export class ManagedWorker<Request, Response> {
         resolve();
       }
     });
+    // Termination can occur before ensureReady resumes from ensureWorker.
+    // Keep that rejection observed even if the generation check exits first.
+    this.readyPromise.catch(() => {});
 
     return worker;
   }
@@ -511,7 +518,9 @@ implements SolverExecutor<Request, Response, Event> {
     if (!state.dispatched) {
       state.cancelled = true;
       state.error = new SolverJobCancelledError(this.codec.label, targetRequestId);
-      this.worker.terminate(state.error);
+      // A ready worker may own retained sessions from previous operations.
+      // Its pre-dispatch hook will reject this job without destroying them.
+      if (!this.worker.isReady) this.worker.terminate(state.error);
       return;
     }
     if (this.codec.solver === 'mathopt') return this.interrupt(state);
@@ -524,7 +533,6 @@ implements SolverExecutor<Request, Response, Event> {
       if (supported) await this.interrupt(state);
       return;
     }
-    if (this.activeJob !== state || state.cancelled) return;
     state.cancelled = true;
     state.error = new SolverJobCancelledError(this.codec.label, targetRequestId);
     await options.onEvent(createSolverJobStatusEvent(

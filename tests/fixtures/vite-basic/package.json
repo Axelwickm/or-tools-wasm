@@ -9,10 +9,10 @@
   },
   "devDependencies": {
     "typescript": "^7.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.3.8"
   },
   "dependencies": {
     "or-tools-wasm": "file:../../../javascript/build/javascript/lib/or-tools-wasm-1.0.0.tgz",
-    "protobufjs": "^8.8.0"
+    "protobufjs": "^8.8.1"
   }
 }

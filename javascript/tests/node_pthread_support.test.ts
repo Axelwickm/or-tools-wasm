@@ -43,3 +43,10 @@ for (const mode of ['error', 'exit', 'throw']) {
 test('Node patch fails visibly when upstream worker glue changes', () => {
   assert.throws(() => patchNodePthreads('different upstream glue'), /Unsupported Emscripten/);
 });
+
+test('pthread workers retain Node default inheritance when input-type is absent', async () => {
+  const support = createNodePthreadSupport(FakeWorker, ['--stack-trace-limit=10', '--trace-warnings']);
+  const worker = new support.Worker('worker.js', { workerData: 'em-pthread' });
+  assert.deepEqual(worker.options, { workerData: 'em-pthread' });
+  await support.initialize(() => ({}));
+});

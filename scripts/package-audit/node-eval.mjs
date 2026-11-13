@@ -40,24 +40,27 @@ try {
         ['split flag', ['--input-type', 'module', '-e', normal]],
         ['stdin', ['--input-type=module'], normal],
         ['file', [filename]],
+        ['test runner', ['--test', filename]],
       ];
-      const failure = `${setup}
+      for (const [label, workerUrl, expectedError] of [
+        ['startup failure and retry', 'file:///missing-ortools-pthread.mjs', 'Cannot find module'],
+        ['premature exit and retry', 'data:text/javascript,process.exit(0)', 'exited during startup'],
+      ]) {
+        const failure = `${setup}
         const { createRequire, syncBuiltinESMExports } = await import('node:module');
         const threads = createRequire(import.meta.url)('node:worker_threads');
         const Original = threads.Worker;
         threads.Worker = class extends Original {
-          constructor(url, options) { super(new URL('file:///missing-ortools-pthread.mjs'), options); }
+          constructor(url, options) { super(new URL(${JSON.stringify(workerUrl)}), options); }
         };
         syncBuiltinESMExports();
-        try { await assert.rejects(solve(), /Cannot find module/); }
+        try { await assert.rejects(solve(), new RegExp(${JSON.stringify(expectedError)})); }
         finally { threads.Worker = Original; syncBuiltinESMExports(); }
         try { await solve(); } finally { await api.terminateLoadedRuntimeThreads(); }
         console.log('PASS');
       `;
-      cases.push(['startup failure and retry', ['--input-type=module', '-e', failure]]);
-      cases.push(['premature exit and retry', ['--input-type=module', '-e', failure
-        .replace('file:///missing-ortools-pthread.mjs', 'data:text/javascript,process.exit(0)')
-        .replace('/Cannot find module/', '/exited during startup/')]]);
+        cases.push([label, ['--input-type=module', '-e', failure]]);
+      }
       for (const [label, args, input] of cases) {
         const result = spawnSync(process.execPath, args, { input, encoding: 'utf8', timeout: 60000 });
         assert.ifError(result.error);

@@ -223,7 +223,7 @@ assertion ports. Historical passes remain evidence for their tested snapshots.
   - ✅ 🔎 CpModelTest.test_best_bound_callback
   - ✅ 🔎 CpModelTest.test_value
   - ⚪ 🔎 CpModelTest.test_float_value - intentionally outside the TypeScript contract: this only exercises Python's separate `float_value()` alias; canonical `value()` covers both integer and floating-point expressions
-  - ✅ 🔎 CpModelTest.test_boolean_value
+  - ⚪ 🔎 CpModelTest.test_boolean_value - valid Boolean results match; TypeScript intentionally rejects numeric literals other than 0 and 1 instead of applying Python truthiness (including the upstream `boolean_value(2)` assertion)
   - ✅ 🔎 CpModelTest.test_unsupported_operators
   - ⚪ 🔎 CpModelTest.test_is_literal_true_false - outside the TypeScript contract: this tests Python-internal literal classification helpers and NumPy/bitwise representations; public Boolean literals and negation are covered through canonical model and solve cases
   - ✅ 🔎 CpModelTest.test_solve_minimize_with_solution_callback

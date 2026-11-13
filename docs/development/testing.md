@@ -12,8 +12,15 @@ npm --prefix javascript run test:fixtures
 ```
 
 This runs shared solver cases through Vite, Webpack, Rollup, Deno, Node, and
-Bun. Browser fixtures cover Chromium and Firefox, dev and static serving where
-supported, direct execution, the worker bridge, and solver thread settings.
+Bun. Browser fixtures cover Chromium, Firefox, and Playwright WebKit, dev and
+static serving where supported, direct execution, the worker bridge, and solver
+thread settings.
+
+WebKit coverage uses Playwright’s patched browser build. It does not establish
+compatibility with released Safari or iOS Safari; those need separate device tests.
+The Vite fixture and site servers send `Cache-Control: no-store`: WebKit 27.2
+can reject cached worker reloads after startup cancellation with a COEP error.
+Both JSPI and Asyncify are tested when JSPI is available.
 
 For focused iteration:
 

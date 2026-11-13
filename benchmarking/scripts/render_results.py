@@ -28,6 +28,7 @@ IMPLEMENTATIONS = [
     ("wasm-bun", "Bun WASM"),
     ("web-chromium", "Chromium WASM"),
     ("web-firefox", "Firefox WASM"),
+    ("web-webkit", "WebKit WASM"),
 ]
 
 COLORS = {
@@ -37,6 +38,7 @@ COLORS = {
     "wasm-bun": "#bf3989",
     "web-chromium": "#8250df",
     "web-firefox": "#d1242f",
+    "web-webkit": "#0e8a8a",
 }
 
 
@@ -317,9 +319,9 @@ def svg_header(width: int, height: int) -> list[str]:
 
 def render_legend(implementations: list[tuple[str, str]], x: int, y: int) -> list[str]:
     parts = []
-    column_gap = 150
+    column_gap = 130
     row_gap = 22
-    max_columns = 6
+    max_columns = 7
     for index, (implementation, label) in enumerate(implementations):
         cursor = x + (index % max_columns) * column_gap
         row_y = y + (index // max_columns) * row_gap

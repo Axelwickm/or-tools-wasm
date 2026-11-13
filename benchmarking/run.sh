@@ -29,6 +29,7 @@ DENO_IMAGE="ortools-wasm-bench-wasm-deno"
 BUN_IMAGE="ortools-wasm-bench-wasm-bun"
 WEB_IMAGE="ortools-wasm-bench-web-chromium"
 FIREFOX_IMAGE="ortools-wasm-bench-web-firefox"
+WEBKIT_IMAGE="ortools-wasm-bench-web-webkit"
 
 BENCHMARK_CONTAINER_LABEL="org.or-tools-wasm.benchmark.run=1"
 RUN_CONTAINER_NAMES=(
@@ -38,6 +39,7 @@ RUN_CONTAINER_NAMES=(
   "ortools-wasm-bench-run-wasm-bun"
   "ortools-wasm-bench-run-web-chromium"
   "ortools-wasm-bench-run-web-firefox"
+  "ortools-wasm-bench-run-web-webkit"
 )
 
 cleanup_containers() {
@@ -109,6 +111,7 @@ docker build -f "${ROOT}/benchmarking/docker/wasm-deno.Dockerfile" -t "${DENO_IM
 docker build -f "${ROOT}/benchmarking/docker/wasm-bun.Dockerfile" -t "${BUN_IMAGE}" "${ROOT}"
 docker build -f "${ROOT}/benchmarking/docker/web-chromium.Dockerfile" -t "${WEB_IMAGE}" "${ROOT}"
 docker build -f "${ROOT}/benchmarking/docker/web-firefox.Dockerfile" -t "${FIREFOX_IMAGE}" "${ROOT}"
+docker build -f "${ROOT}/benchmarking/docker/web-webkit.Dockerfile" -t "${WEBKIT_IMAGE}" "${ROOT}"
 
 docker run --rm \
   --name "ortools-wasm-bench-run-native-python" \
@@ -152,12 +155,20 @@ docker run --rm \
   -v "${RESULTS_DIR}:/results" \
   "${FIREFOX_IMAGE}" --out /results/web-firefox.csv
 
+docker run --rm \
+  --name "ortools-wasm-bench-run-web-webkit" \
+  --label "${BENCHMARK_CONTAINER_LABEL}" \
+  -e BENCH_GIT_SHA="${GIT_SHA}" \
+  -v "${RESULTS_DIR}:/results" \
+  "${WEBKIT_IMAGE}" --out /results/web-webkit.csv
+
 printf 'Wrote %s\n' "${RESULTS_DIR}/native-python.csv"
 printf 'Wrote %s\n' "${RESULTS_DIR}/wasm-node.csv"
 printf 'Wrote %s\n' "${RESULTS_DIR}/wasm-deno.csv"
 printf 'Wrote %s\n' "${RESULTS_DIR}/wasm-bun.csv"
 printf 'Wrote %s\n' "${RESULTS_DIR}/web-chromium.csv"
 printf 'Wrote %s\n' "${RESULTS_DIR}/web-firefox.csv"
+printf 'Wrote %s\n' "${RESULTS_DIR}/web-webkit.csv"
 
 printf 'Rendering benchmark report\n'
 python3 "${ROOT}/benchmarking/scripts/render_results.py"

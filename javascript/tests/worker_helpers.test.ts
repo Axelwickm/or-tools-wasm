@@ -316,7 +316,8 @@ test('aborting a stalled worker startup releases the executor before loading res
     bundle: true, write: false, platform: 'node', format: 'esm' });
   const api = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
   for (const solver of ['cp-sat', 'routing', 'mathopt', 'mp-solver']) {
-    for (const stage of ['creation', 'ready', 'dispatch']) {
+    for (const stage of ['creation', 'ready', 'dispatch', 'warm']) {
+      const preservesWorker = stage === 'warm' || stage === 'dispatch';
       await t.test(`${solver}: abort during ${stage}`, async () => {
         const codec = { solver, label: solver,
           encodeRequest: () => new Uint8Array([7]), decodeResult: (bytes: Uint8Array) => bytes[0] };
@@ -334,33 +335,56 @@ test('aborting a stalled worker startup releases the executor before loading res
           };
           workers.push(worker);
           if (workers.length === 1 && stage === 'creation') return new Promise(resolve => { finishCreation = resolve; });
-          if (workers.length > 1 || stage === 'dispatch') setImmediate(() => events.emit('message', api.encodeSolverBridgeReady(solver)));
+          if (workers.length > 1 || preservesWorker) setImmediate(() => events.emit('message', api.encodeSolverBridgeReady(solver)));
           return Promise.resolve(worker);
         }, true);
         const controller = new AbortController();
         const reason = new Error('cancel startup');
         try {
+          if (stage === 'warm') await executor.load();
           // Retained-session requests must also be cancellable before dispatch.
           const result = api.executeSolverJob(executor, { type: 'sessionRun' }, {
             showCloudNotice: false, signal: controller.signal,
             onDispatch: stage === 'dispatch' ? () => controller.abort(reason) : undefined,
           });
           const rejected = assert.rejects(result, (error: unknown) => error === reason);
-          if (stage !== 'dispatch') { await nextTurn(); controller.abort(reason); }
+          if (stage !== 'dispatch') {
+            if (stage !== 'warm') await nextTurn();
+            controller.abort(reason);
+          }
           await rejected;
           assert.equal(workers[0].posts, 0);
-          if (stage !== 'creation') assert.equal(workers[0].terminated, 1);
+          if (stage !== 'creation') assert.equal(workers[0].terminated, preservesWorker ? 0 : 1);
           const next = api.executeSolverJob(executor, { type: 'sessionRun' }, { showCloudNotice: false });
           if (stage === 'creation') finishCreation(workers[0]);
           await nextTurn();
           // Retired ready messages cannot revive the abandoned operation.
           workers[0].events.emit('message', api.encodeSolverBridgeReady(solver));
           assert.equal(await next, 42);
-          assert.equal(workers[0].terminated, 1);
-          assert.equal(workers[1].terminated, 0);
-          assert.equal(workers.length, 2);
+          assert.equal(workers[0].terminated, preservesWorker ? 0 : 1);
+          assert.equal(workers[workers.length - 1].terminated, 0);
+          assert.equal(workers.length, preservesWorker ? 1 : 2);
         } finally { executor.terminate(); }
       });
     }
+  }
+});
+
+test('termination between worker creation and awaiting readiness has no unhandled rejection', { timeout: 10_000 }, async () => {
+  const bundled = await build({ stdin: { resolveDir: fileURLToPath(new URL('../lib', import.meta.url)),
+    contents: `export { ManagedWorker } from './worker_helpers.ts';` },
+    bundle: true, write: false, platform: 'node', format: 'esm' });
+  const api = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+  for (let turns = 0; turns < 10; turns++) {
+    const manager = new api.ManagedWorker({
+      createWorker: async () => ({ postMessage() {}, terminate() {} }),
+      isReady: () => false, getRequestId: () => 1, getResponseId: () => undefined,
+    });
+    const reason = new Error('cancel before readiness');
+    const rejected = assert.rejects(manager.load(), (error: unknown) => error === reason);
+    for (let i = 0; i < turns; i++) await Promise.resolve();
+    manager.terminate(reason);
+    await rejected;
+    await nextTurn();
   }
 });

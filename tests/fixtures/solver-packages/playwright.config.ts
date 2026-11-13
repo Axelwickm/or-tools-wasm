@@ -5,7 +5,8 @@ export default defineConfig({
   timeout: 300_000,
   use: { baseURL: 'http://127.0.0.1:4187', headless: true },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } },
-    { name: 'firefox', use: { browserName: 'firefox' } }],
+    { name: 'firefox', use: { browserName: 'firefox' } },
+    { name: 'webkit', use: { browserName: 'webkit' } }],
   webServer: { command: 'npm exec vite preview -- --host 127.0.0.1 --port 4187 --strictPort',
     url: 'http://127.0.0.1:4187', reuseExistingServer: false },
 });

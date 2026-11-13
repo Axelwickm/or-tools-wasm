@@ -154,7 +154,7 @@ export async function executeSolverJob<Request, Response, Event>(
     if (nativeCallbackFailure) throw nativeCallbackFailure.error;
     if (callbackFailure) throw callbackFailure.error;
     if (abortFailure) throw abortFailure.error;
-    if (options.showCloudNotice) printCloudNotice();
+    if (options.showCloudNotice) printCloudNotice(executor.solver);
     return response;
   } finally {
     stopObservers();

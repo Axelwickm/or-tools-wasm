@@ -2324,6 +2324,10 @@ export class RoutingModel {
     this.operations.push({ type: 'setNextValues', index: routingIndex, values });
   }
 
+  /**
+   * @deprecated Use nextVarHandle(index) for a validated, model-bound successor
+   * variable. This method returns the numeric index unchanged.
+   */
   nextVar(index: number): number {
     return index;
   }

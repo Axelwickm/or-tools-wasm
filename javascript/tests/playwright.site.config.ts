@@ -8,6 +8,7 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
     { name: 'firefox', testMatch: ['**/ergonomics.spec.ts', '**/live_code.spec.ts', '**/solver_docs.spec.ts'], use: { browserName: 'firefox' } },
+    { name: 'webkit', testMatch: ['**/ergonomics.spec.ts', '**/live_code.spec.ts', '**/solver_docs.spec.ts'], use: { browserName: 'webkit' } },
   ],
   use: { baseURL: 'http://127.0.0.1:4191', browserName: 'chromium' },
   webServer: {

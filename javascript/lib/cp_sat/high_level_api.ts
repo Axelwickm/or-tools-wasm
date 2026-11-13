@@ -2350,60 +2350,73 @@ export class CpSolver {
     }
   }
 
+  /** @deprecated Use response on the CpResult returned by CpSat.solve(model). */
   get response() {
     return this.lastResponse === null ? null : cloneProto(this.lastResponse);
   }
 
+  /** @deprecated Use responseStats() on the CpResult returned by CpSat.solve(model). */
   responseStats() {
     this.requireResponse();
     stateError(this.lastResponseStatistics !== null, 'native response statistics are unavailable');
     return this.lastResponseStatistics;
   }
 
+  /** @deprecated Use deterministicTime on the CpResult returned by CpSat.solve(model). */
   get deterministicTime() {
     const response = this.requireResponse();
     stateError(typeof response.deterministicTime === 'number', 'missing deterministic time');
     return response.deterministicTime;
   }
 
+  /** @deprecated Use numBinaryPropagations on the CpResult returned by CpSat.solve(model). */
   get numBinaryPropagations() {
     return protoInt64ToNumber(this.requireResponse().numBinaryPropagations);
   }
 
+  /** @deprecated Use numIntegerPropagations on the CpResult returned by CpSat.solve(model). */
   get numIntegerPropagations() {
     return protoInt64ToNumber(this.requireResponse().numIntegerPropagations);
   }
 
+  /** @deprecated Use userTime on the CpResult returned by CpSat.solve(model). */
   get userTime() {
     const response = this.requireResponse();
     stateError(typeof response.userTime === 'number', 'missing user time');
     return response.userTime;
   }
 
+  /** @deprecated Use solveLog on the CpResult returned by CpSat.solve(model). */
   get solveLog() {
     return this.requireResponse().solveLog;
   }
 
+  /** @deprecated Use numIntegers on the CpResult returned by CpSat.solve(model). */
   get numIntegers() {
     return protoInt64ToNumber(this.requireResponse().numIntegers);
   }
 
+  /** @deprecated Use solutionInfo on the CpResult returned by CpSat.solve(model). */
   get solutionInfo() {
     return this.requireResponse().solutionInfo ?? '';
   }
 
+  /** @deprecated Use numBooleans on the CpResult returned by CpSat.solve(model). */
   get numBooleans() {
     return protoInt64ToNumber(this.requireResponse().numBooleans);
   }
 
+  /** @deprecated Use numConflicts on the CpResult returned by CpSat.solve(model). */
   get numConflicts() {
     return protoInt64ToNumber(this.requireResponse().numConflicts);
   }
 
+  /** @deprecated Use numBranches on the CpResult returned by CpSat.solve(model). */
   get numBranches() {
     return protoInt64ToNumber(this.requireResponse().numBranches);
   }
 
+  /** @deprecated Use wallTime on the CpResult returned by CpSat.solve(model). */
   get wallTime() {
     return this.requireResponse().wallTime ?? 0;
   }
@@ -2424,12 +2437,14 @@ export class CpSolver {
     return this.lastResult!.booleanValue(literal);
   }
 
+  /** @deprecated Use objectiveValue on the CpResult returned by CpSat.solve(model). */
   get objectiveValue() {
     const response = this.requireResponse();
     stateError(typeof response.objectiveValue === 'number', 'missing objective value');
     return response.objectiveValue;
   }
 
+  /** @deprecated Use bestObjectiveBound on the CpResult returned by CpSat.solve(model). */
   get bestObjectiveBound() {
     const response = this.requireResponse();
     stateError(typeof response.bestObjectiveBound === 'number', 'missing best objective bound');
@@ -2440,6 +2455,7 @@ export class CpSolver {
     return cpSolverStatusName(status);
   }
 
+  /** @deprecated Use sufficientAssumptionsForInfeasibility() on the CpResult returned by CpSat.solve(model). */
   sufficientAssumptionsForInfeasibility(): number[] {
     return [...(this.requireResponse().sufficientAssumptionsForInfeasibility ?? [])];
   }

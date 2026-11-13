@@ -20,7 +20,7 @@ export function setCloudNoticeEnabled(enabled: boolean): void {
   state().enabled = enabled;
 }
 
-export function printCloudNotice(): void {
+export function printCloudNotice(solver: string): void {
   const notice = state();
   if (notice.printed || !(notice.enabled ?? (optionalEnvironmentVariable('ORTOOLS_WASM_CLOUD_NOTICE') !== '0'))) return;
   notice.printed = true;
@@ -34,6 +34,15 @@ export function printCloudNotice(): void {
     'Explore cloud / early access:',
     'https://or-tools-wasm-api.axelwickman.com/info',
   ];
+  if (solver === 'cp-sat' || solver === 'routing') {
+    const label = solver === 'cp-sat' ? 'CP-SAT' : 'Routing';
+    lines.push(
+      '',
+      `Only need ${label}? Use the standalone package:`,
+      `npm install ${solver}-wasm`,
+      `https://www.npmjs.com/package/${solver}-wasm`,
+    );
+  }
   const width = Math.max(...lines.map((line) => line.length));
   const border = `+-${'-'.repeat(width)}-+`;
   const banner = [border, ...lines.map((line) => `| ${line.padEnd(width)} |`), border].join('\n');

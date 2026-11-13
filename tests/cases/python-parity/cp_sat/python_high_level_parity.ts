@@ -2098,7 +2098,7 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
     },
   },
   {
-    // TEMP: parity - CpModelTest.test_boolean_value matches upstream assertions using the high-level CP-SAT API.
+    // Partial parity: TypeScript deliberately rejects numeric literals other than 0 and 1.
     name: 'CpModelTest.test_boolean_value',
     source: 'ortools/sat/python/cp_model_test.py',
     async run({ CpModel, CpSolver }) {
@@ -2119,7 +2119,8 @@ export const cpSatHighLevelParityCases: CpSatHighLevelParityCase[] = [
       assertEqual(solver.booleanValue(y), false, `${this.name} boolean_value(y)`);
       assertEqual(solver.booleanValue(true), true, `${this.name} boolean_value(True)`);
       assertEqual(solver.booleanValue(false), false, `${this.name} boolean_value(False)`);
-      assertEqual(solver.booleanValue(2), true, `${this.name} boolean_value(2)`);
+      assertThrows(TypeError, () => solver.booleanValue(2), `${this.name} rejects non-Boolean numeric literal`);
+      assertEqual(solver.booleanValue(1), true, `${this.name} boolean_value(1)`);
       assertEqual(solver.booleanValue(0), false, `${this.name} boolean_value(0)`);
     },
   },
