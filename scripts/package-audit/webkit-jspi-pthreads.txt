@@ -1,0 +1,163 @@
+WebKit JSPI/pthread investigation, 2026-11-13
+
+Upstream report filed with user authorization:
+https://github.com/emscripten-core/emscripten/issues/28258
+Includes standalone source/runner, fresh failing logs, verbose link output,
+and both original failing CI-job links.
+
+Release 2.1.0 remains on hold. No stable update or version tag has been pushed.
+The original failing release candidate was 5d4913b129.
+
+ROOT CAUSE CONFIRMED (follow-up investigation)
+
+This is an Emscripten JSPI pthread lifetime race, naturally exposed by the
+observed WebKit scheduling. It is not evidence of an Atomics.waitAsync
+implementation defect in WebKit. No actual Apple Safari execution has yet
+been tested. The earlier mailbox fallback is a workaround, not the root fix.
+
+Causal chain:
+1. invokeEntryPoint resets runtimeKeepaliveCounter=0 and noExitRuntime=0,
+   invokes the pthread through WebAssembly.promising, and awaits its result.
+   It does not retain the runtime across that await.
+2. A resolved mailbox wait can run checkMailbox during that interval.
+   In particular, a callback from a previous use of the pooled worker can
+   observe the new pthread identity. checkMailbox uses callUserCallback.
+3. callUserCallback unconditionally invokes maybeExit in its finally block.
+   With no keepalive, maybeExit calls _emscripten_thread_exit prematurely.
+4. C teardown clears pthread_self and publishes DT_EXITED, permitting the
+   main runtime to join/free the pthread and recycle its worker.
+5. The suspended invokeEntryPoint resumes and calls finish, attempting
+   another _emscripten_thread_exit. It can act on no current pthread.
+   With assertions disabled, this invalid teardown can leave the program
+   hanging. Full downstream memory-corruption consequences were not audited.
+
+Evidence:
+- Bounded-join reproduction of the natural WebKit failure captured a worker:
+    before await: pthread_self=70176
+    mailbox callback: pthread_self=70176
+    after mailbox callback: pthread_self=0
+    after await: pthread_self=0
+- The timed join returned ETIMEDOUT (73) for an unfinished thread.
+- Scheduling queueMicrotask(checkMailbox) before the pthread entry promise
+  continuation forces this ordering in Chromium too. Uncorrected run hung
+  at iteration 1. This is explicit test fault scheduling, not a claim that
+  ordinary Chromium execution reliably reproduces the race.
+- With ASSERTIONS=1, forced ordering produced:
+    Assertion failed: self, pthread_create.c:312, _emscripten_thread_exit
+  Stack: finish -> invokeEntryPoint -> handleMessage.
+- Balanced runtimeKeepalivePush/Pop around the pending JSPI entry fixes the
+  isolated test: 1000 natural WebKit iterations and 1000 forced-ordering
+  Chromium iterations passed. Neither waitAsync nor JSPI was disabled.
+- All solver groups/executor modes in Vite dev WebKit passed with that
+  correction applied by a diagnostic response transform: 1 passed (1.6m).
+- Pure JavaScript mailbox/Promise tests and raw WebAssembly.promising tests
+  did not reproduce the failure, consistent with Emscripten bookkeeping.
+- Upstream main libpthread.js inspected on 2026-11-13 still lacked the
+  pending-entry keepalive. Upstream issue #28258 was subsequently filed (see above).
+
+Deterministic reproducer controls (same prerequisites as below):
+  REPRO_BROWSER=chromium REPRO_FORCE_MAILBOX=1 REPRO_ASSERTIONS=1 timeout -k 5s 45s node scripts/package-audit/webkit-jspi-pthreads.mjs
+Expected: pthread self assertion (and possibly an external timeout).
+  REPRO_BROWSER=chromium REPRO_FORCE_MAILBOX=1 REPRO_KEEPALIVE=1 REPRO_ASSERTIONS=1 timeout -k 5s 45s node scripts/package-audit/webkit-jspi-pthreads.mjs
+Expected: 1000 iterations pass.
+  REPRO_KEEPALIVE=1 timeout -k 5s 45s taskset -c 0,1 node scripts/package-audit/webkit-jspi-pthreads.mjs
+Natural WebKit ordering with the correction; expected 1000 iterations pass.
+
+Production integration:
+- scripts/patch_jspi_pthread_entry.ts now retains the runtime before invoking
+  the JSPI pthread entry and releases it in finally after await. This covers
+  synchronous invocation errors and rejected promises. There is no await
+  between releasing the keepalive and finish().
+- Applied by scripts/patch_emscripten_runtime.mjs to browser and Node JSPI
+  runtimes, including standalone solver packages. Asyncify is unchanged.
+- Regression tests cover the forced callback ordering, synchronous errors,
+  rejected promises, independently retained work, explicit exit/unwind,
+  idempotence, and rejecting an unrecognized generated entry implementation.
+- Temporary fixture response transforms and verbose progress hooks used
+  during investigation have been removed. Integration tests use packaged
+  runtime files directly.
+- REPRO_KEEPALIVE remains the original diagnostic prototype used in the
+  upstream report. REPRO_PRODUCTION_PATCH exercises the actual packaged fix.
+  Do not combine those two controls.
+
+Final Deno 2.9.7 validation:
+- Result/lifecycle suite alone: 302 passed, both patched and unpatched.
+- Full basic + result suite: 313 tests / 1564 steps passed with the production
+  patch (4m29s). The isolated unpatched comparison also passed (4m25s).
+- An initial combined run during parallel multi-runtime validation timed out
+  in set_cover.lifecycle.cancel_blocked_observer (worker). That case passed
+  in isolation and in both complete reruns. The timeout was not reproduced;
+  these results do not establish its cause.
+
+Production-patch reproducer controls:
+  REPRO_BROWSER=chromium REPRO_FORCE_MAILBOX=1 REPRO_PRODUCTION_PATCH=1 REPRO_ASSERTIONS=1 timeout -k 5s 60s node scripts/package-audit/webkit-jspi-pthreads.mjs
+  REPRO_PRODUCTION_PATCH=1 timeout -k 5s 60s taskset -c 0,1 node scripts/package-audit/webkit-jspi-pthreads.mjs
+Both passed 1000 iterations; neither disables JSPI nor Atomics.waitAsync.
+The complete unit suite passed 396 tests.
+Node 26.13.1 and Bun 1.4.4 complete fixtures passed.
+Vite dev WebKit and Firefox passed; Webpack static WebKit passed.
+Standalone CP-SAT/Routing WebKit tests passed in both JSPI and Asyncify modes.
+A Chromium stress run constrained to two CPUs rejected the fixture's
+four-worker request (runtime capacity 2); that was an invalid diagnostic
+configuration, not a keepalive failure. Chromium is validated with normal
+CPU availability; its complete Vite dev profile passed (44.1s).
+
+
+Earlier investigation history follows:
+
+CI: Package run 43463119879
+- Vite dev WebKit and Webpack static WebKit timed out in the CP-SAT group.
+- All other test jobs passed, including native-server integration.
+
+Local reproduction on Playwright 1.65.0 WebKit 27.2, Emscripten 6.0.8:
+- Limit execution to two CPUs with taskset -c 0,1.
+- Repeated four-worker solves of a tiny three-variable Boolean model stall
+  with JSPI: direct stalled at iteration 41; worker stalled at iteration 83.
+- The complete CP-SAT group passed under the same affinity with direct
+  execution switched to Asyncify (34 seconds including startup).
+- A solver-independent C++ program creating/joining four std::threads also
+  stalls in WebKit JSPI (observed at iteration 18).
+- That program passed 1000 iterations in WebKit Asyncify and Chromium JSPI.
+- Recompiling the tiny program with official emscripten/emsdk:7.0.0 also
+  stalled in WebKit JSPI (observed at iteration 3).
+- Yielding the event loop between calls did not prevent the stall.
+- Disabling WebKit WASM optimizing tiers did not prevent the stall.
+- Disabling WebKit garbage collection did not prevent the stall.
+- GDB showed workers waiting, but stripped browser symbols prevented a
+  useful attribution. Backtrace is in /tmp/ortools-runtime-upgrade.
+- Corrected worker-entry experiments: removing only WebAssembly.promising
+  from pthread entry still stalled (iteration 27). Removing that wrapper
+  AND the await before __emscripten_thread_exit passed 1000 iterations,
+  while retaining JSPI on the exported work function.
+  Earlier worker-entry experiments were invalid: generated Worker URLs
+  still pointed at the original module, not the modified diagnostic file.
+- Keeping JSPI intact and forcing Emscripten's waitAsyncPolyfilled=true
+  mailbox fallback passed 1000 iterations of the standalone reproducer.
+  This uses existing postMessage mailbox notifications instead of
+  Atomics.waitAsync; it does not disable threading or JSPI.
+- The same mailbox control passed 1000 real CP-SAT solves with each of
+  executor:'direct' and executor:'worker', under two-CPU affinity.
+- Complete Vite dev WebKit fixture passed all solver groups/executor modes
+  with JSPI retained and the mailbox fallback applied by a test-only HTTP
+  response transform: 1 passed (1.6m), two-CPU affinity.
+  The temporary response-transform control has since been removed.
+- Syntax check, TypeScript noEmit, and git diff --check passed.
+- These were diagnostic controls; see production integration above.
+  No release has been published; upstream issue #28258 is now filed.
+
+At this earlier stage, the failure was isolated only to the
+WebKit/Emscripten JSPI/pthread boundary. The follow-up above identifies the
+Emscripten lifetime race.
+The user chose further JSPI investigation over defaulting WebKit to Asyncify.
+
+Reproduce without OR-Tools (Linux; select two CPUs allowed on your machine):
+  timeout -k 5s 90s taskset -c 0,1 node scripts/package-audit/webkit-jspi-pthreads.mjs
+Control runs:
+  REPRO_NO_WAITASYNC=1 timeout -k 5s 90s taskset -c 0,1 node scripts/package-audit/webkit-jspi-pthreads.mjs
+  REPRO_FLAVOR=asyncify timeout -k 5s 90s taskset -c 0,1 node scripts/package-audit/webkit-jspi-pthreads.mjs
+  REPRO_BROWSER=chromium timeout -k 5s 90s taskset -c 0,1 node scripts/package-audit/webkit-jspi-pthreads.mjs
+
+Requires the repo Emscripten SDK, javascript dependencies and matching
+Playwright browser installations. Set PLAYWRIGHT_BROWSERS_PATH if needed.
+Optional EM_CACHE reuses a writable compiler cache; the default is temporary.
+The external timeout bounds hangs in the browser. Public report: emscripten-core/emscripten#28258.

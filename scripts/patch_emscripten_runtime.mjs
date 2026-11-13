@@ -1,3 +1,4 @@
+import { patchJspiPthreadEntry } from './patch_jspi_pthread_entry.ts';
 import { patchJspiAsyncCtors } from './patch_jspi_ctors.ts';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -73,6 +74,7 @@ for (const nodeRuntimePath of nodeRuntimePaths) {
     runtime = runtime.replaceAll(from, to);
   }
   runtime = patchJspiAsyncCtors(runtime);
+  runtime = patchJspiPthreadEntry(runtime);
   runtime = patchJspiInvokeTableEntries(runtime);
   runtime = patchNodePthreads(runtime);
 
@@ -186,6 +188,7 @@ for (const webRuntimePath of webRuntimePaths) {
     'Module["PThread"]=PThread;PThread.init();FS.createPreloadedFile=FS_createPreloadedFile;',
   );
   runtime = patchJspiAsyncCtors(runtime);
+  runtime = patchJspiPthreadEntry(runtime);
   // Wait for the runtime to install its message handler before the worker is ready.
   runtime = runtime.replaceAll('globalThis.__ORTOOLS_WASM_PTHREAD=true;import(',
     'globalThis.__ORTOOLS_WASM_PTHREAD=true;await import(');
