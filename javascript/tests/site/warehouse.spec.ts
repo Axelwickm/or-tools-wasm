@@ -173,9 +173,12 @@ test('warehouse: real solve replay animates while paused and disappears after on
   page.on('console', (message) => {
     if (/GL_INVALID|Framebuffer is incomplete|THREE.*Error/.test(message.text())) errors.push(message.text());
   });
+  await page.clock.install();
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/warehouse_storage.html');
   await expect(page.locator('#warehouse-canvas')).toHaveAttribute('data-ready', 'true');
+  // Keep the one-second replay observable even on a busy CI runner.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const replay = page.locator('.solve-replay');
   await expect(replay).toBeHidden();
@@ -184,8 +187,12 @@ test('warehouse: real solve replay animates while paused and disappears after on
   await expect(replay).toContainText('branches');
   await expect(replay).toContainText('SOLVER REPLAY');
   await expect(page.locator('#pause-forklift')).toHaveAttribute('data-paused', 'true');
+  await page.clock.runFor(100);
   await page.screenshot({ path: '/tmp/warehouse-solve-replay.png' });
-  await expect(replay).toBeHidden({ timeout: 2_000 });
+  await page.clock.runFor(899);
+  await expect(replay).toBeVisible();
+  await page.clock.runFor(1);
+  await expect(replay).toBeHidden();
   await expect(page.locator('#scene-error')).toBeHidden();
   expect(errors).toEqual([]);
 });
