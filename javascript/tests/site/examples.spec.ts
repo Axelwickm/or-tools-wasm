@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../site_test.ts';
 import { readdirSync, readFileSync } from 'node:fs';
 
 const site = new URL('../../site/', import.meta.url);

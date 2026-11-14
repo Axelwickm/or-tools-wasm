@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../site_test.ts';
 import { transform } from 'esbuild';
 import ts from '@typescript/typescript6';
 import { execFile } from 'node:child_process';

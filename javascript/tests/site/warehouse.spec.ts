@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../site_test.ts';
 import * as THREE from 'three';
 import { slots, pallets } from '../../site/warehouse/model/layout.ts';
 

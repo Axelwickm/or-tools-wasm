@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../site_test.ts';
 
 test.setTimeout(90_000);
 for (const executor of ['worker', 'direct']) {

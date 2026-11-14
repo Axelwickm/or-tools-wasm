@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../site_test.ts';
 import { readdirSync } from 'node:fs';
 
 // One real worker solve per example. Keep page-specific expectations explicit:
