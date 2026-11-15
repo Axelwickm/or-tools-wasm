@@ -115,7 +115,9 @@ jobs:
         run: cd javascript && npx playwright install --with-deps chromium firefox webkit
 
       - name: Test all runtimes with and without isolation headers
-        run: npm --prefix javascript run test:browser:isolation
+        # The library is already packed; rebuilding would clear its tarball.
+        working-directory: javascript
+        run: npx playwright test --config tests/playwright.isolation.config.ts
 
       - name: Test example interactions and mobile layout
         run: npm --prefix javascript run test:site:browser
