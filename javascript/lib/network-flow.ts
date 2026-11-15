@@ -25,3 +25,5 @@ export type {
 } from './executor_configuration.js';
 export { terminateLoadedRuntimeThreads } from './runtime_loader.js';
 export { setCloudNoticeEnabled } from './cloud_notice.js';
+
+export { setSingleThreadWarningEnabled } from './browser_threading.js';

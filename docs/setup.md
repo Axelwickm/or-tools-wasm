@@ -70,16 +70,25 @@ Solve calls share execution controls: `executor` selects where to run,
 
 ## Browser requirements
 
-Local browser WASM builds use WebAssembly threads, so pages must be served with
-cross-origin isolation enabled:
+Browsers work without special headers using one solver thread. Automatic execution
+runs directly and may block the UI. For parallel solving, worker callbacks and
+native interruption, enable:
 
 ```http
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Without these headers, solving can fail during WebAssembly runtime or worker
-startup.
+Without headers, use one solver thread and solver time limits instead of native
+interruption in Routing, MPSolver and MathOpt. Explicit workers support solves
+without synchronous callback replies. Node.js, Bun and Deno do not need these headers.
+
+To silence the once-per-page warning before solving:
+
+```ts
+import { setSingleThreadWarningEnabled } from 'or-tools-wasm';
+setSingleThreadWarningEnabled(false);
+```
 
 Server-only execution does not load local WASM and does not require these
 headers. The server must still be reachable from the page under the browser's

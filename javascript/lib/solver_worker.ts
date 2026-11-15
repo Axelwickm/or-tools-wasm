@@ -1,4 +1,5 @@
 import { create } from '@bufbuild/protobuf';
+import { isSingleThreadedBrowser } from './browser_threading.js';
 import {
   decodeSolverBridgeRequest,
   encodeSolverBridgeCancelled,
@@ -75,6 +76,9 @@ export function installSolverWorker<Request, Response, Event>(
 
       const job = executor.execute(codec.decodeRequest(outer.operation.value), {
         onCallback: payload => {
+          if (isSingleThreadedBrowser()) throw new SolverCallbackTransportError(
+            'Worker callbacks require cross-origin isolation. Use executor: "direct" for callbacks without COOP/COEP headers.',
+          );
           const reply = new SharedArrayBuffer(12 + WORKER_CALLBACK_REPLY_CHUNK_SIZE);
           const control = new Int32Array(reply, 0, 3);
           scope.postMessage({ type: 'callback', requestId, payload, reply }, []);
@@ -136,7 +140,7 @@ export function installSolverWorker<Request, Response, Event>(
   };
 
   void (async () => {
-    if (options.cancellation) {
+    if (options.cancellation && !isSingleThreadedBrowser()) {
       scope.postMessage({
         type: 'shared-cancellation',
         ...await options.cancellation(),

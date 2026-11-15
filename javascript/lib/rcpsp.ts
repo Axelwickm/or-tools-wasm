@@ -13,3 +13,5 @@ export type {
   WorkerExecutorConfiguration,
 } from './executor_configuration.js';
 export { setCloudNoticeEnabled } from './cloud_notice.js';
+
+export { setSingleThreadWarningEnabled } from './browser_threading.js';

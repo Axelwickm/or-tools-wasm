@@ -120,3 +120,5 @@ export { MathOptCallbackEventProto } from './generated/mathopt_callback_types.js
 export type * from './generated/mathopt_callback_types.js';
 export type { MathOptCallback, MathOptCallbackData, MathOptCallbackRegistration, MathOptCallbackResult } from './mathopt/callbacks.js';
 export { encodeMathOptCallbackRegistration, decodeMathOptCallbackData, encodeMathOptCallbackResult } from './mathopt/callbacks.js';
+
+export { setSingleThreadWarningEnabled } from './browser_threading.js';

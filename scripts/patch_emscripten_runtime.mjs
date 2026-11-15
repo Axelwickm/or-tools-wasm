@@ -4,6 +4,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { initializeBunPthread } from './bun_pthread_bootstrap.ts';
 import { patchNodePthreads } from './node_pthread_support.mjs';
+import { patchSingleThreadBrowser } from './patch_single_thread_browser.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const packageBuildRoot = path.join(repoRoot, 'javascript/build/javascript');
@@ -187,6 +188,7 @@ for (const webRuntimePath of webRuntimePaths) {
     /(?:Module\["PThread"\]=PThread;)+PThread\.init\(\);FS\.createPreloadedFile=FS_createPreloadedFile;/g,
     'Module["PThread"]=PThread;PThread.init();FS.createPreloadedFile=FS_createPreloadedFile;',
   );
+  runtime = patchSingleThreadBrowser(runtime);
   runtime = patchJspiAsyncCtors(runtime);
   runtime = patchJspiPthreadEntry(runtime);
   // Wait for the runtime to install its message handler before the worker is ready.

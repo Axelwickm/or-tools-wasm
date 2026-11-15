@@ -154,7 +154,7 @@ await mkdir(outDir, { recursive: true });
 
 // Public entries and workers are bundled. Only the shared runtime loader and
 // per-runtime asset modules remain external so consumers can omit unused WASM.
-for (const sourceName of ['runtime_loader.ts', 'runtime_loader_core.ts',
+for (const sourceName of ['browser_threading.ts', 'runtime_loader.ts', 'runtime_loader_core.ts',
   ...(await readdir(path.join(sourceDir, 'runtime'))).filter(name => name.endsWith('.ts'))
     .map(name => `runtime/${name}`)]) {
   await transpileSource(path.join(sourceDir, sourceName));

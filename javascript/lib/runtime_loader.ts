@@ -1,3 +1,4 @@
+import { warnSingleThreadedBrowser } from './browser_threading.js';
 import {
   createRuntimeLoader,
   type RuntimeFlavor,
@@ -25,20 +26,7 @@ export function loadBrowserRuntime(
   flavor?: RuntimeFlavor,
 ) {
   return loader.loadRuntime(name, selectedFlavor => {
-    // All shipped browser runtimes use shared memory, even for one search worker.
-    const isolated = globalThis.crossOriginIsolated;
-    const sharedMemory = typeof globalThis.SharedArrayBuffer === 'function';
-    if (isolated !== true || !sharedMemory) {
-      const placement = typeof document === 'undefined' ? 'browser-worker' : 'browser-main';
-      throw new Error(
-        'Threaded OR-Tools WASM requires a cross-origin-isolated page and SharedArrayBuffer. '
-        + `crossOriginIsolated=${String(isolated)}, SharedArrayBuffer=${sharedMemory ? 'available' : 'unavailable'}, `
-        + `isSecureContext=${String(globalThis.isSecureContext)}; runtime=${name}, flavor=${selectedFlavor}, placement=${placement}. `
-        + 'Configure compatible Cross-Origin-Opener-Policy (COOP) and Cross-Origin-Embedder-Policy (COEP) response headers '
-        + '(for example, same-origin and require-corp) and serve over HTTPS or localhost. '
-        + 'These runtimes require shared memory even with one search worker.',
-      );
-    }
+    warnSingleThreadedBrowser();
     const asset = resolveAsset(selectedFlavor);
     const baseName = selectedFlavor === 'asyncify' ? `${name}_asyncify` : name;
     return {

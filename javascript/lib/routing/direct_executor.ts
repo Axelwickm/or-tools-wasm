@@ -1,3 +1,4 @@
+import { isSingleThreadedBrowser } from '../browser_threading.js';
 import { trackPendingEvent } from '../solver_executor.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import { allocateWasm } from '../wasm_memory.js';
@@ -41,6 +42,9 @@ export class DirectRoutingExecutor implements RoutingExecutor {
     operation: RoutingOperation,
     options: SolverExecutionOptions<RoutingSolverEvent>,
   ): RoutingJob {
+    if (isSingleThreadedBrowser() && (operation.interruptible)) {
+      throw new Error('Native interruption requires COOP/COEP headers. Omit the signal/interrupter and use a solver time limit for header-free execution.');
+    }
     if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextRequestId++;
     const state = { cancelled: false, nativeRunning: false };

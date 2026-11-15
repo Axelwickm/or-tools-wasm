@@ -18,11 +18,10 @@ The root `or-tools-wasm` entry exports `packageName`, `version` and
 from their solver subpaths. Standalone CP-SAT and Routing packages expose the
 same solver APIs from their package roots, as shown in [setup](setup.md).
 
-Most solver runtimes are loaded lazily. Browser solves use the package worker
-bridge by default so the main thread stays responsive. Local browser WASM needs
-cross-origin isolation headers; server-only execution does not. See
-[Browser requirements](setup.md#browser-requirements). For local setup, see
-the [example site guide](development/testing.md) and [native server setup](../server/README.md).
+Most solver runtimes load lazily. Browsers default to worker execution with isolation
+headers, or single-thread direct execution without them. See
+[Browser requirements](setup.md#browser-requirements), the
+[example site guide](development/testing.md) and [native server setup](../server/README.md).
 
 The one-shot APIs keep inputs on the model/problem and return an independent
 result for that particular solve. Solver settings and executor controls go in one options object:

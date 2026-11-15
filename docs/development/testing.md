@@ -109,3 +109,9 @@ docker compose -f server/docker-compose.yml run --build --rm ortools-native-test
 ```
 
 See [server setup](../../server/README.md) for deployment and protocol details.
+
+## Browser isolation fallback
+
+Run `npm --prefix javascript run test:browser:isolation` with existing WASM assets.
+This tests all seven runtimes with and without headers in Chromium, Firefox and
+WebKit, using JSPI and Asyncify where supported. It does not rebuild WASM.

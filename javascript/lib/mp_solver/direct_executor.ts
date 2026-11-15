@@ -1,3 +1,4 @@
+import { isSingleThreadedBrowser } from '../browser_threading.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
 import { loadMPSolverRuntime } from '../runtime/mp_solver.js';
 import {
@@ -40,6 +41,9 @@ export class DirectMpSolverExecutor implements MpSolverExecutor {
     operation: MpSolverOperation,
     options: SolverExecutionOptions<MpSolverLogEvent>,
   ): MpSolverJob {
+    if (isSingleThreadedBrowser() && ('interruptible' in operation && operation.interruptible)) {
+      throw new Error('Native interruption requires COOP/COEP headers. Omit the signal/interrupter and use a solver time limit for header-free execution.');
+    }
     if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextRequestId++;
     const state = { cancelled: false, nativeRunning: false, interruptible: (operation.type === 'solve' || operation.type === 'sessionRun') && operation.interruptible };

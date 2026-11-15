@@ -43,7 +43,7 @@ for (const { entry, directory, runtime, label, keywords } of solvers) {
   }
   const files = [
     `browser/${entry}.js`, `browser/${directory}/worker.js`,
-    `browser/runtime/${directory}.js`, 'browser/runtime_loader.js', 'browser/runtime_loader_core.js',
+    `browser/runtime/${directory}.js`, 'browser/runtime_loader.js', 'browser/runtime_loader_core.js', 'browser/browser_threading.js',
     `node/${entry}.js`, `node/${directory}/worker.js`, `node/${directory}/worker_runtime.js`,
     'node/runtime_loader.js',
   ];

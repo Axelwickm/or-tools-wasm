@@ -68,7 +68,6 @@ console.log(result);
 Use `executor: 'direct'` for in-process execution, or
 `executor: { type: 'server', url: 'http://localhost:17827' }` for an OR-Tools solver server. Server solves do not load local WASM.
 
-Browser local execution requires cross-origin isolation (COOP/COEP headers).
 Worker execution keeps solving off the application's main thread.
 
 In Node.js, `executor: 'direct'` can block the event loop during a solve, even
@@ -88,8 +87,8 @@ The existing `or-tools-wasm/routing` import remains supported. Choose either dis
 ## Compatibility
 
 `routing-wasm` runs in Chromium browsers and Firefox, and in Node.js, Deno,
-and Bun. Browser WebAssembly execution requires cross-origin isolation
-(COOP/COEP headers). JSPI and Asyncify runtimes are included and selected automatically.
+and Bun. Browsers can run single-threaded without headers; see [setup](../../setup.md#browser-requirements).
+JSPI and Asyncify runtimes are selected automatically.
 
 Supported bundlers include Vite, Webpack, and Rollup. The same API also supports
 execution on a native C++ OR-Tools solver server.

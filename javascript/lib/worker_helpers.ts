@@ -1,3 +1,4 @@
+import { isSingleThreadedBrowser } from './browser_threading.js';
 import {
   decodeSolverBridgeRequest,
   decodeSolverBridgeResponse,
@@ -544,7 +545,7 @@ implements SolverExecutor<Request, Response, Event> {
     const supportsSharedCancellation = typeof this.supportsSharedCancellation === 'function'
       ? this.supportsSharedCancellation(state.request)
       : this.supportsSharedCancellation;
-    if (!supportsSharedCancellation) {
+    if (!supportsSharedCancellation || (isSingleThreadedBrowser() && !this.cancellation)) {
       this.worker.terminate(state.error);
       return;
     }

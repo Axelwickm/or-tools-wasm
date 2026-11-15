@@ -89,7 +89,7 @@ npm install routing-wasm
 ```
 
 For browser headers and bundler configuration, see
-[Setup](docs/setup.md). Local browser WASM requires cross-origin isolation.
+[Setup](docs/setup.md).
 
 ## Solve your first problem
 

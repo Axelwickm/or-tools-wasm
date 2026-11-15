@@ -1,3 +1,5 @@
+import { isSingleThreadedBrowser, warnSingleThreadedBrowser } from './browser_threading.js';
+
 export type AutoExecutorConfiguration = {
   type: 'auto';
 };
@@ -56,7 +58,12 @@ export function resolveExecutorConfiguration(
   const configuration: ExecutorConfiguration =
     typeof selection === 'string' ? { type: selection } : selection;
   if (configuration.type !== 'auto') {
+    if (configuration.type === 'direct' || configuration.type === 'worker') warnSingleThreadedBrowser();
     return configuration;
+  }
+  if (isSingleThreadedBrowser()) {
+    warnSingleThreadedBrowser();
+    return { type: 'direct' };
   }
   return { type: isBrowserMainThread && isWorkerAvailable ? 'worker' : 'direct' };
 }

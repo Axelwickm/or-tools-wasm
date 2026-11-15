@@ -136,6 +136,7 @@
     "prepack": "npm run patch:wasm-runtime && node ../scripts/verify_shared_wasm.mjs && node ../scripts/prepare_package_readme.mjs",
     "start": "npm run dev",
     "preview": "vite --config vite.site.config.ts preview --host",
+    "test:browser:isolation": "npm run patch:wasm-runtime && npm run build:js && playwright test --config tests/playwright.isolation.config.ts",
     "test:unit": "node --experimental-strip-types --test tests/*.test.ts ../scripts/verify_shared_wasm.test.mjs",
     "test:fixture:vite:install": "node ../tests/fixtures/install-packed-package.mjs vite-basic",
     "test:fixture:vite:build": "npm run test:fixture:vite:install && npm --prefix ../tests/fixtures/vite-basic run build",

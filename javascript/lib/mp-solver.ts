@@ -46,3 +46,5 @@ export { terminateLoadedRuntimeThreads } from './runtime_loader.js';
 export { setCloudNoticeEnabled } from './cloud_notice.js';
 
 export type * from './generated/mp_solver_types.js';
+
+export { setSingleThreadWarningEnabled } from './browser_threading.js';

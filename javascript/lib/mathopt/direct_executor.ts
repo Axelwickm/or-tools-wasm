@@ -1,3 +1,4 @@
+import { isSingleThreadedBrowser } from '../browser_threading.js';
 import { fromBinary } from '@bufbuild/protobuf';
 import { MathOptModelTransformationResponseSchema } from '../generated/bridge/mathopt_model_transform_pb.js';
 import { withWasmRuntimeLock } from '../wasm_runtime_lock.js';
@@ -43,6 +44,9 @@ export class DirectMathOptExecutor implements MathOptExecutor {
     operation: MathOptOperation,
     options: SolverExecutionOptions<MathOptLogEvent>,
   ): MathOptJob {
+    if (isSingleThreadedBrowser() && ('useInterrupter' in operation && operation.useInterrupter)) {
+      throw new Error('Native interruption requires COOP/COEP headers. Omit the signal/interrupter and use a solver time limit for header-free execution.');
+    }
     if (this.activeJob) throw new SolverExecutorBusyError(this.solver);
     const requestId = this.nextRequestId++;
     const state = { cancelled: false, nativeRunning: false, interruptible: (operation.type === 'solve' || operation.type === 'incrementalSolve' || operation.type === 'computeInfeasibleSubsystem') && operation.useInterrupter, interrupted: false };
