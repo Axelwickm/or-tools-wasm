@@ -69,8 +69,9 @@ export async function runPdlpControlCases(api: typeof Api) {
             if (event.type !== 'iteration' || nativeProgress) return;
             nativeProgress = true;
             if (callbackFailure) throw failure;
-            // The caller remains responsive through the worker/server bridge.
-            setTimeout(() => controller.abort(), 0);
+            // Cancel on progress before queued iteration events can delay a timer
+            // and overflow the server's retained event history.
+            controller.abort();
           },
         });
       } catch (error) {
