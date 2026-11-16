@@ -309,7 +309,7 @@ export type MathOptApi = {
 
 type MathOptExecutorSelection = FixtureMode | ReturnType<typeof serverExecutorConfiguration>;
 
-function withMathOptExecutor(
+export function withMathOptExecutor(
   api: MathOptApi,
   executor: MathOptExecutorSelection,
 ): MathOptApi {
@@ -650,7 +650,7 @@ async function runGlpkLp(api: MathOptApi, mode: ExecutorFixtureMode): Promise<Ma
   });
 }
 
-const mathOptBackendCases = [
+export const mathOptBackendCases = [
   { id: 'mathopt.backend.glop_linear_program', name: 'MathOpt.testGlopLinearProgram', run: runGlopLp, threads: [1, 4] },
   { id: 'mathopt.backend.cp_sat_integer_program', name: 'MathOpt.testCpSatIntegerProgram', run: runCpSatMip, threads: [1, 4] },
   { id: 'mathopt.backend.gscip_integer_program', name: 'MathOpt.testGScipIntegerProgram', run: runGScipMip, threads: [1, 4] },
@@ -658,7 +658,7 @@ const mathOptBackendCases = [
   { id: 'mathopt.backend.glpk_linear_program', name: 'MathOpt.testGlpkLinearProgram', run: runGlpkLp, threads: [1] },
 ];
 
-const activeSolveResultCases = mathoptSolveResultContractCases.filter((testCase) => activeSolveResultContractNames.has(testCase.name));
+export const activeSolveResultCases = mathoptSolveResultContractCases.filter((testCase) => activeSolveResultContractNames.has(testCase.name));
 
 export const mathOptCaseDefinitions = [
   ...mathOptBackendCases,

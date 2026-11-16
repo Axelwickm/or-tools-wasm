@@ -1,3 +1,4 @@
+import { headerFreeBrowser } from '../../../harness/shared_case.ts';
 import type { SharedCase, ExecutorFixtureMode } from '../../../harness/shared_case.ts';
 import { serverExecutorConfiguration } from '../../../harness/shared_case.ts';
 import type { SolveResultApis } from '../solve_results.ts';
@@ -102,7 +103,8 @@ export const routingSecondaryCases: SharedCase<SolveResultApis, Record<string, n
     await rejects(() => cancellable.solve({ ...options, ...search, signal: controller.signal,
       onEvent(event) { if (event.type === 'searchEntered') { cancelled = true; controller.abort(); } },
     }));
-    assert(cancelled, 'Cancellation starts from a real native search-entry event');
+    assert(cancelled === (!headerFreeBrowser || mode === 'server'),
+      'Native search-entry cancellation runs only when shared interruption is available');
     assert((await cancellable.solve({ ...options, ...search })).assignment, 'Cancellation leaves the executor reusable');
     const multi = new api.RoutingModel(new api.RoutingIndexManager(6, 2, 0));
     const heterogeneous = new api.RoutingModel(new api.RoutingIndexManager(6, 2, 0));

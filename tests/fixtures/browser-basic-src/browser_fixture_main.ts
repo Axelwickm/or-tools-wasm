@@ -320,6 +320,10 @@ async function terminateRuntimeThreads(apis: BrowserFixtureApis): Promise<void> 
 }
 
 export async function runBrowserFixture(apis: BrowserFixtureApis) {
+  if (new URLSearchParams(location.search).has('noHeaders')) {
+    const { runHeaderFreeFixture } = await import('./header_free_fixture.ts');
+    return runHeaderFreeFixture(apis);
+  }
   const {
     PackageApi,
     CpSatApi,

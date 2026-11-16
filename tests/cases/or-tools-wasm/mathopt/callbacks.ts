@@ -1,7 +1,7 @@
 import type * as Api from 'or-tools-wasm/mathopt';
 import { runMathOptCallbackResultCases } from './callback_results.ts';
 import { runMathOptMessageCases } from './messages.ts';
-import { executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
+import { headerFreeBrowser, executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
 function assert(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 function callbackModel(api: typeof Api) {
   const model = api.MathOpt.Model('callbacks');
@@ -20,7 +20,7 @@ export async function runMathOptCallbackCases(api: typeof Api) {
   for (const mode of executorFixtureModes) {
     const executor = mode === 'server' ? serverExecutorConfiguration() : mode;
     for (const backend of [api.MathOptSolverType.CP_SAT, api.MathOptSolverType.GSCIP]) {
-      for (const incremental of [false, true]) for (const threads of backend === api.MathOptSolverType.CP_SAT ? [1, 4] : [1]) {
+      for (const incremental of [false, true]) for (const threads of backend === api.MathOptSolverType.CP_SAT && !(headerFreeBrowser && mode !== 'server') ? [1, 4] : [1]) {
         const { model, variables } = callbackModel(api);
         const instance = incremental ? new api.MathOpt.IncrementalSolver(model, backend, { executor }) : null;
         const options: Api.MathOptSolveOptions = { executor, solverType: backend, threads, timeLimitSeconds: 10,

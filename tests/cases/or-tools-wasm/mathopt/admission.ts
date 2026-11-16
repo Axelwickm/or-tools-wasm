@@ -1,5 +1,5 @@
 import type * as Api from 'or-tools-wasm/mathopt';
-import { executorFixtureModes, serverExecutorConfiguration, solverJobStates } from '../../../harness/shared_case.ts';
+import { headerFreeBrowser, executorFixtureModes, serverExecutorConfiguration, solverJobStates } from '../../../harness/shared_case.ts';
 function assert(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 
 export async function runMathOptAdmissionCases(api: typeof Api) {
@@ -44,6 +44,13 @@ export async function runMathOptAdmissionCases(api: typeof Api) {
           onEvent: event => { if (event.type === 'status' && event.status.state === solverJobStates.RUNNING) allocated.push(event.status.allocatedThreads); } };
         const instance = incremental ? new api.MathOpt.IncrementalSolver(model, scenario.options.solverType!, { executor }) : null;
         try {
+          if (headerFreeBrowser && mode !== 'server' && scenario.workers > 1) {
+            let rejected = false;
+            try { if (instance) await instance.solve(options); else await api.MathOpt.solve(model, options); }
+            catch (error) { rejected = error instanceof Error && /capacity/.test(error.message); }
+            assert(rejected, `Header-free runtime must reject parallel admission (${scenario.id})`);
+            continue;
+          }
           const result = instance ? await instance.solve(options) : await api.MathOpt.solve(model, options);
           check(result);
           if (mode === 'server') assert(allocated.includes(scenario.workers), `Server admission disagrees with native workers (${scenario.id})`);
@@ -86,7 +93,8 @@ export async function runMathOptAdmissionCases(api: typeof Api) {
         let rejected = false;
         const options: Api.MathOptSolveOptions = { executor, solverType: api.MathOptSolverType.CP_SAT, threads: 1, cpSat: { numSearchWorkers: 2 } };
         try { if (instance) await instance.solve(options); else await api.MathOpt.solve(model, options); }
-        catch (error) { rejected = error instanceof Error && /Do not specify both num_search_workers and num_workers/.test(error.message); }
+        catch (error) { rejected = error instanceof Error && (/Do not specify both num_search_workers and num_workers/.test(error.message)
+          || headerFreeBrowser && mode !== 'server' && /capacity/.test(error.message)); }
         assert(rejected, 'Conflicting common modern and legacy CP-SAT workers retain native validation');
       } finally { await instance?.close(); }
     }

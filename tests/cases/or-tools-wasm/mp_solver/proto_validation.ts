@@ -1,4 +1,4 @@
-import { executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
+import { headerFreeBrowser, executorFixtureModes, serverExecutorConfiguration } from '../../../harness/shared_case.ts';
 
 type Api = {
   MPSolver: {
@@ -85,7 +85,7 @@ export async function runMpSolverProtoValidationCases(api: Api) {
     }
     const inferred = await api.MPSolver.solveModelRequest({
       ...request, solverType: 'SAT_INTEGER_PROGRAMMING',
-      solverSpecificParameters: 'num_workers: 2',
+      solverSpecificParameters: `num_workers: ${headerFreeBrowser && mode !== 'server' ? 1 : 2}`,
     }, { executor });
     if (inferred.response.status !== 'MPSOLVER_OPTIMAL' || inferred.response.objectiveValue !== 3) {
       throw new Error(`Parameter-only native worker request was not admitted (${mode})`);

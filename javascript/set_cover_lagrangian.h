@@ -16,7 +16,8 @@ inline auto ComputeSetCoverLagrangianBound(operations_research::SetCoverModel& m
       throw std::invalid_argument("Set Cover Lagrangian bounds require a coverable model.");
   operations_research::SetCoverInvariant invariant(&model);
   operations_research::SetCoverLagrangian lagrangian(&invariant);
-  lagrangian.UseNumThreads(1);
+  // Keep the default serial execution: UseNumThreads(1) creates a native
+  // worker thread, which is unavailable in header-free browser WASM.
   return lagrangian.ComputeLowerBound(model.subset_costs(), upper_bound);
 }
 }  // namespace ortools_wasm

@@ -1,3 +1,4 @@
+import { headerFreeBrowser } from '../../harness/shared_case.ts';
 import { observerCancellationCases } from './observer_cancellation.ts';
 import { mathOptExpressionBoundsCases } from './mathopt/expression_bounds.ts';
 import { routingSiblingCases } from './routing/sibling.ts';
@@ -474,8 +475,8 @@ export const solveResultCases: SharedCase<SolveResultApis, Record<string, never>
       model.objective().setMaximization();
       const options = execution(mode);
       const [packed, linear] = await Promise.all([
-        bag.solve({ ...options, numWorkers: 4 }),
-        mp.MPSolver.solve(model, { ...options, solverType: mp.MPSolver.SAT_INTEGER_PROGRAMMING, threads: 4 }),
+        bag.solve({ ...options, numWorkers: headerFreeBrowser && mode !== 'server' ? 1 : 4 }),
+        mp.MPSolver.solve(model, { ...options, solverType: mp.MPSolver.SAT_INTEGER_PROGRAMMING, threads: headerFreeBrowser && mode !== 'server' ? 1 : 4 }),
       ]);
       equal(packed.profit, 9n);
       equal(packed.contains(2), true);

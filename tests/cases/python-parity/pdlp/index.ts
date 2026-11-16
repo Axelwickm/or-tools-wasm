@@ -27,7 +27,7 @@ type PdlpOperationOptions = {
   signal?: AbortSignal;
 };
 
-function withPdlpExecutor(api: PdlpApi, executor: PdlpExecutorSelection): PdlpApi {
+export function withPdlpExecutor(api: PdlpApi, executor: PdlpExecutorSelection): PdlpApi {
   return {
     Pdlp: {
       ...api.Pdlp,

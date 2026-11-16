@@ -1,3 +1,7 @@
+/** Browser tests without shared WASM memory must use a single solver thread. */
+const { crossOriginIsolated } = globalThis as typeof globalThis & { crossOriginIsolated?: boolean };
+export const headerFreeBrowser = crossOriginIsolated === false;
+
 export const executorTypes = ['direct', 'worker', 'server', 'cloud'] as const;
 export type ExecutorType = typeof executorTypes[number];
 

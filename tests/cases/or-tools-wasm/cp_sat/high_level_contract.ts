@@ -426,6 +426,7 @@ async function runCancellationCase(api: HighLevelCpSatPackage, mode: ExecutorFix
 
 export async function runCpSatHighLevelContractCases(
   api: HighLevelCpSatPackage,
+  options: { nativeInterruption?: boolean } = {},
 ): Promise<CpSatHighLevelContractResult[]> {
   const results: CpSatHighLevelContractResult[] = [];
   for (const mode of executorFixtureModes) {
@@ -439,7 +440,7 @@ export async function runCpSatHighLevelContractCases(
     results.push(passedCase(sparseDomainParametersCase, context, await runSparseDomainParametersCase(api, mode)));
     results.push(passedCase(modelReuseCase, context, await runModelReuseCase(api, mode)));
     results.push(passedCase(linearDomainCase, context, await runLinearDomainCase(api, mode)));
-    if (mode !== 'direct') results.push(passedCase(cancellationCase, context, await runCancellationCase(api, mode)));
+    if (mode !== 'direct' && options.nativeInterruption !== false) results.push(passedCase(cancellationCase, context, await runCancellationCase(api, mode)));
   }
   return results;
 }

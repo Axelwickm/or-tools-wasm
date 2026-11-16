@@ -48,7 +48,8 @@ const webServers = [
 
 export default defineConfig({
   testDir: './specs',
-  // Each profile runs every solver group and executor mode in one test.
+  reporter: [['list'], ['json', { outputFile: path.resolve(packageDir, 'test-results/report.json') }]],
+  // Isolated profiles run all groups together; header-free profiles report each group.
   timeout: 600_000,
   workers: 2,
   expect: {
@@ -161,5 +162,8 @@ export default defineConfig({
         baseURL: 'http://127.0.0.1:4178',
       },
     },
-  ],
+  ].flatMap(project => [
+    { ...project, testIgnore: '**/header-free-fixture.spec.ts' },
+    { ...project, name: `${project.name}-no-headers`, testMatch: '**/header-free-fixture.spec.ts' },
+  ]),
 });

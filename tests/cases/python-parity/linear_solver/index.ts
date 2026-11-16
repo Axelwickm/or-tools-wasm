@@ -220,7 +220,7 @@ export type MPSolverRunOptions = {
 
 let mpSolverMode: ExecutorFixtureMode = 'direct';
 
-function setMPSolverMode(_api: MPSolverApi, mode: ExecutorFixtureMode) {
+export function setMPSolverMode(_api: MPSolverApi, mode: ExecutorFixtureMode) {
   mpSolverMode = mode;
 }
 
@@ -1164,7 +1164,7 @@ async function runLpTestSolveFromProtoCase(api: MPSolverApi, backend: LpBackend)
   return { name, ok: true, status: api.MPSolver.OPTIMAL, objective: Number(result.response.objectiveValue), values: {} };
 }
 
-async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string): Promise<MpSolverCaseResult> {
+async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string, numWorkers = 4): Promise<MpSolverCaseResult> {
   const name = displayName ?? 'MPSolver: solveWithProto loads solution';
   const solver = createSolver(api, 'SAT', name);
   {
@@ -1183,7 +1183,7 @@ async function runStatefulProtoSolveCase(api: MPSolverApi, displayName?: string)
 
     const result = await solver.solveWithProto({
       ...mpSolverExecutionOptions(),
-      solverSpecificParameters: 'num_workers: 4',
+      solverSpecificParameters: `num_workers: ${numWorkers}`,
     });
     assert(result.loaded, `${name}: solution was not loaded back into the solver`);
     assert(result.response.status === 'MPSOLVER_OPTIMAL', `${name}: expected MPSOLVER_OPTIMAL`);
@@ -1199,7 +1199,7 @@ type MpSolverCase = {
   run(mode: ExecutorFixtureMode): Promise<MpSolverCaseResult> | MpSolverCaseResult;
 };
 
-export function mpSolverCases(api: MPSolverApi) {
+export function mpSolverCases(api: MPSolverApi, options: { singleThread?: boolean } = {}) {
   const cases: MpSolverCase[] = [
     { name: 'MPSolver: native degenerate basis and statistics', async run() {
       const solver = createSolver(api, 'GLOP', 'degenerate_native_basis');
@@ -1218,8 +1218,8 @@ export function mpSolverCases(api: MPSolverApi) {
       assert(solver.iterations() >= 0, 'native LP iteration count available');
       return { name: 'MPSolver: native degenerate basis and statistics', ok: true, status, objective: solver.objective().value(), values: { x: x.solutionValue(), y: y.solutionValue() } };
     } },
-    { name: 'MPSolver: solveWithProto loads solution', run: () => runStatefulProtoSolveCase(api) },
-    ...[1, 4].map((numWorkers) => ({
+    { name: 'MPSolver: solveWithProto loads solution', run: () => runStatefulProtoSolveCase(api, undefined, options.singleThread ? 1 : 4) },
+    ...(options.singleThread ? [1] : [1, 4]).map((numWorkers) => ({
       name: `MPSolver: MPModelRequest solve (${numWorkers} worker${numWorkers === 1 ? '' : 's'})`,
       run: (mode: ExecutorFixtureMode) => runProtoSolveCase(api, mode, numWorkers),
     })),
@@ -1266,7 +1266,7 @@ export function mpSolverCases(api: MPSolverApi) {
       (solver, infinity) => integer ? solver.addIntVariable(0, infinity, 'x') : solver.addNumVariable(0, infinity, 'x'),
       (solver, infinity) => integer ? solver.addIntVariable(0, infinity, 'y') : solver.addNumVariable(0, infinity, 'y'),
       integer ? { objective: 23, x: 3, y: 2 } : { objective: 25, x: 0, y: 2.5 },
-      threads,
+      options.singleThread ? 1 : threads,
     ) });
   }
   return cases.map((testCase) => ({ ...testCase, id: mpSolverCaseId(testCase.name) }));

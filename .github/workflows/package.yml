@@ -251,7 +251,15 @@ jobs:
 
       - name: Run Vite fixture
         working-directory: javascript
-        run: NODE_PATH=./node_modules FIXTURE_GROUP=vite npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=vite npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }} --project=${{ matrix.project }}-no-headers
+
+      - name: Upload browser test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-results-${{ matrix.project }}
+          path: javascript/test-results
+          if-no-files-found: ignore
 
   webpack-fixture:
     name: Webpack 5 / ${{ matrix.mode }} / ${{ matrix.browser }}
@@ -311,7 +319,15 @@ jobs:
 
       - name: Run Webpack fixture
         working-directory: javascript
-        run: NODE_PATH=./node_modules FIXTURE_GROUP=webpack npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=webpack npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }} --project=${{ matrix.project }}-no-headers
+
+      - name: Upload browser test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-results-${{ matrix.project }}
+          path: javascript/test-results
+          if-no-files-found: ignore
 
   rollup-fixture:
     name: Rollup 4 / static / ${{ matrix.browser }}
@@ -359,7 +375,15 @@ jobs:
 
       - name: Run Rollup fixture
         working-directory: javascript
-        run: NODE_PATH=./node_modules FIXTURE_GROUP=rollup npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }}
+        run: NODE_PATH=./node_modules FIXTURE_GROUP=rollup npx playwright test --config tests/playwright.config.ts --project=${{ matrix.project }} --project=${{ matrix.project }}-no-headers
+
+      - name: Upload browser test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-results-${{ matrix.project }}
+          path: javascript/test-results
+          if-no-files-found: ignore
 
   deno-fixture:
     name: Deno 2.9.7 / solve

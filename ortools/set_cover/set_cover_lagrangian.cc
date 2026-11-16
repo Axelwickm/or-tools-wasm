@@ -108,6 +108,7 @@ BaseInt BlockSize(BaseInt size, int num_threads) {
 // Computes the reduced costs for all subsets in parallel using ThreadPool.
 SubsetCostVector SetCoverLagrangian::ParallelComputeReducedCosts(
     const SubsetCostVector& costs, const ElementCostVector& multipliers) const {
+  if (num_threads_ == 1) return ComputeReducedCosts(costs, multipliers);
   const SubsetIndex num_subsets(model()->num_subsets());
   const SparseColumnView& columns = model()->columns();
   SubsetCostVector reduced_costs(num_subsets);
@@ -180,6 +181,7 @@ ElementCostVector SetCoverLagrangian::ComputeSubgradient(
 
 ElementCostVector SetCoverLagrangian::ParallelComputeSubgradient(
     const SubsetCostVector& reduced_costs) const {
+  if (num_threads_ == 1) return ComputeSubgradient(reduced_costs);
   const SubsetIndex num_subsets(model()->num_subsets());
   const SparseColumnView& columns = model()->columns();
   ElementCostVector subgradient(model()->num_elements(), 1.0);
@@ -258,6 +260,7 @@ Cost SetCoverLagrangian::ComputeLagrangianValue(
 Cost SetCoverLagrangian::ParallelComputeLagrangianValue(
     const SubsetCostVector& reduced_costs,
     const ElementCostVector& multipliers) const {
+  if (num_threads_ == 1) return ComputeLagrangianValue(reduced_costs, multipliers);
   Cost lagrangian_value = 0.0;
   // This is \sum{i \in M} u_i.
   for (const Cost u : multipliers) {
