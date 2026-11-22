@@ -230,6 +230,7 @@ export type RoutingWorkflow = {
   callAtSolutionMonitors?: boolean;
 };
 export type RoutingSolveRequest = RoutingWorkflow & {
+  validateSearchParameters?: boolean;
   assignmentTransfer?: { nextValues: number[]; vehicleValues: number[] };
   secondaryModel?: RoutingSolveRequest;
   routeCostQuery?: number[];
@@ -302,6 +303,7 @@ export type RoutingOperation = {
 };
 
 export type RoutingResult = {
+  searchParameterError?: string;
   assignmentSeed?: RoutingAssignmentSnapshot;
   routeCost?: bigint | null;
   modelInspection?: RoutingModelInspection;
@@ -737,6 +739,7 @@ function encodeOperation(operation: RoutingOperation): Uint8Array {
 
 function bridgeRequest(request: RoutingSolveRequest, interruptible = false): import('../generated/bridge/routing_pb.js').RoutingBridgeRequest {
   return create(RoutingBridgeRequestSchema, {
+    validateSearchParameters: request.validateSearchParameters,
     assignmentTransfer: request.assignmentTransfer,
     secondaryModel: request.secondaryModel && bridgeRequest(request.secondaryModel),
     routeLocks: request.routeLocks && create(RoutingRouteLocksSchema, { closeRoutes: request.routeLocks.closeRoutes,
@@ -794,11 +797,12 @@ function decodeOperation(payload: Uint8Array): RoutingOperation {
 }
 
 function decodeBridgeRequest(request: import('../generated/bridge/routing_pb.js').RoutingBridgeRequest): RoutingOperation {
-  if (!request.transitMatrix) throw new Error('Routing request has no transit matrix.');
+  if (!request.transitMatrix && !request.validateSearchParameters) throw new Error('Routing request has no transit matrix.');
   return {
     type: 'solve',
     interruptible: request.interruptible,
     request: {
+      ...(request.validateSearchParameters ? { validateSearchParameters: true } : {}),
       ...(request.assignmentTransfer ? { assignmentTransfer: {
         nextValues: [...request.assignmentTransfer.nextValues], vehicleValues: [...request.assignmentTransfer.vehicleValues],
       } } : {}),
@@ -823,8 +827,8 @@ function decodeBridgeRequest(request: import('../generated/bridge/routing_pb.js'
       searchParameterFields: request.searchParameterFields,
       modelParametersProto: request.modelParameterFields.length > 0 || request.modelParametersProto.length > 0 ? request.modelParametersProto : undefined,
       modelParameterFields: request.modelParameterFields,
-      transitMatrix: new BigInt64Array(request.transitMatrix.values),
-      transitMatrixDimension: request.transitMatrix.dimension,
+      transitMatrix: new BigInt64Array(request.transitMatrix?.values ?? []),
+      transitMatrixDimension: request.transitMatrix?.dimension ?? 0,
       operations: request.operations.map(decodeModelOperation),
       ...(request.resourceGroups.length ? { resourceGroups: request.resourceGroups.map(group => ({
         resources: group.resources.map(resource => ({ dimensionName: resource.dimensionName, startDomain: resource.startDomain, endDomain: resource.endDomain })),
@@ -878,6 +882,7 @@ function bridgeSolution(solution: RoutingSolveResult) {
 function encodeResult(result: RoutingResult): Uint8Array {
   const solution = result.solution;
   return toBinary(RoutingBridgeResponseSchema, create(RoutingBridgeResponseSchema, {
+    searchParameterError: result.searchParameterError,
     assignmentSeed: bridgeAssignment(result.assignmentSeed),
     routeCost: result.routeCost === undefined ? undefined : create(RoutingRouteCostSchema, { cost: result.routeCost ?? undefined }),
     locksApplied: result.locksApplied,
@@ -931,6 +936,7 @@ function decodeSolution(snapshot: BridgeRoutingSolution | BridgeRoutingResponse,
 function decodeResult(payload: Uint8Array): RoutingResult {
   const response = fromBinary(RoutingBridgeResponseSchema, payload);
   return {
+    ...(response.searchParameterError !== undefined ? { searchParameterError: response.searchParameterError } : {}),
     ...(response.assignmentSeed ? { assignmentSeed: decodeAssignment(response.assignmentSeed) } : {}),
     type: 'solve',
     ...(response.routeCost ? { routeCost: response.routeCost.cost ?? null } : {}),

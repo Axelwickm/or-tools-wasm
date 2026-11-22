@@ -7,6 +7,7 @@ export {
   BoundCost,
   defaultRoutingModelParameters,
   defaultRoutingSearchParameters,
+  findErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   PickupAndDeliveryPolicy,
   VisitTypePolicy,

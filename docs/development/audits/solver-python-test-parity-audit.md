@@ -316,6 +316,87 @@ real native ranges for all four factories, rejects `value()` on unbound results,
 and verifies that binding operands in a later solve leaves the old assignment
 snapshot unchanged. This supplements the constructed-assignment unit test.
 
+## Routing API gap roster (2026-11-17)
+
+This supplements the Python **test** roster below. Passing the listed Python tests
+is not complete Python API parity. Scope: the bundled `routing.h`,
+`routing_index_manager.h`, Python `routing.swig` and `constraint_solver.swig`,
+and `javascript/lib/routing/api.ts`. These are source-level findings, not claims
+that every Python callback typemap or native method has been exercised.
+
+### Missing or partial capabilities
+
+| Surface | Gap / current alternative |
+| --- | --- |
+| Cumul-dependent transit | **Upstream implementation gap.** Native registration stores callbacks and dimension construction records evaluator classes, but transit construction does not consume them. No TypeScript binding is exposed. Keep the reproduction; implementing missing native behavior is outside the wrapper boundary. Python callable conversion remains unverified. Existing state-dependent transit is a distinct native implementation. |
+| Custom search | No public `AddLocalSearchOperator`, `AddLocalSearchFilter`, `MakeGreedyDescentLSOperator`, arbitrary `AddSearchMonitor`/`GetSearchMonitors`, or `AddRestoreDimensionValuesResetCallback`. Solution and search-entry callbacks cover only selected events. |
+| CP solver access | No general `routing.solver()` handle, custom decision builders, demons, arbitrary CP constraints or full mutable `IntVar`/`IntervalVar`/`Assignment` API. Typed expression/constraint/domain helpers cover a subset. No objective `CostVar` handle or arbitrary `AddToAssignment`/`AddIntervalToAssignment`. |
+| Advanced finalizers | `MakeGuidedSlackFinalizer` and `MakeSelfDependentDimensionFinalizer` builders are missing. Ordinary min/max/target and weighted variable finalizers are implemented. |
+| Tabu selection | `setTabuVars()` implements a fixed variable selection. Arbitrary `SetTabuVarsCallback` behavior is not exposed. |
+| Persistent native lifecycle | No explicit `CloseModel`, `CloseModelWithParameters`, mutable native preassignment, or persistent native search loop. Solve/inspection reconstruct native models; locks, seeds and assignment restoration are supported through those workflows. |
+| Live search controls | No arbitrary native limit objects, `UpdateTimeLimit`/`UpdateLimits`, deadline/remaining-time queries, direct interrupt pointers, or `CheckLimit`. Execution cancellation and solve-time limits are alternatives, not identical APIs. |
+| Assignment conversion / I/O | Native mutable `RoutesToAssignment`, `AssignmentToRoutes`, `GetRoutesFromAssignment`, `WriteAssignment`, and arbitrary assignment-container mutation are not exposed as such. Route seeds, result snapshots and supported codecs/workflows should not be mistaken for full native Assignment parity. |
+| Index manager convenience APIs | No bulk `NodesToIndices` / `IndicesToNodes`, `GetIndexToNodeMap`, or unique-depot count getter. Scalar conversions and start/end indices are supported. |
+| Detailed model inspection | Missing direct callback getters, `GetDisjunctionNodeIndices`, raw pickup/delivery pair/disjunction collections (including implicit pairs), `GetVehicleTypeContainer`, path metadata, bin-capacity metadata, neighbor-by-cost-class objects, and native debug-string/debug-assignment output. Existing typed inspection covers selected relationships and classes. |
+| Optimizer internals | No mutable global/local LP/MP optimizer handles or direct optimizer indices. Optimizer presence, dimension lists and cumul packing are available. |
+| Dimension internals | No direct `base_dimension()` accessor, native cumul/transit/slack vector objects, raw transit evaluator objects, `AllTransitEvaluatorSignsAreUnknown`, direct precedence graph/status objects, per-vehicle-class span/slack coefficient getters, or global/local optimizer offsets. Break initialization is managed internally. Cumul bounds and allowed/forbidden intervals have typed alternatives. |
+| Statistics | Assignment search statistics include first-solution decisions/rejects; general `GetSubSolverStatistics` is not exposed. |
+| Explicit ILS entry point | No separately named `SolveWithIteratedLocalSearch`; generated ILS search parameters alone do not establish equivalent behavior or assertion parity. |
+| Python CP surface beyond Routing | Full `pywrapcp.Solver`, solver-owned containers, operator overloads, and subclassable search objects are not covered by the Routing test roster. Track requested subsets individually; do not imply full CP-solver parity. |
+
+### Cumul-dependent reproduction
+
+[Native reproduction](../../../tests/reproductions/routing_cumul_dependent.cc)
+and [runner](../../../tests/reproductions/run_routing_cumul_dependent.py) use the
+existing Emscripten build's native library, without the JavaScript Routing bridge.
+From the repository root run:
+
+```sh
+python tests/reproductions/run_routing_cumul_dependent.py
+```
+
+Observed with the bundled native implementation:
+`expected_end_cumul=33 actual_end_cumul=3 callback_calls=0` (exit 1).
+Three arcs each have fixed transit 1 and cumul-dependent transit 10; the native
+implementation counts only fixed transit. This is a retained failing capability
+probe, not a passing regression or Python assertion-port claim.
+
+The attempted local native implementation and its TypeScript/WASM/server bindings
+were removed on 2026-11-18 to preserve the repository's wrapper-only boundary.
+No local cumul solver patch, fixed-transit optimizer/filter bypass, or cumul
+binding remains. Standalone parameter validation is retained independently.
+
+### Existing equivalents and native-only extensions
+
+- `findErrorInRoutingSearchParameters()` exposes standalone native validation
+  with direct/worker/server executors. Sparse overrides are applied to native
+  defaults and diagnostics are returned without constructing a model.
+  `routing.parameters.standalone_validation_contract` additionally checks valid
+  defaults, explicit false/zero overrides, invalid worker settings, captured
+  inputs, recovery and pre-aborted requests across the same five executor modes.
+  The JS build, site typecheck and all seven Routing unit-test files pass.
+
+- `transferAssignmentFrom()` covers the supported cross-model assignment transfer
+  workflow; missing `SetAssignmentFromOtherModelAssignment` spelling is not itself
+  a feature gap.
+- `inspectActivityGroups()` exposes same-activity membership; absence of separate
+  native getter names is not a missing group-inspection capability.
+- Scalar variable handles replace native `Nexts`, `VehicleVars`, and `ResourceVars`
+  arrays. Assignment statistics and automatic-first-solution-strategy results
+  replace several native getter names.
+- State-dependent transit and resource-group construction are implemented here;
+  Python's `routing.swig` explicitly ignores their native construction methods.
+  These are native extensions, not missing Python parity.
+- State-dependent dimensions with breaks are explicitly rejected because native
+  break propagation omits dependent transit. This remains a capability limitation.
+- Native pointer ownership, mutable optimizer access and search-object lifetimes
+  cannot be inferred from successful per-solve serialization tests.
+
+This roster records all gaps identified in this review, including lifecycle and
+native-only differences. It is not an assertion-by-assertion audit of the entire
+CP solver API; new findings must be added rather than inferred complete from the
+Python test checkmarks.
+
 ## ortools/constraint_solver/python/pywraprouting_test.py
 - TestPyWrapRoutingIndexManager
   - ✅ 🔎 TestPyWrapRoutingIndexManager.testCtor
@@ -345,8 +426,8 @@ snapshot unchanged. This supplements the constructed-assignment unit test.
   - ✅ 🔎 TestPyWrapRoutingModel.testDisjunctionPenaltyTSP
   - ✅ 🔎 TestPyWrapRoutingModel.testRoutingModelParameters
   - ✅ 🔎 TestPyWrapRoutingModel.testRoutingLocalSearchFiltering
-  - ⚪ 🔎 TestPyWrapRoutingModel.testRoutingSearchParameters - intentionally excluded: its explicit model-closing and first-solution decision/reject statistics contract is outside the per-solve TypeScript API; pass search parameters to solve instead
-  - ⚪ 🔎 TestPyWrapRoutingModel.testFindErrorInRoutingSearchParameters - standalone validation is not exposed; the bridge validates local-search operators and native parameter combinations during execution, including WASM
+  - ⚪ 🔎 TestPyWrapRoutingModel.testRoutingSearchParameters - lifecycle difference: explicit persistent model closure is not exposed; pass search parameters to solve instead. First-solution decision/reject counters ARE exposed in assignment search statistics; the exact upstream closure/assertion sequence is not ported
+  - ✅ 🔎 TestPyWrapRoutingModel.testFindErrorInRoutingSearchParameters - shared case `routing.parameters.python_standalone_validation` ports the default-parameters setup, BOOL_UNSPECIFIED cross override, and diagnostic substring assertion. Passes Node JSPI direct/worker, forced Asyncify direct/worker, and native-server execution (2026-11-18).
   - ✅ 🔎 TestPyWrapRoutingModel.testCallback
   - ✅ 🔎 TestPyWrapRoutingModel.testReadAssignment
   - ✅ 🔎 TestPyWrapRoutingModel.testAutomaticFirstSolutionStrategy_simple

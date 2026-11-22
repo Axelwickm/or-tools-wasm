@@ -42,3 +42,8 @@ function encodeRoutingParameters(normalized: Record<string, unknown>, parameters
   if (error) throw new TypeError(`Routing search parameters: ${error}`);
   return { proto: new Uint8Array(parametersType.encode(parametersType.create(value)).finish()), fields };
 }
+
+/** Encode validation input without rejecting solver parameter values in JavaScript. */
+export function encodeRoutingSearchParametersForValidation(parameters: RoutingSearchParameters): EncodedRoutingSearchParameters {
+  return encodeRoutingParameters(normalizeProtobufInput(parameters, parametersType), parametersType);
+}

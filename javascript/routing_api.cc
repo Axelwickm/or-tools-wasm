@@ -229,6 +229,17 @@ std::optional<int64_t> CallRoutingEvaluator(int callback_id, int evaluator, cons
 
 extern "C" {
 
+EMSCRIPTEN_KEEPALIVE const char* routing_find_error_in_search_parameters(
+    const char* bytes, int byte_count, const char* fields) {
+  RoutingSearchParameters parameters;
+  g_routing_search_parameter_error.clear();
+  if (!ReadRoutingSearchParameters(bytes, byte_count, fields, &parameters) &&
+      g_routing_search_parameter_error.empty()) {
+    g_routing_search_parameter_error = "Invalid Routing search parameter buffer.";
+  }
+  return g_routing_search_parameter_error.c_str();
+}
+
 EMSCRIPTEN_KEEPALIVE const char* routing_inspect_model(int model_handle, int kind,
     int64_t index, int64_t other_index, int vehicle_or_class, int64_t default_value, int callback_id, int predicate_evaluator, int64_t third_index) {
   auto* handle = GetModel(model_handle);

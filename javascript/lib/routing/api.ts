@@ -1,3 +1,4 @@
+import { encodeRoutingSearchParametersForValidation } from './search_parameters.js';
 import { synchronousCallbackResult } from '../callback_validation.js';
 import { CloudExecutor } from '../cloud_executor.js';
 import type { ExecutorSelection, ResolvedExecutorConfiguration } from '../executor_configuration.js';
@@ -163,6 +164,22 @@ function createResolvedExecutor(configuration: ResolvedExecutorConfiguration): R
     case 'server': return new SolverServerExecutor(routingProtocol, configuration);
     case 'cloud': return new CloudExecutor('routing', { test: configuration.test });
   }
+}
+
+/** Return an empty string for valid parameters, or a native diagnostic. No model is constructed. */
+export async function findErrorInRoutingSearchParameters(
+  parameters: RoutingSearchParameters = {}, options: RoutingDomainOptions = {},
+): Promise<string> {
+  const encoded = encodeRoutingSearchParametersForValidation(parameters);
+  const executor = createRoutingExecutor(options.executor);
+  const result = await executeSolverJob(executor, { type: 'solve', interruptible: false, request: {
+    validateSearchParameters: true, searchParametersProto: encoded.proto, searchParameterFields: encoded.fields,
+    numLocations: 0, numVehicles: 0, starts: [], ends: [], transitMatrix: new BigInt64Array(),
+    transitMatrixDimension: 0, operations: [], dimensionNames: [],
+  } }, { signal: options.signal, onEvent: () => {}, resources: { threads: 1 },
+    showCloudNotice: !(executor instanceof SolverServerExecutor) });
+  if (result.searchParameterError === undefined) throw new Error('Routing executor did not return parameter validation.');
+  return result.searchParameterError;
 }
 
 export type RoutingSolutionEvent = { type: 'solution'; objectiveValue: bigint; solutionCount: bigint; unchecked: boolean };

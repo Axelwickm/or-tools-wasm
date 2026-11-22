@@ -1156,3 +1156,40 @@ generated parameter enums. Local search supports `AUTOMATIC`, `GREEDY_DESCENT`,
 - `ROUTING_INVALID`
 - `ROUTING_INFEASIBLE`
 - `ROUTING_OPTIMAL`
+
+### Cumul-dependent transit limitation
+
+The bundled native `RegisterCumulDependentTransitCallback` and
+`AddDimensionWithCumulDependentVehicleTransitAndCapacity` record evaluators but
+do not apply them to transit variables. They are not exposed through TypeScript.
+The reproduction and [Routing API gap roster](../../development/audits/solver-python-test-parity-audit.md#routing-api-gap-roster-2026-11-17)
+track this upstream limitation. The separate, existing state-dependent transit
+API remains available with its documented restrictions.
+
+### Validate search parameters before solving
+
+`findErrorInRoutingSearchParameters(parameters = {}, options = {}): Promise<string>`
+returns an empty string when valid, otherwise a native validation diagnostic. It
+does not construct a Routing model or run a search. `options` accepts `executor`
+and `signal`, including worker and server executors.
+
+```ts
+import { findErrorInRoutingSearchParameters, BOOL_UNSPECIFIED } from 'routing-wasm';
+
+const error = await findErrorInRoutingSearchParameters(
+  { localSearchOperators: { useCross: BOOL_UNSPECIFIED } },
+  { executor: 'worker' },
+);
+console.log(error); // Diagnostic naming use_cross.
+```
+
+As with `solve()`, parameters are sparse overrides of native defaults. Explicit
+zero values are preserved; `{}` validates the defaults. Input is captured before
+execution. Diagnostics include the bridge's existing CP-SAT worker restrictions
+and its WASM local-search-operator validation. Malformed JavaScript inputs
+(unknown fields or values that cannot be encoded), cancellation, and transport
+failures reject the promise instead of returning a parameter diagnostic.
+
+The bridge proto exposes `RoutingBridgeRequest.validate_search_parameters` and
+optional `RoutingBridgeResponse.search_parameter_error`; model fields are not
+required for validation. An empty but present response string denotes success.

@@ -1,5 +1,6 @@
 import { setControlAvailable } from './example_controls.js';
 import {
+  findErrorInRoutingSearchParameters,
   FirstSolutionStrategy,
   LocalSearchMetaheuristic,
   RoutingIndexManager,
@@ -364,8 +365,7 @@ async function runSimpleRouting() {
         appendStatus(statusEl, `Native node-precedence layers: ${JSON.stringify(precedenceLayers)}.`);
         appendStatus(statusEl, `Unary dimensions: ${unary.map(dimension => dimension.name).join(', ') || 'none'}. Soft/span dimensions: ${costly.map(dimension => dimension.name).join(', ') || 'none'}.`);
       }
-      const result = await routing.solve({
-        ...currentRoutingExecutionOptions(),
+      const searchParameters = {
         firstSolutionStrategy,
         ...(enabled('secondary-model') ? { firstSolutionOptimizationPeriod: 1 } : {}),
         ...(enabled('generic-tabu') ? { localSearchMetaheuristic: LocalSearchMetaheuristic.GENERIC_TABU_SEARCH,
@@ -374,7 +374,10 @@ async function runSimpleRouting() {
           useIteratedLocalSearch: true, timeLimit: { nanos: 100000000 },
           iteratedLocalSearchParameters: { ruinRecreateParameters: { ruinStrategies: [{ spatiallyCloseRoutes: { numRuinedRoutes: 1 } }] } },
         } : { numberOfSolutionsToCollect: 3 }),
-      });
+      };
+      const parameterError = await findErrorInRoutingSearchParameters(searchParameters, currentRoutingExecutionOptions());
+      if (parameterError) throw new Error(parameterError);
+      const result = await routing.solve({ ...currentRoutingExecutionOptions(), ...searchParameters });
       if (enabled('native-inspection') && result.searchStatistics) {
         appendStatus(statusEl, `First-solution decisions: ${result.searchStatistics.numDecisionsInFirstSolution ?? 'unavailable'}; rejects: ${result.searchStatistics.numRejectsInFirstSolution ?? 'unavailable'}.`);
       }

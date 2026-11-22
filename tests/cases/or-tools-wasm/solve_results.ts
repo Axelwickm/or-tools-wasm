@@ -41,6 +41,7 @@ import { flowPriceScalingCases } from './network_flow/price_scaling.ts';
 import { mathOptConeCases } from './mathopt/cones.ts';
 import { routingBreakCases } from './routing/breaks.ts';
 import { routingEnergyActivityCases } from './routing/energy_activity.ts';
+import { routingParameterValidationCases } from './routing/parameter_validation.ts';
 import { routingStateDependentCases } from './routing/state_dependent.ts';
 import { routingReuseCases } from './routing/reuse.ts';
 import { routingPairCases } from './routing/pairs.ts';
@@ -104,6 +105,7 @@ export const solveResultCases: SharedCase<SolveResultApis, Record<string, never>
   ...routingBreakCases,
   ...routingEnergyActivityCases,
   ...routingStateDependentCases,
+  ...routingParameterValidationCases,
   ...routingReuseCases,
   ...routingWorkflowCases,
   ...routingSearchInspectionCases,

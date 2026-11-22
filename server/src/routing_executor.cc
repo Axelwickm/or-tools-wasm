@@ -545,6 +545,7 @@ int RoutingExecutor::RequestedThreads(const SolverExecutorRequest& request,
                                       int server_total_threads) const {
   bridge::RoutingBridgeRequest parsed;
   if (!parsed.ParseFromString(request.payload)) throw std::invalid_argument("Failed to parse Routing bridge request.");
+  if (parsed.validate_search_parameters()) return 1;
   if (server_total_threads < 1) throw std::invalid_argument("Server has no Routing capacity.");
   int solver_threads = 1;
   bool automatic = false;
@@ -651,6 +652,21 @@ SolverExecutorResult RoutingExecutor::Execute(const SolverExecutorRequest& reque
 
   bridge::RoutingBridgeRequest parsed;
   if (!parsed.ParseFromString(request.payload)) return Error("Failed to parse Routing bridge request.");
+  if (parsed.validate_search_parameters()) {
+    if (context.cancellation_requested()) {
+      auto result = Error("Routing validation was cancelled before it started.");
+      result.failure_kind = SolverExecutionFailureKind::kCancelled;
+      return result;
+    }
+    RoutingSearchParameters parameters;
+    std::string error;
+    ortools_wasm::ParseRoutingSearchParameters(parsed.search_parameters_proto(),
+        std::vector<std::string>(parsed.search_parameter_fields().begin(), parsed.search_parameter_fields().end()),
+        &parameters, &error);
+    bridge::RoutingBridgeResponse response;
+    response.set_search_parameter_error(error);
+    return Serialize(response);
+  }
   if (parsed.read_assignment_only() && !parsed.has_initial_assignment()) return Error("Routing assignment validation requires routes.");
   if (parsed.num_locations() <= 0 || parsed.num_vehicles() <= 0 ||
       parsed.starts_size() != parsed.num_vehicles() || parsed.ends_size() != parsed.num_vehicles() ||

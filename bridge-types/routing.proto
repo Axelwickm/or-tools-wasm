@@ -591,6 +591,8 @@ message RoutingSolution {
 }
 
 message RoutingBridgeRequest {
+  // Validate the parameter patch without constructing or solving a model.
+  bool validate_search_parameters = 41;
   int32 num_locations = 1;
   int32 num_vehicles = 2;
   repeated int32 starts = 3;
@@ -669,6 +671,7 @@ message RoutingAssignmentVariable {
 message RoutingRouteCost { optional int64 cost = 1; }
 
 message RoutingBridgeResponse {
+  optional string search_parameter_error = 35;
   bool has_solution = 1;
   int32 status = 2;
   int64 objective_value = 3;

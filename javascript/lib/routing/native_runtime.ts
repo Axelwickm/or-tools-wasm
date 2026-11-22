@@ -716,6 +716,15 @@ async function createRoutingModel(
 export async function solveRoutingWithModule(
   module: OrToolsWasmModule, message: RoutingSolveRequest, interruptible = false, callbackId = 0,
 ): Promise<Omit<RoutingResult, 'type'>> {
+  if (message.validateSearchParameters) {
+    const bytes = allocateWasmBytes(module, message.searchParametersProto, 1);
+    try {
+      const error = await withWasmCString(module, (message.searchParameterFields ?? []).join(','), fields =>
+        module.ccall('routing_find_error_in_search_parameters', 'string', ['number', 'number', 'number'],
+          [bytes, message.searchParametersProto.length, fields], { async: true })) as string;
+      return { status: 0, solution: null, searchParameterError: error };
+    } finally { module._free(bytes); }
+  }
   const models: NativeRoutingModel[] = [];
   try {
     const requests: RoutingSolveRequest[] = [];

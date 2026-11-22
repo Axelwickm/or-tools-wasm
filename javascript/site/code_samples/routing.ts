@@ -3,7 +3,7 @@ import { checked, executor, numberValue, value } from './controls.js';
 export function routingCode(): string {
   const lines = [`import {
   RoutingIndexManager, RoutingModel, FirstSolutionStrategy, LocalSearchMetaheuristic,
-  RoutingPrecedencePerformedConstraint, VisitTypePolicy,
+  RoutingPrecedencePerformedConstraint, VisitTypePolicy, findErrorInRoutingSearchParameters,
 } from 'or-tools-wasm/routing';
 
 const locations = [
@@ -89,7 +89,7 @@ routing.setSecondaryModel(secondary, { localSearchMetaheuristic: LocalSearchMeta
   if (checked('native-inspection')) lines.push(`console.log(await routing.isMatchingModel(execution));
 console.log(await routing.getCostClassesCount(execution));
 console.log(await routing.getUnaryDimensions(execution));`);
-  const options = [`  ...execution,`, `  firstSolutionStrategy: FirstSolutionStrategy.${strategy},`];
+  const options = [`  firstSolutionStrategy: FirstSolutionStrategy.${strategy},`];
   if (checked('secondary-model')) options.push('  firstSolutionOptimizationPeriod: 1,');
   if (checked('generic-tabu')) options.push('  localSearchMetaheuristic: LocalSearchMetaheuristic.GENERIC_TABU_SEARCH,');
   if (checked('generic-tabu') || checked('iterated-local-search')) options.push('  timeLimit: { nanos: 100000000 },');
@@ -98,7 +98,10 @@ console.log(await routing.getUnaryDimensions(execution));`);
     ruinStrategies: [{ spatiallyCloseRoutes: { numRuinedRoutes: 1 } }],
   } },`);
   else options.push('  numberOfSolutionsToCollect: 3,');
-  lines.push(`const result = await routing.solve({\n${options.join('\n')}\n});
+  lines.push(`const searchParameters = {\n${options.join('\n')}\n};
+const parameterError = await findErrorInRoutingSearchParameters(searchParameters, execution);
+if (parameterError) throw new Error(parameterError);
+const result = await routing.solve({ ...execution, ...searchParameters });
 let assignment = result.assignment;
 if (!assignment) throw new Error('No route found.');`);
   if (checked('transfer-route')) lines.push(`const repriced = new RoutingModel(manager);
